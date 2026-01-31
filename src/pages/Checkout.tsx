@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Package, ArrowRight, MapPin, User, Phone, Mail } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
@@ -24,6 +24,13 @@ const Checkout: React.FC = () => {
     building: '',
   });
 
+  // Redirect if cart is empty
+  useEffect(() => {
+    if (items.length === 0) {
+      navigate('/carrinho');
+    }
+  }, [items.length, navigate]);
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({
@@ -34,17 +41,6 @@ const Checkout: React.FC = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Validate required fields
-    if (!formData.name || !formData.email || !formData.phone || 
-        !formData.postalCode || !formData.prefecture || !formData.city || !formData.address) {
-      toast({
-        title: "Campos obrigatórios",
-        description: "Por favor, preencha todos os campos obrigatórios.",
-        variant: "destructive",
-      });
-      return;
-    }
 
     // Simulate order submission
     toast({
@@ -53,17 +49,14 @@ const Checkout: React.FC = () => {
     });
 
     // Clear cart and redirect
-    setTimeout(() => {
+    const timeoutId = setTimeout(() => {
       clearCart();
       navigate('/');
     }, 2000);
-  };
 
-  // Redirect if cart is empty
-  if (items.length === 0) {
-    navigate('/carrinho');
-    return null;
-  }
+    // Cleanup timeout on unmount
+    return () => clearTimeout(timeoutId);
+  };
 
   return (
     <Layout>
