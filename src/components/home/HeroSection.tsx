@@ -69,16 +69,16 @@ const HeroSection: React.FC = () => {
           {/* Video Section */}
           <div className="relative animate-fade-in">
             <div className="relative aspect-[4/3] rounded-3xl overflow-hidden shadow-elevated bg-card">
-              {/* Video Placeholder */}
-              <div className="absolute inset-0 bg-gradient-to-br from-caramel-light/30 to-primary/20 flex items-center justify-center">
-                <div className="text-center">
-                  <button className="group w-24 h-24 rounded-full gradient-caramel shadow-elevated flex items-center justify-center transition-transform hover:scale-110">
-                    <Play className="w-10 h-10 text-primary-foreground ml-1" fill="currentColor" />
-                  </button>
-                  <p className="mt-6 font-display text-lg text-foreground">Assista nosso preparo</p>
-                  <p className="text-sm text-muted-foreground mt-1">Veja como fazemos o doce de leite</p>
-                </div>
-              </div>
+              {/* Video */}
+              <video 
+                className="w-full h-full object-cover"
+                controls
+                poster="/video/preparo-thumbnail.jpg"
+                preload="metadata"
+              >
+                <source src="/video/preparo.mp4" type="video/mp4" />
+                Seu navegador não suporta vídeo HTML5.
+              </video>
 
               {/* Decorative border */}
               <div className="absolute inset-0 border-4 border-primary/20 rounded-3xl pointer-events-none" />

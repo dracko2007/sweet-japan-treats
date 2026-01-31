@@ -147,27 +147,44 @@ const OrderConfirmation: React.FC = () => {
       console.error('Error creating shipping label:', error);
     }
     
-    // 2. Send Email (WITH tracking number and shipping label)
+    // 2. Send Emails - One for customer (without label) and one for store (with label)
     try {
-      const emailHTML = emailService.generateOrderEmailHTML({
+      // Email for CUSTOMER (without shipping label)
+      const customerEmailHTML = emailService.generateCustomerEmailHTML({
         ...data,
         orderNumber
       }, generatedTrackingNumber);
       
-      const emailResult = await emailService.sendOrderConfirmation({
+      const customerEmailResult = await emailService.sendOrderConfirmation({
         to: data.formData.email,
-        subject: `Confirmação de Pedido ${orderNumber} - Doce de Leite`,
-        html: emailHTML,
+        subject: `Confirmação de Pedido ${orderNumber} - Sabor do Campo`,
+        html: customerEmailHTML,
         orderNumber,
         customerName: data.formData.name,
         trackingNumber: generatedTrackingNumber
       });
       
-      setEmailSent(emailResult);
-      console.log('📧 Email sent to:', data.formData.email, emailResult ? '✅' : '⏳');
-      console.log('📧 Email includes: Order details, shipping label with QR code, tracking number');
+      setEmailSent(customerEmailResult);
+      console.log('📧 Email sent to customer:', data.formData.email, customerEmailResult ? '✅' : '⏳');
+      
+      // Email for STORE OWNER (with shipping label)
+      const storeEmailHTML = emailService.generateStoreEmailHTML({
+        ...data,
+        orderNumber
+      }, generatedTrackingNumber);
+      
+      const storeEmailResult = await emailService.sendOrderConfirmation({
+        to: 'dracko2007@gmail.com', // Paula's email
+        subject: `🎉 NOVO PEDIDO ${orderNumber} - Sabor do Campo`,
+        html: storeEmailHTML,
+        orderNumber,
+        customerName: data.formData.name,
+        trackingNumber: generatedTrackingNumber
+      });
+      
+      console.log('📧 Email sent to store:', 'dracko2007@gmail.com', storeEmailResult ? '✅' : '⏳');
     } catch (error) {
-      console.error('Error sending email:', error);
+      console.error('Error sending emails:', error);
     }
     
     // 3. PayPay Integration (if PayPay payment selected)

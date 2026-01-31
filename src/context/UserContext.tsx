@@ -247,7 +247,16 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
 
   const updateProfile = (userData: Partial<UserProfile>) => {
     if (user) {
-      const updatedUser = { ...user, ...userData };
+      // Deep merge para objetos aninhados como address
+      const updatedUser: UserProfile = {
+        ...user,
+        ...userData,
+        // Merge address separadamente para preservar campos não modificados
+        address: userData.address 
+          ? { ...user.address, ...userData.address }
+          : user.address
+      };
+      
       setUser(updatedUser);
       
       // Also update in users database
@@ -257,7 +266,11 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       );
       saveAllUsers(updatedUsers);
       
-      console.log('User profile updated:', { id: updatedUser.id, email: updatedUser.email });
+      console.log('✅ User profile updated:', { 
+        id: updatedUser.id, 
+        email: updatedUser.email,
+        address: updatedUser.address 
+      });
     }
   };
 

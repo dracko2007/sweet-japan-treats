@@ -46,6 +46,9 @@ const Checkout: React.FC = () => {
   // Auto-populate from user profile if authenticated
   useEffect(() => {
     if (isAuthenticated && user && !location.state?.formData) {
+      console.log('🔍 Checkout - Preenchendo dados do usuário:', user);
+      console.log('📍 Endereço do usuário:', user.address);
+      
       setFormData({
         name: user.name || '',
         email: user.email || '',
@@ -56,6 +59,14 @@ const Checkout: React.FC = () => {
         address: user.address?.address || '',
         building: user.address?.building || '',
       });
+      
+      console.log('✅ Checkout - Formulário preenchido com dados do perfil');
+    } else if (!isAuthenticated) {
+      console.log('⚠️ Checkout - Usuário não autenticado');
+    } else if (!user) {
+      console.log('⚠️ Checkout - Dados do usuário não disponíveis');
+    } else if (location.state?.formData) {
+      console.log('🔄 Checkout - Usando dados do location.state (voltando da revisão)');
     }
   }, [isAuthenticated, user, location.state]);
 
