@@ -4,17 +4,17 @@ export const products: Product[] = [
   // Artesanal - 280g: ¥1200, 800g: ¥2000
   {
     id: 'art-cremoso',
-    name: 'Doce de Leite Cremoso',
-    description: 'O clássico doce de leite brasileiro, cremoso e irresistível. Feito com leite fresco e açúcar, cozido lentamente até atingir a textura perfeita.',
+    name: 'Doce de Leite Tradicional',
+    description: 'Doce de leite artesanal, textura cremosa e sabor intenso. Feito apenas com leite e açúcar, sem leite condensado e sem conservantes.',
     category: 'artesanal',
     prices: { small: 1200, large: 2000 },
-    image: '/products/cremoso.jpg',
+    image: '/products/tradicional.jpg',
     flavor: 'Tradicional'
   },
   {
     id: 'art-cafe',
     name: 'Doce de Leite de Café',
-    description: 'Uma combinação perfeita do doce de leite tradicional com o sabor marcante do café brasileiro. Ideal para os amantes de café.',
+    description: 'Doce de leite com café selecionado. Combinação perfeita do doce com o sabor marcante do café.',
     category: 'artesanal',
     prices: { small: 1200, large: 2000 },
     image: '/products/cafe.jpg',
@@ -23,7 +23,7 @@ export const products: Product[] = [
   {
     id: 'art-coco',
     name: 'Doce de Leite de Coco',
-    description: 'A doçura tropical do coco combinada com a cremosidade do doce de leite. Uma experiência única e refrescante.',
+    description: 'Doce de leite com coco selecionado, equilibrado e aromático. Textura cremosa e sabor tropical.',
     category: 'artesanal',
     prices: { small: 1200, large: 2000 },
     image: '/products/coco.jpg',
@@ -32,7 +32,7 @@ export const products: Product[] = [
   {
     id: 'art-amendoim',
     name: 'Doce de Leite de Amendoim',
-    description: 'O sabor irresistível do amendoim torrado misturado ao doce de leite cremoso. Perfeito para paladares exigentes.',
+    description: 'Com amendoim torrado como creme de amendoim e toque de sal. Sabor intenso e irresistível.',
     category: 'artesanal',
     prices: { small: 1200, large: 2000 },
     image: '/products/amendoim.jpg',
@@ -42,7 +42,7 @@ export const products: Product[] = [
   {
     id: 'prem-amendoas',
     name: 'Doce de Leite de Amêndoas',
-    description: 'Uma versão sofisticada com amêndoas selecionadas. O toque crocante das amêndoas eleva esta experiência a outro nível.',
+    description: 'Doce de leite artesanal com amêndoas torradas. Versão premium sofisticada e crocante.',
     category: 'premium',
     prices: { small: 1400, large: 2400 },
     image: '/products/amendoas.jpg',
@@ -50,8 +50,8 @@ export const products: Product[] = [
   },
   {
     id: 'prem-matcha',
-    name: 'Doce de Leite de Matcha',
-    description: 'A fusão perfeita entre o Brasil e o Japão. Matcha de alta qualidade de Uji combinado com nosso doce de leite artesanal.',
+    name: 'Doce de Leite de Matcha Japonês',
+    description: 'Finalizado com matcha culinário, trazendo o aroma delicado e o doce e o amargo do chá-verde. Fusão Brasil-Japão.',
     category: 'premium',
     prices: { small: 1400, large: 2400 },
     image: '/products/matcha.jpg',
@@ -59,8 +59,8 @@ export const products: Product[] = [
   },
   {
     id: 'prem-chocolate',
-    name: 'Doce de Leite de Chocolate',
-    description: 'Chocolate belga premium encontra o doce de leite brasileiro. Uma indulgência irresistível para os chocólatras.',
+    name: 'Doce de Leite de Chocolate Meio Amargo',
+    description: 'Com chocolate selecionado, equilibrando com notas intensas de cacau. Premium e irresistível.',
     category: 'premium',
     prices: { small: 1400, large: 2400 },
     image: '/products/chocolate.jpg',

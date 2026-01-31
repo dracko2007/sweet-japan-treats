@@ -61,7 +61,7 @@ const HeroSection: React.FC = () => {
               <div className="w-px h-12 bg-border" />
               <div>
                 <p className="font-display text-3xl font-bold text-foreground">47</p>
-                <p className="text-sm text-muted-foreground">Prefeituras</p>
+                <p className="text-sm text-muted-foreground">Províncias</p>
               </div>
             </div>
           </div>

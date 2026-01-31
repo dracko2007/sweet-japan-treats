@@ -82,18 +82,18 @@ const ShippingCalculator: React.FC = () => {
         </div>
       </div>
 
-      {/* Prefecture Selection */}
+      {/* Province Selection */}
       <div className="mb-6">
         <label className="block text-sm font-medium text-foreground mb-2">
           <MapPin className="w-4 h-4 inline mr-1" />
-          Selecione sua prefeitura (都道府県)
+          Selecione sua província (都道府県)
         </label>
         <select
           value={selectedPrefecture}
           onChange={(e) => setSelectedPrefecture(e.target.value)}
           className="w-full p-3 rounded-lg border border-border bg-background text-foreground focus:ring-2 focus:ring-primary focus:border-primary transition-all"
         >
-          <option value="">Escolha uma prefeitura...</option>
+          <option value="">Escolha uma província...</option>
           {prefectures.map((pref) => (
             <option key={pref.name} value={pref.name}>
               {pref.nameJa} ({pref.name})

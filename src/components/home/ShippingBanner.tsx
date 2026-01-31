@@ -45,7 +45,7 @@ const ShippingBanner: React.FC = () => {
             Enviamos para todo o Japão
           </h2>
           <p className="text-primary-foreground/80 max-w-2xl mx-auto text-lg">
-            Saindo de Mie Prefecture, calculamos o frete automaticamente 
+            Saindo de Mie, calculamos o frete automaticamente 
             para sua localização com as melhores transportadoras do país.
           </p>
         </div>

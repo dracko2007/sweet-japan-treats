@@ -32,11 +32,13 @@ const Header: React.FC = () => {
         <div className="flex items-center justify-between h-20">
           {/* Logo */}
           <Link to="/" className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-full gradient-caramel flex items-center justify-center shadow-soft">
-              <span className="text-primary-foreground font-display font-bold text-xl">DL</span>
-            </div>
+            <img 
+              src="/logo/sabor-do-campo.png" 
+              alt="Sabor do Campo" 
+              className="h-16 w-auto object-contain"
+            />
             <span className="font-display text-xl font-semibold text-foreground hidden sm:block">
-              Doce de Leite
+              Sabor do Campo
             </span>
           </Link>
 
