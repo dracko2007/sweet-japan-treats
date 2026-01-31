@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 import { ShoppingBag, ArrowRight, Trash2 } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import CartItemComponent from '@/components/cart/CartItem';
-import ShippingCalculator from '@/components/shipping/ShippingCalculator';
 import { Button } from '@/components/ui/button';
 import { useCart } from '@/context/CartContext';
 
@@ -31,9 +30,9 @@ const Cart: React.FC = () => {
       <section className="py-12 bg-background">
         <div className="container mx-auto px-4">
           {items.length > 0 ? (
-            <div className="grid lg:grid-cols-3 gap-8">
+            <div className="max-w-4xl mx-auto">
               {/* Cart Items */}
-              <div className="lg:col-span-2 space-y-4">
+              <div className="space-y-4">
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="font-display text-xl font-semibold text-foreground">
                     Seus Produtos
@@ -55,37 +54,36 @@ const Cart: React.FC = () => {
                     item={item} 
                   />
                 ))}
-
-                {/* Order Summary (Mobile) */}
-                <div className="lg:hidden bg-card rounded-2xl border border-border p-6 mt-6">
-                  <h3 className="font-display text-lg font-semibold mb-4">Resumo do Pedido</h3>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Subtotal</span>
-                      <span className="font-medium">¥{totalPrice.toLocaleString()}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Frete</span>
-                      <span className="text-muted-foreground">Calcule abaixo</span>
-                    </div>
-                  </div>
-                </div>
               </div>
 
-              {/* Shipping Calculator */}
-              <div className="lg:col-span-1">
-                <div className="sticky top-24">
-                  <ShippingCalculator />
-                  
-                  <Button className="w-full mt-6 btn-primary rounded-xl py-6 text-lg font-semibold">
+              {/* Order Summary */}
+              <div className="bg-card rounded-2xl border border-border p-6 mt-6">
+                <h3 className="font-display text-lg font-semibold mb-4">Resumo do Pedido</h3>
+                <div className="space-y-3">
+                  <div className="flex justify-between text-base">
+                    <span className="text-muted-foreground">Subtotal</span>
+                    <span className="font-semibold">¥{totalPrice.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between text-base">
+                    <span className="text-muted-foreground">Frete</span>
+                    <span className="text-muted-foreground text-sm">Calcular no checkout</span>
+                  </div>
+                  <div className="flex justify-between pt-3 border-t border-border">
+                    <span className="font-bold text-xl">Total</span>
+                    <span className="font-bold text-2xl text-primary">¥{totalPrice.toLocaleString()}+</span>
+                  </div>
+                </div>
+
+                <Button asChild className="w-full mt-6 btn-primary rounded-xl py-6 text-lg font-semibold">
+                  <Link to="/checkout">
                     Finalizar Compra
                     <ArrowRight className="w-5 h-5 ml-2" />
-                  </Button>
-                  
-                  <p className="text-center text-sm text-muted-foreground mt-4">
-                    Pagamento seguro via PIX, cartão ou transferência
-                  </p>
-                </div>
+                  </Link>
+                </Button>
+                
+                <p className="text-center text-sm text-muted-foreground mt-4">
+                  Frete será calculado no próximo passo
+                </p>
               </div>
             </div>
           ) : (
