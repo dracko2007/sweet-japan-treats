@@ -7,9 +7,12 @@ import { useCart } from '@/context/CartContext';
 import { useUser } from '@/context/UserContext';
 import { useToast } from '@/hooks/use-toast';
 import { emailService } from '@/services/emailService';
+import { whatsappService } from '@/services/whatsappService';
 import { paypayService } from '@/services/paypayService';
 import { carrierService } from '@/services/carrierService';
 import type { OrderData, CartItem } from '@/types/order';
+
+const TWILIO_CONFIGURED = !!(import.meta.env.VITE_TWILIO_ACCOUNT_SID && import.meta.env.VITE_TWILIO_AUTH_TOKEN);
 
 const OrderConfirmation: React.FC = () => {
   const { clearCart } = useCart();
@@ -187,8 +190,8 @@ const OrderConfirmation: React.FC = () => {
       }
     }
     
-    // 4. WhatsApp Message (to store owner Paula)
-    const whatsappMessage = `
+    // 4. WhatsApp Messages (automatic via Twilio API or fallback to WhatsApp Web)
+    const whatsappMessageToStore = `
 🎉 *NOVO PEDIDO - Doce de Leite*
 
 📋 *Pedido:* ${orderNumber}
@@ -223,19 +226,8 @@ Previsão: ${shipping.estimatedDays} dias úteis
 💳 *Pagamento:*
 ${data.paymentMethod === 'bank' ? 'Depósito Bancário' : 'PayPay'}
     `.trim();
-    
-    // Open WhatsApp Web with pre-filled message
-    const whatsappNumber = '070-1367-1679'.replace(/[^0-9]/g, ''); // Remove formatting
-    const whatsappUrl = `https://wa.me/81${whatsappNumber}?text=${encodeURIComponent(whatsappMessage)}`;
-    
-    console.log('📱 Opening WhatsApp Web to send message to Paula');
-    console.log('📱 Phone: 070-1367-1679');
-    
-    // Open WhatsApp in new tab
-    window.open(whatsappUrl, '_blank');
-    
-    // Also send WhatsApp to customer
-    const customerMessage = `
+
+    const whatsappMessageToCustomer = `
 🎉 *Pedido Confirmado!*
 
 Olá ${data.formData.name}!
@@ -261,16 +253,25 @@ Obrigada pela preferência! 🍮
 _Sabor do Campo - Doce de Leite Artesanal_
     `.trim();
     
-    const customerPhone = data.formData.phone.replace(/[^0-9]/g, '');
-    const customerWhatsappUrl = `https://wa.me/81${customerPhone}?text=${encodeURIComponent(customerMessage)}`;
-    
-    console.log('📱 Opening WhatsApp to notify customer');
-    console.log('📱 Customer Phone:', data.formData.phone);
-    
-    // Open customer WhatsApp in another tab after 2 seconds
-    setTimeout(() => {
-      window.open(customerWhatsappUrl, '_blank');
-    }, 2000);
+    // Send WhatsApp messages (automatically if configured, or opens WhatsApp Web)
+    try {
+      // Send to store owner (Paula)
+      await whatsappService.sendMessage({
+        to: '+81070-1367-1679',
+        message: whatsappMessageToStore
+      });
+      
+      // Send to customer
+      const customerPhone = data.formData.phone.replace(/[^0-9]/g, '');
+      await whatsappService.sendMessage({
+        to: `+81${customerPhone}`,
+        message: whatsappMessageToCustomer
+      });
+      
+      console.log('✅ WhatsApp messages sent/opened');
+    } catch (error) {
+      console.error('Error with WhatsApp service:', error);
+    }
   };
 
   if (!orderData || isLoading) {
@@ -337,7 +338,9 @@ _Sabor do Campo - Doce de Leite Artesanal_
                     <p className="font-medium">Notificação WhatsApp</p>
                     <p className="text-muted-foreground">070-1367-1679</p>
                     <p className="text-xs text-orange-600 mt-1">
-                      💡 Duas janelas do WhatsApp Web serão abertas automaticamente. Clique em "Enviar" em cada uma!
+                      💡 {TWILIO_CONFIGURED 
+                        ? 'Mensagens enviadas automaticamente!' 
+                        : 'Duas janelas do WhatsApp Web serão abertas. Clique em "Enviar" em cada uma!'}
                     </p>
                   </div>
                 </div>
