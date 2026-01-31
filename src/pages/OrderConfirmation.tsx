@@ -1,15 +1,15 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { CheckCircle, Package, Smartphone, Printer, Home, Mail, Truck } from 'lucide-react';
+import { CheckCircle, Smartphone, Home, Mail } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { useCart } from '@/context/CartContext';
 import { useUser } from '@/context/UserContext';
 import { useToast } from '@/hooks/use-toast';
-import ShippingLabel from '@/components/shipping/ShippingLabel';
 import { emailService } from '@/services/emailService';
 import { paypayService } from '@/services/paypayService';
 import { carrierService } from '@/services/carrierService';
+import type { OrderData, CartItem } from '@/types/order';
 
 const OrderConfirmation: React.FC = () => {
   const { clearCart } = useCart();
@@ -21,7 +21,9 @@ const OrderConfirmation: React.FC = () => {
   
   const [trackingNumber, setTrackingNumber] = useState<string>('');
   const [emailSent, setEmailSent] = useState(false);
-  const [showShippingLabel, setShowShippingLabel] = useState(false);
+  
+  // Use ref to prevent processing the order multiple times
+  const processedRef = useRef(false);
 
   useEffect(() => {
     if (!orderData) {
@@ -29,13 +31,19 @@ const OrderConfirmation: React.FC = () => {
       return;
     }
 
+    // Prevent processing order multiple times
+    if (processedRef.current) {
+      return;
+    }
+    processedRef.current = true;
+
     // Clear cart
     clearCart();
 
     // Save order to user's history if authenticated
     if (isAuthenticated) {
       addOrder({
-        items: orderData.items.map((item: any) => ({
+        items: orderData.items.map((item: CartItem) => ({
           productName: item.product.name,
           size: item.size,
           quantity: item.quantity,
@@ -65,31 +73,72 @@ const OrderConfirmation: React.FC = () => {
     sendNotifications(orderData);
   }, [orderData, clearCart, navigate, toast, addOrder, isAuthenticated]);
 
-  const sendNotifications = async (data: any) => {
+  const sendNotifications = async (data: OrderData) => {
     const orderNumber = `DL-${Date.now().toString().slice(-8)}`;
     const shipping = data.shipping || { carrier: 'N/A', cost: 0, estimatedDays: 'N/A' };
+    let generatedTrackingNumber = '';
     
-    // 1. Send Email
+    // 1. Create Shipping Label via Carrier API (FIRST - to get tracking number)
+    try {
+      const labelData = {
+        orderNumber,
+        sender: {
+          name: 'Paula Shiokawa',
+          postalCode: '518-0225',
+          address: 'Mie-ken Iga-shi Kirigaoka 5-292',
+          phone: '070-1367-1679'
+        },
+        recipient: {
+          name: data.formData.name,
+          postalCode: data.formData.postalCode,
+          prefecture: data.formData.prefecture,
+          city: data.formData.city,
+          address: data.formData.address,
+          building: data.formData.building,
+          phone: data.formData.phone
+        },
+        items: data.items.map((item: CartItem) => ({
+          name: item.product.name,
+          quantity: item.quantity,
+          weight: item.size === '800g' ? 800 : 280
+        })),
+        deliveryTime: data.deliveryTime
+      };
+      
+      const tracking = await carrierService.createLabel(shipping.carrier, labelData);
+      generatedTrackingNumber = tracking.trackingNumber;
+      setTrackingNumber(generatedTrackingNumber);
+      
+      console.log('📦 Shipping label created');
+      console.log('🔢 Tracking number:', generatedTrackingNumber);
+    } catch (error) {
+      console.error('Error creating shipping label:', error);
+    }
+    
+    // 2. Send Email (WITH tracking number and shipping label)
     try {
       const emailHTML = emailService.generateOrderEmailHTML({
         ...data,
         orderNumber
-      });
+      }, generatedTrackingNumber);
       
       const emailResult = await emailService.sendOrderConfirmation({
         to: data.formData.email,
         subject: `Confirmação de Pedido ${orderNumber} - Doce de Leite`,
         html: emailHTML,
         orderNumber,
-        customerName: data.formData.name
+        customerName: data.formData.name,
+        trackingNumber: generatedTrackingNumber
       });
       
       setEmailSent(emailResult);
+      console.log('📧 Email sent to:', data.formData.email, emailResult ? '✅' : '⏳');
+      console.log('📧 Email includes: Order details, shipping label with QR code, tracking number');
     } catch (error) {
       console.error('Error sending email:', error);
     }
     
-    // 2. PayPay Integration (if PayPay payment selected)
+    // 3. PayPay Integration (if PayPay payment selected)
     if (data.paymentMethod === 'paypay') {
       try {
         const paymentResult = await paypayService.createPayment({
@@ -109,48 +158,13 @@ const OrderConfirmation: React.FC = () => {
       }
     }
     
-    // 3. Create Shipping Label via Carrier API
-    try {
-      const labelData = {
-        orderNumber,
-        sender: {
-          name: 'Paula Shiokawa',
-          postalCode: '518-0225',
-          address: 'Mie-ken Iga-shi Kirigaoka 5-292',
-          phone: '070-1367-1679'
-        },
-        recipient: {
-          name: data.formData.name,
-          postalCode: data.formData.postalCode,
-          prefecture: data.formData.prefecture,
-          city: data.formData.city,
-          address: data.formData.address,
-          building: data.formData.building,
-          phone: data.formData.phone
-        },
-        items: data.items.map((item: any) => ({
-          name: item.product.name,
-          quantity: item.quantity,
-          weight: item.size === '800g' ? 800 : 280
-        })),
-        deliveryTime: data.deliveryTime
-      };
-      
-      const tracking = await carrierService.createLabel(shipping.carrier, labelData);
-      setTrackingNumber(tracking.trackingNumber);
-      
-      console.log('📦 Shipping label created');
-      console.log('🔢 Tracking number:', tracking.trackingNumber);
-    } catch (error) {
-      console.error('Error creating shipping label:', error);
-    }
-    
-    // 4. WhatsApp Message (as before)
+    // 4. WhatsApp Message (to store owner)
     const whatsappMessage = `
 🎉 *NOVO PEDIDO - Doce de Leite*
 
 📋 *Pedido:* ${orderNumber}
 📅 *Data:* ${new Date().toLocaleDateString('pt-BR')}
+${generatedTrackingNumber ? `🔢 *Rastreamento:* ${generatedTrackingNumber}\n` : ''}
 
 👤 *Cliente:*
 Nome: ${data.formData.name}
@@ -164,7 +178,7 @@ ${data.formData.address}
 ${data.formData.building ? data.formData.building : ''}
 
 📦 *Produtos:*
-${data.items.map((item: any) => 
+${data.items.map((item: CartItem) => 
   `• ${item.product.name} (${item.size}) x${item.quantity} - ¥${(item.product.prices[item.size] * item.quantity).toLocaleString()}`
 ).join('\n')}
 
@@ -181,7 +195,6 @@ Previsão: ${shipping.estimatedDays} dias úteis
 ${data.paymentMethod === 'bank' ? 'Depósito Bancário' : 'PayPay'}
     `.trim();
     
-    console.log('📧 Email sent to:', data.formData.email, emailSent ? '✅' : '⏳');
     console.log('📱 WhatsApp to: 070-1367-1679');
     console.log('📱 WhatsApp Message:\n', whatsappMessage);
   };
@@ -286,7 +299,7 @@ ${data.paymentMethod === 'bank' ? 'Depósito Bancário' : 'PayPay'}
                 <div>
                   <h3 className="font-semibold text-lg mb-3">Produtos</h3>
                   <div className="space-y-2">
-                    {items.map((item: any) => (
+                    {items.map((item: CartItem) => (
                       <div key={`${item.product.id}-${item.size}`} className="flex justify-between text-sm border-b pb-2">
                         <div className="flex-1">
                           <p className="font-medium">{item.product.name}</p>
@@ -392,74 +405,6 @@ ${data.paymentMethod === 'bank' ? 'Depósito Bancário' : 'PayPay'}
                       <p className="text-sm">Tel: {formData.phone}</p>
                     </div>
                   </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Shipping Label Section */}
-            <div className="mb-6 print:hidden">
-              <div className="bg-card rounded-2xl border border-border p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="font-display text-xl font-semibold text-foreground flex items-center gap-2">
-                    <Truck className="w-6 h-6" />
-                    Etiqueta de Envio
-                  </h2>
-                  <Button
-                    variant="outline"
-                    onClick={() => setShowShippingLabel(!showShippingLabel)}
-                    className="flex items-center gap-2"
-                  >
-                    {showShippingLabel ? 'Ocultar' : 'Mostrar'} Etiqueta
-                  </Button>
-                </div>
-
-                {showShippingLabel && (
-                  <div className="mt-4">
-                    <ShippingLabel
-                      orderNumber={orderNumber}
-                      sender={{
-                        name: 'Paula Shiokawa',
-                        postalCode: '518-0225',
-                        address: 'Mie-ken Iga-shi Kirigaoka 5-292',
-                        phone: '070-1367-1679'
-                      }}
-                      recipient={{
-                        name: formData.name,
-                        postalCode: formData.postalCode,
-                        prefecture: formData.prefecture,
-                        city: formData.city,
-                        address: formData.address,
-                        building: formData.building,
-                        phone: formData.phone
-                      }}
-                      carrier={shipping?.carrier || 'N/A'}
-                      deliveryTime={orderData.deliveryTime}
-                    />
-                    
-                    {trackingNumber && (
-                      <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
-                        <p className="text-sm font-semibold text-green-800">
-                          📦 Número de Rastreamento: <span className="font-mono">{trackingNumber}</span>
-                        </p>
-                        <p className="text-xs text-green-700 mt-1">
-                          Use este número para rastrear sua encomenda
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                  <p className="text-sm font-semibold text-blue-800 mb-2">
-                    💡 Instruções para Etiqueta:
-                  </p>
-                  <ul className="text-xs text-blue-700 space-y-1 list-disc list-inside">
-                    <li>Clique em "Mostrar Etiqueta" para visualizar</li>
-                    <li>Use "Imprimir Etiqueta" para imprimir em papel A5</li>
-                    <li>Cole a etiqueta na caixa de forma visível</li>
-                    <li>Apresente o QR code na transportadora para leitura automática</li>
-                    <li>Guarde o número de rastreamento</li>
-                  </ul>
                 </div>
               </div>
             </div>

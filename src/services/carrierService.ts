@@ -1,50 +1,23 @@
-/**
- * Carrier API Service
- * 
- * This module handles integration with Japanese shipping carriers.
- * Supports: Japan Post (ゆうパック), Yamato (クロネコヤマト), Sagawa (佐川急便)
- * 
- * IMPLEMENTATION NOTES:
- * - This is a frontend mock for demonstration
- * - Real carrier integration requires backend server with API credentials
- * - Each carrier has different API specifications
- * 
- * APIs:
- * - Japan Post: https://www.post.japanpost.jp/service/webservice/
- * - Yamato: Contact Yamato for B2B API access
- * - Sagawa: Contact Sagawa for business account API
- */
-
-interface ShippingLabelData {
-  orderNumber: string;
-  sender: {
-    name: string;
-    postalCode: string;
-    address: string;
-    phone: string;
-  };
-  recipient: {
-    name: string;
-    postalCode: string;
-    prefecture: string;
-    city: string;
-    address: string;
-    building?: string;
-    phone: string;
-  };
-  items: Array<{
-    name: string;
-    quantity: number;
-    weight?: number;
-  }>;
-  deliveryTime?: string;
-}
+import type { ShippingLabelData } from '@/types/order';
 
 interface TrackingInfo {
   trackingNumber: string;
   carrier: string;
   status: string;
   estimatedDelivery?: string;
+}
+
+interface TrackingEvent {
+  date: string;
+  status: string;
+  location: string;
+}
+
+interface TrackingDetails {
+  trackingNumber: string;
+  carrier: string;
+  status: string;
+  events: TrackingEvent[];
 }
 
 export const carrierService = {
@@ -130,7 +103,7 @@ export const carrierService = {
   /**
    * Get tracking information
    */
-  getTracking: async (trackingNumber: string, carrier: string): Promise<any> => {
+  getTracking: async (trackingNumber: string, carrier: string): Promise<TrackingDetails> => {
     console.log(`🔍 Tracking - ${carrier}: ${trackingNumber}`);
     
     // Mock API call
