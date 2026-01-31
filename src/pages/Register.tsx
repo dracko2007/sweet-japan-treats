@@ -75,8 +75,8 @@ const Register: React.FC = () => {
       }, 1500);
     } else {
       toast({
-        title: "Erro",
-        description: "Não foi possível realizar o cadastro.",
+        title: "Erro no cadastro",
+        description: "Este email já está cadastrado. Tente fazer login ou use outro email.",
         variant: "destructive",
       });
     }
