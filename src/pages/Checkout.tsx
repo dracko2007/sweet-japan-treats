@@ -100,8 +100,8 @@ const Checkout: React.FC = () => {
             : result.address1;
           
           // Adiciona hints de leitura para cidade e bairro separadamente
-          const city = await addAddressHints(result.address2);
-          const neighborhood = result.address3 ? await addAddressHints(result.address3) : '';
+          const city = addAddressHints(result.address2);
+          const neighborhood = result.address3 ? addAddressHints(result.address3) : '';
           const cityDisplay = neighborhood ? `${city} ${neighborhood}` : city;
           
           setFormData(prev => ({

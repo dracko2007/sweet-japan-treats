@@ -1,40 +1,13 @@
 /**
- * Converte texto japonês para romaji usando a API kuroshiro
- * Para uso offline, mantém o texto original se a API falhar
+ * Converte texto japonês para romaji
+ * Usa mapeamento manual de cidades e bairros comuns
  */
 
-import Kuroshiro from 'kuroshiro';
-import KuromojiAnalyzer from 'kuroshiro-analyzer-kuromoji';
-
-let kuroshiroInstance: Kuroshiro | null = null;
-let kuroshiroInitialized = false;
-
-// Inicializa o Kuroshiro uma vez
-async function initKuroshiro() {
-  if (kuroshiroInitialized) return kuroshiroInstance;
-  
-  try {
-    const kuroshiro = new Kuroshiro();
-    await kuroshiro.init(new KuromojiAnalyzer());
-    kuroshiroInstance = kuroshiro;
-    kuroshiroInitialized = true;
-    console.log('✅ Kuroshiro initialized');
-    return kuroshiro;
-  } catch (error) {
-    console.warn('⚠️ Failed to initialize Kuroshiro:', error);
-    kuroshiroInitialized = true; // Mark as initialized to avoid retrying
-    return null;
-  }
-}
-
-// Inicializa automaticamente quando o módulo é importado
-initKuroshiro();
-
-// Mapeamento básico de kanji comuns para romaji (fallback)
+// Mapeamento básico de kanji comuns para romaji
 const basicKanjiMap: Record<string, string> = {
   '市': 'shi',
   '区': 'ku',
-  '町': 'cho/machi',
+  '町': 'cho',
   '村': 'mura',
   '県': 'ken',
   '都': 'to',
@@ -43,10 +16,9 @@ const basicKanjiMap: Record<string, string> = {
 };
 
 /**
- * Tenta romanizar texto japonês
- * Retorna no formato: "日本 (Nihon)" ou apenas "日本" se falhar
+ * Tenta romanizar texto japonês usando mapeamento manual
  */
-export const romanizeJapanese = async (text: string): Promise<string> => {
+export const romanizeJapanese = (text: string): string => {
   if (!text) return '';
   
   // Se já contém parênteses com romaji, retorna como está
@@ -54,47 +26,18 @@ export const romanizeJapanese = async (text: string): Promise<string> => {
     return text;
   }
   
-  try {
-    const kuroshiro = await initKuroshiro();
-    if (!kuroshiro) {
-      return text; // Fallback to original text
-    }
-    
-    // Converte para romaji com capitalize
-    const romaji = await kuroshiro.convert(text, {
-      to: 'romaji',
-      mode: 'spaced',
-      romajiSystem: 'hepburn'
-    });
-    
-    // Capitaliza primeira letra de cada palavra
-    const capitalizedRomaji = romaji
-      .split(' ')
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(' ');
-    
-    return `${text} (${capitalizedRomaji})`;
-  } catch (error) {
-    console.warn('Failed to romanize:', text, error);
-    return text; // Fallback to original text
-  }
+  // Usa o mapeamento manual
+  return addAddressHintsSync(text);
 };
 
 /**
  * Adiciona dicas de leitura para partes comuns de endereço
- * Agora usa romanização automática para qualquer texto
  */
-export const addAddressHints = async (text: string): Promise<string> => {
+export const addAddressHints = (text: string): string => {
   if (!text) return '';
   
-  try {
-    // Tenta romanização automática completa primeiro
-    return await romanizeJapanese(text);
-  } catch (error) {
-    console.warn('Fallback to manual mapping for:', text);
-    // Se falhar, usa mapeamento manual
-    return addAddressHintsSync(text);
-  }
+  // Usa mapeamento manual
+  return addAddressHintsSync(text);
 };
 
 /**
@@ -132,13 +75,13 @@ export const addAddressHintsSync = (text: string): string => {
     '郡': 'gun',
   };
 
-  let result = text;async (city: string, town: string = ''): Promise<string> => {
-  if (!city && !town) return '';
+  let result = text;
   
-  const fullAddress = town ? `${city} ${town}` : city;
+  // First try exact matches (longer strings first)
+  const sortedEntries = Object.entries(nameMap).sort((a, b) => b[0].length - a[0].length);
   
-  // Adiciona hints para termos comuns
-  return awaitresult.includes(japanese) && !result.includes(`(${romaji})`)) {
+  for (const [japanese, romaji] of sortedEntries) {
+    if (result.includes(japanese) && !result.includes(`(${romaji})`)) {
       result = result.replace(japanese, `${japanese} (${romaji})`);
     }
   }
