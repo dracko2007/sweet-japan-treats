@@ -4,10 +4,12 @@ import { CheckCircle, Package, Smartphone, Printer, Home, Mail } from 'lucide-re
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { useCart } from '@/context/CartContext';
+import { useUser } from '@/context/UserContext';
 import { useToast } from '@/hooks/use-toast';
 
 const OrderConfirmation: React.FC = () => {
   const { clearCart } = useCart();
+  const { addOrder, isAuthenticated } = useUser();
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
@@ -22,6 +24,29 @@ const OrderConfirmation: React.FC = () => {
     // Clear cart
     clearCart();
 
+    // Save order to user's history if authenticated
+    if (isAuthenticated) {
+      addOrder({
+        items: orderData.items.map((item: any) => ({
+          productName: item.product.name,
+          size: item.size,
+          quantity: item.quantity,
+          price: item.product.prices[item.size],
+        })),
+        totalAmount: orderData.totalPrice,
+        paymentMethod: orderData.paymentMethod,
+        status: 'pending',
+        shippingAddress: {
+          name: orderData.formData.name,
+          postalCode: orderData.formData.postalCode,
+          prefecture: orderData.formData.prefecture,
+          city: orderData.formData.city,
+          address: orderData.formData.address,
+          building: orderData.formData.building,
+        }
+      });
+    }
+
     // Show success notification
     toast({
       title: "🎉 Pedido Confirmado!",
@@ -31,7 +56,7 @@ const OrderConfirmation: React.FC = () => {
     // Simulate sending notifications
     // In a real app, this would call a backend API
     sendNotifications(orderData);
-  }, [orderData, clearCart, navigate, toast]);
+  }, [orderData, clearCart, navigate, toast, addOrder, isAuthenticated]);
 
   const sendNotifications = async (data: any) => {
     // This is a placeholder for backend integration

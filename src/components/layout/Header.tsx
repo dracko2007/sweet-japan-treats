@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { ShoppingCart, Menu, X, ChevronDown, UserCircle } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
+import { useUser } from '@/context/UserContext';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 
@@ -9,6 +10,7 @@ const Header: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isProductsOpen, setIsProductsOpen] = useState(false);
   const { totalItems } = useCart();
+  const { isAuthenticated, user } = useUser();
   const location = useLocation();
 
   const navItems = [
@@ -110,9 +112,9 @@ const Header: React.FC = () => {
               size="sm"
               className="hidden lg:flex items-center gap-2"
             >
-              <Link to="/cadastro">
+              <Link to={isAuthenticated ? "/perfil" : "/cadastro"}>
                 <UserCircle className="w-5 h-5" />
-                <span>Cadastro</span>
+                <span>{isAuthenticated ? (user?.name?.split(' ')[0] || 'Perfil') : 'Cadastro'}</span>
               </Link>
             </Button>
 
@@ -173,9 +175,9 @@ const Header: React.FC = () => {
               variant="ghost" 
               className="w-full justify-start mt-2 text-base font-medium"
             >
-              <Link to="/cadastro" onClick={() => setIsMenuOpen(false)}>
+              <Link to={isAuthenticated ? "/perfil" : "/cadastro"} onClick={() => setIsMenuOpen(false)}>
                 <UserCircle className="w-5 h-5 mr-2" />
-                Cadastro
+                {isAuthenticated ? (user?.name?.split(' ')[0] || 'Perfil') : 'Cadastro'}
               </Link>
             </Button>
           </nav>

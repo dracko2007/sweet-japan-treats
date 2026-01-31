@@ -6,10 +6,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
+import { useUser } from '@/context/UserContext';
 
 const Register: React.FC = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { register: registerUser, isAuthenticated } = useUser();
   
   const [formData, setFormData] = useState({
     name: '',
@@ -19,6 +21,13 @@ const Register: React.FC = () => {
     confirmPassword: '',
   });
 
+  // Redirect if already authenticated
+  React.useEffect(() => {
+    if (isAuthenticated) {
+      navigate('/perfil');
+    }
+  }, [isAuthenticated, navigate]);
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({
@@ -27,7 +36,7 @@ const Register: React.FC = () => {
     }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     // Validate passwords match
@@ -40,16 +49,36 @@ const Register: React.FC = () => {
       return;
     }
 
-    // Simulate registration
-    toast({
-      title: "Cadastro realizado!",
-      description: "Bem-vindo(a) ao Doce de Leite!",
+    // Register user
+    const success = await registerUser({
+      name: formData.name,
+      email: formData.email,
+      phone: formData.phone,
+      address: {
+        postalCode: '',
+        prefecture: '',
+        city: '',
+        address: '',
+      }
     });
 
-    // Redirect to home or login
-    setTimeout(() => {
-      navigate('/');
-    }, 1500);
+    if (success) {
+      toast({
+        title: "Cadastro realizado!",
+        description: "Bem-vindo(a) ao Doce de Leite! Você ganhou um cupom de boas-vindas!",
+      });
+
+      // Redirect to profile
+      setTimeout(() => {
+        navigate('/perfil');
+      }, 1500);
+    } else {
+      toast({
+        title: "Erro",
+        description: "Não foi possível realizar o cadastro.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
