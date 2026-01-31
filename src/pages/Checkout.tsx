@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Package, ArrowRight, MapPin, User, Phone, Mail } from 'lucide-react';
+import { Package, ArrowRight, MapPin, User, Phone, Mail, Clock } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { useCart } from '@/context/CartContext';
 import { useUser } from '@/context/UserContext';
 import ShippingCalculator from '@/components/shipping/ShippingCalculator';
+import { prefectures } from '@/data/prefectures';
 
 const Checkout: React.FC = () => {
   const { items, totalPrice } = useCart();
@@ -31,6 +32,8 @@ const Checkout: React.FC = () => {
     cost: number;
     estimatedDays: string;
   } | null>(null);
+
+  const [deliveryTime, setDeliveryTime] = useState<string>('');
 
   // Load form data from state if returning from review page
   useEffect(() => {
@@ -62,7 +65,7 @@ const Checkout: React.FC = () => {
     }
   }, [items.length, navigate]);
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
@@ -82,7 +85,8 @@ const Checkout: React.FC = () => {
     navigate('/order-review', { 
       state: { 
         formData,
-        shipping: selectedShipping
+        shipping: selectedShipping,
+        deliveryTime
       } 
     });
   };
@@ -201,15 +205,21 @@ const Checkout: React.FC = () => {
                         <Label htmlFor="prefecture">
                           Prefeitura (都道府県) *
                         </Label>
-                        <Input
+                        <select
                           id="prefecture"
                           name="prefecture"
-                          type="text"
-                          placeholder="三重県"
                           value={formData.prefecture}
                           onChange={handleInputChange}
                           required
-                        />
+                          className="w-full p-3 rounded-lg border border-border bg-background text-foreground focus:ring-2 focus:ring-primary focus:border-primary transition-all"
+                        >
+                          <option value="">Escolha uma prefeitura...</option>
+                          {prefectures.map((pref) => (
+                            <option key={pref.name} value={pref.name}>
+                              {pref.nameJa} ({pref.name})
+                            </option>
+                          ))}
+                        </select>
                       </div>
                     </div>
 
@@ -268,6 +278,31 @@ const Checkout: React.FC = () => {
                       onShippingSelect={setSelectedShipping}
                     />
                   </div>
+
+                  {/* Delivery Time Selection */}
+                  {selectedShipping && (
+                    <div className="pt-4 border-t border-border">
+                      <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-4 flex items-center gap-2">
+                        <Clock className="w-4 h-4" />
+                        Horário de Entrega Preferido
+                      </h3>
+                      <select
+                        id="deliveryTime"
+                        name="deliveryTime"
+                        value={deliveryTime}
+                        onChange={(e) => setDeliveryTime(e.target.value)}
+                        className="w-full p-3 rounded-lg border border-border bg-background text-foreground focus:ring-2 focus:ring-primary focus:border-primary transition-all"
+                      >
+                        <option value="">Qualquer horário</option>
+                        <option value="morning">Manhã (9:00 - 12:00)</option>
+                        <option value="afternoon">Tarde (12:00 - 17:00)</option>
+                        <option value="evening">Noite (17:00 - 20:00)</option>
+                      </select>
+                      <p className="text-xs text-muted-foreground mt-2">
+                        Faremos o possível para entregar no horário preferido
+                      </p>
+                    </div>
+                  )}
 
                   <div className="pt-4 border-t border-border">
                     <Button 
@@ -343,12 +378,24 @@ const Checkout: React.FC = () => {
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Frete</span>
-                      <span className="text-muted-foreground text-xs">A calcular</span>
+                      {selectedShipping ? (
+                        <span className="font-medium">¥{selectedShipping.cost.toLocaleString()}</span>
+                      ) : (
+                        <span className="text-muted-foreground text-xs">Selecione acima</span>
+                      )}
                     </div>
+                    {selectedShipping && (
+                      <div className="text-xs text-muted-foreground text-right">
+                        {selectedShipping.carrier} - {selectedShipping.estimatedDays} dias
+                      </div>
+                    )}
                     <div className="flex justify-between pt-2 border-t border-border">
                       <span className="font-semibold">Total</span>
                       <span className="font-bold text-lg text-primary">
-                        ¥{totalPrice.toLocaleString()}+
+                        ¥{selectedShipping 
+                          ? (totalPrice + selectedShipping.cost).toLocaleString()
+                          : `${totalPrice.toLocaleString()}+`
+                        }
                       </span>
                     </div>
                   </div>
