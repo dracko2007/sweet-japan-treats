@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 import { Package, Truck, Clock, Shield, ArrowRight } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import ShippingCalculator from '@/components/shipping/ShippingCalculator';
-import AddressForm from '@/components/shipping/AddressForm';
 import { Button } from '@/components/ui/button';
 
 const Shipping: React.FC = () => {
@@ -67,7 +66,7 @@ const Shipping: React.FC = () => {
         <div className="container mx-auto px-4">
           <div className="grid lg:grid-cols-2 gap-12">
             {/* Calculator */}
-            <div className="space-y-6">
+            <div>
               <ShippingCalculator />
               
               <div className="mt-6 p-4 bg-secondary/50 rounded-xl">
@@ -81,14 +80,6 @@ const Shipping: React.FC = () => {
                     <ArrowRight className="w-4 h-4 ml-1" />
                   </Link>
                 </Button>
-              </div>
-
-              {/* Address Form */}
-              <div className="bg-card rounded-2xl shadow-card p-6 lg:p-8">
-                <h2 className="font-display text-2xl font-bold text-foreground mb-6">
-                  Buscar Endereço por CEP
-                </h2>
-                <AddressForm />
               </div>
             </div>
 

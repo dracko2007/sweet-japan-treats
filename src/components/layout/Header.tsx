@@ -1,13 +1,16 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { ShoppingCart, Menu, X, ChevronDown } from 'lucide-react';
+import { ShoppingCart, Menu, X, ChevronDown, UserCircle } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
+import { useUser } from '@/context/UserContext';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
 
 const Header: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isProductsOpen, setIsProductsOpen] = useState(false);
   const { totalItems } = useCart();
+  const { isAuthenticated, user } = useUser();
   const location = useLocation();
 
   const navItems = [
@@ -105,6 +108,18 @@ const Header: React.FC = () => {
 
           {/* Cart & Mobile Menu */}
           <div className="flex items-center gap-4">
+            <Button 
+              asChild
+              variant="ghost" 
+              size="sm"
+              className="hidden lg:flex items-center gap-2"
+            >
+              <Link to={isAuthenticated ? "/perfil" : "/cadastro"}>
+                <UserCircle className="w-5 h-5" />
+                <span>{isAuthenticated ? (user?.name?.split(' ')[0] || 'Perfil') : 'Cadastro'}</span>
+              </Link>
+            </Button>
+
             <Link 
               to="/carrinho" 
               className="relative p-2 rounded-full hover:bg-secondary/50 transition-colors"
@@ -157,6 +172,16 @@ const Header: React.FC = () => {
                 )}
               </div>
             ))}
+            <Button 
+              asChild
+              variant="ghost" 
+              className="w-full justify-start mt-2 text-base font-medium"
+            >
+              <Link to={isAuthenticated ? "/perfil" : "/cadastro"} onClick={() => setIsMenuOpen(false)}>
+                <UserCircle className="w-5 h-5 mr-2" />
+                {isAuthenticated ? (user?.name?.split(' ')[0] || 'Perfil') : 'Cadastro'}
+              </Link>
+            </Button>
           </nav>
         )}
       </div>

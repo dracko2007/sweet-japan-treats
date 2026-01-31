@@ -1,13 +1,29 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Truck, Package, Calculator, MapPin } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { prefectures, shippingRates, CarrierName, BoxSize } from '@/data/prefectures';
 import { useCart } from '@/context/CartContext';
 import { cn } from '@/lib/utils';
 
-const ShippingCalculator: React.FC = () => {
-  const [selectedPrefecture, setSelectedPrefecture] = useState<string>('');
+interface ShippingCalculatorProps {
+  selectedPrefecture?: string;
+  onShippingSelect?: (shipping: { carrier: string; cost: number; estimatedDays: string } | null) => void;
+}
+
+const ShippingCalculator: React.FC<ShippingCalculatorProps> = ({ 
+  selectedPrefecture: externalPrefecture,
+  onShippingSelect 
+}) => {
+  const [selectedPrefecture, setSelectedPrefecture] = useState<string>(externalPrefecture || '');
+  const [selectedCarrier, setSelectedCarrier] = useState<string | null>(null);
   const { getSpaceUsed, items, totalPrice } = useCart();
+
+  // Update internal state when external prop changes
+  useEffect(() => {
+    if (externalPrefecture) {
+      setSelectedPrefecture(externalPrefecture);
+    }
+  }, [externalPrefecture]);
 
   const spaceInfo = getSpaceUsed();
   
@@ -70,28 +86,54 @@ const ShippingCalculator: React.FC = () => {
     }).sort((a, b) => a.cost - b.cost);
   }, [selectedPref, items, calculateBoxes]);
 
-  return (
-    <div className="bg-card rounded-2xl shadow-card p-6 lg:p-8">
-      <div className="flex items-center gap-3 mb-6">
-        <div className="w-12 h-12 rounded-full gradient-caramel flex items-center justify-center">
-          <Calculator className="w-6 h-6 text-primary-foreground" />
-        </div>
-        <div>
-          <h2 className="font-display text-2xl font-bold text-foreground">Calcular Frete</h2>
-          <p className="text-sm text-muted-foreground">De Mie para todo o Japão</p>
-        </div>
-      </div>
+  // Notify parent when shipping is selected
+  useEffect(() => {
+    if (onShippingSelect && selectedCarrier && shippingOptions.length > 0) {
+      const selected = shippingOptions.find(opt => opt.carrier === selectedCarrier);
+      if (selected) {
+        onShippingSelect({
+          carrier: selected.name,
+          cost: selected.cost,
+          estimatedDays: selected.estimatedDays
+        });
+      }
+    } else if (onShippingSelect && !selectedCarrier) {
+      onShippingSelect(null);
+    }
+  }, [selectedCarrier, shippingOptions, onShippingSelect]);
 
-      {/* Province Selection */}
+  const handleCarrierSelect = (carrier: string) => {
+    setSelectedCarrier(carrier);
+  };
+
+  return (
+    <div className={cn("bg-card rounded-2xl shadow-card p-6", !onShippingSelect && "lg:p-8")}>
+      {!onShippingSelect && (
+        <div className="flex items-center gap-3 mb-6">
+          <div className="w-12 h-12 rounded-full gradient-caramel flex items-center justify-center">
+            <Calculator className="w-6 h-6 text-primary-foreground" />
+          </div>
+          <div>
+            <h2 className="font-display text-2xl font-bold text-foreground">Calcular Frete</h2>
+            <p className="text-sm text-muted-foreground">De Mie para todo o Japão</p>
+          </div>
+        </div>
+      )}
+
+      {/* Prefecture Selection */}
       <div className="mb-6">
         <label className="block text-sm font-medium text-foreground mb-2">
           <MapPin className="w-4 h-4 inline mr-1" />
-          Selecione sua província (都道府県)
+          {externalPrefecture ? 'Província selecionada' : 'Selecione sua província (都道府県)'}
         </label>
         <select
           value={selectedPrefecture}
-          onChange={(e) => setSelectedPrefecture(e.target.value)}
-          className="w-full p-3 rounded-lg border border-border bg-background text-foreground focus:ring-2 focus:ring-primary focus:border-primary transition-all"
+          onChange={(e) => {
+            setSelectedPrefecture(e.target.value);
+            setSelectedCarrier(null); // Reset carrier when prefecture changes
+          }}
+          disabled={!!externalPrefecture}
+          className="w-full p-3 rounded-lg border border-border bg-background text-foreground focus:ring-2 focus:ring-primary focus:border-primary transition-all disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <option value="">Escolha uma província...</option>
           {prefectures.map((pref) => (
@@ -143,21 +185,39 @@ const ShippingCalculator: React.FC = () => {
         <div className="space-y-3">
           <h3 className="font-medium text-foreground flex items-center gap-2">
             <Truck className="w-4 h-4" />
-            Opções de envio para {selectedPref?.nameJa}
+            {onShippingSelect ? 'Selecione a transportadora' : 'Opções de envio'} para {selectedPref?.nameJa}
           </h3>
           
           {shippingOptions.map((option, index) => (
             <div 
               key={option.carrier}
+              onClick={() => onShippingSelect && handleCarrierSelect(option.carrier)}
               className={cn(
                 "p-4 rounded-xl border-2 transition-all",
-                index === 0 
+                onShippingSelect && "cursor-pointer",
+                selectedCarrier === option.carrier
+                  ? "border-primary bg-primary/10 ring-2 ring-primary/20"
+                  : onShippingSelect
+                  ? "border-border hover:border-primary/50"
+                  : index === 0 
                   ? "border-primary bg-primary/5" 
                   : "border-border hover:border-primary/50"
               )}
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
+                  {onShippingSelect && (
+                    <div className={cn(
+                      "w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all",
+                      selectedCarrier === option.carrier
+                        ? "border-primary bg-primary"
+                        : "border-border"
+                    )}>
+                      {selectedCarrier === option.carrier && (
+                        <div className="w-2 h-2 rounded-full bg-white"></div>
+                      )}
+                    </div>
+                  )}
                   <span className="text-2xl">{option.logo}</span>
                   <div>
                     <p className="font-medium text-foreground">{option.name}</p>
@@ -170,23 +230,28 @@ const ShippingCalculator: React.FC = () => {
                   <p className="font-display text-xl font-bold text-primary">
                     ¥{option.cost.toLocaleString()}
                   </p>
-                  {index === 0 && (
+                  {!onShippingSelect && index === 0 && (
                     <span className="text-xs text-primary font-medium">Mais barato</span>
+                  )}
+                  {selectedCarrier === option.carrier && (
+                    <span className="text-xs text-primary font-medium">Selecionado</span>
                   )}
                 </div>
               </div>
             </div>
           ))}
 
-          {/* Total */}
-          <div className="bg-accent text-accent-foreground rounded-xl p-4 mt-4">
-            <div className="flex justify-between items-center">
-              <span className="font-medium">Total com frete (melhor opção):</span>
-              <span className="font-display text-2xl font-bold">
-                ¥{(totalPrice + shippingOptions[0].cost).toLocaleString()}
-              </span>
+          {/* Total - only show when not in selection mode */}
+          {!onShippingSelect && (
+            <div className="bg-accent text-accent-foreground rounded-xl p-4 mt-4">
+              <div className="flex justify-between items-center">
+                <span className="font-medium">Total com frete (melhor opção):</span>
+                <span className="font-display text-2xl font-bold">
+                  ¥{(totalPrice + shippingOptions[0].cost).toLocaleString()}
+                </span>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       )}
 
