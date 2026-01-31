@@ -3,6 +3,33 @@
  * Para uso offline, mantém o texto original se a API falhar
  */
 
+import Kuroshiro from 'kuroshiro';
+import KuromojiAnalyzer from 'kuroshiro-analyzer-kuromoji';
+
+let kuroshiroInstance: Kuroshiro | null = null;
+let kuroshiroInitialized = false;
+
+// Inicializa o Kuroshiro uma vez
+async function initKuroshiro() {
+  if (kuroshiroInitialized) return kuroshiroInstance;
+  
+  try {
+    const kuroshiro = new Kuroshiro();
+    await kuroshiro.init(new KuromojiAnalyzer());
+    kuroshiroInstance = kuroshiro;
+    kuroshiroInitialized = true;
+    console.log('✅ Kuroshiro initialized');
+    return kuroshiro;
+  } catch (error) {
+    console.warn('⚠️ Failed to initialize Kuroshiro:', error);
+    kuroshiroInitialized = true; // Mark as initialized to avoid retrying
+    return null;
+  }
+}
+
+// Inicializa automaticamente quando o módulo é importado
+initKuroshiro();
+
 // Mapeamento básico de kanji comuns para romaji (fallback)
 const basicKanjiMap: Record<string, string> = {
   '市': 'shi',
@@ -19,7 +46,7 @@ const basicKanjiMap: Record<string, string> = {
  * Tenta romanizar texto japonês
  * Retorna no formato: "日本 (Nihon)" ou apenas "日本" se falhar
  */
-export const romanizeJapanese = (text: string): string => {
+export const romanizeJapanese = async (text: string): Promise<string> => {
   if (!text) return '';
   
   // Se já contém parênteses com romaji, retorna como está
@@ -27,15 +54,53 @@ export const romanizeJapanese = (text: string): string => {
     return text;
   }
   
-  // Apenas retorna o texto original já que a romanização completa
-  // requer bibliotecas complexas. O usuário verá os caracteres japoneses.
-  return text;
+  try {
+    const kuroshiro = await initKuroshiro();
+    if (!kuroshiro) {
+      return text; // Fallback to original text
+    }
+    
+    // Converte para romaji com capitalize
+    const romaji = await kuroshiro.convert(text, {
+      to: 'romaji',
+      mode: 'spaced',
+      romajiSystem: 'hepburn'
+    });
+    
+    // Capitaliza primeira letra de cada palavra
+    const capitalizedRomaji = romaji
+      .split(' ')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+    
+    return `${text} (${capitalizedRomaji})`;
+  } catch (error) {
+    console.warn('Failed to romanize:', text, error);
+    return text; // Fallback to original text
+  }
 };
 
 /**
  * Adiciona dicas de leitura para partes comuns de endereço
+ * Agora usa romanização automática para qualquer texto
  */
-export const addAddressHints = (text: string): string => {
+export const addAddressHints = async (text: string): Promise<string> => {
+  if (!text) return '';
+  
+  try {
+    // Tenta romanização automática completa primeiro
+    return await romanizeJapanese(text);
+  } catch (error) {
+    console.warn('Fallback to manual mapping for:', text);
+    // Se falhar, usa mapeamento manual
+    return addAddressHintsSync(text);
+  }
+};
+
+/**
+ * Versão síncrona com mapeamento manual (fallback)
+ */
+export const addAddressHintsSync = (text: string): string => {
   if (!text) return '';
   
   // Common city/area name mappings
@@ -67,13 +132,13 @@ export const addAddressHints = (text: string): string => {
     '郡': 'gun',
   };
 
-  let result = text;
+  let result = text;async (city: string, town: string = ''): Promise<string> => {
+  if (!city && !town) return '';
   
-  // First try exact matches (longer strings first)
-  const sortedEntries = Object.entries(nameMap).sort((a, b) => b[0].length - a[0].length);
+  const fullAddress = town ? `${city} ${town}` : city;
   
-  for (const [japanese, romaji] of sortedEntries) {
-    if (result.includes(japanese) && !result.includes(`(${romaji})`)) {
+  // Adiciona hints para termos comuns
+  return awaitresult.includes(japanese) && !result.includes(`(${romaji})`)) {
       result = result.replace(japanese, `${japanese} (${romaji})`);
     }
   }
