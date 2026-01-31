@@ -84,25 +84,53 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
+  // Helper functions for users database
+  const getAllUsers = (): UserProfile[] => {
+    const usersData = localStorage.getItem('users');
+    return usersData ? JSON.parse(usersData) : [];
+  };
+
+  const saveAllUsers = (users: UserProfile[]) => {
+    localStorage.setItem('users', JSON.stringify(users));
+  };
+
+  const getUserCoupons = (userId: string): Coupon[] => {
+    const couponsData = localStorage.getItem(`coupons_${userId}`);
+    return couponsData ? JSON.parse(couponsData) : [];
+  };
+
+  const saveUserCoupons = (userId: string, coupons: Coupon[]) => {
+    localStorage.setItem(`coupons_${userId}`, JSON.stringify(coupons));
+  };
+
+  const getUserOrders = (userId: string): Order[] => {
+    const ordersData = localStorage.getItem(`orders_${userId}`);
+    return ordersData ? JSON.parse(ordersData) : [];
+  };
+
+  const saveUserOrders = (userId: string, orders: Order[]) => {
+    localStorage.setItem(`orders_${userId}`, JSON.stringify(orders));
+  };
+
   // Load user data from localStorage on mount
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
-    const storedCoupons = localStorage.getItem('coupons');
-    const storedOrders = localStorage.getItem('orders');
 
     if (storedUser) {
-      setUser(JSON.parse(storedUser));
+      const userData = JSON.parse(storedUser);
+      setUser(userData);
       setIsAuthenticated(true);
-    }
-    if (storedCoupons) {
-      setCoupons(JSON.parse(storedCoupons));
-    }
-    if (storedOrders) {
-      setOrders(JSON.parse(storedOrders));
+      
+      // Load user-specific coupons and orders
+      const userCoupons = getUserCoupons(userData.id);
+      const userOrders = getUserOrders(userData.id);
+      
+      setCoupons(userCoupons);
+      setOrders(userOrders);
     }
   }, []);
 
-  // Save to localStorage whenever data changes
+  // Save current user session to localStorage
   useEffect(() => {
     if (user) {
       localStorage.setItem('user', JSON.stringify(user));
@@ -111,51 +139,53 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     }
   }, [user]);
 
+  // Save user-specific coupons to localStorage
   useEffect(() => {
-    localStorage.setItem('coupons', JSON.stringify(coupons));
-  }, [coupons]);
+    if (user && coupons.length >= 0) {
+      saveUserCoupons(user.id, coupons);
+    }
+  }, [coupons, user]);
 
+  // Save user-specific orders to localStorage
   useEffect(() => {
-    localStorage.setItem('orders', JSON.stringify(orders));
-  }, [orders]);
+    if (user && orders.length >= 0) {
+      saveUserOrders(user.id, orders);
+    }
+  }, [orders, user]);
 
   const login = async (email: string, password: string): Promise<boolean> => {
-    // Simulate login - in real app, this would call an API with secure authentication
-    const storedUser = localStorage.getItem('user');
-    const storedCoupons = localStorage.getItem('coupons');
-    const storedOrders = localStorage.getItem('orders');
+    // Search in users database for matching credentials
+    const allUsers = getAllUsers();
+    const foundUser = allUsers.find(u => u.email === email && u.password === password);
     
-    if (storedUser) {
-      const userData = JSON.parse(storedUser);
-      // Check both email and password
-      if (userData.email === email && userData.password === password) {
-        setUser(userData);
-        setIsAuthenticated(true);
-        
-        // Restore user's coupons and orders
-        if (storedCoupons) {
-          setCoupons(JSON.parse(storedCoupons));
-        }
-        if (storedOrders) {
-          setOrders(JSON.parse(storedOrders));
-        }
-        
-        return true;
-      }
+    if (foundUser) {
+      setUser(foundUser);
+      setIsAuthenticated(true);
+      
+      // Load user-specific coupons and orders
+      const userCoupons = getUserCoupons(foundUser.id);
+      const userOrders = getUserOrders(foundUser.id);
+      
+      setCoupons(userCoupons);
+      setOrders(userOrders);
+      
+      console.log('User logged in successfully:', { email: foundUser.email, id: foundUser.id });
+      return true;
     }
+    
+    console.log('Login failed: User not found or incorrect password');
     return false;
   };
 
   const register = async (userData: Omit<UserProfile, 'id' | 'createdAt' | 'password'> & { password: string }): Promise<boolean> => {
     try {
-      // Check if user with this email already exists
-      const storedUser = localStorage.getItem('user');
-      if (storedUser) {
-        const existingUser = JSON.parse(storedUser);
-        if (existingUser.email === userData.email) {
-          console.error('User with this email already exists');
-          return false;
-        }
+      // Check if user with this email already exists in the users database
+      const allUsers = getAllUsers();
+      const existingUser = allUsers.find(u => u.email === userData.email);
+      
+      if (existingUser) {
+        console.error('Registration failed: User with this email already exists');
+        return false;
       }
 
       const newUser: UserProfile = {
@@ -165,10 +195,15 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
         password: userData.password, // Store password (demo only - use backend auth in production)
       };
       
+      // Add new user to users database
+      const updatedUsers = [...allUsers, newUser];
+      saveAllUsers(updatedUsers);
+      
+      // Set as current user
       setUser(newUser);
       setIsAuthenticated(true);
 
-      // Add welcome coupon
+      // Add welcome coupon for this user
       const welcomeCoupon: Coupon = {
         id: `coupon-${Date.now()}`,
         code: 'WELCOME10',
@@ -179,8 +214,12 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
         isUsed: false,
       };
       setCoupons([welcomeCoupon]);
+      
+      // Initialize empty orders for this user
+      setOrders([]);
 
       console.log('User registered successfully:', { email: newUser.email, id: newUser.id });
+      console.log('Total users in database:', updatedUsers.length);
       return true;
     } catch (error) {
       console.error('Error registering user:', error);
@@ -189,19 +228,31 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
   };
 
   const logout = () => {
+    // Save current user's data before logging out (already done by useEffect)
+    // Just clear the current session
     setUser(null);
     setIsAuthenticated(false);
     setCoupons([]);
     setOrders([]);
+    
+    // Remove only current session, keep users database intact
     localStorage.removeItem('user');
-    localStorage.removeItem('coupons');
-    localStorage.removeItem('orders');
+    console.log('User logged out successfully');
   };
 
   const updateProfile = (userData: Partial<UserProfile>) => {
     if (user) {
       const updatedUser = { ...user, ...userData };
       setUser(updatedUser);
+      
+      // Also update in users database
+      const allUsers = getAllUsers();
+      const updatedUsers = allUsers.map(u => 
+        u.id === user.id ? updatedUser : u
+      );
+      saveAllUsers(updatedUsers);
+      
+      console.log('User profile updated:', { id: updatedUser.id, email: updatedUser.email });
     }
   };
 
