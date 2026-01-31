@@ -46,8 +46,8 @@ export const addAddressHints = (text: string): string => {
 export const addAddressHintsSync = (text: string): string => {
   if (!text) return '';
   
-  // Common city/area name mappings
-  const nameMap: { [key: string]: string } = {
+  // Separate complete city names from generic suffixes
+  const cityNames: { [key: string]: string } = {
     // Cities
     '伊賀市': 'Iga-shi',
     '名古屋市': 'Nagoya-shi',
@@ -67,7 +67,9 @@ export const addAddressHintsSync = (text: string): string => {
     '港区': 'Minato-ku',
     '新宿区': 'Shinjuku-ku',
     '渋谷区': 'Shibuya-ku',
-    // Generic suffixes
+  };
+
+  const genericSuffixes: { [key: string]: string } = {
     '市': 'shi',
     '区': 'ku',
     '町': 'cho',
@@ -76,13 +78,24 @@ export const addAddressHintsSync = (text: string): string => {
   };
 
   let result = text;
+  let hasCompleteMatch = false;
   
-  // First try exact matches (longer strings first)
-  const sortedEntries = Object.entries(nameMap).sort((a, b) => b[0].length - a[0].length);
+  // First, try complete city/district names (longer strings first)
+  const sortedCities = Object.entries(cityNames).sort((a, b) => b[0].length - a[0].length);
   
-  for (const [japanese, romaji] of sortedEntries) {
+  for (const [japanese, romaji] of sortedCities) {
     if (result.includes(japanese) && !result.includes(`(${romaji})`)) {
       result = result.replace(japanese, `${japanese} (${romaji})`);
+      hasCompleteMatch = true;
+    }
+  }
+
+  // Only apply generic suffixes if no complete match was found
+  if (!hasCompleteMatch) {
+    for (const [kanji, romaji] of Object.entries(genericSuffixes)) {
+      if (result.includes(kanji) && !result.includes(`(${romaji})`)) {
+        result = result.replace(kanji, `${kanji} (${romaji})`);
+      }
     }
   }
 
