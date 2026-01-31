@@ -187,7 +187,7 @@ const OrderConfirmation: React.FC = () => {
       }
     }
     
-    // 4. WhatsApp Message (to store owner)
+    // 4. WhatsApp Message (to store owner Paula)
     const whatsappMessage = `
 🎉 *NOVO PEDIDO - Doce de Leite*
 
@@ -224,8 +224,53 @@ Previsão: ${shipping.estimatedDays} dias úteis
 ${data.paymentMethod === 'bank' ? 'Depósito Bancário' : 'PayPay'}
     `.trim();
     
-    console.log('📱 WhatsApp to: 070-1367-1679');
-    console.log('📱 WhatsApp Message:\n', whatsappMessage);
+    // Open WhatsApp Web with pre-filled message
+    const whatsappNumber = '070-1367-1679'.replace(/[^0-9]/g, ''); // Remove formatting
+    const whatsappUrl = `https://wa.me/81${whatsappNumber}?text=${encodeURIComponent(whatsappMessage)}`;
+    
+    console.log('📱 Opening WhatsApp Web to send message to Paula');
+    console.log('📱 Phone: 070-1367-1679');
+    
+    // Open WhatsApp in new tab
+    window.open(whatsappUrl, '_blank');
+    
+    // Also send WhatsApp to customer
+    const customerMessage = `
+🎉 *Pedido Confirmado!*
+
+Olá ${data.formData.name}!
+
+Seu pedido foi recebido com sucesso!
+
+📋 *Número do Pedido:* ${orderNumber}
+${generatedTrackingNumber ? `🔢 *Rastreamento:* ${generatedTrackingNumber}\n` : ''}
+
+📦 *Produtos:*
+${data.items.map((item: CartItem) => 
+  `• ${item.product.name} (${item.size}) x${item.quantity}`
+).join('\n')}
+
+💰 *Total:* ¥${(data.totalPrice + shipping.cost).toLocaleString()}
+
+🚚 *Previsão de Entrega:* ${shipping.estimatedDays} dias úteis
+
+Em breve você receberá um email com todos os detalhes.
+
+Obrigada pela preferência! 🍮
+
+_Sabor do Campo - Doce de Leite Artesanal_
+    `.trim();
+    
+    const customerPhone = data.formData.phone.replace(/[^0-9]/g, '');
+    const customerWhatsappUrl = `https://wa.me/81${customerPhone}?text=${encodeURIComponent(customerMessage)}`;
+    
+    console.log('📱 Opening WhatsApp to notify customer');
+    console.log('📱 Customer Phone:', data.formData.phone);
+    
+    // Open customer WhatsApp in another tab after 2 seconds
+    setTimeout(() => {
+      window.open(customerWhatsappUrl, '_blank');
+    }, 2000);
   };
 
   if (!orderData || isLoading) {

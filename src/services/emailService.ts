@@ -1,12 +1,7 @@
 /**
  * Email Service
  * 
- * This module handles sending emails through a backend API.
- * 
- * IMPLEMENTATION NOTES:
- * - This is a frontend mock that logs to console
- * - Real implementation requires a backend server
- * - Backend should use services like SendGrid, AWS SES, or Resend
+ * Sends order confirmation emails using Resend API
  */
 
 import type { EmailOrderData, CartItem, ShippingLabelData } from '@/types/order';
@@ -21,9 +16,13 @@ interface EmailData {
   shippingLabelData?: ShippingLabelData;
 }
 
+// Resend API configuration
+const RESEND_API_KEY = import.meta.env.VITE_RESEND_API_KEY;
+const FROM_EMAIL = import.meta.env.VITE_FROM_EMAIL || 'pedidos@saborsdocampo.com';
+
 export const emailService = {
   /**
-   * Send order confirmation email
+   * Send order confirmation email using Resend
    */
   sendOrderConfirmation: async (data: EmailData): Promise<boolean> => {
     console.log('📧 Email Service - Sending order confirmation email');
@@ -33,12 +32,46 @@ export const emailService = {
     if (data.trackingNumber) {
       console.log('Tracking Number:', data.trackingNumber);
     }
-    console.log('Email includes: Order details, payment info, shipping label with QR code');
     
-    // Mock API call - replace with real backend endpoint
+    // If no API key, fallback to console logging
+    if (!RESEND_API_KEY) {
+      console.warn('⚠️ VITE_RESEND_API_KEY not configured - email not sent');
+      console.log('📧 Email HTML preview:', data.html.substring(0, 200) + '...');
+      
+      // Open email in new window for testing
+      const emailWindow = window.open('', '_blank');
+      if (emailWindow) {
+        emailWindow.document.write(data.html);
+        emailWindow.document.close();
+      }
+      
+      return false;
+    }
+    
     try {
-      console.log('✅ Email would be sent successfully (backend integration required)');
-      console.log('📧 Email includes shipping label HTML and embedded QR code for printing');
+      const response = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${RESEND_API_KEY}`
+        },
+        body: JSON.stringify({
+          from: FROM_EMAIL,
+          to: data.to,
+          subject: data.subject,
+          html: data.html
+        })
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        console.error('❌ Resend API error:', error);
+        return false;
+      }
+
+      const result = await response.json();
+      console.log('✅ Email sent successfully via Resend');
+      console.log('📧 Email ID:', result.id);
       return true;
     } catch (error) {
       console.error('❌ Error sending email:', error);
