@@ -72,24 +72,49 @@ export const prefectures: Prefecture[] = [
 ];
 
 // Shipping rates by carrier, box size, and zone (in yen)
-// Box 60cm: fits 8 small (280g) OR 1 large + 1 small
-// Box 80cm: fits 3 large OR 2 large + 2 small
-// 1 large = 2 small in space
+// CORRECTED: 1 large pot = 2 small pots in space
+// Box 60cm: fits 2 large pots (or 4 small pots)
+// Box 80cm: fits 3 large pots (or 6 small pots)
+// Box 100cm: fits 6 large pots (or 12 small pots)
 
 export const shippingRates = {
   yuubin: {
     '60': { 1: 870, 2: 970, 3: 1100, 4: 1350 },
-    '80': { 1: 1100, 2: 1200, 3: 1400, 4: 1700 }
+    '80': { 1: 1100, 2: 1200, 3: 1400, 4: 1700 },
+    '100': { 1: 1300, 2: 1450, 3: 1650, 4: 2000 }
   },
   yamato: {
     '60': { 1: 930, 2: 1040, 3: 1150, 4: 1480 },
-    '80': { 1: 1150, 2: 1260, 3: 1370, 4: 1810 }
+    '80': { 1: 1150, 2: 1260, 3: 1370, 4: 1810 },
+    '100': { 1: 1380, 2: 1520, 3: 1720, 4: 2180 }
   },
   sagawa: {
     '60': { 1: 880, 2: 990, 3: 1100, 4: 1430 },
-    '80': { 1: 1100, 2: 1210, 3: 1430, 4: 1760 }
+    '80': { 1: 1100, 2: 1210, 3: 1430, 4: 1760 },
+    '100': { 1: 1320, 2: 1470, 3: 1680, 4: 2100 }
   }
 };
 
 export type CarrierName = keyof typeof shippingRates;
-export type BoxSize = '60' | '80';
+export type BoxSize = '60' | '80' | '100';
+
+export const carrierInfo = {
+  yuubin: { 
+    name: 'Japan Post (ゆうパック)', 
+    logo: '📮',
+    website: 'https://www.post.japanpost.jp/service/you_pack/',
+    deliveryTimes: ['9:00-12:00', '14:00-16:00', '16:00-18:00', '18:00-20:00', '19:00-21:00']
+  },
+  yamato: { 
+    name: 'Yamato (クロネコ)', 
+    logo: '🐱',
+    website: 'https://www.kuronekoyamato.co.jp/ytc/customer/send/',
+    deliveryTimes: ['Antes das 12:00', '14:00-16:00', '16:00-18:00', '18:00-20:00', '19:00-21:00']
+  },
+  sagawa: { 
+    name: 'Sagawa (佐川急便)', 
+    logo: '📦',
+    website: 'https://www.sagawa-exp.co.jp/service/timetable/',
+    deliveryTimes: ['Manhã (9:00-12:00)', 'Tarde (12:00-18:00)', 'Noite (18:00-21:00)']
+  }
+};

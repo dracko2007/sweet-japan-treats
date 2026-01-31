@@ -1,39 +1,55 @@
 import React, { useState, useMemo } from 'react';
-import { Truck, Package, Calculator, MapPin } from 'lucide-react';
+import { Truck, Package, Calculator, MapPin, Clock, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { prefectures, shippingRates, CarrierName, BoxSize } from '@/data/prefectures';
+import { prefectures, shippingRates, CarrierName, BoxSize, carrierInfo } from '@/data/prefectures';
 import { useCart } from '@/context/CartContext';
 import { cn } from '@/lib/utils';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Label } from '@/components/ui/label';
 
 const ShippingCalculator: React.FC = () => {
   const [selectedPrefecture, setSelectedPrefecture] = useState<string>('');
+  const [selectedCarrier, setSelectedCarrier] = useState<CarrierName | null>(null);
+  const [selectedDeliveryTime, setSelectedDeliveryTime] = useState<string>('');
   const { getSpaceUsed, items, totalPrice } = useCart();
 
   const spaceInfo = getSpaceUsed();
   
-  // Calculate required boxes
-  // Box 60cm: 8 small OR 1 large + 1 small (=4 small equivalent max)
-  // Box 80cm: 3 large (=6 small eq) OR 2 large + 2 small (=6 small eq)
-  // For simplicity: 60cm = 4 small eq, 80cm = 6 small eq
+  // Calculate required boxes based on CORRECTED formula
+  // 1 large pot = 2 small pots
+  // Box 60cm: 2 large pots (4 small pots)
+  // Box 80cm: 3 large pots (6 small pots)
+  // Box 100cm: 6 large pots (12 small pots)
   const calculateBoxes = useMemo(() => {
-    if (items.length === 0) return { boxes60: 0, boxes80: 0 };
+    if (items.length === 0) return { boxes60: 0, boxes80: 0, boxes100: 0 };
     
     const totalSmallEq = spaceInfo.totalSmallEquivalent;
     
-    // Optimal packing: use 80cm for larger orders
+    // Optimal packing strategy
     if (totalSmallEq <= 4) {
-      return { boxes60: 1, boxes80: 0 };
+      // Fits in 60cm box
+      return { boxes60: 1, boxes80: 0, boxes100: 0 };
     } else if (totalSmallEq <= 6) {
-      return { boxes60: 0, boxes80: 1 };
-    } else if (totalSmallEq <= 8) {
-      // 2 boxes of 60 or 1 of 80 + extras
-      return { boxes60: 2, boxes80: 0 };
+      // Fits in 80cm box
+      return { boxes60: 0, boxes80: 1, boxes100: 0 };
+    } else if (totalSmallEq <= 12) {
+      // Fits in 100cm box
+      return { boxes60: 0, boxes80: 0, boxes100: 1 };
     } else {
-      // Multiple boxes needed
-      const boxes80Needed = Math.floor(totalSmallEq / 6);
-      const remaining = totalSmallEq % 6;
-      const boxes60Needed = remaining > 0 ? Math.ceil(remaining / 4) : 0;
-      return { boxes60: boxes60Needed, boxes80: boxes80Needed };
+      // Need multiple boxes - use 100cm boxes first, then smaller ones
+      const boxes100Needed = Math.floor(totalSmallEq / 12);
+      const remaining = totalSmallEq % 12;
+      
+      if (remaining === 0) {
+        return { boxes60: 0, boxes80: 0, boxes100: boxes100Needed };
+      } else if (remaining <= 4) {
+        return { boxes60: 1, boxes80: 0, boxes100: boxes100Needed };
+      } else if (remaining <= 6) {
+        return { boxes60: 0, boxes80: 1, boxes100: boxes100Needed };
+      } else {
+        // remaining > 6, need another 100cm box
+        return { boxes60: 0, boxes80: 0, boxes100: boxes100Needed + 1 };
+      }
     }
   }, [items, spaceInfo.totalSmallEquivalent]);
 
@@ -54,21 +70,22 @@ const ShippingCalculator: React.FC = () => {
       if (calculateBoxes.boxes80 > 0) {
         totalCost += shippingRates[carrier]['80'][zone] * calculateBoxes.boxes80;
       }
-
-      const carrierNames = {
-        yuubin: { name: 'Japan Post (ゆうパック)', logo: '📮' },
-        yamato: { name: 'Yamato (クロネコ)', logo: '🐱' },
-        sagawa: { name: 'Sagawa (佐川急便)', logo: '📦' }
-      };
+      if (calculateBoxes.boxes100 > 0) {
+        totalCost += shippingRates[carrier]['100'][zone] * calculateBoxes.boxes100;
+      }
 
       return {
         carrier,
-        ...carrierNames[carrier],
+        ...carrierInfo[carrier],
         cost: totalCost,
-        estimatedDays: zone === 1 ? '1-2' : zone === 2 ? '2-3' : '3-4'
+        estimatedDays: zone === 1 ? '1-2' : zone === 2 ? '2-3' : zone === 3 ? '3-4' : '4-5'
       };
     }).sort((a, b) => a.cost - b.cost);
   }, [selectedPref, items, calculateBoxes]);
+
+  const selectedShippingOption = selectedCarrier 
+    ? shippingOptions.find(opt => opt.carrier === selectedCarrier)
+    : shippingOptions[0];
 
   return (
     <div className="bg-card rounded-2xl shadow-card p-6 lg:p-8">
@@ -120,12 +137,16 @@ const ShippingCalculator: React.FC = () => {
             </div>
             <div className="border-t border-border pt-2 mt-2">
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Caixas 60cm:</span>
+                <span className="text-muted-foreground">Caixas 60cm (até 2 grandes):</span>
                 <span className="font-medium">{calculateBoxes.boxes60}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Caixas 80cm:</span>
+                <span className="text-muted-foreground">Caixas 80cm (até 3 grandes):</span>
                 <span className="font-medium">{calculateBoxes.boxes80}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Caixas 100cm (até 6 grandes):</span>
+                <span className="font-medium">{calculateBoxes.boxes100}</span>
               </div>
             </div>
             <div className="border-t border-border pt-2 mt-2">
@@ -140,50 +161,92 @@ const ShippingCalculator: React.FC = () => {
 
       {/* Shipping Results */}
       {selectedPrefecture && items.length > 0 && shippingOptions.length > 0 && (
-        <div className="space-y-3">
+        <div className="space-y-4">
           <h3 className="font-medium text-foreground flex items-center gap-2">
             <Truck className="w-4 h-4" />
-            Opções de envio para {selectedPref?.nameJa}
+            Escolha a transportadora para {selectedPref?.nameJa}
           </h3>
           
-          {shippingOptions.map((option, index) => (
-            <div 
-              key={option.carrier}
-              className={cn(
-                "p-4 rounded-xl border-2 transition-all",
-                index === 0 
-                  ? "border-primary bg-primary/5" 
-                  : "border-border hover:border-primary/50"
-              )}
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <span className="text-2xl">{option.logo}</span>
-                  <div>
-                    <p className="font-medium text-foreground">{option.name}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {option.estimatedDays} dias úteis
-                    </p>
+          <RadioGroup value={selectedCarrier || shippingOptions[0].carrier} onValueChange={(value) => setSelectedCarrier(value as CarrierName)}>
+            {shippingOptions.map((option, index) => (
+              <div 
+                key={option.carrier}
+                className={cn(
+                  "p-4 rounded-xl border-2 transition-all cursor-pointer",
+                  selectedCarrier === option.carrier || (!selectedCarrier && index === 0)
+                    ? "border-primary bg-primary/5" 
+                    : "border-border hover:border-primary/50"
+                )}
+              >
+                <div className="flex items-start gap-3">
+                  <RadioGroupItem value={option.carrier} id={option.carrier} />
+                  <div className="flex-1">
+                    <Label htmlFor={option.carrier} className="cursor-pointer">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-3">
+                          <span className="text-2xl">{option.logo}</span>
+                          <div>
+                            <p className="font-medium text-foreground">{option.name}</p>
+                            <p className="text-sm text-muted-foreground">
+                              {option.estimatedDays} dias úteis
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-display text-xl font-bold text-primary">
+                            ¥{option.cost.toLocaleString()}
+                          </p>
+                          {index === 0 && !selectedCarrier && (
+                            <span className="text-xs text-primary font-medium">Mais barato</span>
+                          )}
+                        </div>
+                      </div>
+                      <Button 
+                        variant="link" 
+                        size="sm" 
+                        className="p-0 h-auto text-xs"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          window.open(option.website, '_blank');
+                        }}
+                      >
+                        Acessar site da transportadora <ExternalLink className="w-3 h-3 ml-1" />
+                      </Button>
+                    </Label>
                   </div>
                 </div>
-                <div className="text-right">
-                  <p className="font-display text-xl font-bold text-primary">
-                    ¥{option.cost.toLocaleString()}
-                  </p>
-                  {index === 0 && (
-                    <span className="text-xs text-primary font-medium">Mais barato</span>
-                  )}
-                </div>
               </div>
+            ))}
+          </RadioGroup>
+
+          {/* Delivery Time Selection */}
+          {selectedShippingOption && (
+            <div className="mt-4 p-4 bg-secondary/30 rounded-xl">
+              <h4 className="font-medium text-foreground flex items-center gap-2 mb-3">
+                <Clock className="w-4 h-4" />
+                Horário de entrega preferido
+              </h4>
+              <RadioGroup value={selectedDeliveryTime} onValueChange={setSelectedDeliveryTime}>
+                <div className="space-y-2">
+                  {selectedShippingOption.deliveryTimes.map((time) => (
+                    <div key={time} className="flex items-center space-x-2">
+                      <RadioGroupItem value={time} id={`time-${time}`} />
+                      <Label htmlFor={`time-${time}`} className="cursor-pointer text-sm">
+                        {time}
+                      </Label>
+                    </div>
+                  ))}
+                </div>
+              </RadioGroup>
             </div>
-          ))}
+          )}
 
           {/* Total */}
           <div className="bg-accent text-accent-foreground rounded-xl p-4 mt-4">
             <div className="flex justify-between items-center">
-              <span className="font-medium">Total com frete (melhor opção):</span>
+              <span className="font-medium">Total com frete:</span>
               <span className="font-display text-2xl font-bold">
-                ¥{(totalPrice + shippingOptions[0].cost).toLocaleString()}
+                ¥{(totalPrice + (selectedShippingOption?.cost || 0)).toLocaleString()}
               </span>
             </div>
           </div>
