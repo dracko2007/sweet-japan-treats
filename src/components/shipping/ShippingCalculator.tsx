@@ -14,7 +14,7 @@ interface ShippingCalculatorProps {
     carrierLogo: string;
     shippingCost: number;
     estimatedDays: string;
-  }) => void;
+  } | null) => void;
 }
 
 const ShippingCalculator: React.FC<ShippingCalculatorProps> = ({ onShippingSelected }) => {
@@ -105,7 +105,7 @@ const ShippingCalculator: React.FC<ShippingCalculatorProps> = ({ onShippingSelec
     setSelectedPrefecture(prefName);
     setSelectedCarrier('');
     if (onShippingSelected) {
-      onShippingSelected(null as any);
+      onShippingSelected(null);
     }
   };
 
