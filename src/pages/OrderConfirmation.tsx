@@ -65,8 +65,46 @@ const OrderConfirmation: React.FC = () => {
     // 2. Send email confirmation
     // 3. Generate shipping labels via courier APIs
     
+    // Format WhatsApp message
+    const shipping = data.shipping || { carrier: 'N/A', cost: 0, estimatedDays: 'N/A' };
+    const whatsappMessage = `
+🎉 *NOVO PEDIDO - Doce de Leite*
+
+📋 *Pedido:* ${orderNumber}
+📅 *Data:* ${new Date().toLocaleDateString('pt-BR')}
+
+👤 *Cliente:*
+Nome: ${data.formData.name}
+Tel: ${data.formData.phone}
+Email: ${data.formData.email}
+
+📍 *Endereço de Entrega:*
+〒${data.formData.postalCode}
+${data.formData.prefecture} ${data.formData.city}
+${data.formData.address}
+${data.formData.building ? data.formData.building : ''}
+
+📦 *Produtos:*
+${data.items.map((item: any) => 
+  `• ${item.product.name} (${item.size}) x${item.quantity} - ¥${(item.product.prices[item.size] * item.quantity).toLocaleString()}`
+).join('\n')}
+
+💰 *Valores:*
+Subtotal: ¥${data.totalPrice.toLocaleString()}
+Frete (${shipping.carrier}): ¥${shipping.cost.toLocaleString()}
+*Total: ¥${(data.totalPrice + shipping.cost).toLocaleString()}*
+
+🚚 *Frete:*
+Transportadora: ${shipping.carrier}
+Previsão: ${shipping.estimatedDays} dias úteis
+
+💳 *Pagamento:*
+${data.paymentMethod === 'bank' ? 'Depósito Bancário' : 'PayPay'}
+    `.trim();
+    
     console.log('📧 Sending email to:', data.formData.email);
     console.log('📱 Sending WhatsApp to: 070-1367-1679');
+    console.log('📱 WhatsApp Message:\n', whatsappMessage);
     console.log('📦 Order details:', data);
 
     // Simulate API call
@@ -77,6 +115,7 @@ const OrderConfirmation: React.FC = () => {
       //   body: JSON.stringify({
       //     customer: data.formData,
       //     items: data.items,
+      //     shipping: shipping,
       //     payment: data.paymentMethod,
       //     total: data.totalPrice
       //   })
@@ -90,7 +129,7 @@ const OrderConfirmation: React.FC = () => {
     return null;
   }
 
-  const { formData, paymentMethod, items, totalPrice } = orderData;
+  const { formData, paymentMethod, items, totalPrice, shipping } = orderData;
   const orderNumber = `DL-${Date.now().toString().slice(-8)}`;
 
   const handlePrint = () => {
@@ -200,10 +239,10 @@ const OrderConfirmation: React.FC = () => {
 
                 {/* Payment Info */}
                 <div>
-                  <h3 className="font-semibold text-lg mb-3">Pagamento</h3>
+                  <h3 className="font-semibold text-lg mb-3">Pagamento e Frete</h3>
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Método:</span>
+                      <span className="text-muted-foreground">Método de Pagamento:</span>
                       <span className="font-medium">
                         {paymentMethod === 'bank' ? 'Depósito Bancário' : 'PayPay'}
                       </span>
@@ -212,13 +251,28 @@ const OrderConfirmation: React.FC = () => {
                       <span className="text-muted-foreground">Subtotal:</span>
                       <span className="font-medium">¥{totalPrice.toLocaleString()}</span>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Frete:</span>
-                      <span className="font-medium">A calcular</span>
-                    </div>
+                    {shipping && (
+                      <>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Frete ({shipping.carrier}):</span>
+                          <span className="font-medium">¥{shipping.cost.toLocaleString()}</span>
+                        </div>
+                        <div className="text-xs text-muted-foreground text-right">
+                          Previsão: {shipping.estimatedDays} dias úteis
+                        </div>
+                      </>
+                    )}
+                    {!shipping && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Frete:</span>
+                        <span className="font-medium">A calcular</span>
+                      </div>
+                    )}
                     <div className="flex justify-between pt-2 border-t font-bold text-lg">
                       <span>Total:</span>
-                      <span className="text-primary">¥{totalPrice.toLocaleString()}+</span>
+                      <span className="text-primary">
+                        ¥{shipping ? (totalPrice + shipping.cost).toLocaleString() : `${totalPrice.toLocaleString()}+`}
+                      </span>
                     </div>
                   </div>
                 </div>

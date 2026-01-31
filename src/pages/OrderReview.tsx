@@ -25,16 +25,17 @@ const OrderReview: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const formData = location.state?.formData;
+  const shipping = location.state?.shipping;
   const [paymentMethod, setPaymentMethod] = useState('bank');
 
-  // Redirect if no form data
+  // Redirect if no form data or shipping
   React.useEffect(() => {
-    if (!formData) {
+    if (!formData || !shipping) {
       navigate('/checkout');
     }
-  }, [formData, navigate]);
+  }, [formData, shipping, navigate]);
 
-  if (!formData) {
+  if (!formData || !shipping) {
     return null;
   }
 
@@ -47,6 +48,7 @@ const OrderReview: React.FC = () => {
       state: { 
         formData, 
         paymentMethod,
+        shipping,
         items,
         totalPrice 
       } 
@@ -135,13 +137,16 @@ const OrderReview: React.FC = () => {
                     <span className="font-semibold">¥{totalPrice.toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between text-base">
-                    <span className="text-muted-foreground">Frete</span>
-                    <span className="text-muted-foreground">A calcular</span>
+                    <span className="text-muted-foreground">Frete ({shipping.carrier})</span>
+                    <span className="font-semibold">¥{shipping.cost.toLocaleString()}</span>
+                  </div>
+                  <div className="text-xs text-muted-foreground text-right">
+                    Entrega em {shipping.estimatedDays} dias úteis
                   </div>
                   <div className="flex justify-between pt-3 border-t border-border">
                     <span className="font-bold text-xl">Total</span>
                     <span className="font-bold text-2xl text-primary">
-                      ¥{totalPrice.toLocaleString()}+
+                      ¥{(totalPrice + shipping.cost).toLocaleString()}
                     </span>
                   </div>
                 </div>
