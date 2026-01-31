@@ -13,6 +13,10 @@ export default {
       },
     },
     extend: {
+      fontFamily: {
+        display: ["Playfair Display", "serif"],
+        body: ["Lato", "sans-serif"],
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
@@ -47,6 +51,15 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        caramel: {
+          DEFAULT: "hsl(var(--caramel))",
+          light: "hsl(var(--caramel-light))",
+          dark: "hsl(var(--caramel-dark))",
+        },
+        cream: "hsl(var(--cream))",
+        chocolate: "hsl(var(--chocolate))",
+        coffee: "hsl(var(--coffee))",
+        gold: "hsl(var(--gold))",
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
           foreground: "hsl(var(--sidebar-foreground))",
