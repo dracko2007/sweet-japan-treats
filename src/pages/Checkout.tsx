@@ -94,10 +94,13 @@ const Checkout: React.FC = () => {
         if (data.status === 200 && data.results && data.results.length > 0) {
           const result = data.results[0];
           const prefecture = prefectures.find(p => p.nameJa === result.address1);
+          const prefectureDisplay = prefecture 
+            ? `${result.address1} (${prefecture.name})` 
+            : result.address1;
           
           setFormData(prev => ({
             ...prev,
-            prefecture: prefecture?.name || '',
+            prefecture: prefectureDisplay,
             city: result.address2 + result.address3,
           }));
         }
