@@ -76,9 +76,10 @@ const Profile: React.FC = () => {
             ? `${result.address1} (${prefecture.name})` 
             : result.address1;
           
-          // Adiciona hints de leitura para cidade e bairro
-          const cityRaw = `${result.address2}${result.address3}`;
-          const cityDisplay = addAddressHints(cityRaw);
+          // Adiciona hints de leitura para cidade e bairro separadamente
+          const city = addAddressHints(result.address2);
+          const neighborhood = result.address3 ? addAddressHints(result.address3) : '';
+          const cityDisplay = neighborhood ? `${city} ${neighborhood}` : city;
           
           setEditedUser(prev => ({
             ...prev,
