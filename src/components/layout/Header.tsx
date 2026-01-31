@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { ShoppingCart, Menu, X, ChevronDown } from 'lucide-react';
+import { ShoppingCart, Menu, X, ChevronDown, UserCircle } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
 
 const Header: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -103,6 +104,15 @@ const Header: React.FC = () => {
 
           {/* Cart & Mobile Menu */}
           <div className="flex items-center gap-4">
+            <Button 
+              variant="ghost" 
+              size="sm"
+              className="hidden lg:flex items-center gap-2"
+            >
+              <UserCircle className="w-5 h-5" />
+              <span>Cadastro</span>
+            </Button>
+
             <Link 
               to="/carrinho" 
               className="relative p-2 rounded-full hover:bg-secondary/50 transition-colors"
@@ -155,6 +165,14 @@ const Header: React.FC = () => {
                 )}
               </div>
             ))}
+            <Button 
+              variant="ghost" 
+              className="w-full justify-start mt-2 text-base font-medium"
+              onClick={() => setIsMenuOpen(false)}
+            >
+              <UserCircle className="w-5 h-5 mr-2" />
+              Cadastro
+            </Button>
           </nav>
         )}
       </div>

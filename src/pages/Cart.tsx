@@ -77,9 +77,11 @@ const Cart: React.FC = () => {
                 <div className="sticky top-24">
                   <ShippingCalculator />
                   
-                  <Button className="w-full mt-6 btn-primary rounded-xl py-6 text-lg font-semibold">
-                    Finalizar Compra
-                    <ArrowRight className="w-5 h-5 ml-2" />
+                  <Button asChild className="w-full mt-6 btn-primary rounded-xl py-6 text-lg font-semibold">
+                    <Link to="/checkout">
+                      Finalizar Compra
+                      <ArrowRight className="w-5 h-5 ml-2" />
+                    </Link>
                   </Button>
                   
                   <p className="text-center text-sm text-muted-foreground mt-4">
