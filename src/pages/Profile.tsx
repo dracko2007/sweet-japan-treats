@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { useUser, UserProfile } from '@/context/UserContext';
 import { useToast } from '@/hooks/use-toast';
 import { prefectures } from '@/data/prefectures';
+import { addAddressHints } from '@/utils/romanize';
 
 const Profile: React.FC = () => {
   const { user, isAuthenticated, coupons, orders, updateProfile, logout } = useUser();
@@ -75,13 +76,17 @@ const Profile: React.FC = () => {
             ? `${result.address1} (${prefecture.name})` 
             : result.address1;
           
+          // Adiciona hints de leitura para cidade e bairro
+          const cityRaw = `${result.address2}${result.address3}`;
+          const cityDisplay = addAddressHints(cityRaw);
+          
           setEditedUser(prev => ({
             ...prev,
             address: {
               ...prev.address,
               postalCode: formatted,
               prefecture: prefectureDisplay,
-              city: result.address2 + result.address3,
+              city: cityDisplay,
             }
           }));
           

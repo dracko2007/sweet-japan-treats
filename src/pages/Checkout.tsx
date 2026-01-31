@@ -9,6 +9,7 @@ import { useCart } from '@/context/CartContext';
 import { useUser } from '@/context/UserContext';
 import ShippingCalculator from '@/components/shipping/ShippingCalculator';
 import { prefectures } from '@/data/prefectures';
+import { addAddressHints } from '@/utils/romanize';
 
 const Checkout: React.FC = () => {
   const { items, totalPrice } = useCart();
@@ -98,10 +99,14 @@ const Checkout: React.FC = () => {
             ? `${result.address1} (${prefecture.name})` 
             : result.address1;
           
+          // Adiciona hints de leitura para cidade e bairro
+          const cityRaw = `${result.address2}${result.address3}`;
+          const cityDisplay = addAddressHints(cityRaw);
+          
           setFormData(prev => ({
             ...prev,
             prefecture: prefectureDisplay,
-            city: result.address2 + result.address3,
+            city: cityDisplay,
           }));
         }
       } catch (error) {

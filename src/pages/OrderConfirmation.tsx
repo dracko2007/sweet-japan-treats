@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { CheckCircle, Smartphone, Home, Mail } from 'lucide-react';
+import { CheckCircle, Smartphone, Home, Mail, Printer } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { useCart } from '@/context/CartContext';
@@ -21,18 +21,44 @@ const OrderConfirmation: React.FC = () => {
   
   const [trackingNumber, setTrackingNumber] = useState<string>('');
   const [emailSent, setEmailSent] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   
   // Use ref to prevent processing the order multiple times
   const processedRef = useRef(false);
 
   useEffect(() => {
+    console.log('🔍 OrderConfirmation mounted');
+    console.log('📦 location.state:', location.state);
+    console.log('📦 orderData:', orderData);
+    
     if (!orderData) {
-      navigate('/');
+      console.error('⚠️ No order data found in location.state');
+      console.log('🔙 Redirecting to home...');
+      navigate('/', { replace: true });
       return;
     }
 
+    // Validate orderData structure
+    if (!orderData.formData || !orderData.items || !orderData.totalPrice) {
+      console.error('⚠️ Invalid order data structure:', {
+        hasFormData: !!orderData.formData,
+        hasItems: !!orderData.items,
+        hasTotalPrice: !!orderData.totalPrice
+      });
+      navigate('/', { replace: true });
+      return;
+    }
+
+    console.log('✅ Valid order data received:', {
+      customerName: orderData.formData.name,
+      itemsCount: orderData.items.length,
+      total: orderData.totalPrice,
+      paymentMethod: orderData.paymentMethod
+    });
+
     // Prevent processing order multiple times
     if (processedRef.current) {
+      console.log('✅ Order already processed, skipping');
       return;
     }
     processedRef.current = true;
@@ -68,6 +94,9 @@ const OrderConfirmation: React.FC = () => {
       title: "🎉 Pedido Confirmado!",
       description: "Seu pedido foi realizado com sucesso. Você receberá uma confirmação por email e WhatsApp.",
     });
+
+    // Mark as loaded
+    setIsLoading(false);
 
     // Send notifications and create shipping label
     sendNotifications(orderData);
@@ -199,8 +228,17 @@ ${data.paymentMethod === 'bank' ? 'Depósito Bancário' : 'PayPay'}
     console.log('📱 WhatsApp Message:\n', whatsappMessage);
   };
 
-  if (!orderData) {
-    return null;
+  if (!orderData || isLoading) {
+    return (
+      <Layout>
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Processando pedido...</p>
+          </div>
+        </div>
+      </Layout>
+    );
   }
 
   const { formData, paymentMethod, items, totalPrice, shipping } = orderData;
