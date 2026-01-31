@@ -32,7 +32,7 @@ const Checkout: React.FC = () => {
     }
     
     setCheckoutData(state);
-  }, [location.state, items.length, navigate]);
+  }, [location, items.length, navigate]);
 
   const handlePrintReceipt = () => {
     window.print();

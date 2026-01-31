@@ -200,6 +200,7 @@ const ShippingCalculator: React.FC<ShippingCalculatorProps> = ({ onShippingSelec
               )}
               disabled={!onShippingSelected}
               type="button"
+              aria-label={`${option.name}, ¥${option.cost.toLocaleString()}, ${option.estimatedDays} dias úteis${selectedCarrier === option.carrier ? ', selecionado' : ''}`}
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
