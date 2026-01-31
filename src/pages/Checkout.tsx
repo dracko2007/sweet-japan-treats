@@ -6,9 +6,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useCart } from '@/context/CartContext';
+import { useUser } from '@/context/UserContext';
+import ShippingCalculator from '@/components/shipping/ShippingCalculator';
 
 const Checkout: React.FC = () => {
   const { items, totalPrice } = useCart();
+  const { user, isAuthenticated } = useUser();
   const navigate = useNavigate();
   const location = useLocation();
   
@@ -23,12 +26,34 @@ const Checkout: React.FC = () => {
     building: '',
   });
 
+  const [selectedShipping, setSelectedShipping] = useState<{
+    carrier: string;
+    cost: number;
+    estimatedDays: string;
+  } | null>(null);
+
   // Load form data from state if returning from review page
   useEffect(() => {
     if (location.state?.formData) {
       setFormData(location.state.formData);
     }
   }, [location.state]);
+
+  // Auto-populate from user profile if authenticated
+  useEffect(() => {
+    if (isAuthenticated && user && !location.state?.formData) {
+      setFormData({
+        name: user.name || '',
+        email: user.email || '',
+        phone: user.phone || '',
+        postalCode: user.address?.postalCode || '',
+        prefecture: user.address?.prefecture || '',
+        city: user.address?.city || '',
+        address: user.address?.address || '',
+        building: user.address?.building || '',
+      });
+    }
+  }, [isAuthenticated, user, location.state]);
 
   // Redirect if cart is empty
   useEffect(() => {
@@ -48,8 +73,18 @@ const Checkout: React.FC = () => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Navigate to review page with form data
-    navigate('/order-review', { state: { formData } });
+    // Validate shipping is selected
+    if (!selectedShipping) {
+      return; // ShippingCalculator will handle the UI feedback
+    }
+
+    // Navigate to review page with form data and shipping info
+    navigate('/order-review', { 
+      state: { 
+        formData,
+        shipping: selectedShipping
+      } 
+    });
   };
 
   return (
@@ -223,16 +258,46 @@ const Checkout: React.FC = () => {
                     </div>
                   </div>
 
+                  {/* Shipping Calculator Section */}
+                  <div className="pt-4 border-t border-border">
+                    <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-4">
+                      Calcular Frete
+                    </h3>
+                    <ShippingCalculator 
+                      selectedPrefecture={formData.prefecture}
+                      onShippingSelect={setSelectedShipping}
+                    />
+                  </div>
+
                   <div className="pt-4 border-t border-border">
                     <Button 
                       type="submit" 
                       className="w-full btn-primary rounded-xl py-6 text-lg font-semibold"
+                      disabled={!selectedShipping}
                     >
                       Revisar Pedido
                       <ArrowRight className="w-5 h-5 ml-2" />
                     </Button>
+                    {!selectedShipping && (
+                      <p className="text-xs text-muted-foreground text-center mt-2">
+                        Selecione uma transportadora para continuar
+                      </p>
+                    )}
                   </div>
                 </form>
+              </div>
+
+              {/* Shipping Calculator - Full Width on Mobile */}
+              <div className="lg:col-span-2 lg:hidden">
+                <div className="bg-card rounded-2xl border border-border p-6">
+                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-4">
+                    Calcular Frete
+                  </h3>
+                  <ShippingCalculator 
+                    selectedPrefecture={formData.prefecture}
+                    onShippingSelect={setSelectedShipping}
+                  />
+                </div>
               </div>
             </div>
 
