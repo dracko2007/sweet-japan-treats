@@ -323,16 +323,22 @@ _Sabor do Campo - Doce de Leite Artesanal_
               <div className="space-y-3">
                 <div className="flex items-center gap-3 text-sm">
                   <Mail className="w-5 h-5 text-green-600" />
-                  <div>
-                    <p className="font-medium">Email de confirmação enviado</p>
+                  <div className="flex-1">
+                    <p className="font-medium">Email de confirmação</p>
                     <p className="text-muted-foreground">{formData.email}</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {emailSent ? '✅ Enviado com sucesso' : '⏳ O email será enviado automaticamente'}
+                    </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3 text-sm">
                   <Smartphone className="w-5 h-5 text-green-600" />
-                  <div>
-                    <p className="font-medium">WhatsApp enviado para a loja</p>
+                  <div className="flex-1">
+                    <p className="font-medium">Notificação WhatsApp</p>
                     <p className="text-muted-foreground">070-1367-1679</p>
+                    <p className="text-xs text-orange-600 mt-1">
+                      💡 Duas janelas do WhatsApp Web serão abertas automaticamente. Clique em "Enviar" em cada uma!
+                    </p>
                   </div>
                 </div>
               </div>
