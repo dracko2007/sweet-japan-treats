@@ -105,12 +105,15 @@ const Header: React.FC = () => {
           {/* Cart & Mobile Menu */}
           <div className="flex items-center gap-4">
             <Button 
+              asChild
               variant="ghost" 
               size="sm"
               className="hidden lg:flex items-center gap-2"
             >
-              <UserCircle className="w-5 h-5" />
-              <span>Cadastro</span>
+              <Link to="/cadastro">
+                <UserCircle className="w-5 h-5" />
+                <span>Cadastro</span>
+              </Link>
             </Button>
 
             <Link 
@@ -166,12 +169,14 @@ const Header: React.FC = () => {
               </div>
             ))}
             <Button 
+              asChild
               variant="ghost" 
               className="w-full justify-start mt-2 text-base font-medium"
-              onClick={() => setIsMenuOpen(false)}
             >
-              <UserCircle className="w-5 h-5 mr-2" />
-              Cadastro
+              <Link to="/cadastro" onClick={() => setIsMenuOpen(false)}>
+                <UserCircle className="w-5 h-5 mr-2" />
+                Cadastro
+              </Link>
             </Button>
           </nav>
         )}

@@ -1,17 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Package, ArrowRight, MapPin, User, Phone, Mail } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useCart } from '@/context/CartContext';
-import { useToast } from '@/hooks/use-toast';
 
 const Checkout: React.FC = () => {
-  const { items, totalPrice, clearCart } = useCart();
+  const { items, totalPrice } = useCart();
   const navigate = useNavigate();
-  const { toast } = useToast();
+  const location = useLocation();
   
   const [formData, setFormData] = useState({
     name: '',
@@ -23,6 +22,13 @@ const Checkout: React.FC = () => {
     address: '',
     building: '',
   });
+
+  // Load form data from state if returning from review page
+  useEffect(() => {
+    if (location.state?.formData) {
+      setFormData(location.state.formData);
+    }
+  }, [location.state]);
 
   // Redirect if cart is empty
   useEffect(() => {
@@ -42,20 +48,8 @@ const Checkout: React.FC = () => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Simulate order submission
-    toast({
-      title: "Pedido realizado!",
-      description: "Você receberá um email de confirmação em breve.",
-    });
-
-    // Clear cart and redirect
-    const timeoutId = setTimeout(() => {
-      clearCart();
-      navigate('/');
-    }, 2000);
-
-    // Cleanup timeout on unmount
-    return () => clearTimeout(timeoutId);
+    // Navigate to review page with form data
+    navigate('/order-review', { state: { formData } });
   };
 
   return (
@@ -234,7 +228,7 @@ const Checkout: React.FC = () => {
                       type="submit" 
                       className="w-full btn-primary rounded-xl py-6 text-lg font-semibold"
                     >
-                      Confirmar Pedido
+                      Revisar Pedido
                       <ArrowRight className="w-5 h-5 ml-2" />
                     </Button>
                   </div>

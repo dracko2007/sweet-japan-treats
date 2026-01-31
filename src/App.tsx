@@ -8,6 +8,9 @@ import Index from "./pages/Index";
 import Products from "./pages/Products";
 import Cart from "./pages/Cart";
 import Checkout from "./pages/Checkout";
+import OrderReview from "./pages/OrderReview";
+import OrderConfirmation from "./pages/OrderConfirmation";
+import Register from "./pages/Register";
 import Shipping from "./pages/Shipping";
 import About from "./pages/About";
 import Vlog from "./pages/Vlog";
@@ -28,6 +31,9 @@ const App = () => (
             <Route path="/produtos/:category" element={<Products />} />
             <Route path="/carrinho" element={<Cart />} />
             <Route path="/checkout" element={<Checkout />} />
+            <Route path="/order-review" element={<OrderReview />} />
+            <Route path="/order-confirmation" element={<OrderConfirmation />} />
+            <Route path="/cadastro" element={<Register />} />
             <Route path="/frete" element={<Shipping />} />
             <Route path="/sobre" element={<About />} />
             <Route path="/vlog" element={<Vlog />} />
