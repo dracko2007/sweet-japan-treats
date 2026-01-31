@@ -5,7 +5,7 @@ import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useUser } from '@/context/UserContext';
+import { useUser, UserProfile } from '@/context/UserContext';
 import { useToast } from '@/hooks/use-toast';
 
 const Profile: React.FC = () => {
@@ -13,7 +13,7 @@ const Profile: React.FC = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [isEditing, setIsEditing] = useState(false);
-  const [editedUser, setEditedUser] = useState(user || {});
+  const [editedUser, setEditedUser] = useState<Partial<UserProfile>>(user || {});
 
   // Redirect if not authenticated
   React.useEffect(() => {
@@ -33,7 +33,7 @@ const Profile: React.FC = () => {
       setEditedUser(prev => ({
         ...prev,
         [parent]: {
-          ...(prev as any)[parent],
+          ...((prev as UserProfile)[parent as keyof UserProfile] as Record<string, unknown>),
           [child]: value
         }
       }));
@@ -120,7 +120,7 @@ const Profile: React.FC = () => {
                     <Input
                       id="name"
                       name="name"
-                      value={(editedUser as any).name || ''}
+                      value={editedUser.name || ''}
                       onChange={handleInputChange}
                     />
                   </div>
@@ -130,7 +130,7 @@ const Profile: React.FC = () => {
                       id="email"
                       name="email"
                       type="email"
-                      value={(editedUser as any).email || ''}
+                      value={editedUser.email || ''}
                       onChange={handleInputChange}
                     />
                   </div>
@@ -140,7 +140,7 @@ const Profile: React.FC = () => {
                       id="phone"
                       name="phone"
                       type="tel"
-                      value={(editedUser as any).phone || ''}
+                      value={editedUser.phone || ''}
                       onChange={handleInputChange}
                     />
                   </div>
@@ -150,7 +150,7 @@ const Profile: React.FC = () => {
                       id="birthdate"
                       name="birthdate"
                       type="date"
-                      value={(editedUser as any).birthdate || ''}
+                      value={editedUser.birthdate || ''}
                       onChange={handleInputChange}
                     />
                   </div>
@@ -159,7 +159,7 @@ const Profile: React.FC = () => {
                     <Input
                       id="postalCode"
                       name="address.postalCode"
-                      value={(editedUser as any).address?.postalCode || ''}
+                      value={editedUser.address?.postalCode || ''}
                       onChange={handleInputChange}
                     />
                   </div>
@@ -168,7 +168,7 @@ const Profile: React.FC = () => {
                     <Input
                       id="prefecture"
                       name="address.prefecture"
-                      value={(editedUser as any).address?.prefecture || ''}
+                      value={editedUser.address?.prefecture || ''}
                       onChange={handleInputChange}
                     />
                   </div>
@@ -177,7 +177,7 @@ const Profile: React.FC = () => {
                     <Input
                       id="city"
                       name="address.city"
-                      value={(editedUser as any).address?.city || ''}
+                      value={editedUser.address?.city || ''}
                       onChange={handleInputChange}
                     />
                   </div>
@@ -186,7 +186,7 @@ const Profile: React.FC = () => {
                     <Input
                       id="address"
                       name="address.address"
-                      value={(editedUser as any).address?.address || ''}
+                      value={editedUser.address?.address || ''}
                       onChange={handleInputChange}
                     />
                   </div>
@@ -195,7 +195,7 @@ const Profile: React.FC = () => {
                     <Input
                       id="building"
                       name="address.building"
-                      value={(editedUser as any).address?.building || ''}
+                      value={editedUser.address?.building || ''}
                       onChange={handleInputChange}
                     />
                   </div>
