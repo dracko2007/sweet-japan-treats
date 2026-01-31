@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useUser, UserProfile } from '@/context/UserContext';
 import { useToast } from '@/hooks/use-toast';
+import { prefectures } from '@/data/prefectures';
 
 const Profile: React.FC = () => {
   const { user, isAuthenticated, coupons, orders, updateProfile, logout } = useUser();
@@ -39,6 +40,55 @@ const Profile: React.FC = () => {
       }));
     } else {
       setEditedUser(prev => ({ ...prev, [name]: value }));
+    }
+  };
+
+  // Busca automática de endereço por CEP
+  const handlePostalCodeChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value.replace(/\D/g, '');
+    
+    // Formata CEP (XXX-XXXX)
+    let formatted = value;
+    if (value.length > 3) {
+      formatted = `${value.slice(0, 3)}-${value.slice(3, 7)}`;
+    }
+    
+    // Atualiza o campo CEP
+    setEditedUser(prev => ({
+      ...prev,
+      address: {
+        ...prev.address,
+        postalCode: formatted
+      }
+    }));
+
+    // Busca endereço quando CEP está completo (7 dígitos)
+    if (value.length === 7) {
+      try {
+        const response = await fetch(`https://zipcloud.ibsnet.co.jp/api/search?zipcode=${value}`);
+        const data = await response.json();
+        
+        if (data.status === 200 && data.results && data.results.length > 0) {
+          const result = data.results[0];
+          
+          setEditedUser(prev => ({
+            ...prev,
+            address: {
+              ...prev.address,
+              postalCode: formatted,
+              prefecture: result.address1,
+              city: result.address2 + result.address3,
+            }
+          }));
+          
+          toast({
+            title: "Endereço encontrado!",
+            description: "Província e cidade preenchidos automaticamente.",
+          });
+        }
+      } catch (error) {
+        console.error('Erro ao buscar CEP:', error);
+      }
     }
   };
 
@@ -155,30 +205,40 @@ const Profile: React.FC = () => {
                     />
                   </div>
                   <div className="space-y-2 md:col-span-2">
-                    <Label htmlFor="postalCode">CEP</Label>
+                    <Label htmlFor="postalCode">CEP (郵便番号)</Label>
                     <Input
                       id="postalCode"
                       name="address.postalCode"
+                      type="text"
+                      placeholder="100-0001"
                       value={editedUser.address?.postalCode || ''}
-                      onChange={handleInputChange}
+                      onChange={handlePostalCodeChange}
+                      maxLength={8}
                     />
+                    <p className="text-xs text-muted-foreground">
+                      Digite o CEP - Província e cidade preenchem automaticamente
+                    </p>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="prefecture">Prefeitura</Label>
+                    <Label htmlFor="prefecture">Província (都道府県)</Label>
                     <Input
                       id="prefecture"
                       name="address.prefecture"
                       value={editedUser.address?.prefecture || ''}
                       onChange={handleInputChange}
+                      readOnly
+                      className="bg-secondary/50"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="city">Cidade</Label>
+                    <Label htmlFor="city">Cidade (市区町村)</Label>
                     <Input
                       id="city"
                       name="address.city"
                       value={editedUser.address?.city || ''}
                       onChange={handleInputChange}
+                      readOnly
+                      className="bg-secondary/50"
                     />
                   </div>
                   <div className="space-y-2 md:col-span-2">
