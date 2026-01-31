@@ -52,6 +52,12 @@ export const emailService = {
     
     try {
       console.log('📤 Sending request to Resend API...');
+      console.log('📤 Request body:', {
+        from: FROM_EMAIL,
+        to: data.to,
+        subject: data.subject,
+        htmlLength: data.html.length
+      });
       
       const response = await fetch('https://api.resend.com/emails', {
         method: 'POST',
@@ -67,7 +73,10 @@ export const emailService = {
         })
       });
 
+      console.log('📥 Response status:', response.status, response.statusText);
+
       const result = await response.json();
+      console.log('📥 Response data:', result);
 
       if (!response.ok) {
         console.error('❌ Resend API error:', {
@@ -76,8 +85,9 @@ export const emailService = {
           error: result
         });
         
-        // Show error to user
-        alert(`Erro ao enviar email: ${result.message || 'Erro desconhecido'}. Verifique o console para detalhes.`);
+        // Show detailed error to user
+        const errorMessage = result.message || result.error || 'Erro desconhecido';
+        alert(`❌ Erro ao enviar email:\n\n${errorMessage}\n\nStatus: ${response.status}\n\nVerifique o console (F12) para mais detalhes.`);
         
         return false;
       }
@@ -87,7 +97,12 @@ export const emailService = {
       return true;
     } catch (error) {
       console.error('❌ Error sending email:', error);
-      alert('Erro ao enviar email. Verifique sua conexão e tente novamente.');
+      console.error('❌ Error details:', {
+        name: (error as Error).name,
+        message: (error as Error).message,
+        stack: (error as Error).stack
+      });
+      alert(`❌ Erro ao enviar email:\n\n${(error as Error).message}\n\nVerifique sua conexão e o console (F12).`);
       return false;
     }
   },

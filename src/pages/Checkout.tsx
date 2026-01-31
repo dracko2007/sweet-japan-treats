@@ -48,8 +48,9 @@ const Checkout: React.FC = () => {
     if (isAuthenticated && user && !location.state?.formData) {
       console.log('🔍 Checkout - Preenchendo dados do usuário:', user);
       console.log('📍 Endereço do usuário:', user.address);
+      console.log('🏛️ Província do usuário:', user.address?.prefecture);
       
-      setFormData({
+      const formDataToSet = {
         name: user.name || '',
         email: user.email || '',
         phone: user.phone || '',
@@ -58,7 +59,11 @@ const Checkout: React.FC = () => {
         city: user.address?.city || '',
         address: user.address?.address || '',
         building: user.address?.building || '',
-      });
+      };
+      
+      console.log('📝 Dados que serão preenchidos no formulário:', formDataToSet);
+      
+      setFormData(formDataToSet);
       
       console.log('✅ Checkout - Formulário preenchido com dados do perfil');
     } else if (!isAuthenticated) {
