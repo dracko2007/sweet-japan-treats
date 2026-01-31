@@ -156,6 +156,10 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
   const login = async (email: string, password: string): Promise<boolean> => {
     // Search in users database for matching credentials
     const allUsers = getAllUsers();
+    console.log('🔍 Login attempt:', { email });
+    console.log('📦 Total users in database:', allUsers.length);
+    console.log('👥 All registered users:', allUsers.map(u => ({ email: u.email, id: u.id })));
+    
     const foundUser = allUsers.find(u => u.email === email && u.password === password);
     
     if (foundUser) {
@@ -169,11 +173,12 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       setCoupons(userCoupons);
       setOrders(userOrders);
       
-      console.log('User logged in successfully:', { email: foundUser.email, id: foundUser.id });
+      console.log('✅ User logged in successfully:', { email: foundUser.email, id: foundUser.id });
       return true;
     }
     
-    console.log('Login failed: User not found or incorrect password');
+    console.log('❌ Login failed: User not found or incorrect password');
+    console.log('💡 Hint: Did you register first? Check the Register page.');
     return false;
   };
 

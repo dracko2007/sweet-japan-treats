@@ -191,46 +191,49 @@ const OrderReview: React.FC = () => {
               </div>
             </div>
 
-            {/* Shipping Addresses */}
-            <div className="grid md:grid-cols-2 gap-6">
-              {/* Sender Address */}
-              <div className="bg-card rounded-2xl border border-border p-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-8 h-8 rounded-full bg-secondary/50 flex items-center justify-center">
-                    <MapPin className="w-4 h-4 text-foreground" />
-                  </div>
-                  <h3 className="font-display text-lg font-semibold text-foreground">
-                    Remetente
-                  </h3>
+            {/* Shipping Address - Destinatário APENAS */}
+            <div className="bg-card rounded-2xl border border-border p-6 lg:p-8">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                  <MapPin className="w-5 h-5 text-primary" />
                 </div>
-                <div className="space-y-2 text-sm">
-                  <p className="font-semibold">{senderAddress.name}</p>
-                  <p>〒{senderAddress.postalCode}</p>
-                  <p>{senderAddress.prefecture}</p>
-                  <p>{senderAddress.city}</p>
-                  <p>{senderAddress.address}</p>
-                  <p>Tel: {senderAddress.phone}</p>
-                </div>
+                <h2 className="font-display text-2xl font-semibold text-foreground">
+                  Endereço de Entrega (Destinatário)
+                </h2>
               </div>
-
-              {/* Recipient Address */}
-              <div className="bg-card rounded-2xl border border-border p-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                    <MapPin className="w-4 h-4 text-primary" />
-                  </div>
-                  <h3 className="font-display text-lg font-semibold text-foreground">
-                    Destinatário
-                  </h3>
+              
+              <div className="space-y-4">
+                <div>
+                  <Label className="text-muted-foreground text-sm">Nome Completo</Label>
+                  <p className="font-semibold text-lg text-foreground">{formData.name}</p>
                 </div>
-                <div className="space-y-2 text-sm">
-                  <p className="font-semibold">{formData.name}</p>
-                  <p>〒{formData.postalCode}</p>
-                  <p>{formData.prefecture}</p>
-                  <p>{formData.city}</p>
-                  <p>{formData.address}</p>
-                  {formData.building && <p>{formData.building}</p>}
-                  <p>Tel: {formData.phone}</p>
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-muted-foreground text-sm">CEP</Label>
+                    <p className="font-medium text-foreground">〒{formData.postalCode}</p>
+                  </div>
+                  <div>
+                    <Label className="text-muted-foreground text-sm">Província</Label>
+                    <p className="font-medium text-foreground">{formData.prefecture}</p>
+                  </div>
+                </div>
+                <div>
+                  <Label className="text-muted-foreground text-sm">Cidade</Label>
+                  <p className="font-medium text-foreground">{formData.city}</p>
+                </div>
+                <div>
+                  <Label className="text-muted-foreground text-sm">Endereço</Label>
+                  <p className="font-medium text-foreground">{formData.address}</p>
+                </div>
+                {formData.building && (
+                  <div>
+                    <Label className="text-muted-foreground text-sm">Edifício/Apartamento</Label>
+                    <p className="font-medium text-foreground">{formData.building}</p>
+                  </div>
+                )}
+                <div>
+                  <Label className="text-muted-foreground text-sm">Telefone</Label>
+                  <p className="font-medium text-foreground">{formData.phone}</p>
                 </div>
               </div>
             </div>

@@ -73,6 +73,40 @@ const Checkout: React.FC = () => {
     }));
   };
 
+  // Busca automática de endereço por CEP
+  const handlePostalCodeChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value.replace(/\D/g, '');
+    
+    // Formata CEP (XXX-XXXX)
+    let formatted = value;
+    if (value.length > 3) {
+      formatted = `${value.slice(0, 3)}-${value.slice(3, 7)}`;
+    }
+    
+    setFormData(prev => ({ ...prev, postalCode: formatted }));
+
+    // Busca endereço quando CEP está completo (7 dígitos)
+    if (value.length === 7) {
+      try {
+        const response = await fetch(`https://zipcloud.ibsnet.co.jp/api/search?zipcode=${value}`);
+        const data = await response.json();
+        
+        if (data.status === 200 && data.results && data.results.length > 0) {
+          const result = data.results[0];
+          const prefecture = prefectures.find(p => p.nameJa === result.address1);
+          
+          setFormData(prev => ({
+            ...prev,
+            prefecture: prefecture?.name || '',
+            city: result.address2 + result.address3,
+          }));
+        }
+      } catch (error) {
+        console.error('Erro ao buscar CEP:', error);
+      }
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -196,9 +230,13 @@ const Checkout: React.FC = () => {
                           type="text"
                           placeholder="123-4567"
                           value={formData.postalCode}
-                          onChange={handleInputChange}
+                          onChange={handlePostalCodeChange}
+                          maxLength={8}
                           required
                         />
+                        <p className="text-xs text-muted-foreground">
+                          Digite o CEP - Província e cidade preenchem automaticamente
+                        </p>
                       </div>
 
                       <div className="space-y-2">
