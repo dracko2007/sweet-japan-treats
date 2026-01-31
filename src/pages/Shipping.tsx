@@ -122,13 +122,19 @@ const Shipping: React.FC = () => {
                   <div className="flex items-start gap-3">
                     <span className="font-medium text-foreground min-w-[60px]">60cm:</span>
                     <span className="text-muted-foreground">
-                      Até 8 potes pequenos (280g) ou 1 grande + 1 pequeno
+                      Até 2 potes grandes (800g) ou 4 potes pequenos (280g)
                     </span>
                   </div>
                   <div className="flex items-start gap-3">
                     <span className="font-medium text-foreground min-w-[60px]">80cm:</span>
                     <span className="text-muted-foreground">
-                      Até 3 potes grandes (800g) ou 2 grandes + 2 pequenos
+                      Até 3 potes grandes (800g) ou 6 potes pequenos (280g)
+                    </span>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <span className="font-medium text-foreground min-w-[60px]">100cm:</span>
+                    <span className="text-muted-foreground">
+                      Até 6 potes grandes (800g) ou 12 potes pequenos (280g)
                     </span>
                   </div>
                   <p className="text-xs text-muted-foreground pt-2 border-t border-primary/10">

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { ShoppingCart, Menu, X, ChevronDown } from 'lucide-react';
+import { ShoppingCart, Menu, X, ChevronDown, UserPlus } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
 import { cn } from '@/lib/utils';
 
@@ -101,8 +101,16 @@ const Header: React.FC = () => {
             ))}
           </nav>
 
-          {/* Cart & Mobile Menu */}
+          {/* Cart, Register & Mobile Menu */}
           <div className="flex items-center gap-4">
+            <Link 
+              to="/cadastro" 
+              className="hidden md:flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 hover:bg-primary/20 text-primary transition-colors text-sm font-medium"
+            >
+              <UserPlus className="w-4 h-4" />
+              Cadastre-se
+            </Link>
+
             <Link 
               to="/carrinho" 
               className="relative p-2 rounded-full hover:bg-secondary/50 transition-colors"
@@ -155,6 +163,13 @@ const Header: React.FC = () => {
                 )}
               </div>
             ))}
+            <Link
+              to="/cadastro"
+              className="block py-3 text-base font-medium text-primary transition-colors"
+              onClick={() => setIsMenuOpen(false)}
+            >
+              Cadastre-se
+            </Link>
           </nav>
         )}
       </div>
