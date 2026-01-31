@@ -466,42 +466,23 @@ _Sabor do Campo - Doce de Leite Artesanal_
                   </div>
                 )}
 
-                {/* Sender Info for Shipping Label */}
-                <div className="print:block hidden print:break-before-page">
-                  <h3 className="font-semibold text-lg mb-3">Etiqueta de Envio</h3>
-                  <div className="grid grid-cols-2 gap-4 border-2 border-dashed border-border p-4">
-                    <div>
-                      <p className="font-semibold mb-2">REMETENTE:</p>
-                      <p className="text-sm">Paula Shiokawa</p>
-                      <p className="text-sm">〒518-0225</p>
-                      <p className="text-sm">三重県 伊賀市</p>
-                      <p className="text-sm">桐ヶ丘 5-292</p>
-                      <p className="text-sm">Tel: 070-1367-1679</p>
-                    </div>
-                    <div>
-                      <p className="font-semibold mb-2">DESTINATÁRIO:</p>
-                      <p className="text-sm">{formData.name}</p>
-                      <p className="text-sm">〒{formData.postalCode}</p>
-                      <p className="text-sm">{formData.prefecture} {formData.city}</p>
-                      <p className="text-sm">{formData.address}</p>
-                      {formData.building && <p className="text-sm">{formData.building}</p>}
-                      <p className="text-sm">Tel: {formData.phone}</p>
+                {/* Payment Info - Only visible when printed */}
+                {paymentMethod === 'bank' && (
+                  <div className="print:block hidden print:break-inside-avoid">
+                    <h4 className="font-semibold mb-2">Dados Bancários</h4>
+                    <div className="text-sm space-y-1 font-mono">
+                      <p>Banco: [Nome do Banco]</p>
+                      <p>Agência: [Número da Agência]</p>
+                      <p>Conta: [Número da Conta]</p>
+                      <p>Nome: Paula Shiokawa</p>
                     </div>
                   </div>
-                </div>
+                )}
               </div>
             </div>
 
             {/* Action Buttons */}
             <div className="flex flex-col sm:flex-row gap-4 print:hidden">
-              <Button 
-                variant="outline" 
-                onClick={handlePrint}
-                className="flex-1 rounded-xl py-6 text-lg gap-2"
-              >
-                <Printer className="w-5 h-5" />
-                Imprimir Recibo
-              </Button>
               <Button 
                 onClick={() => navigate('/')}
                 className="flex-1 btn-primary rounded-xl py-6 text-lg font-semibold gap-2"

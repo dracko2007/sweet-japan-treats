@@ -108,6 +108,21 @@ const Header: React.FC = () => {
 
           {/* Cart & Mobile Menu */}
           <div className="flex items-center gap-4">
+            {/* Admin Link - Only for Paula */}
+            {isAuthenticated && user?.email === 'dracko2007@gmail.com' && (
+              <Button 
+                asChild
+                variant="ghost" 
+                size="sm"
+                className="hidden lg:flex items-center gap-2 text-orange-600 hover:text-orange-700"
+              >
+                <Link to="/admin">
+                  <UserCircle className="w-5 h-5" />
+                  <span>Admin</span>
+                </Link>
+              </Button>
+            )}
+            
             <Button 
               asChild
               variant="ghost" 
