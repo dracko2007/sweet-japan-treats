@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { UserCircle, Mail, Lock, Phone, ArrowRight } from 'lucide-react';
+import { Mail, Lock, ArrowRight, UserCircle } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,18 +8,16 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { useUser } from '@/context/UserContext';
 
-const Register: React.FC = () => {
+const Login: React.FC = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { register: registerUser, isAuthenticated } = useUser();
+  const { login, isAuthenticated } = useUser();
   
   const [formData, setFormData] = useState({
-    name: '',
     email: '',
-    phone: '',
     password: '',
-    confirmPassword: '',
   });
+  const [isLoading, setIsLoading] = useState(false);
 
   // Redirect if already authenticated
   React.useEffect(() => {
@@ -38,47 +36,36 @@ const Register: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsLoading(true);
 
-    // Validate passwords match
-    if (formData.password !== formData.confirmPassword) {
-      toast({
-        title: "Erro",
-        description: "As senhas não coincidem.",
-        variant: "destructive",
-      });
-      return;
-    }
+    try {
+      const success = await login(formData.email, formData.password);
 
-    // Register user
-    const success = await registerUser({
-      name: formData.name,
-      email: formData.email,
-      phone: formData.phone,
-      password: formData.password,
-      address: {
-        postalCode: '',
-        prefecture: '',
-        city: '',
-        address: '',
+      if (success) {
+        toast({
+          title: "Login realizado!",
+          description: "Bem-vindo(a) de volta!",
+        });
+
+        // Redirect to profile
+        setTimeout(() => {
+          navigate('/perfil');
+        }, 1000);
+      } else {
+        toast({
+          title: "Erro ao fazer login",
+          description: "Email ou senha incorretos. Verifique seus dados ou cadastre-se.",
+          variant: "destructive",
+        });
       }
-    });
-
-    if (success) {
-      toast({
-        title: "Cadastro realizado!",
-        description: "Bem-vindo(a) ao Doce de Leite! Você ganhou um cupom de boas-vindas!",
-      });
-
-      // Redirect to profile
-      setTimeout(() => {
-        navigate('/perfil');
-      }, 1500);
-    } else {
+    } catch (error) {
       toast({
         title: "Erro",
-        description: "Não foi possível realizar o cadastro.",
+        description: "Ocorreu um erro ao fazer login. Tente novamente.",
         variant: "destructive",
       });
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -88,10 +75,10 @@ const Register: React.FC = () => {
         <div className="container mx-auto px-4">
           <div className="text-center">
             <h1 className="font-display text-4xl lg:text-5xl font-bold text-foreground mb-4">
-              Criar Conta
+              Fazer Login
             </h1>
             <p className="text-muted-foreground text-lg">
-              Cadastre-se para acompanhar seus pedidos e receber ofertas exclusivas
+              Entre na sua conta para acompanhar seus pedidos
             </p>
           </div>
         </div>
@@ -106,27 +93,11 @@ const Register: React.FC = () => {
                   <UserCircle className="w-5 h-5 text-primary" />
                 </div>
                 <h2 className="font-display text-2xl font-semibold text-foreground">
-                  Seus Dados
+                  Entrar na Conta
                 </h2>
               </div>
 
               <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name" className="flex items-center gap-2">
-                    <UserCircle className="w-4 h-4" />
-                    Nome Completo *
-                  </Label>
-                  <Input
-                    id="name"
-                    name="name"
-                    type="text"
-                    placeholder="山田 太郎"
-                    value={formData.name}
-                    onChange={handleInputChange}
-                    required
-                  />
-                </div>
-
                 <div className="space-y-2">
                   <Label htmlFor="email" className="flex items-center gap-2">
                     <Mail className="w-4 h-4" />
@@ -140,22 +111,7 @@ const Register: React.FC = () => {
                     value={formData.email}
                     onChange={handleInputChange}
                     required
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="phone" className="flex items-center gap-2">
-                    <Phone className="w-4 h-4" />
-                    Telefone *
-                  </Label>
-                  <Input
-                    id="phone"
-                    name="phone"
-                    type="tel"
-                    placeholder="090-1234-5678"
-                    value={formData.phone}
-                    onChange={handleInputChange}
-                    required
+                    disabled={isLoading}
                   />
                 </div>
 
@@ -173,23 +129,7 @@ const Register: React.FC = () => {
                     onChange={handleInputChange}
                     required
                     minLength={6}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="confirmPassword" className="flex items-center gap-2">
-                    <Lock className="w-4 h-4" />
-                    Confirmar Senha *
-                  </Label>
-                  <Input
-                    id="confirmPassword"
-                    name="confirmPassword"
-                    type="password"
-                    placeholder="••••••••"
-                    value={formData.confirmPassword}
-                    onChange={handleInputChange}
-                    required
-                    minLength={6}
+                    disabled={isLoading}
                   />
                 </div>
 
@@ -197,19 +137,27 @@ const Register: React.FC = () => {
                   <Button 
                     type="submit" 
                     className="w-full btn-primary rounded-xl py-6 text-lg font-semibold"
+                    disabled={isLoading}
                   >
-                    Criar Conta
-                    <ArrowRight className="w-5 h-5 ml-2" />
+                    {isLoading ? 'Entrando...' : 'Entrar'}
+                    {!isLoading && <ArrowRight className="w-5 h-5 ml-2" />}
                   </Button>
                 </div>
 
-                <div className="text-center pt-4">
+                <div className="text-center pt-4 space-y-2">
                   <p className="text-sm text-muted-foreground">
-                    Já tem uma conta?{' '}
-                    <Link to="/login" className="text-primary hover:underline font-medium">
-                      Fazer login
+                    Não tem uma conta?{' '}
+                    <Link to="/cadastro" className="text-primary hover:underline font-medium">
+                      Cadastre-se
                     </Link>
                   </p>
+                  
+                  <div className="pt-4 border-t border-border">
+                    <p className="text-xs text-muted-foreground">
+                      💡 <strong>Dica:</strong> Se você já se cadastrou mas não consegue fazer login,
+                      tente se cadastrar novamente. Seu cadastro anterior pode não ter sido salvo corretamente.
+                    </p>
+                  </div>
                 </div>
               </form>
             </div>
@@ -220,4 +168,4 @@ const Register: React.FC = () => {
   );
 };
 
-export default Register;
+export default Login;

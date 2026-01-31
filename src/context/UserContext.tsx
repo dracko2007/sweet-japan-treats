@@ -5,6 +5,7 @@ export interface UserProfile {
   name: string;
   email: string;
   phone: string;
+  password?: string; // Stored for demo purposes - in production, use backend authentication
   birthdate?: string;
   address: {
     postalCode: string;
@@ -55,7 +56,7 @@ interface UserContextType {
   coupons: Coupon[];
   orders: Order[];
   login: (email: string, password: string) => Promise<boolean>;
-  register: (userData: Omit<UserProfile, 'id' | 'createdAt'>) => Promise<boolean>;
+  register: (userData: Omit<UserProfile, 'id' | 'createdAt' | 'password'> & { password: string }) => Promise<boolean>;
   logout: () => void;
   updateProfile: (userData: Partial<UserProfile>) => void;
   addCoupon: (coupon: Coupon) => void;
@@ -119,25 +120,49 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
   }, [orders]);
 
   const login = async (email: string, password: string): Promise<boolean> => {
-    // Simulate login - in real app, this would call an API
+    // Simulate login - in real app, this would call an API with secure authentication
     const storedUser = localStorage.getItem('user');
+    const storedCoupons = localStorage.getItem('coupons');
+    const storedOrders = localStorage.getItem('orders');
+    
     if (storedUser) {
       const userData = JSON.parse(storedUser);
-      if (userData.email === email) {
+      // Check both email and password
+      if (userData.email === email && userData.password === password) {
         setUser(userData);
         setIsAuthenticated(true);
+        
+        // Restore user's coupons and orders
+        if (storedCoupons) {
+          setCoupons(JSON.parse(storedCoupons));
+        }
+        if (storedOrders) {
+          setOrders(JSON.parse(storedOrders));
+        }
+        
         return true;
       }
     }
     return false;
   };
 
-  const register = async (userData: Omit<UserProfile, 'id' | 'createdAt'>): Promise<boolean> => {
+  const register = async (userData: Omit<UserProfile, 'id' | 'createdAt' | 'password'> & { password: string }): Promise<boolean> => {
     try {
+      // Check if user with this email already exists
+      const storedUser = localStorage.getItem('user');
+      if (storedUser) {
+        const existingUser = JSON.parse(storedUser);
+        if (existingUser.email === userData.email) {
+          console.error('User with this email already exists');
+          return false;
+        }
+      }
+
       const newUser: UserProfile = {
         ...userData,
         id: `user-${Date.now()}`,
         createdAt: new Date().toISOString(),
+        password: userData.password, // Store password (demo only - use backend auth in production)
       };
       
       setUser(newUser);
@@ -155,6 +180,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       };
       setCoupons([welcomeCoupon]);
 
+      console.log('User registered successfully:', { email: newUser.email, id: newUser.id });
       return true;
     } catch (error) {
       console.error('Error registering user:', error);

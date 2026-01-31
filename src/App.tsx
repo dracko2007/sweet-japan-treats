@@ -12,6 +12,7 @@ import Checkout from "./pages/Checkout";
 import OrderReview from "./pages/OrderReview";
 import OrderConfirmation from "./pages/OrderConfirmation";
 import Register from "./pages/Register";
+import Login from "./pages/Login";
 import Profile from "./pages/Profile";
 import Shipping from "./pages/Shipping";
 import About from "./pages/About";
@@ -37,7 +38,7 @@ const App = () => (
               <Route path="/order-review" element={<OrderReview />} />
               <Route path="/order-confirmation" element={<OrderConfirmation />} />
               <Route path="/cadastro" element={<Register />} />
-              <Route path="/login" element={<Register />} />
+              <Route path="/login" element={<Login />} />
               <Route path="/perfil" element={<Profile />} />
               <Route path="/frete" element={<Shipping />} />
               <Route path="/sobre" element={<About />} />
