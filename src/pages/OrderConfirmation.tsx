@@ -1,11 +1,15 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { CheckCircle, Package, Smartphone, Printer, Home, Mail } from 'lucide-react';
+import { CheckCircle, Package, Smartphone, Printer, Home, Mail, Truck } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { useCart } from '@/context/CartContext';
 import { useUser } from '@/context/UserContext';
 import { useToast } from '@/hooks/use-toast';
+import ShippingLabel from '@/components/shipping/ShippingLabel';
+import { emailService } from '@/services/emailService';
+import { paypayService } from '@/services/paypayService';
+import { carrierService } from '@/services/carrierService';
 
 const OrderConfirmation: React.FC = () => {
   const { clearCart } = useCart();
@@ -14,6 +18,10 @@ const OrderConfirmation: React.FC = () => {
   const location = useLocation();
   const { toast } = useToast();
   const orderData = location.state;
+  
+  const [trackingNumber, setTrackingNumber] = useState<string>('');
+  const [emailSent, setEmailSent] = useState(false);
+  const [showShippingLabel, setShowShippingLabel] = useState(false);
 
   useEffect(() => {
     if (!orderData) {
@@ -53,20 +61,91 @@ const OrderConfirmation: React.FC = () => {
       description: "Seu pedido foi realizado com sucesso. Você receberá uma confirmação por email e WhatsApp.",
     });
 
-    // Simulate sending notifications
-    // In a real app, this would call a backend API
+    // Send notifications and create shipping label
     sendNotifications(orderData);
   }, [orderData, clearCart, navigate, toast, addOrder, isAuthenticated]);
 
   const sendNotifications = async (data: any) => {
-    // This is a placeholder for backend integration
-    // In production, this would call your backend API which would:
-    // 1. Send WhatsApp message via WhatsApp Business API
-    // 2. Send email confirmation
-    // 3. Generate shipping labels via courier APIs
-    
-    // Format WhatsApp message
+    const orderNumber = `DL-${Date.now().toString().slice(-8)}`;
     const shipping = data.shipping || { carrier: 'N/A', cost: 0, estimatedDays: 'N/A' };
+    
+    // 1. Send Email
+    try {
+      const emailHTML = emailService.generateOrderEmailHTML({
+        ...data,
+        orderNumber
+      });
+      
+      const emailResult = await emailService.sendOrderConfirmation({
+        to: data.formData.email,
+        subject: `Confirmação de Pedido ${orderNumber} - Doce de Leite`,
+        html: emailHTML,
+        orderNumber,
+        customerName: data.formData.name
+      });
+      
+      setEmailSent(emailResult);
+    } catch (error) {
+      console.error('Error sending email:', error);
+    }
+    
+    // 2. PayPay Integration (if PayPay payment selected)
+    if (data.paymentMethod === 'paypay') {
+      try {
+        const paymentResult = await paypayService.createPayment({
+          orderNumber,
+          amount: (data.totalPrice || 0) + (shipping.cost || 0),
+          description: `Pedido Doce de Leite ${orderNumber}`,
+          customerEmail: data.formData.email,
+          customerPhone: data.formData.phone
+        });
+        
+        if (paymentResult.success && paymentResult.paymentUrl) {
+          console.log('💳 PayPay payment URL:', paymentResult.paymentUrl);
+          console.log('📱 PayPay QR Code:', paymentResult.qrCodeUrl);
+        }
+      } catch (error) {
+        console.error('Error creating PayPay payment:', error);
+      }
+    }
+    
+    // 3. Create Shipping Label via Carrier API
+    try {
+      const labelData = {
+        orderNumber,
+        sender: {
+          name: 'Paula Shiokawa',
+          postalCode: '518-0225',
+          address: 'Mie-ken Iga-shi Kirigaoka 5-292',
+          phone: '070-1367-1679'
+        },
+        recipient: {
+          name: data.formData.name,
+          postalCode: data.formData.postalCode,
+          prefecture: data.formData.prefecture,
+          city: data.formData.city,
+          address: data.formData.address,
+          building: data.formData.building,
+          phone: data.formData.phone
+        },
+        items: data.items.map((item: any) => ({
+          name: item.product.name,
+          quantity: item.quantity,
+          weight: item.size === '800g' ? 800 : 280
+        })),
+        deliveryTime: data.deliveryTime
+      };
+      
+      const tracking = await carrierService.createLabel(shipping.carrier, labelData);
+      setTrackingNumber(tracking.trackingNumber);
+      
+      console.log('📦 Shipping label created');
+      console.log('🔢 Tracking number:', tracking.trackingNumber);
+    } catch (error) {
+      console.error('Error creating shipping label:', error);
+    }
+    
+    // 4. WhatsApp Message (as before)
     const whatsappMessage = `
 🎉 *NOVO PEDIDO - Doce de Leite*
 
@@ -102,27 +181,9 @@ Previsão: ${shipping.estimatedDays} dias úteis
 ${data.paymentMethod === 'bank' ? 'Depósito Bancário' : 'PayPay'}
     `.trim();
     
-    console.log('📧 Sending email to:', data.formData.email);
-    console.log('📱 Sending WhatsApp to: 070-1367-1679');
+    console.log('📧 Email sent to:', data.formData.email, emailSent ? '✅' : '⏳');
+    console.log('📱 WhatsApp to: 070-1367-1679');
     console.log('📱 WhatsApp Message:\n', whatsappMessage);
-    console.log('📦 Order details:', data);
-
-    // Simulate API call
-    try {
-      // Backend endpoint would be something like:
-      // await fetch('/api/orders', {
-      //   method: 'POST',
-      //   body: JSON.stringify({
-      //     customer: data.formData,
-      //     items: data.items,
-      //     shipping: shipping,
-      //     payment: data.paymentMethod,
-      //     total: data.totalPrice
-      //   })
-      // });
-    } catch (error) {
-      console.error('Error sending notifications:', error);
-    }
   };
 
   if (!orderData) {
@@ -331,6 +392,74 @@ ${data.paymentMethod === 'bank' ? 'Depósito Bancário' : 'PayPay'}
                       <p className="text-sm">Tel: {formData.phone}</p>
                     </div>
                   </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Shipping Label Section */}
+            <div className="mb-6 print:hidden">
+              <div className="bg-card rounded-2xl border border-border p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="font-display text-xl font-semibold text-foreground flex items-center gap-2">
+                    <Truck className="w-6 h-6" />
+                    Etiqueta de Envio
+                  </h2>
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowShippingLabel(!showShippingLabel)}
+                    className="flex items-center gap-2"
+                  >
+                    {showShippingLabel ? 'Ocultar' : 'Mostrar'} Etiqueta
+                  </Button>
+                </div>
+
+                {showShippingLabel && (
+                  <div className="mt-4">
+                    <ShippingLabel
+                      orderNumber={orderNumber}
+                      sender={{
+                        name: 'Paula Shiokawa',
+                        postalCode: '518-0225',
+                        address: 'Mie-ken Iga-shi Kirigaoka 5-292',
+                        phone: '070-1367-1679'
+                      }}
+                      recipient={{
+                        name: formData.name,
+                        postalCode: formData.postalCode,
+                        prefecture: formData.prefecture,
+                        city: formData.city,
+                        address: formData.address,
+                        building: formData.building,
+                        phone: formData.phone
+                      }}
+                      carrier={shipping?.carrier || 'N/A'}
+                      deliveryTime={orderData.deliveryTime}
+                    />
+                    
+                    {trackingNumber && (
+                      <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+                        <p className="text-sm font-semibold text-green-800">
+                          📦 Número de Rastreamento: <span className="font-mono">{trackingNumber}</span>
+                        </p>
+                        <p className="text-xs text-green-700 mt-1">
+                          Use este número para rastrear sua encomenda
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-sm font-semibold text-blue-800 mb-2">
+                    💡 Instruções para Etiqueta:
+                  </p>
+                  <ul className="text-xs text-blue-700 space-y-1 list-disc list-inside">
+                    <li>Clique em "Mostrar Etiqueta" para visualizar</li>
+                    <li>Use "Imprimir Etiqueta" para imprimir em papel A5</li>
+                    <li>Cole a etiqueta na caixa de forma visível</li>
+                    <li>Apresente o QR code na transportadora para leitura automática</li>
+                    <li>Guarde o número de rastreamento</li>
+                  </ul>
                 </div>
               </div>
             </div>
