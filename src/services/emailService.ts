@@ -9,7 +9,7 @@
  * - Backend should use services like SendGrid, AWS SES, or Resend
  */
 
-import type { EmailOrderData, CartItem } from '@/types/order';
+import type { EmailOrderData, CartItem, ShippingLabelData } from '@/types/order';
 
 interface EmailData {
   to: string;
@@ -18,7 +18,7 @@ interface EmailData {
   orderNumber: string;
   customerName: string;
   trackingNumber?: string;
-  shippingLabelData?: unknown;
+  shippingLabelData?: ShippingLabelData;
 }
 
 export const emailService = {
@@ -288,9 +288,10 @@ export const emailService = {
               <div class="info-box">
                 <p><strong>Por favor, realize o depósito para:</strong></p>
                 <p style="margin: 10px 0;">
-                  <strong>Banco:</strong> [Nome do Banco]<br>
-                  <strong>Agência:</strong> [Número da Agência]<br>
-                  <strong>Conta:</strong> [Número da Conta]<br>
+                  <!-- TODO: Replace with actual bank account details before production -->
+                  <strong>Banco:</strong> [Nome do Banco - Configure no .env]<br>
+                  <strong>Agência:</strong> [Número da Agência - Configure no .env]<br>
+                  <strong>Conta:</strong> [Número da Conta - Configure no .env]<br>
                   <strong>Nome:</strong> Paula Shiokawa
                 </p>
                 <p style="color: #856404; margin-top: 10px;">
