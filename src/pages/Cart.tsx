@@ -1,5 +1,5 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { ShoppingBag, ArrowRight, Trash2 } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import CartItemComponent from '@/components/cart/CartItem';
@@ -7,8 +7,20 @@ import ShippingCalculator from '@/components/shipping/ShippingCalculator';
 import { Button } from '@/components/ui/button';
 import { useCart } from '@/context/CartContext';
 
+interface SelectedShipping {
+  prefecture: string;
+  prefectureJa: string;
+  carrier: string;
+  carrierName: string;
+  carrierLogo: string;
+  shippingCost: number;
+  estimatedDays: string;
+}
+
 const Cart: React.FC = () => {
   const { items, totalPrice, clearCart } = useCart();
+  const navigate = useNavigate();
+  const [selectedShipping, setSelectedShipping] = useState<SelectedShipping | null>(null);
 
   return (
     <Layout>
@@ -75,16 +87,32 @@ const Cart: React.FC = () => {
               {/* Shipping Calculator */}
               <div className="lg:col-span-1">
                 <div className="sticky top-24">
-                  <ShippingCalculator />
+                  <ShippingCalculator onShippingSelected={setSelectedShipping} />
                   
-                  <Button className="w-full mt-6 btn-primary rounded-xl py-6 text-lg font-semibold">
+                  <Button 
+                    className="w-full mt-6 btn-primary rounded-xl py-6 text-lg font-semibold"
+                    disabled={!selectedShipping}
+                    onClick={() => {
+                      if (selectedShipping) {
+                        navigate('/checkout', { state: selectedShipping });
+                      }
+                    }}
+                  >
                     Finalizar Compra
                     <ArrowRight className="w-5 h-5 ml-2" />
                   </Button>
                   
-                  <p className="text-center text-sm text-muted-foreground mt-4">
-                    Pagamento seguro via PIX, cartão ou transferência
-                  </p>
+                  {!selectedShipping && (
+                    <p className="text-center text-sm text-muted-foreground mt-4">
+                      Selecione a prefeitura e transportadora para continuar
+                    </p>
+                  )}
+                  
+                  {selectedShipping && (
+                    <p className="text-center text-sm text-muted-foreground mt-4">
+                      Total: ¥{(totalPrice + selectedShipping.shippingCost).toLocaleString()}
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
