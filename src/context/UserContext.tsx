@@ -242,6 +242,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
         id: `user-${Date.now()}`,
         createdAt: new Date().toISOString(),
         password: userData.password, // Store password (demo only - use backend auth in production)
+        orders: [], // Initialize empty orders array
       };
       
       // Add new user to users database

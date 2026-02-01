@@ -19,7 +19,7 @@ const TWILIO_CONFIGURED = !!(import.meta.env.VITE_TWILIO_ACCOUNT_SID && import.m
 
 const OrderConfirmation: React.FC = () => {
   const { clearCart } = useCart();
-  const { addOrder, isAuthenticated } = useUser();
+  const { addOrder, isAuthenticated, user } = useUser();
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
@@ -32,6 +32,31 @@ const OrderConfirmation: React.FC = () => {
   
   // Use ref to prevent processing the order multiple times
   const processedRef = useRef(false);
+
+  // Helper function to save order directly to localStorage (even if not logged in)
+  const saveOrderToStorage = (email: string, orderData: any) => {
+    const usersData = localStorage.getItem('sweet-japan-users');
+    if (!usersData) return;
+    
+    const users = JSON.parse(usersData);
+    
+    // Find or create user entry
+    if (!users[email]) {
+      // User exists but not in the format we need - try to find by email
+      console.log('⚠️ User not found in storage:', email);
+      return;
+    }
+    
+    // Ensure orders array exists
+    if (!users[email].orders) {
+      users[email].orders = [];
+    }
+    
+    // Add the order
+    users[email].orders.unshift(orderData);
+    localStorage.setItem('sweet-japan-users', JSON.stringify(users));
+    console.log('✅ Order saved to storage for:', email);
+  };
 
   useEffect(() => {
     console.log('🔍 OrderConfirmation mounted');
@@ -73,17 +98,21 @@ const OrderConfirmation: React.FC = () => {
     // Clear cart
     clearCart();
 
-    // Save order to user's history if authenticated
-    if (isAuthenticated) {
-      const couponDiscount = orderData.couponDiscount || 0;
-      const finalTotal = orderData.totalPrice - couponDiscount;
-      
-      // Mark coupon as used by this user
-      if (orderData.coupon && user?.email) {
-        couponService.useCoupon(orderData.coupon.code, user.email);
-      }
-      
-      addOrder({
+    // Save order to user's history
+    const couponDiscount = orderData.couponDiscount || 0;
+    const finalTotal = orderData.totalPrice - couponDiscount;
+    const generatedOrderNumber = `DL-${Date.now().toString().slice(-8)}`;
+    
+    // Get customer email from form data or from logged in user
+    const customerEmail = orderData.formData.email || user?.email;
+    
+    if (customerEmail) {
+      // Create order object
+      const newOrder = {
+        id: `order-${Date.now()}`,
+        orderNumber: generatedOrderNumber,
+        orderDate: new Date().toISOString(),
+        date: new Date().toISOString(),
         items: orderData.items.map((item: CartItem) => ({
           productName: item.product.name,
           size: item.size,
@@ -91,8 +120,9 @@ const OrderConfirmation: React.FC = () => {
           price: item.product.prices[item.size],
         })),
         totalAmount: finalTotal,
+        totalPrice: finalTotal,
         paymentMethod: orderData.paymentMethod,
-        status: 'pending',
+        status: 'pending' as const,
         shippingAddress: {
           name: orderData.formData.name,
           postalCode: orderData.formData.postalCode,
@@ -100,8 +130,30 @@ const OrderConfirmation: React.FC = () => {
           city: orderData.formData.city,
           address: orderData.formData.address,
           building: orderData.formData.building,
-        }
-      });
+        },
+        shipping: orderData.shipping
+      };
+      
+      // Mark coupon as used by this user
+      if (orderData.coupon && customerEmail) {
+        couponService.useCoupon(orderData.coupon.code, customerEmail);
+      }
+      
+      // Save to storage (works for logged in or guest users)
+      saveOrderToStorage(customerEmail, newOrder);
+      
+      // Also add to context if authenticated
+      if (isAuthenticated) {
+        addOrder({
+          items: newOrder.items,
+          totalAmount: finalTotal,
+          paymentMethod: orderData.paymentMethod,
+          status: 'pending',
+          shippingAddress: newOrder.shippingAddress
+        });
+      }
+    } else {
+      console.error('⚠️ No customer email available to save order');
     }
 
     // Show success notification
