@@ -20,8 +20,8 @@ export const couponService = {
     );
   },
 
-  // Validate and get coupon by code
-  validateCoupon: (code: string): { valid: boolean; coupon?: Coupon; error?: string } => {
+  // Validate and get coupon by code (with user email check)
+  validateCoupon: (code: string, userEmail?: string): { valid: boolean; coupon?: Coupon; error?: string } => {
     const coupons = couponService.getAll();
     const coupon = coupons.find(c => c.code.toUpperCase() === code.toUpperCase());
 
@@ -40,6 +40,14 @@ export const couponService = {
 
     if (coupon.usageLimit && coupon.usedCount >= coupon.usageLimit) {
       return { valid: false, error: 'Cupom esgotado' };
+    }
+
+    // Check if user has already used this coupon
+    if (userEmail) {
+      const usedBy = couponService.getCouponUsage(code);
+      if (usedBy.includes(userEmail)) {
+        return { valid: false, error: 'Você já usou este cupom' };
+      }
     }
 
     return { valid: true, coupon };

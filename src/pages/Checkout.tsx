@@ -47,6 +47,19 @@ const Checkout: React.FC = () => {
 
   // Handlers for coupon
   const handleCouponApply = (coupon: Coupon, discount: number) => {
+    // Double-check if user hasn't already used this coupon
+    if (user?.email) {
+      const validation = couponService.validateCoupon(coupon.code, user.email);
+      if (!validation.valid) {
+        toast({
+          title: "Cupom inválido",
+          description: validation.error || "Não foi possível aplicar este cupom",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+    
     setAppliedCoupon(coupon);
     setCouponDiscount(discount);
   };

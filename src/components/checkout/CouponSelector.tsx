@@ -26,9 +26,10 @@ const CouponSelector: React.FC<CouponSelectorProps> = ({
   const { user } = useUser();
   const { toast } = useToast();
 
+  // Reload coupons when user changes or when returning from order
   useEffect(() => {
     loadAvailableCoupons();
-  }, [user]);
+  }, [user, appliedCoupon]);
 
   const loadAvailableCoupons = () => {
     const active = couponService.getActive();
