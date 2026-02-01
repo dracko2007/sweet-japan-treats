@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { useCart } from '@/context/CartContext';
 import { useUser } from '@/context/UserContext';
 import ShippingCalculator from '@/components/shipping/ShippingCalculator';
+import CouponSelector from '@/components/checkout/CouponSelector';
 import { prefectures } from '@/data/prefectures';
 import { addAddressHints } from '@/utils/romanize';
 import { couponService } from '@/services/couponService';
@@ -41,9 +42,19 @@ const Checkout: React.FC = () => {
   const [deliveryTime, setDeliveryTime] = useState<string>('');
 
   // Coupon state
-  const [couponCode, setCouponCode] = useState('');
   const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
   const [couponDiscount, setCouponDiscount] = useState(0);
+
+  // Handlers for coupon
+  const handleCouponApply = (coupon: Coupon, discount: number) => {
+    setAppliedCoupon(coupon);
+    setCouponDiscount(discount);
+  };
+
+  const handleCouponRemove = () => {
+    setAppliedCoupon(null);
+    setCouponDiscount(0);
+  };
 
   // Load form data from state if returning from review page
   useEffect(() => {
@@ -144,47 +155,6 @@ const Checkout: React.FC = () => {
           
           setFormData(prev => ({
             ...prev,
-            prefecture: prefecture?.name || '', // Usa apenas o nome em português que corresponde ao value do select
-            city: cityDisplay,
-          }));
-        }
-      } catch (error) {
-        console.error('Erro ao buscar CEP:', error);
-      }
-    }
-  };
-
-  // Apply coupon
-  const handleApplyCoupon = () => {
-    if (!couponCode.trim()) {
-      toast({
-        title: "Erro",
-        description: "Digite um código de cupom",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const result = couponService.validateCoupon(couponCode);
-    
-    if (result.valid && result.coupon) {
-      const discount = couponService.calculateDiscount(result.coupon, totalPrice);
-      setAppliedCoupon(result.coupon);
-      setCouponDiscount(discount);
-      toast({
-        title: "Cupom aplicado!",
-        description: `Desconto de ¥${discount.toLocaleString()} aplicado`,
-      });
-    } else {
-      toast({
-        title: "Cupom inválido",
-        description: result.error,
-        variant: "destructive",
-      });
-    }
-  };
-
-  // Remove coupon
   const handleRemoveCoupon = () => {
     setAppliedCoupon(null);
     setCouponDiscount(0);
@@ -512,58 +482,12 @@ const Checkout: React.FC = () => {
                   ))}
 
                   {/* Coupon Section */}
-                  <div className="pt-4 mt-4 border-t border-border">
-                    {!appliedCoupon ? (
-                      <div className="space-y-3">
-                        <Label className="flex items-center gap-2 text-sm font-medium">
-                          <Tag className="w-4 h-4" />
-                          Cupom de Desconto
-                        </Label>
-                        <div className="flex gap-2">
-                          <Input
-                            value={couponCode}
-                            onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
-                            placeholder="Digite o código"
-                            className="flex-1"
-                            onKeyPress={(e) => e.key === 'Enter' && handleApplyCoupon()}
-                          />
-                          <Button 
-                            type="button"
-                            onClick={handleApplyCoupon}
-                            variant="outline"
-                            size="sm"
-                          >
-                            Aplicar
-                          </Button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg p-3">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <Tag className="w-4 h-4 text-green-600 dark:text-green-400" />
-                            <div>
-                              <p className="text-sm font-medium text-green-900 dark:text-green-100">
-                                {appliedCoupon.code}
-                              </p>
-                              <p className="text-xs text-green-700 dark:text-green-300">
-                                {appliedCoupon.description}
-                              </p>
-                            </div>
-                          </div>
-                          <Button 
-                            type="button"
-                            onClick={handleRemoveCoupon}
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 w-8 p-0 text-green-700 hover:text-green-900 dark:text-green-400 dark:hover:text-green-200"
-                          >
-                            <X className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                  <CouponSelector
+                    totalPrice={totalPrice}
+                    onCouponApply={handleCouponApply}
+                    onCouponRemove={handleCouponRemove}
+                    appliedCoupon={appliedCoupon}
+                  />
 
                   <div className="space-y-2 pt-2">
                     <div className="flex justify-between text-sm">

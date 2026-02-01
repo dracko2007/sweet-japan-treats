@@ -12,6 +12,7 @@ import { whatsappService } from '@/services/whatsappService';
 import { whatsappServiceSimple } from '@/services/whatsappServiceSimple';
 import { paypayService } from '@/services/paypayService';
 import { carrierService } from '@/services/carrierService';
+import { couponService } from '@/services/couponService';
 import type { OrderData, CartItem } from '@/types/order';
 
 const TWILIO_CONFIGURED = !!(import.meta.env.VITE_TWILIO_ACCOUNT_SID && import.meta.env.VITE_TWILIO_AUTH_TOKEN);
@@ -76,6 +77,11 @@ const OrderConfirmation: React.FC = () => {
     if (isAuthenticated) {
       const couponDiscount = orderData.couponDiscount || 0;
       const finalTotal = orderData.totalPrice - couponDiscount;
+      
+      // Mark coupon as used by this user
+      if (orderData.coupon && user?.email) {
+        couponService.useCoupon(orderData.coupon.code, user.email);
+      }
       
       addOrder({
         items: orderData.items.map((item: CartItem) => ({

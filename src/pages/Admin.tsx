@@ -12,6 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import CouponManager from '@/components/admin/CouponManager';
 import Dashboard from '@/components/admin/Dashboard';
 import CustomerList from '@/components/admin/CustomerList';
+import TrackingModal from '@/components/admin/TrackingModal';
 import { orderService } from '@/services/orderService';
 
 const Admin: React.FC = () => {
@@ -21,6 +22,8 @@ const Admin: React.FC = () => {
   const [allOrders, setAllOrders] = useState<any[]>([]);
   const [isTesting, setIsTesting] = useState(false);
   const [activeTab, setActiveTab] = useState<'orders' | 'coupons' | 'dashboard' | 'customers'>('orders');
+  const [trackingModalOpen, setTrackingModalOpen] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
 
   // Admin email - apenas Paula pode acessar
   const ADMIN_EMAIL = 'dracko2007@gmail.com';
@@ -552,7 +555,10 @@ _This is an automated test message_
                       )}
                       {(order.status === 'pending' || order.status === 'processing') && (
                         <Button
-                          onClick={() => handleUpdateStatus(order.orderNumber, 'shipped')}
+                          onClick={() => {
+                            setSelectedOrder(order);
+                            setTrackingModalOpen(true);
+                          }}
                           variant="outline"
                           size="sm"
                           className="gap-2"
@@ -608,6 +614,25 @@ _This is an automated test message_
           </div>
         </div>
       </section>
+
+      {/* Tracking Modal */}
+      {selectedOrder && (
+        <TrackingModal
+          order={selectedOrder}
+          isOpen={trackingModalOpen}
+          onClose={() => {
+            setTrackingModalOpen(false);
+            setSelectedOrder(null);
+          }}
+          onSuccess={(trackingNumber) => {
+            handleUpdateStatus(selectedOrder.orderNumber, 'shipped');
+            toast({
+              title: "Pedido marcado como enviado!",
+              description: `Tracking: ${trackingNumber}`,
+            });
+          }}
+        />
+      )}
     </Layout>
   );
 };

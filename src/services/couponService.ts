@@ -54,15 +54,30 @@ export const couponService = {
     }
   },
 
-  // Use coupon (increment usage)
-  useCoupon: (code: string): void => {
+  // Use coupon (increment usage and track user)
+  useCoupon: (code: string, userEmail: string): void => {
     const coupons = couponService.getAll();
     const index = coupons.findIndex(c => c.code.toUpperCase() === code.toUpperCase());
     
     if (index !== -1) {
       coupons[index].usedCount += 1;
+      
+      // Track which users have used this coupon
+      const usageKey = `coupon_usage_${code.toUpperCase()}`;
+      const usedBy = JSON.parse(localStorage.getItem(usageKey) || '[]');
+      if (!usedBy.includes(userEmail)) {
+        usedBy.push(userEmail);
+        localStorage.setItem(usageKey, JSON.stringify(usedBy));
+      }
+      
       localStorage.setItem(STORAGE_KEY, JSON.stringify(coupons));
     }
+  },
+
+  // Get users who used a coupon
+  getCouponUsage: (code: string): string[] => {
+    const usageKey = `coupon_usage_${code.toUpperCase()}`;
+    return JSON.parse(localStorage.getItem(usageKey) || '[]');
   },
 
   // Create new coupon
