@@ -149,56 +149,39 @@ const OrderConfirmation: React.FC = () => {
       console.error('Error creating shipping label:', error);
     }
     
-    // 2. Send Emails - One for customer (without label) and one for store (with label)
+    // 2. Send Emails using EmailJS
     try {
-      console.log('📧 Trying to send emails...');
+      console.log('📧 Sending emails via EmailJS...');
       
-      // Try with Resend first (if configured)
-      if (import.meta.env.VITE_RESEND_API_KEY) {
-        console.log('📧 Using Resend service...');
-        
-        // Email for CUSTOMER (without shipping label)
-        const customerEmailHTML = emailService.generateCustomerEmailHTML({
-          ...data,
-          orderNumber
-        }, generatedTrackingNumber);
-        
-        const customerEmailResult = await emailService.sendOrderConfirmation({
-          to: data.formData.email,
-          subject: `Confirmação de Pedido ${orderNumber} - Sabor do Campo`,
-          html: customerEmailHTML,
-          orderNumber,
-          customerName: data.formData.name,
-          trackingNumber: generatedTrackingNumber
-        });
-        
-        setEmailSent(customerEmailResult);
-        console.log('📧 Email sent to customer:', data.formData.email, customerEmailResult ? '✅' : '⏳');
-        
-        // Email for STORE OWNER (with shipping label)
-        const storeEmailHTML = emailService.generateStoreEmailHTML({
-          ...data,
-          orderNumber
-        }, generatedTrackingNumber);
-        
-        const storeEmailResult = await emailService.sendOrderConfirmation({
-          to: 'dracko2007@gmail.com', // Paula's email
-          subject: `🎉 NOVO PEDIDO ${orderNumber} - Sabor do Campo`,
-          html: storeEmailHTML,
-          orderNumber,
-          customerName: data.formData.name,
-          trackingNumber: generatedTrackingNumber
-        });
-        
-        console.log('📧 Email sent to store:', 'dracko2007@gmail.com', storeEmailResult ? '✅' : '⏳');
-      } else {
-        // Use EmailJS as alternative (opens email client if not configured)
-        console.log('📧 Using EmailJS service (simpler)...');
-        await emailServiceSimple.sendOrderConfirmation({
-          ...data,
-          orderNumber
-        });
-      }
+      // Send to customer
+      const emailResultCustomer = await emailServiceSimple.sendOrderConfirmation({
+        formData: data.formData,
+        items: data.items,
+        totalPrice: data.totalPrice,
+        orderNumber,
+        paymentMethod: data.paymentMethod,
+        shipping: data.shipping
+      });
+      
+      console.log('📧 Email sent to customer:', data.formData.email, emailResultCustomer ? '✅' : '❌');
+      
+      // Send to store owner (you)
+      const emailResultStore = await emailServiceSimple.sendOrderConfirmation({
+        formData: {
+          ...data.formData,
+          email: 'dracko2007@gmail.com', // Your email
+          name: 'Paula Shiokawa' // Your name
+        },
+        items: data.items,
+        totalPrice: data.totalPrice,
+        orderNumber,
+        paymentMethod: data.paymentMethod,
+        shipping: data.shipping
+      });
+      
+      console.log('📧 Email sent to store:', 'dracko2007@gmail.com', emailResultStore ? '✅' : '❌');
+      setEmailSent(emailResultCustomer || emailResultStore);
+      
     } catch (error) {
       console.error('❌ Error sending emails:', error);
     }
