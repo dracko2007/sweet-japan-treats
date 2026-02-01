@@ -40,7 +40,8 @@ const Profile: React.FC = () => {
       description: `${order.items.length} produto(s) do pedido #${order.orderNumber}`,
     });
     
-    navigate('/checkout');
+    // Navega para o carrinho ao invés do checkout
+    navigate('/carrinho');
   };
 
   // Função para limpar histórico de pedidos
