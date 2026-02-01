@@ -28,3 +28,15 @@ export type Prefecture = {
   nameJa: string;
   zone: number; // Zone for shipping calculation
 };
+export interface Coupon {
+  code: string;
+  discount: number; // Desconto em valor absoluto (¥)
+  discountPercent?: number; // Ou desconto em porcentagem
+  type: 'fixed' | 'percent';
+  expiryDate: string;
+  isActive: boolean;
+  usageLimit?: number; // Limite de usos totais
+  usedCount: number;
+  description: string;
+  createdAt: string;
+}

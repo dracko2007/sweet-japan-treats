@@ -470,10 +470,12 @@ const Profile: React.FC = () => {
                   <p className="text-muted-foreground mb-2">
                     Você ainda não fez nenhuma compra
                   </p>
-                  <Button asChild className="btn-primary mt-4">
-                    <a href="/produtos">
-                      Começar a Comprar
-                    </a>
+                  <Button 
+                    className="btn-primary mt-4"
+                    onClick={() => navigate('/produtos')}
+                  >
+                    Começar a Comprar
+                    <ShoppingBag className="w-4 h-4 ml-2" />
                   </Button>
                 </div>
               )}
