@@ -74,6 +74,9 @@ const OrderConfirmation: React.FC = () => {
 
     // Save order to user's history if authenticated
     if (isAuthenticated) {
+      const couponDiscount = orderData.couponDiscount || 0;
+      const finalTotal = orderData.totalPrice - couponDiscount;
+      
       addOrder({
         items: orderData.items.map((item: CartItem) => ({
           productName: item.product.name,
@@ -81,7 +84,7 @@ const OrderConfirmation: React.FC = () => {
           quantity: item.quantity,
           price: item.product.prices[item.size],
         })),
-        totalAmount: orderData.totalPrice,
+        totalAmount: finalTotal,
         paymentMethod: orderData.paymentMethod,
         status: 'pending',
         shippingAddress: {
@@ -112,6 +115,8 @@ const OrderConfirmation: React.FC = () => {
     const generatedOrderNumber = `DL-${Date.now().toString().slice(-8)}`;
     setOrderNumber(generatedOrderNumber);
     const shipping = data.shipping || { carrier: 'N/A', cost: 0, estimatedDays: 'N/A' };
+    const couponDiscount = data.couponDiscount || 0;
+    const finalTotal = data.totalPrice - couponDiscount;
     let generatedTrackingNumber = '';
     
     // 1. Create Shipping Label via Carrier API (FIRST - to get tracking number)
@@ -189,7 +194,7 @@ const OrderConfirmation: React.FC = () => {
       try {
         const paymentResult = await paypayService.createPayment({
           orderNumber: generatedOrderNumber,
-          amount: (data.totalPrice || 0) + (shipping.cost || 0),
+          amount: (finalTotal || 0) + (shipping.cost || 0),
           description: `Pedido Doce de Leite ${generatedOrderNumber}`,
           customerEmail: data.formData.email,
           customerPhone: data.formData.phone
@@ -229,9 +234,9 @@ ${data.items.map((item: CartItem) =>
 ).join('\n')}
 
 💰 *Valores:*
-Subtotal: ¥${data.totalPrice.toLocaleString()}
+Subtotal: ¥${data.totalPrice.toLocaleString()}${couponDiscount > 0 ? `\nDesconto: -¥${couponDiscount.toLocaleString()}` : ''}
 Frete (${shipping.carrier}): ¥${shipping.cost.toLocaleString()}
-*Total: ¥${(data.totalPrice + shipping.cost).toLocaleString()}*
+*Total: ¥${(finalTotal + shipping.cost).toLocaleString()}*
 
 🚚 *Frete:*
 Transportadora: ${shipping.carrier}
@@ -256,7 +261,7 @@ ${data.items.map((item: CartItem) =>
   `• ${item.product.name} (${item.size}) x${item.quantity}`
 ).join('\n')}
 
-💰 *Total:* ¥${(data.totalPrice + shipping.cost).toLocaleString()}
+💰 *Total:* ¥${(finalTotal + shipping.cost).toLocaleString()}
 
 🚚 *Previsão de Entrega:* ${shipping.estimatedDays} dias úteis
 
@@ -324,7 +329,9 @@ _Sabor do Campo - Doce de Leite Artesanal_
   }
 
   const { formData, paymentMethod, items, totalPrice, shipping } = orderData;
-
+  const couponDiscount = orderData.couponDiscount || 0;
+  const appliedCoupon = orderData.appliedCoupon;
+  const finalTotal = totalPrice - couponDiscount;
   const handlePrint = () => {
     window.print();
   };
@@ -452,6 +459,12 @@ _Sabor do Campo - Doce de Leite Artesanal_
                       <span className="text-muted-foreground">Subtotal:</span>
                       <span className="font-medium">¥{totalPrice.toLocaleString()}</span>
                     </div>
+                    {couponDiscount > 0 && (
+                      <div className="flex justify-between text-green-600">
+                        <span>Desconto {appliedCoupon ? `(${appliedCoupon.code})` : ''}:</span>
+                        <span className="font-medium">-¥{couponDiscount.toLocaleString()}</span>
+                      </div>
+                    )}
                     {shipping && (
                       <>
                         <div className="flex justify-between">
@@ -472,7 +485,7 @@ _Sabor do Campo - Doce de Leite Artesanal_
                     <div className="flex justify-between pt-2 border-t font-bold text-lg">
                       <span>Total:</span>
                       <span className="text-primary">
-                        ¥{shipping ? (totalPrice + shipping.cost).toLocaleString() : `${totalPrice.toLocaleString()}+`}
+                        ¥{shipping ? (finalTotal + shipping.cost).toLocaleString() : `${finalTotal.toLocaleString()}+`}
                       </span>
                     </div>
                   </div>

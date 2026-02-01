@@ -26,6 +26,8 @@ const OrderReview: React.FC = () => {
   const location = useLocation();
   const formData = location.state?.formData;
   const shipping = location.state?.shipping;
+  const couponDiscount = location.state?.couponDiscount || 0;
+  const appliedCoupon = location.state?.coupon;
   const [paymentMethod, setPaymentMethod] = useState('bank');
 
   // Redirect if no form data or shipping
@@ -50,7 +52,9 @@ const OrderReview: React.FC = () => {
         paymentMethod,
         shipping,
         items,
-        totalPrice 
+        totalPrice,
+        couponDiscount,
+        appliedCoupon
       } 
     });
   };
@@ -136,6 +140,12 @@ const OrderReview: React.FC = () => {
                     <span className="text-muted-foreground">Subtotal</span>
                     <span className="font-semibold">¥{totalPrice.toLocaleString()}</span>
                   </div>
+                  {couponDiscount > 0 && (
+                    <div className="flex justify-between text-base text-green-600">
+                      <span>Desconto {appliedCoupon ? `(${appliedCoupon.code})` : ''}</span>
+                      <span className="font-semibold">-¥{couponDiscount.toLocaleString()}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between text-base">
                     <span className="text-muted-foreground">Frete ({shipping.carrier})</span>
                     <span className="font-semibold">¥{shipping.cost.toLocaleString()}</span>
@@ -146,7 +156,7 @@ const OrderReview: React.FC = () => {
                   <div className="flex justify-between pt-3 border-t border-border">
                     <span className="font-bold text-xl">Total</span>
                     <span className="font-bold text-2xl text-primary">
-                      ¥{(totalPrice + shipping.cost).toLocaleString()}
+                      ¥{(totalPrice - couponDiscount + shipping.cost).toLocaleString()}
                     </span>
                   </div>
                 </div>
