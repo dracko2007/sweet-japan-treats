@@ -153,6 +153,7 @@ const Checkout: React.FC = () => {
             prefectureName: prefecture?.name
           });
           
+          // Atualiza os dados do formulário com as informações do CEP
           setFormData(prev => ({
             ...prev,
             prefecture: prefecture?.name || '', // Usa apenas o nome em português que corresponde ao value do select
