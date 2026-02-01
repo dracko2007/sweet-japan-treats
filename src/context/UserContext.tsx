@@ -87,12 +87,21 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
 
   // Helper functions for users database
   const getAllUsers = (): UserProfile[] => {
-    const usersData = localStorage.getItem('users');
-    return usersData ? JSON.parse(usersData) : [];
+    const usersData = localStorage.getItem('sweet-japan-users');
+    if (!usersData) return [];
+    
+    const usersObj = JSON.parse(usersData);
+    // Converte objeto para array
+    return Object.values(usersObj);
   };
 
   const saveAllUsers = (users: UserProfile[]) => {
-    localStorage.setItem('users', JSON.stringify(users));
+    // Converte array para objeto com email como chave
+    const usersObj: Record<string, UserProfile> = {};
+    users.forEach(user => {
+      usersObj[user.email] = user;
+    });
+    localStorage.setItem('sweet-japan-users', JSON.stringify(usersObj));
   };
 
   const getUserCoupons = (userId: string): Coupon[] => {
@@ -294,7 +303,29 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       orderNumber: `DL-${Date.now().toString().slice(-8)}`,
       date: new Date().toISOString(),
     };
+    
+    // Atualiza os pedidos do usuário atual
     setOrders(prev => [newOrder, ...prev]);
+    
+    // Também atualiza na base global de usuários
+    if (user) {
+      const usersData = localStorage.getItem('sweet-japan-users');
+      if (usersData) {
+        const users = JSON.parse(usersData);
+        if (users[user.email]) {
+          // Adiciona o pedido ao array de pedidos do usuário
+          if (!users[user.email].orders) {
+            users[user.email].orders = [];
+          }
+          users[user.email].orders.unshift({
+            ...newOrder,
+            orderDate: newOrder.date, // Adiciona orderDate para compatibilidade
+            totalPrice: newOrder.totalAmount, // Adiciona totalPrice para compatibilidade
+          });
+          localStorage.setItem('sweet-japan-users', JSON.stringify(users));
+        }
+      }
+    }
   };
 
   const clearOrderHistory = () => {

@@ -12,10 +12,11 @@ export interface OrderStatus {
 export const orderService = {
   // Get all orders from all users
   getAllOrders: (): any[] => {
-    const users = JSON.parse(localStorage.getItem('sweet-japan-users') || '[]');
+    const users = JSON.parse(localStorage.getItem('sweet-japan-users') || '{}');
     const allOrders: any[] = [];
 
-    users.forEach((user: any) => {
+    Object.keys(users).forEach((email) => {
+      const user = users[email];
       if (user.orders && user.orders.length > 0) {
         user.orders.forEach((order: any) => {
           allOrders.push({
@@ -35,15 +36,16 @@ export const orderService = {
 
   // Update order status
   updateOrderStatus: (orderNumber: string, status: OrderStatus['status']): boolean => {
-    const users = JSON.parse(localStorage.getItem('sweet-japan-users') || '[]');
+    const users = JSON.parse(localStorage.getItem('sweet-japan-users') || '{}');
     let updated = false;
 
-    users.forEach((user: any, userIndex: number) => {
+    Object.keys(users).forEach((email) => {
+      const user = users[email];
       if (user.orders && user.orders.length > 0) {
         user.orders.forEach((order: any, orderIndex: number) => {
           if (order.orderNumber === orderNumber) {
-            users[userIndex].orders[orderIndex].status = status;
-            users[userIndex].orders[orderIndex].updatedAt = new Date().toISOString();
+            users[email].orders[orderIndex].status = status;
+            users[email].orders[orderIndex].updatedAt = new Date().toISOString();
             updated = true;
           }
         });
@@ -59,17 +61,18 @@ export const orderService = {
 
   // Delete/Cancel order
   deleteOrder: (orderNumber: string): boolean => {
-    const users = JSON.parse(localStorage.getItem('sweet-japan-users') || '[]');
+    const users = JSON.parse(localStorage.getItem('sweet-japan-users') || '{}');
     let deleted = false;
 
-    users.forEach((user: any, userIndex: number) => {
+    Object.keys(users).forEach((email) => {
+      const user = users[email];
       if (user.orders && user.orders.length > 0) {
         const orderIndex = user.orders.findIndex((order: any) => 
           order.orderNumber === orderNumber
         );
         
         if (orderIndex !== -1) {
-          users[userIndex].orders.splice(orderIndex, 1);
+          users[email].orders.splice(orderIndex, 1);
           deleted = true;
         }
       }
