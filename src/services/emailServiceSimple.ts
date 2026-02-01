@@ -13,18 +13,13 @@
  */
 
 import type { CartItem } from '@/types/order';
+import { emailJsConfig } from '@/config/emailjs';
 
 declare const emailjs: any;
 
-const EMAILJS_SERVICE_ID = import.meta.env.VITE_EMAILJS_SERVICE_ID as string;
-const EMAILJS_TEMPLATE_ID = import.meta.env.VITE_EMAILJS_TEMPLATE_ID as string;
-const EMAILJS_PUBLIC_KEY = import.meta.env.VITE_EMAILJS_PUBLIC_KEY as string;
-
-console.log('🔧 EmailJS Config Loaded:', {
-  serviceId: EMAILJS_SERVICE_ID ? '✅ ' + EMAILJS_SERVICE_ID : '❌ MISSING',
-  templateId: EMAILJS_TEMPLATE_ID ? '✅ ' + EMAILJS_TEMPLATE_ID : '❌ MISSING',
-  publicKey: EMAILJS_PUBLIC_KEY ? '✅ ' + EMAILJS_PUBLIC_KEY.substring(0, 5) + '...' : '❌ MISSING'
-});
+const EMAILJS_SERVICE_ID = emailJsConfig.serviceId;
+const EMAILJS_TEMPLATE_ID = emailJsConfig.templateId;
+const EMAILJS_PUBLIC_KEY = emailJsConfig.publicKey;
 
 // Load EmailJS library dynamically
 let emailjsLoaded = false;
