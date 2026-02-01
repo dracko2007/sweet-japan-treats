@@ -33,16 +33,35 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
       >
-        {product.video && isHovered ? (
-          <video 
-            key={product.video}
-            src={product.video} 
-            autoPlay 
-            loop 
-            muted 
-            playsInline
+        {product.video ? (
+          <>
+            <video 
+              key={product.video}
+              src={product.video} 
+              autoPlay 
+              loop 
+              muted 
+              playsInline
+              poster={product.image}
+              className="absolute inset-0 w-full h-full object-cover"
+              onError={(e) => {
+                console.error('Erro ao carregar vídeo:', product.video, e);
+                const videoElement = e.target as HTMLVideoElement;
+                videoElement.style.display = 'none';
+                // Mostra a imagem se o vídeo falhar
+                const imgElement = document.createElement('img');
+                imgElement.src = product.image;
+                imgElement.alt = product.name;
+                imgElement.className = 'absolute inset-0 w-full h-full object-cover';
+                videoElement.parentElement?.appendChild(imgElement);
+              }}
+            />
+          </>
+        ) : product.image ? (
+          <img 
+            src={product.image} 
+            alt={product.name}
             className="absolute inset-0 w-full h-full object-cover"
-            onError={(e) => console.error('Erro ao carregar vídeo:', product.video, e)}
           />
         ) : (
           <div className="absolute inset-0 bg-gradient-to-br from-caramel-light/40 to-primary/30 flex items-center justify-center">

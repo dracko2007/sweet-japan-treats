@@ -13,11 +13,11 @@ export const products: Product[] = [
     flavor: 'Tradicional'
   },
   {
-    id: 'art-cafe',
+    id: 'prem-cafe',
     name: 'Doce de Leite de Café',
     description: 'Uma combinação perfeita do doce de leite tradicional com o sabor marcante do café brasileiro. Ideal para os amantes de café.',
-    category: 'artesanal',
-    prices: { small: 1200, large: 2000 },
+    category: 'premium',
+    prices: { small: 1400, large: 2400 },
     image: '/products/cafe.jpg',
     video: '/video/cafe.mp4',
     flavor: 'Café'

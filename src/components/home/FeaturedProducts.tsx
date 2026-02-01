@@ -35,9 +35,32 @@ const FeaturedProducts: React.FC = () => {
             >
               {/* Image */}
               <div className="aspect-square bg-secondary/50 relative overflow-hidden">
-                <div className="absolute inset-0 bg-gradient-to-br from-caramel-light/40 to-primary/30 flex items-center justify-center">
-                  <span className="text-6xl opacity-80">🍯</span>
-                </div>
+                {product.video ? (
+                  <video 
+                    src={product.video} 
+                    autoPlay 
+                    loop 
+                    muted 
+                    playsInline
+                    poster={product.image}
+                    className="absolute inset-0 w-full h-full object-cover"
+                    onError={(e) => {
+                      console.error('Erro ao carregar vídeo:', product.video);
+                      const videoElement = e.target as HTMLVideoElement;
+                      videoElement.style.display = 'none';
+                    }}
+                  />
+                ) : product.image ? (
+                  <img 
+                    src={product.image} 
+                    alt={product.name}
+                    className="absolute inset-0 w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="absolute inset-0 bg-gradient-to-br from-caramel-light/40 to-primary/30 flex items-center justify-center">
+                    <span className="text-6xl opacity-80">🍯</span>
+                  </div>
+                )}
                 
                 {/* Category Badge */}
                 <div className="absolute top-3 left-3">

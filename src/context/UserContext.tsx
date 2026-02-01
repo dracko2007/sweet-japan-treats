@@ -212,7 +212,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       // Add welcome coupon for this user
       const welcomeCoupon: Coupon = {
         id: `coupon-${Date.now()}`,
-        code: 'WELCOME10',
+        code: 'BEMVINDO10',
         description: 'Cupom de boas-vindas - 10% de desconto',
         discount: 10,
         discountType: 'percentage',
