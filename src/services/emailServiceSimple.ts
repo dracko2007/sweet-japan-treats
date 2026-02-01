@@ -126,7 +126,10 @@ Tel: ${orderData.formData.phone}
    * Send new order notification to store owner
    */
   sendStoreNotification: async (orderData: any): Promise<boolean> => {
-    console.log('📧 EmailJS - Sending store notification');
+    console.log('🏪 EmailJS - Sending STORE notification');
+    console.log('🏪 Service ID:', EMAILJS_SERVICE_ID);
+    console.log('🏪 Template ID (STORE):', EMAILJS_TEMPLATE_ID_STORE, '(exists:', !!EMAILJS_TEMPLATE_ID_STORE, ')');
+    console.log('🏪 Public Key:', EMAILJS_PUBLIC_KEY, '(exists:', !!EMAILJS_PUBLIC_KEY, ')');
     
     if (!EMAILJS_SERVICE_ID || !EMAILJS_TEMPLATE_ID_STORE || !EMAILJS_PUBLIC_KEY) {
       console.error('❌ EmailJS store template not configured');
@@ -166,6 +169,7 @@ Tel: ${orderData.formData.phone}
       
       console.log('📤 Sending store notification...');
       console.log('📤 Store Params:', storeParams);
+      console.log('📤 Using Template ID:', EMAILJS_TEMPLATE_ID_STORE);
       
       const response = await emailjs.send(
         EMAILJS_SERVICE_ID,
@@ -174,7 +178,7 @@ Tel: ${orderData.formData.phone}
       );
       
       console.log('✅ Store notification sent!');
-      console.log('📧 Response:', response);
+      console.log('📧 Store Response:', response);
       return true;
       
     } catch (error) {
