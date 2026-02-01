@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Package, Printer, ShoppingBag, User, MapPin, Phone, Mail, Calendar, TestTube } from 'lucide-react';
+import { Package, Printer, ShoppingBag, User, MapPin, Phone, Mail, Calendar, TestTube, Tag } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { useUser } from '@/context/UserContext';
@@ -9,6 +9,7 @@ import { emailServiceSimple } from '@/services/emailServiceSimple';
 import { whatsappService } from '@/services/whatsappService';
 import { whatsappServiceSimple } from '@/services/whatsappServiceSimple';
 import { useToast } from '@/hooks/use-toast';
+import CouponManager from '@/components/admin/CouponManager';
 
 const Admin: React.FC = () => {
   const navigate = useNavigate();
@@ -16,6 +17,7 @@ const Admin: React.FC = () => {
   const { toast } = useToast();
   const [allOrders, setAllOrders] = useState<any[]>([]);
   const [isTesting, setIsTesting] = useState(false);
+  const [activeTab, setActiveTab] = useState<'orders' | 'coupons'>('orders');
 
   // Admin email - apenas Paula pode acessar
   const ADMIN_EMAIL = 'dracko2007@gmail.com';
@@ -286,6 +288,40 @@ _This is an automated test message_
         <div className="container mx-auto px-4">
           <div className="max-w-6xl mx-auto">
             
+            {/* Tabs */}
+            <div className="mb-8">
+              <div className="border-b border-border">
+                <nav className="-mb-px flex space-x-8">
+                  <button
+                    onClick={() => setActiveTab('orders')}
+                    className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                      activeTab === 'orders'
+                        ? 'border-primary text-primary'
+                        : 'border-transparent text-muted-foreground hover:text-foreground hover:border-gray-300'
+                    }`}
+                  >
+                    <Package className="w-4 h-4 inline mr-2" />
+                    Pedidos
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('coupons')}
+                    className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                      activeTab === 'coupons'
+                        ? 'border-primary text-primary'
+                        : 'border-transparent text-muted-foreground hover:text-foreground hover:border-gray-300'
+                    }`}
+                  >
+                    <Tag className="w-4 h-4 inline mr-2" />
+                    Cupons de Desconto
+                  </button>
+                </nav>
+              </div>
+            </div>
+
+            {/* Content */}
+            {activeTab === 'orders' ? (
+              <>
+            
             {/* Test Button */}
             <div className="mb-8 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950 dark:to-purple-950 rounded-2xl border-2 border-blue-200 dark:border-blue-800 p-6">
               <div className="flex items-center justify-between">
@@ -443,6 +479,10 @@ _This is an automated test message_
                 ))
               )}
             </div>
+            </>
+            ) : (
+              <CouponManager />
+            )}
           </div>
         </div>
       </section>
