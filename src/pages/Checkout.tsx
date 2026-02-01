@@ -155,6 +155,16 @@ const Checkout: React.FC = () => {
           
           setFormData(prev => ({
             ...prev,
+            prefecture: prefecture?.name || '', // Usa apenas o nome em português que corresponde ao value do select
+            city: cityDisplay,
+          }));
+        }
+      } catch (error) {
+        console.error('Erro ao buscar CEP:', error);
+      }
+    }
+  };
+
   const handleRemoveCoupon = () => {
     setAppliedCoupon(null);
     setCouponDiscount(0);
