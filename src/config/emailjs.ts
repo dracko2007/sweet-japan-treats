@@ -6,7 +6,7 @@
 export const emailJsConfig = {
   serviceId: import.meta.env.VITE_EMAILJS_SERVICE_ID || 'service_19eq2gy',
   templateId: import.meta.env.VITE_EMAILJS_TEMPLATE_ID || 'template_nlqgk9',
-  publicKey: import.meta.env.VITE_EMAILJS_PUBLIC_KEY || 'Ze9IzkIIEWIQb7XN8'
+  publicKey: import.meta.env.VITE_EMAILJS_PUBLIC_KEY || 'Ze9lzkIiBWIQb7XN8'
 };
 
 // Log para debug
