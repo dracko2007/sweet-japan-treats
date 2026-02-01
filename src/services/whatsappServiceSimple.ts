@@ -1,7 +1,7 @@
 /**
  * Simple WhatsApp Service
- * Abre o WhatsApp Web ou app diretamente com a mensagem
- * NÃO requer API do Twilio - funciona sempre!
+ * Abre o WhatsApp Web ou app - APENAS para o admin testar
+ * NÃO deve ser usado durante o checkout do cliente!
  */
 
 interface WhatsAppMessage {
@@ -12,10 +12,12 @@ interface WhatsAppMessage {
 export const whatsappServiceSimple = {
   /**
    * Send WhatsApp message by opening WhatsApp Web/App
-   * Works on desktop and mobile without any API
+   * ⚠️ ATENÇÃO: Isso abre uma janela! Use apenas para testes no admin.
+   * Durante o checkout, use apenas com Twilio API configurado.
    */
   sendMessage: (data: WhatsAppMessage): void => {
-    console.log('📱 WhatsApp - Opening WhatsApp with message');
+    console.log('📱 WhatsApp Simple - Opening WhatsApp (ADMIN ONLY)');
+    console.log('⚠️ Isso abrirá uma janela do WhatsApp - use apenas para testes!');
     console.log('📱 To:', data.to);
     console.log('📱 Message preview:', data.message.substring(0, 100) + '...');
     

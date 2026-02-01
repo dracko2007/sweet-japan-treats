@@ -315,40 +315,17 @@ _Sabor do Campo - Doce de Leite Artesanal_
           to: `+${customerPhone}`,
           message: whatsappMessageToCustomer
         });
-      } else {
-        // Use simple WhatsApp service (always works!)
-        console.log('📱 Using Simple WhatsApp service (opens WhatsApp directly)...');
         
-        // Send both messages with delay
-        await whatsappServiceSimple.sendMultiple([
-          {
-            to: '8107013671679', // Store owner
-            message: whatsappMessageToStore
-          },
-          {
-            to: data.formData.phone, // Customer
-            message: whatsappMessageToCustomer
-          }
-        ]);
+        console.log('✅ WhatsApp messages sent via Twilio');
+      } else {
+        // No Twilio configured - just log it (DON'T open WhatsApp for customer!)
+        console.log('⚠️ Twilio não configurado - WhatsApp não será enviado automaticamente');
+        console.log('💡 Configure Twilio para enviar WhatsApp automaticamente');
+        console.log('📝 Você pode enviar manualmente pelo admin');
       }
-      
-      console.log('✅ WhatsApp messages sent/opened');
     } catch (error) {
       console.error('❌ Error with WhatsApp service:', error);
       console.error('❌ Error details:', error instanceof Error ? error.message : String(error));
-      
-      // Ultimate fallback: use simple service
-      console.log('🔄 Using fallback Simple WhatsApp service...');
-      await whatsappServiceSimple.sendMultiple([
-        {
-          to: '8107013671679',
-          message: whatsappMessageToStore
-        },
-        {
-          to: data.formData.phone,
-          message: whatsappMessageToCustomer
-        }
-      ]);
     }
   };
 

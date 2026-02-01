@@ -66,38 +66,8 @@ export const emailServiceSimple = {
     
     // Check if EmailJS is configured
     if (!EMAILJS_SERVICE_ID || !EMAILJS_TEMPLATE_ID || !EMAILJS_PUBLIC_KEY) {
-      console.warn('⚠️ EmailJS não configurado - abrindo email no cliente padrão');
-      
-      // Fallback: open default email client with pre-filled content
-      const subject = `Pedido ${orderData.orderNumber} - Sabor do Campo`;
-      const body = `
-Olá ${orderData.formData.name},
-
-Seu pedido foi confirmado!
-
-Pedido: ${orderData.orderNumber}
-Data: ${new Date().toLocaleDateString('pt-BR')}
-
-Produtos:
-${orderData.items.map((item: CartItem) => 
-  `• ${item.product.name} (${item.size}) x${item.quantity} - ¥${(item.product.prices[item.size] * item.quantity).toLocaleString()}`
-).join('\n')}
-
-Total: ¥${orderData.totalPrice.toLocaleString()}
-
-Endereço de Entrega:
-${orderData.formData.name}
-〒${orderData.formData.postalCode}
-${orderData.formData.prefecture} ${orderData.formData.city}
-${orderData.formData.address}
-${orderData.formData.building || ''}
-
-Obrigado pela preferência!
-Sabor do Campo
-      `.trim();
-      
-      const mailtoLink = `mailto:${orderData.formData.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-      window.open(mailtoLink, '_blank');
+      console.error('❌ EmailJS NÃO configurado - emails não serão enviados automaticamente');
+      console.log('💡 Configure EmailJS no .env para enviar emails automaticamente');
       return false;
     }
     
@@ -146,31 +116,6 @@ Tel: ${orderData.formData.phone}
       
     } catch (error) {
       console.error('❌ Error sending email:', error);
-      
-      // Fallback: open default email client
-      const subject = `Pedido ${orderData.orderNumber} - Sabor do Campo`;
-      const body = `
-Olá ${orderData.formData.name},
-
-Seu pedido foi confirmado!
-
-Pedido: ${orderData.orderNumber}
-Data: ${new Date().toLocaleDateString('pt-BR')}
-
-Produtos:
-${orderData.items.map((item: CartItem) => 
-  `• ${item.product.name} (${item.size}) x${item.quantity}`
-).join('\n')}
-
-Total: ¥${orderData.totalPrice.toLocaleString()}
-
-Obrigado pela preferência!
-Sabor do Campo
-      `.trim();
-      
-      const mailtoLink = `mailto:${orderData.formData.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-      window.open(mailtoLink, '_blank');
-      
       return false;
     }
   }
