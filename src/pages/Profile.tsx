@@ -10,6 +10,7 @@ import { useCart } from '@/context/CartContext';
 import { useToast } from '@/hooks/use-toast';
 import { prefectures } from '@/data/prefectures';
 import { addAddressHints } from '@/utils/romanize';
+import { products } from '@/data/products';
 
 const Profile: React.FC = () => {
   const { user, isAuthenticated, coupons, orders, updateProfile, logout } = useUser();
@@ -23,25 +24,34 @@ const Profile: React.FC = () => {
   const handleReorder = (order: any) => {
     clearCart();
     
+    let itemsAdded = 0;
+    
     // Adiciona todos os itens do pedido ao carrinho
     order.items.forEach((item: any) => {
-      addToCart({
-        id: item.productId || item.id,
-        name: item.productName || item.name,
-        price: item.price,
-        image: item.image || '/products/placeholder.jpg',
-        size: item.size,
-        quantity: item.quantity,
+      // Busca o produto original pelo nome
+      const product = products.find(p => p.name === item.productName);
+      
+      if (product) {
+        addToCart(product, item.size as 'small' | 'large', item.quantity);
+        itemsAdded++;
+      }
+    });
+    
+    if (itemsAdded > 0) {
+      toast({
+        title: "Itens adicionados ao carrinho!",
+        description: `${itemsAdded} produto(s) do pedido #${order.orderNumber}`,
       });
-    });
-    
-    toast({
-      title: "Itens adicionados ao carrinho!",
-      description: `${order.items.length} produto(s) do pedido #${order.orderNumber}`,
-    });
-    
-    // Navega para o carrinho ao invés do checkout
-    navigate('/carrinho');
+      
+      // Navega para o carrinho
+      navigate('/carrinho');
+    } else {
+      toast({
+        title: "Erro ao adicionar itens",
+        description: "Alguns produtos podem não estar mais disponíveis",
+        variant: "destructive",
+      });
+    }
   };
 
   // Função para limpar histórico de pedidos
