@@ -1,21 +1,71 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, Mail, Phone, MapPin, Calendar, Gift, ShoppingBag, Edit2, LogOut, Package } from 'lucide-react';
+import { User, Mail, Phone, MapPin, Calendar, Gift, ShoppingBag, Edit2, LogOut, Package, RotateCcw, Trash2 } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useUser, UserProfile } from '@/context/UserContext';
+import { useCart } from '@/context/CartContext';
 import { useToast } from '@/hooks/use-toast';
 import { prefectures } from '@/data/prefectures';
 import { addAddressHints } from '@/utils/romanize';
 
 const Profile: React.FC = () => {
   const { user, isAuthenticated, coupons, orders, updateProfile, logout } = useUser();
+  const { addToCart, clearCart } = useCart();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [isEditing, setIsEditing] = useState(false);
   const [editedUser, setEditedUser] = useState<Partial<UserProfile>>(user || {});
+
+  // Função para recomprar um pedido
+  const handleReorder = (order: any) => {
+    clearCart();
+    
+    // Adiciona todos os itens do pedido ao carrinho
+    order.items.forEach((item: any) => {
+      addToCart({
+        id: item.productId || item.id,
+        name: item.productName || item.name,
+        price: item.price,
+        image: item.image || '/products/placeholder.jpg',
+        size: item.size,
+        quantity: item.quantity,
+      });
+    });
+    
+    toast({
+      title: "Itens adicionados ao carrinho!",
+      description: `${order.items.length} produto(s) do pedido #${order.orderNumber}`,
+    });
+    
+    navigate('/checkout');
+  };
+
+  // Função para limpar histórico de pedidos
+  const handleClearHistory = () => {
+    if (!confirm('Tem certeza que deseja limpar todo o histórico de pedidos? Esta ação não pode ser desfeita.')) {
+      return;
+    }
+
+    const usersData = localStorage.getItem('sweet-japan-users');
+    if (!usersData || !user) return;
+
+    const users = JSON.parse(usersData);
+    if (users[user.email]) {
+      users[user.email].orders = [];
+      localStorage.setItem('sweet-japan-users', JSON.stringify(users));
+      
+      // Atualiza o contexto
+      window.location.reload();
+      
+      toast({
+        title: "Histórico limpo!",
+        description: "Todos os pedidos foram removidos.",
+      });
+    }
+  };
 
   // Redirect if not authenticated
   React.useEffect(() => {
@@ -391,13 +441,26 @@ const Profile: React.FC = () => {
 
             {/* Purchase History */}
             <div className="bg-card rounded-2xl border border-border p-6 lg:p-8">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                  <ShoppingBag className="w-5 h-5 text-primary" />
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                    <ShoppingBag className="w-5 h-5 text-primary" />
+                  </div>
+                  <h2 className="font-display text-2xl font-semibold text-foreground">
+                    Histórico de Compras
+                  </h2>
                 </div>
-                <h2 className="font-display text-2xl font-semibold text-foreground">
-                  Histórico de Compras
-                </h2>
+                {orders.length > 0 && (
+                  <Button
+                    onClick={handleClearHistory}
+                    variant="outline"
+                    size="sm"
+                    className="gap-2 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    Limpar Histórico
+                  </Button>
+                )}
               </div>
 
               {orders.length > 0 ? (
@@ -451,10 +514,21 @@ const Profile: React.FC = () => {
                       </div>
 
                       <div className="mt-3 pt-3 border-t border-border">
-                        <p className="text-xs text-muted-foreground">
-                          <Package className="w-3 h-3 inline mr-1" />
-                          Pagamento: {order.paymentMethod === 'bank' ? 'Depósito Bancário' : 'PayPay'}
-                        </p>
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs text-muted-foreground">
+                            <Package className="w-3 h-3 inline mr-1" />
+                            Pagamento: {order.paymentMethod === 'bank' ? 'Depósito Bancário' : 'PayPay'}
+                          </p>
+                          <Button
+                            onClick={() => handleReorder(order)}
+                            variant="outline"
+                            size="sm"
+                            className="gap-2 text-primary hover:bg-primary/10"
+                          >
+                            <RotateCcw className="w-3 h-3" />
+                            Comprar Novamente
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   ))}
