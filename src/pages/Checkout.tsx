@@ -59,12 +59,22 @@ const Checkout: React.FC = () => {
       console.log('📍 Endereço do usuário:', user.address);
       console.log('🏛️ Província do usuário:', user.address?.prefecture);
       
+      // Normaliza a província se estiver no formato antigo "東京都 (Tóquio)"
+      let normalizedPrefecture = user.address?.prefecture || '';
+      if (normalizedPrefecture && normalizedPrefecture.includes('(')) {
+        // Extrai apenas o nome em português entre parênteses
+        const match = normalizedPrefecture.match(/\(([^)]+)\)/);
+        if (match) {
+          normalizedPrefecture = match[1];
+        }
+      }
+      
       const formDataToSet = {
         name: user.name || '',
         email: user.email || '',
         phone: user.phone || '',
         postalCode: user.address?.postalCode || '',
-        prefecture: user.address?.prefecture || '',
+        prefecture: normalizedPrefecture,
         city: user.address?.city || '',
         address: user.address?.address || '',
         building: user.address?.building || '',

@@ -72,9 +72,6 @@ const Profile: React.FC = () => {
         if (data.status === 200 && data.results && data.results.length > 0) {
           const result = data.results[0];
           const prefecture = prefectures.find(p => p.nameJa === result.address1);
-          const prefectureDisplay = prefecture 
-            ? `${result.address1} (${prefecture.name})` 
-            : result.address1;
           
           // Adiciona hints de leitura para cidade e bairro separadamente
           const city = addAddressHints(result.address2);
@@ -86,7 +83,7 @@ const Profile: React.FC = () => {
             address: {
               ...prev.address,
               postalCode: formatted,
-              prefecture: prefectureDisplay,
+              prefecture: prefecture?.name || '', // Usa apenas o nome em português
               city: cityDisplay,
             }
           }));
