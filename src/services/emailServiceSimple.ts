@@ -50,6 +50,10 @@ interface EmailParams {
   order_number: string;
   order_date: string;
   items_list: string;
+  subtotal: string;
+  discount?: string;
+  shipping_cost: string;
+  shipping_carrier: string;
   total_price: string;
   shipping_address: string;
   payment_method: string;
@@ -91,13 +95,21 @@ ${orderData.formData.building || ''}
 Tel: ${orderData.formData.phone}
       `.trim();
       
+      const couponDiscount = orderData.couponDiscount || 0;
+      const finalTotal = orderData.totalPrice - couponDiscount;
+      const shipping = orderData.shipping || { carrier: 'N/A', cost: 0 };
+      
       const emailParams: EmailParams = {
         to_email: orderData.formData.email,
         to_name: orderData.formData.name,
         order_number: orderData.orderNumber,
         order_date: new Date().toLocaleDateString('pt-BR'),
         items_list: itemsList,
-        total_price: `¥${orderData.totalPrice.toLocaleString()}`,
+        subtotal: `¥${orderData.totalPrice.toLocaleString()}`,
+        discount: couponDiscount > 0 ? `-¥${couponDiscount.toLocaleString()}` : undefined,
+        shipping_cost: `¥${shipping.cost.toLocaleString()}`,
+        shipping_carrier: shipping.carrier,
+        total_price: `¥${(finalTotal + shipping.cost).toLocaleString()}`,
         shipping_address: shippingAddress,
         payment_method: orderData.paymentMethod === 'bank' ? 'Depósito Bancário' : 'PayPay',
         phone: orderData.formData.phone
@@ -152,6 +164,10 @@ ${orderData.formData.building || ''}
 Tel: ${orderData.formData.phone}
       `.trim();
       
+      const couponDiscount = orderData.couponDiscount || 0;
+      const finalTotal = orderData.totalPrice - couponDiscount;
+      const shipping = orderData.shipping || { carrier: 'N/A', cost: 0 };
+      
       // Parameters for store notification (different from customer email)
       const storeParams = {
         to_email: 'dracko2007@gmail.com',
@@ -162,7 +178,11 @@ Tel: ${orderData.formData.phone}
         order_number: orderData.orderNumber,
         order_date: new Date().toLocaleDateString('pt-BR'),
         items_list: itemsList,
-        total_price: `¥${orderData.totalPrice.toLocaleString()}`,
+        subtotal: `¥${orderData.totalPrice.toLocaleString()}`,
+        discount: couponDiscount > 0 ? `-¥${couponDiscount.toLocaleString()}` : undefined,
+        shipping_cost: `¥${shipping.cost.toLocaleString()}`,
+        shipping_carrier: shipping.carrier,
+        total_price: `¥${(finalTotal + shipping.cost).toLocaleString()}`,
         shipping_address: shippingAddress,
         payment_method: orderData.paymentMethod === 'bank' ? 'Depósito Bancário' : 'PayPay'
       };
