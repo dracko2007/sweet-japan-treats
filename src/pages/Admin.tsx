@@ -100,14 +100,6 @@ const Admin: React.FC = () => {
     };
     return colors[status] || 'bg-gray-100 text-gray-800';
   };
-      
-      // Ordena por data (mais recente primeiro)
-      orders.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-      setAllOrders(orders);
-    };
-
-    loadAllOrders();
-  }, [user, navigate]);
 
   // Test notification services
   const testNotifications = async () => {
