@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Limpar Banco de Dados</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            text-align: center;
+        }
+        button {
+            background: #dc2626;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 10px;
+        }
+        button:hover {
+            background: #b91c1c;
+        }
+        .success {
+            color: #16a34a;
+            margin-top: 20px;
+            font-weight: bold;
+        }
+        .info {
+            color: #666;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🗑️ Limpar Banco de Dados</h1>
+        <p class="info">Isso irá apagar todos os dados armazenados:<br>
+        • Usuários<br>
+        • Pedidos<br>
+        • Cupons<br>
+        • Carrinho</p>
+        <button onclick="clearAll()">Limpar Tudo</button>
+        <div id="result"></div>
+    </div>
+
+    <script>
+        function clearAll() {
+            const keys = [
+                'sweet-japan-users',
+                'sweet-japan-coupons',
+                'sweet-japan-cart',
+                'sweet-japan-user'
+            ];
+            
+            let cleared = [];
+            
+            keys.forEach(key => {
+                const data = localStorage.getItem(key);
+                if (data) {
+                    localStorage.removeItem(key);
+                    cleared.push(key);
+                }
+            });
+            
+            // Limpa tudo que começar com sweet-japan
+            Object.keys(localStorage).forEach(key => {
+                if (key.startsWith('sweet-japan')) {
+                    localStorage.removeItem(key);
+                    if (!cleared.includes(key)) {
+                        cleared.push(key);
+                    }
+                }
+            });
+            
+            const result = document.getElementById('result');
+            if (cleared.length > 0) {
+                result.innerHTML = `<p class="success">✅ Banco de dados limpo com sucesso!<br>Removidas ${cleared.length} chaves:<br>${cleared.join('<br>')}</p>`;
+            } else {
+                result.innerHTML = '<p class="info">ℹ️ Nenhum dado encontrado para limpar</p>';
+            }
+        }
+    </script>
+</body>
+</html>

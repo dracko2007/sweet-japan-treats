@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Package, Printer, ShoppingBag, User, MapPin, Phone, Mail, Calendar, TestTube, Tag, Truck, CheckCircle, XCircle, Trash2, BarChart3 } from 'lucide-react';
+import { Package, Printer, ShoppingBag, User, MapPin, Phone, Mail, Calendar, TestTube, Tag, Truck, CheckCircle, XCircle, Trash2, BarChart3, Users } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { useUser } from '@/context/UserContext';
@@ -11,6 +11,7 @@ import { whatsappServiceSimple } from '@/services/whatsappServiceSimple';
 import { useToast } from '@/hooks/use-toast';
 import CouponManager from '@/components/admin/CouponManager';
 import Dashboard from '@/components/admin/Dashboard';
+import CustomerList from '@/components/admin/CustomerList';
 import { orderService } from '@/services/orderService';
 
 const Admin: React.FC = () => {
@@ -19,7 +20,7 @@ const Admin: React.FC = () => {
   const { toast } = useToast();
   const [allOrders, setAllOrders] = useState<any[]>([]);
   const [isTesting, setIsTesting] = useState(false);
-  const [activeTab, setActiveTab] = useState<'orders' | 'coupons' | 'dashboard'>('orders');
+  const [activeTab, setActiveTab] = useState<'orders' | 'coupons' | 'dashboard' | 'customers'>('orders');
 
   // Admin email - apenas Paula pode acessar
   const ADMIN_EMAIL = 'dracko2007@gmail.com';
@@ -365,6 +366,17 @@ _This is an automated test message_
                     <BarChart3 className="w-4 h-4 inline mr-2" />
                     Dashboard
                   </button>
+                  <button
+                    onClick={() => setActiveTab('customers')}
+                    className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                      activeTab === 'customers'
+                        ? 'border-primary text-primary'
+                        : 'border-transparent text-muted-foreground hover:text-foreground hover:border-gray-300'
+                    }`}
+                  >
+                    <Users className="w-4 h-4 inline mr-2" />
+                    Clientes
+                  </button>
                 </nav>
               </div>
             </div>
@@ -588,8 +600,10 @@ _This is an automated test message_
             </>
             ) : activeTab === 'coupons' ? (
               <CouponManager />
-            ) : (
+            ) : activeTab === 'dashboard' ? (
               <Dashboard />
+            ) : (
+              <CustomerList />
             )}
           </div>
         </div>
