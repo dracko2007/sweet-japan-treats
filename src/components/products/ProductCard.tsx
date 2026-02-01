@@ -1,8 +1,11 @@
-import React, { useState } from 'react';
-import { Plus, Minus, ShoppingCart, Check } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Plus, Minus, ShoppingCart, Check, Heart, Share2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Product } from '@/types';
 import { useCart } from '@/context/CartContext';
+import { useUser } from '@/context/UserContext';
+import { wishlistService } from '@/services/wishlistService';
+import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
 interface ProductCardProps {
@@ -14,7 +17,16 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
   const [quantity, setQuantity] = useState(1);
   const [added, setAdded] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
+  const [isFavorite, setIsFavorite] = useState(false);
   const { addToCart } = useCart();
+  const { user } = useUser();
+  const { toast } = useToast();
+
+  useEffect(() => {
+    if (user?.email) {
+      setIsFavorite(wishlistService.isInWishlist(user.email, product.id));
+    }
+  }, [user, product.id]);
 
   const currentPrice = selectedSize === 'small' ? product.prices.small : product.prices.large;
 
@@ -23,6 +35,86 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
     setAdded(true);
     setTimeout(() => setAdded(false), 2000);
     setQuantity(1);
+  };
+
+  const handleToggleFavorite = () => {
+    if (!user?.email) {
+      toast({
+        title: "Login necessário",
+        description: "Faça login para adicionar aos favoritos",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (isFavorite) {
+      wishlistService.removeFromWishlist(user.email, product.id);
+      setIsFavorite(false);
+      toast({
+        title: "Removido dos favoritos",
+        description: `${product.name} removido da lista de desejos`,
+      });
+    } else {
+      const success = wishlistService.addToWishlist(user.email, {
+        productId: product.id,
+        productName: product.name,
+        productImage: product.image,
+        productPrice: product.prices.small,
+      });
+
+      if (success) {
+        setIsFavorite(true);
+        toast({
+          title: "Adicionado aos favoritos! ❤️",
+          description: `${product.name} salvo na sua lista de desejos`,
+        });
+      }
+    }
+  };
+
+  const handleShare = () => {
+    const url = `${window.location.origin}/produtos`;
+    const text = `Confira ${product.name} - Doce de Leite Artesanal 🍯`;
+
+    if (navigator.share) {
+      navigator.share({
+        title: product.name,
+        text: text,
+        url: url,
+      }).catch(() => {
+        // Fallback se cancelar
+      });
+    } else {
+      // Fallback: copiar link
+      navigator.clipboard.writeText(url);
+      toast({
+        title: "Link copiado!",
+        description: "O link foi copiado para sua área de transferência",
+      });
+    }
+
+        {/* Favorite & Share Buttons */}
+        <div className="absolute top-4 right-4 z-10 flex gap-2">
+          <button
+            onClick={handleToggleFavorite}
+            className={cn(
+              "p-2 rounded-full backdrop-blur-sm transition-all",
+              isFavorite 
+                ? "bg-red-500 text-white hover:bg-red-600" 
+                : "bg-white/90 dark:bg-gray-800/90 text-gray-700 dark:text-gray-200 hover:bg-white dark:hover:bg-gray-800"
+            )}
+            title={isFavorite ? "Remover dos favoritos" : "Adicionar aos favoritos"}
+          >
+            <Heart className={cn("w-5 h-5", isFavorite && "fill-current")} />
+          </button>
+          <button
+            onClick={handleShare}
+            className="p-2 rounded-full bg-white/90 dark:bg-gray-800/90 text-gray-700 dark:text-gray-200 hover:bg-white dark:hover:bg-gray-800 backdrop-blur-sm transition-all"
+            title="Compartilhar produto"
+          >
+            <Share2 className="w-5 h-5" />
+          </button>
+        </div>
   };
 
   return (

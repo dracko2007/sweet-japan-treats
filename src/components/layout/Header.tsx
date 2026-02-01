@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { ShoppingCart, Menu, X, ChevronDown, UserCircle } from 'lucide-react';
+import { ShoppingCart, Menu, X, ChevronDown, UserCircle, Heart } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
 import { useUser } from '@/context/UserContext';
 import { cn } from '@/lib/utils';
@@ -135,6 +135,17 @@ const Header: React.FC = () => {
               </Link>
             </Button>
 
+            {/* Wishlist Button */}
+            {isAuthenticated && (
+              <Link 
+                to="/favoritos" 
+                className="relative p-2 rounded-full hover:bg-secondary/50 transition-colors hidden lg:block"
+                title="Meus Favoritos"
+              >
+                <Heart className="w-6 h-6 text-foreground" />
+              </Link>
+            )}
+
             <Link 
               to="/carrinho" 
               className="relative p-2 rounded-full hover:bg-secondary/50 transition-colors"
@@ -197,6 +208,19 @@ const Header: React.FC = () => {
                 {isAuthenticated ? (user?.name?.split(' ')[0] || 'Perfil') : 'Cadastro'}
               </Link>
             </Button>
+            {/* Wishlist Mobile */}
+            {isAuthenticated && (
+              <Button 
+                asChild
+                variant="ghost" 
+                className="w-full justify-start text-base font-medium"
+              >
+                <Link to="/favoritos" onClick={() => setIsMenuOpen(false)}>
+                  <Heart className="w-5 h-5 mr-2" />
+                  Favoritos
+                </Link>
+              </Button>
+            )}
           </nav>
         )}
       </div>
