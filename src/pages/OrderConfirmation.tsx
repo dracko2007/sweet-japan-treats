@@ -165,13 +165,9 @@ const OrderConfirmation: React.FC = () => {
       
       console.log('📧 Email sent to customer:', data.formData.email, emailResultCustomer ? '✅' : '❌');
       
-      // Send to store owner (you)
-      const emailResultStore = await emailServiceSimple.sendOrderConfirmation({
-        formData: {
-          ...data.formData,
-          email: 'dracko2007@gmail.com', // Your email
-          name: 'Paula Shiokawa' // Your name
-        },
+      // Send to store owner (you) - using different template
+      const emailResultStore = await emailServiceSimple.sendStoreNotification({
+        formData: data.formData,
         items: data.items,
         totalPrice: data.totalPrice,
         orderNumber,
@@ -179,7 +175,7 @@ const OrderConfirmation: React.FC = () => {
         shipping: data.shipping
       });
       
-      console.log('📧 Email sent to store:', 'dracko2007@gmail.com', emailResultStore ? '✅' : '❌');
+      console.log('📧 Store notification sent:', emailResultStore ? '✅' : '❌');
       setEmailSent(emailResultCustomer || emailResultStore);
       
     } catch (error) {

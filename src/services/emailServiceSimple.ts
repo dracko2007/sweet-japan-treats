@@ -18,7 +18,8 @@ import { emailJsConfig } from '@/config/emailjs';
 declare const emailjs: any;
 
 const EMAILJS_SERVICE_ID = emailJsConfig.serviceId;
-const EMAILJS_TEMPLATE_ID = emailJsConfig.templateId;
+const EMAILJS_TEMPLATE_ID_CUSTOMER = emailJsConfig.templateIdCustomer;
+const EMAILJS_TEMPLATE_ID_STORE = emailJsConfig.templateIdStore;
 const EMAILJS_PUBLIC_KEY = emailJsConfig.publicKey;
 
 // Load EmailJS library dynamically
@@ -57,16 +58,16 @@ interface EmailParams {
 
 export const emailServiceSimple = {
   /**
-   * Send email using EmailJS
+   * Send order confirmation email to customer
    */
   sendOrderConfirmation: async (orderData: any): Promise<boolean> => {
-    console.log('📧 EmailJS - Sending order confirmation');
+    console.log('📧 EmailJS - Sending order confirmation to customer');
     console.log('📧 Service ID:', EMAILJS_SERVICE_ID, '(exists:', !!EMAILJS_SERVICE_ID, ')');
-    console.log('📧 Template ID:', EMAILJS_TEMPLATE_ID, '(exists:', !!EMAILJS_TEMPLATE_ID, ')');
+    console.log('📧 Template ID:', EMAILJS_TEMPLATE_ID_CUSTOMER, '(exists:', !!EMAILJS_TEMPLATE_ID_CUSTOMER, ')');
     console.log('📧 Public Key:', EMAILJS_PUBLIC_KEY, '(exists:', !!EMAILJS_PUBLIC_KEY, ')');
     
     // Check if EmailJS is configured
-    if (!EMAILJS_SERVICE_ID || !EMAILJS_TEMPLATE_ID || !EMAILJS_PUBLIC_KEY) {
+    if (!EMAILJS_SERVICE_ID || !EMAILJS_TEMPLATE_ID_CUSTOMER || !EMAILJS_PUBLIC_KEY) {
       console.error('❌ EmailJS NÃO configurado - emails não serão enviados automaticamente');
       console.log('💡 Configure EmailJS no .env para enviar emails automaticamente');
       return false;
@@ -107,7 +108,7 @@ Tel: ${orderData.formData.phone}
       
       const response = await emailjs.send(
         EMAILJS_SERVICE_ID,
-        EMAILJS_TEMPLATE_ID,
+        EMAILJS_TEMPLATE_ID_CUSTOMER,
         emailParams
       );
       
@@ -117,6 +118,67 @@ Tel: ${orderData.formData.phone}
       
     } catch (error) {
       console.error('❌ Error sending email:', error);
+      return false;
+    }
+  },
+
+  /**
+   * Send new order notification to store owner
+   */
+  sendStoreNotification: async (orderData: any): Promise<boolean> => {
+    console.log('📧 EmailJS - Sending store notification');
+    
+    if (!EMAILJS_SERVICE_ID || !EMAILJS_TEMPLATE_ID_STORE || !EMAILJS_PUBLIC_KEY) {
+      console.error('❌ EmailJS store template not configured');
+      return false;
+    }
+    
+    try {
+      await loadEmailJS();
+      
+      const itemsList = orderData.items.map((item: CartItem) => 
+        `${item.product.name} (${item.size}) x${item.quantity} - ¥${(item.product.prices[item.size] * item.quantity).toLocaleString()}`
+      ).join('\n');
+      
+      const shippingAddress = `
+${orderData.formData.name}
+〒${orderData.formData.postalCode}
+${orderData.formData.prefecture} ${orderData.formData.city}
+${orderData.formData.address}
+${orderData.formData.building || ''}
+Tel: ${orderData.formData.phone}
+      `.trim();
+      
+      // Parameters for store notification (different from customer email)
+      const storeParams = {
+        to_email: 'dracko2007@gmail.com',
+        to_name: 'Paula Shiokawa',
+        customer_name: orderData.formData.name,
+        customer_email: orderData.formData.email,
+        customer_phone: orderData.formData.phone,
+        order_number: orderData.orderNumber,
+        order_date: new Date().toLocaleDateString('pt-BR'),
+        items_list: itemsList,
+        total_price: `¥${orderData.totalPrice.toLocaleString()}`,
+        shipping_address: shippingAddress,
+        payment_method: orderData.paymentMethod === 'bank' ? 'Depósito Bancário' : 'PayPay'
+      };
+      
+      console.log('📤 Sending store notification...');
+      console.log('📤 Store Params:', storeParams);
+      
+      const response = await emailjs.send(
+        EMAILJS_SERVICE_ID,
+        EMAILJS_TEMPLATE_ID_STORE,
+        storeParams
+      );
+      
+      console.log('✅ Store notification sent!');
+      console.log('📧 Response:', response);
+      return true;
+      
+    } catch (error) {
+      console.error('❌ Error sending store notification:', error);
       return false;
     }
   }
