@@ -164,6 +164,40 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
   }, [orders, user]);
 
   const login = async (email: string, password: string): Promise<boolean> => {
+    // Admin default - sempre disponível
+    const ADMIN_EMAIL = 'dracko2007@gmail.com';
+    const ADMIN_PASSWORD = 'admin123';
+    
+    if (email === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
+      const adminUser: UserProfile = {
+        id: 'admin-001',
+        name: 'Administrador',
+        email: ADMIN_EMAIL,
+        phone: '070-1367-1679',
+        password: ADMIN_PASSWORD,
+        address: {
+          postalCode: '000-0000',
+          prefecture: 'Tokyo',
+          city: 'Tokyo',
+          address: 'Admin',
+        },
+        createdAt: '2024-01-01T00:00:00.000Z',
+      };
+      
+      setUser(adminUser);
+      setIsAuthenticated(true);
+      
+      // Load admin coupons and orders
+      const userCoupons = getUserCoupons(adminUser.id);
+      const userOrders = getUserOrders(adminUser.id);
+      
+      setCoupons(userCoupons);
+      setOrders(userOrders);
+      
+      console.log('✅ Admin logged in successfully');
+      return true;
+    }
+    
     // Search in users database for matching credentials
     const allUsers = getAllUsers();
     console.log('🔍 Login attempt:', { email });
