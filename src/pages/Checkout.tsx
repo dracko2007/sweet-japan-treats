@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Package, ArrowRight, MapPin, User, Phone, Mail, Clock } from 'lucide-react';
+import { Package, ArrowRight, MapPin, User, Phone, Mail, Clock, Tag, X } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,12 +10,16 @@ import { useUser } from '@/context/UserContext';
 import ShippingCalculator from '@/components/shipping/ShippingCalculator';
 import { prefectures } from '@/data/prefectures';
 import { addAddressHints } from '@/utils/romanize';
+import { couponService } from '@/services/couponService';
+import type { Coupon } from '@/types';
+import { useToast } from '@/hooks/use-toast';
 
 const Checkout: React.FC = () => {
   const { items, totalPrice } = useCart();
   const { user, isAuthenticated } = useUser();
   const navigate = useNavigate();
   const location = useLocation();
+  const { toast } = useToast();
   
   const [formData, setFormData] = useState({
     name: '',
@@ -35,6 +39,11 @@ const Checkout: React.FC = () => {
   } | null>(null);
 
   const [deliveryTime, setDeliveryTime] = useState<string>('');
+
+  // Coupon state
+  const [couponCode, setCouponCode] = useState('');
+  const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
+  const [couponDiscount, setCouponDiscount] = useState(0);
 
   // Load form data from state if returning from review page
   useEffect(() => {
@@ -132,6 +141,47 @@ const Checkout: React.FC = () => {
     }
   };
 
+  // Apply coupon
+  const handleApplyCoupon = () => {
+    if (!couponCode.trim()) {
+      toast({
+        title: "Erro",
+        description: "Digite um código de cupom",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const result = couponService.validateCoupon(couponCode);
+    
+    if (result.valid && result.coupon) {
+      const discount = couponService.calculateDiscount(result.coupon, totalPrice);
+      setAppliedCoupon(result.coupon);
+      setCouponDiscount(discount);
+      toast({
+        title: "Cupom aplicado!",
+        description: `Desconto de ¥${discount.toLocaleString()} aplicado`,
+      });
+    } else {
+      toast({
+        title: "Cupom inválido",
+        description: result.error,
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Remove coupon
+  const handleRemoveCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponDiscount(0);
+    setCouponCode('');
+    toast({
+      title: "Cupom removido",
+      description: "O desconto foi removido",
+    });
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -145,7 +195,9 @@ const Checkout: React.FC = () => {
       state: { 
         formData,
         shipping: selectedShipping,
-        deliveryTime
+        deliveryTime,
+        coupon: appliedCoupon,
+        couponDiscount
       } 
     });
   };
@@ -434,11 +486,71 @@ const Checkout: React.FC = () => {
                     </div>
                   ))}
 
+                  {/* Coupon Section */}
+                  <div className="pt-4 mt-4 border-t border-border">
+                    {!appliedCoupon ? (
+                      <div className="space-y-3">
+                        <Label className="flex items-center gap-2 text-sm font-medium">
+                          <Tag className="w-4 h-4" />
+                          Cupom de Desconto
+                        </Label>
+                        <div className="flex gap-2">
+                          <Input
+                            value={couponCode}
+                            onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                            placeholder="Digite o código"
+                            className="flex-1"
+                            onKeyPress={(e) => e.key === 'Enter' && handleApplyCoupon()}
+                          />
+                          <Button 
+                            type="button"
+                            onClick={handleApplyCoupon}
+                            variant="outline"
+                            size="sm"
+                          >
+                            Aplicar
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg p-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Tag className="w-4 h-4 text-green-600 dark:text-green-400" />
+                            <div>
+                              <p className="text-sm font-medium text-green-900 dark:text-green-100">
+                                {appliedCoupon.code}
+                              </p>
+                              <p className="text-xs text-green-700 dark:text-green-300">
+                                {appliedCoupon.description}
+                              </p>
+                            </div>
+                          </div>
+                          <Button 
+                            type="button"
+                            onClick={handleRemoveCoupon}
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0 text-green-700 hover:text-green-900 dark:text-green-400 dark:hover:text-green-200"
+                          >
+                            <X className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
                   <div className="space-y-2 pt-2">
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Subtotal</span>
                       <span className="font-medium">¥{totalPrice.toLocaleString()}</span>
                     </div>
+                    {appliedCoupon && couponDiscount > 0 && (
+                      <div className="flex justify-between text-sm text-green-600 dark:text-green-400">
+                        <span>Desconto ({appliedCoupon.code})</span>
+                        <span className="font-medium">-¥{couponDiscount.toLocaleString()}</span>
+                      </div>
+                    )}
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Frete</span>
                       {selectedShipping ? (
@@ -456,8 +568,8 @@ const Checkout: React.FC = () => {
                       <span className="font-semibold">Total</span>
                       <span className="font-bold text-lg text-primary">
                         ¥{selectedShipping 
-                          ? (totalPrice + selectedShipping.cost).toLocaleString()
-                          : `${totalPrice.toLocaleString()}+`
+                          ? (totalPrice - couponDiscount + selectedShipping.cost).toLocaleString()
+                          : `${(totalPrice - couponDiscount).toLocaleString()}+`
                         }
                       </span>
                     </div>
