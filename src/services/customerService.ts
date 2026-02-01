@@ -57,12 +57,12 @@ export const customerService = {
       const orderHistory: Array<{ orderNumber: string; date: string; total: number; status: string }> = [];
 
       orders.forEach((order: any) => {
-        totalSpent += order.total;
+        totalSpent += order.totalPrice || 0;
 
         orderHistory.push({
           orderNumber: order.orderNumber,
           date: order.date,
-          total: order.total,
+          total: order.totalPrice || 0,
           status: order.status || 'pending',
         });
 
