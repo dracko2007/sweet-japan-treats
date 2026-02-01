@@ -13,16 +13,6 @@ export const products: Product[] = [
     flavor: 'Tradicional'
   },
   {
-    id: 'prem-cafe',
-    name: 'Doce de Leite de Café',
-    description: 'Uma combinação perfeita do doce de leite tradicional com o sabor marcante do café brasileiro. Ideal para os amantes de café.',
-    category: 'premium',
-    prices: { small: 1400, large: 2400 },
-    image: '/products/cafe.jpg',
-    video: '/video/cafe.mp4',
-    flavor: 'Café'
-  },
-  {
     id: 'art-coco',
     name: 'Doce de Leite de Coco',
     description: 'A doçura tropical do coco combinada com a cremosidade do doce de leite. Uma experiência única e refrescante.',
@@ -43,6 +33,16 @@ export const products: Product[] = [
     flavor: 'Amendoim'
   },
   // Premium - 280g: ¥1400, 800g: ¥2400
+  {
+    id: 'prem-cafe',
+    name: 'Doce de Leite de Café',
+    description: 'Uma combinação perfeita do doce de leite tradicional com o sabor marcante do café brasileiro. Ideal para os amantes de café.',
+    category: 'premium',
+    prices: { small: 1400, large: 2400 },
+    image: '/products/cafe.jpg',
+    video: '/video/cafe.mp4',
+    flavor: 'Café'
+  },
   {
     id: 'prem-amendoas',
     name: 'Doce de Leite de Amêndoas',

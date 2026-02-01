@@ -36,7 +36,7 @@ const Header: React.FC = () => {
           {/* Logo */}
           <Link to="/" className="flex items-center gap-3">
             <img 
-              src="/logo/sabor-do-campo.png" 
+              src="/logo/logo.jpeg" 
               alt="Sabor do Campo" 
               className="h-16 w-auto object-contain"
             />
