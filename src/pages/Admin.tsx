@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Package, Printer, ShoppingBag, User, MapPin, Phone, Mail, Calendar, TestTube, Tag } from 'lucide-react';
+import { Package, Printer, ShoppingBag, User, MapPin, Phone, Mail, Calendar, TestTube, Tag, Truck, CheckCircle, XCircle, Trash2, BarChart3 } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { useUser } from '@/context/UserContext';
@@ -10,6 +10,8 @@ import { whatsappService } from '@/services/whatsappService';
 import { whatsappServiceSimple } from '@/services/whatsappServiceSimple';
 import { useToast } from '@/hooks/use-toast';
 import CouponManager from '@/components/admin/CouponManager';
+import Dashboard from '@/components/admin/Dashboard';
+import { orderService } from '@/services/orderService';
 
 const Admin: React.FC = () => {
   const navigate = useNavigate();
@@ -17,7 +19,7 @@ const Admin: React.FC = () => {
   const { toast } = useToast();
   const [allOrders, setAllOrders] = useState<any[]>([]);
   const [isTesting, setIsTesting] = useState(false);
-  const [activeTab, setActiveTab] = useState<'orders' | 'coupons'>('orders');
+  const [activeTab, setActiveTab] = useState<'orders' | 'coupons' | 'dashboard'>('orders');
 
   // Admin email - apenas Paula pode acessar
   const ADMIN_EMAIL = 'dracko2007@gmail.com';
@@ -29,25 +31,75 @@ const Admin: React.FC = () => {
       return;
     }
 
-    // Carrega todos os pedidos de todos os usuários
-    const loadAllOrders = () => {
-      const orders: any[] = [];
-      
-      // Percorre todos os items do localStorage
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key && key.startsWith('orders_')) {
-          const userOrders = JSON.parse(localStorage.getItem(key) || '[]');
-          const userId = key.replace('orders_', '');
-          
-          // Busca dados do usuário
-          const users = JSON.parse(localStorage.getItem('users') || '[]');
-          const userData = users.find((u: any) => u.id === userId);
-          
-          userOrders.forEach((order: any) => {
-            orders.push({
-              ...order,
-              customerData: userData
+    loadOrders();
+  }, [user, navigate]);
+
+  const loadOrders = () => {
+    const orders = orderService.getAllOrders();
+    setAllOrders(orders);
+  };
+
+  const handleUpdateStatus = (orderNumber: string, newStatus: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled') => {
+    const success = orderService.updateOrderStatus(orderNumber, newStatus);
+    
+    if (success) {
+      toast({
+        title: "Status atualizado!",
+        description: `Pedido ${orderNumber} marcado como ${getStatusLabel(newStatus)}`,
+      });
+      loadOrders();
+    } else {
+      toast({
+        title: "Erro",
+        description: "Não foi possível atualizar o status",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDeleteOrder = (orderNumber: string) => {
+    if (!confirm(`Tem certeza que deseja excluir o pedido ${orderNumber}?`)) {
+      return;
+    }
+
+    const success = orderService.deleteOrder(orderNumber);
+    
+    if (success) {
+      toast({
+        title: "Pedido excluído",
+        description: `Pedido ${orderNumber} foi removido`,
+      });
+      loadOrders();
+    } else {
+      toast({
+        title: "Erro",
+        description: "Não foi possível excluir o pedido",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const getStatusLabel = (status: string) => {
+    const labels: Record<string, string> = {
+      pending: 'Pendente',
+      processing: 'Processando',
+      shipped: 'Enviado',
+      delivered: 'Entregue',
+      cancelled: 'Cancelado',
+    };
+    return labels[status] || status;
+  };
+
+  const getStatusColor = (status: string) => {
+    const colors: Record<string, string> = {
+      pending: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
+      processing: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
+      shipped: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200',
+      delivered: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
+      cancelled: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
+    };
+    return colors[status] || 'bg-gray-100 text-gray-800';
+  };
             });
           });
         }
@@ -314,6 +366,17 @@ _This is an automated test message_
                     <Tag className="w-4 h-4 inline mr-2" />
                     Cupons de Desconto
                   </button>
+                  <button
+                    onClick={() => setActiveTab('dashboard')}
+                    className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                      activeTab === 'dashboard'
+                        ? 'border-primary text-primary'
+                        : 'border-transparent text-muted-foreground hover:text-foreground hover:border-gray-300'
+                    }`}
+                  >
+                    <BarChart3 className="w-4 h-4 inline mr-2" />
+                    Dashboard
+                  </button>
                 </nav>
               </div>
             </div>
@@ -401,10 +464,8 @@ _This is an automated test message_
                           <h3 className="font-semibold text-lg">
                             Pedido #{order.orderNumber || `ORD-${index + 1}`}
                           </h3>
-                          <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                            order.status === 'pending' ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'
-                          }`}>
-                            {order.status === 'pending' ? '⏳ Pendente' : '✅ Confirmado'}
+                          <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(order.status || 'pending')}`}>
+                            {getStatusLabel(order.status || 'pending')}
                           </span>
                         </div>
                         <p className="text-sm text-muted-foreground mb-1">
@@ -437,11 +498,11 @@ _This is an automated test message_
                           <p className="font-medium">{order.shippingAddress.name}</p>
                           <p className="text-muted-foreground flex items-center gap-2">
                             <Mail className="w-4 h-4" />
-                            {order.customerData?.email || 'N/A'}
+                            {order.customerEmail || 'N/A'}
                           </p>
                           <p className="text-muted-foreground flex items-center gap-2">
                             <Phone className="w-4 h-4" />
-                            {order.customerData?.phone || 'N/A'}
+                            {order.shippingAddress.phone || order.customerName || 'N/A'}
                           </p>
                           <p className="text-muted-foreground flex items-start gap-2 mt-2">
                             <MapPin className="w-4 h-4 mt-0.5" />
@@ -475,13 +536,72 @@ _This is an automated test message_
                         </div>
                       </div>
                     </div>
+
+                    {/* Action Buttons */}
+                    <div className="mt-6 pt-4 border-t border-border flex flex-wrap gap-2">
+                      {order.status === 'pending' && (
+                        <Button
+                          onClick={() => handleUpdateStatus(order.orderNumber, 'processing')}
+                          variant="outline"
+                          size="sm"
+                          className="gap-2"
+                        >
+                          <CheckCircle className="w-4 h-4" />
+                          Processar
+                        </Button>
+                      )}
+                      {(order.status === 'pending' || order.status === 'processing') && (
+                        <Button
+                          onClick={() => handleUpdateStatus(order.orderNumber, 'shipped')}
+                          variant="outline"
+                          size="sm"
+                          className="gap-2"
+                        >
+                          <Truck className="w-4 h-4" />
+                          Marcar como Enviado
+                        </Button>
+                      )}
+                      {order.status === 'shipped' && (
+                        <Button
+                          onClick={() => handleUpdateStatus(order.orderNumber, 'delivered')}
+                          variant="outline"
+                          size="sm"
+                          className="gap-2"
+                        >
+                          <CheckCircle className="w-4 h-4" />
+                          Marcar como Entregue
+                        </Button>
+                      )}
+                      {order.status !== 'cancelled' && order.status !== 'delivered' && (
+                        <Button
+                          onClick={() => handleUpdateStatus(order.orderNumber, 'cancelled')}
+                          variant="outline"
+                          size="sm"
+                          className="gap-2 text-orange-600 hover:text-orange-700"
+                        >
+                          <XCircle className="w-4 h-4" />
+                          Cancelar
+                        </Button>
+                      )}
+                      <Button
+                        onClick={() => handleDeleteOrder(order.orderNumber)}
+                        variant="destructive"
+                        size="sm"
+                        className="gap-2 ml-auto"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        Excluir
+                      </Button>
+                    </div>
                   </div>
                 ))
               )}
             </div>
             </>
-            ) : (
+            ) : activeTab === 'coupons' ? (
               <CouponManager />
+            ) : (
+              <Dashboard />
             )}
           </div>
         </div>
