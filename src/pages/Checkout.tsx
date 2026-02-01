@@ -136,6 +136,12 @@ const Checkout: React.FC = () => {
           const neighborhood = result.address3 ? addAddressHints(result.address3) : '';
           const cityDisplay = neighborhood ? `${city} ${neighborhood}` : city;
           
+          console.log('🔍 CEP encontrado:', {
+            address1: result.address1,
+            prefectureFound: prefecture,
+            prefectureName: prefecture?.name
+          });
+          
           setFormData(prev => ({
             ...prev,
             prefecture: prefecture?.name || '', // Usa apenas o nome em português que corresponde ao value do select
@@ -235,7 +241,7 @@ const Checkout: React.FC = () => {
                     <MapPin className="w-5 h-5 text-primary" />
                   </div>
                   <h2 className="font-display text-2xl font-semibold text-foreground">
-                    Dados para Entrega
+                    {selectedShipping?.carrier === 'Retirar no Local 🏠' ? 'Seus Dados' : 'Dados para Entrega'}
                   </h2>
                 </div>
 
@@ -298,6 +304,7 @@ const Checkout: React.FC = () => {
                   </div>
 
                   {/* Shipping Address */}
+                  {selectedShipping?.carrier !== 'Retirar no Local 🏠' && (
                   <div className="space-y-4">
                     <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
                       Endereço de Entrega
@@ -389,12 +396,23 @@ const Checkout: React.FC = () => {
                       />
                     </div>
                   </div>
+                  )}
 
                   {/* Shipping Calculator Section */}
                   <div className="pt-4 border-t border-border">
                     <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-4">
-                      Calcular Frete
+                      Forma de Entrega
                     </h3>
+                    {selectedShipping?.carrier === 'Retirar no Local 🏠' && (
+                      <div className="bg-green-50 dark:bg-green-950/20 border border-green-500 rounded-lg p-4 mb-4">
+                        <p className="text-sm font-medium text-green-700 dark:text-green-300 mb-2">🏪 Retirada no Local Selecionada</p>
+                        <p className="text-sm text-green-600 dark:text-green-400">
+                          📍 <strong>Endereço:</strong> Mie-ken, Iga-shi, Kirigaoka 5-292 (〒518-0225)<br/>
+                          📞 <strong>Contato:</strong> 070-1367-1679<br/>
+                          ⏰ Entre em contato para combinar o horário de retirada
+                        </p>
+                      </div>
+                    )}
                     <ShippingCalculator 
                       selectedPrefecture={formData.prefecture}
                       onShippingSelect={setSelectedShipping}
@@ -432,12 +450,12 @@ const Checkout: React.FC = () => {
                       className="w-full btn-primary rounded-xl py-6 text-lg font-semibold"
                       disabled={!selectedShipping}
                     >
-                      Revisar Pedido
+                      {selectedShipping?.carrier === 'Retirar no Local 🏠' ? 'Revisar Pedido de Retirada' : 'Revisar Pedido'}
                       <ArrowRight className="w-5 h-5 ml-2" />
                     </Button>
                     {!selectedShipping && (
                       <p className="text-xs text-muted-foreground text-center mt-2">
-                        Selecione uma transportadora para continuar
+                        Selecione uma forma de entrega para continuar
                       </p>
                     )}
                   </div>

@@ -56,34 +56,52 @@ const ShippingCalculator: React.FC<ShippingCalculatorProps> = ({
   const selectedPref = prefectures.find(p => p.name === selectedPrefecture);
 
   const shippingOptions = useMemo(() => {
-    if (!selectedPref || items.length === 0) return [];
+    if (items.length === 0) return [];
 
-    const zone = selectedPref.zone as 1 | 2 | 3 | 4;
-    const carriers: CarrierName[] = ['yuubin', 'yamato', 'sagawa'];
-    
-    return carriers.map(carrier => {
-      let totalCost = 0;
+    const options = [];
+
+    // Always add pickup option (available even without province selection)
+    options.push({
+      carrier: 'pickup',
+      name: 'Retirar no Local 🏠',
+      logo: '🏪',
+      cost: 0,
+      estimatedDays: 'Combinar'
+    });
+
+    // Add shipping options only if province is selected
+    if (selectedPref) {
+      const zone = selectedPref.zone as 1 | 2 | 3 | 4;
+      const carriers: CarrierName[] = ['yuubin', 'yamato', 'sagawa'];
       
-      if (calculateBoxes.boxes60 > 0) {
-        totalCost += shippingRates[carrier]['60'][zone] * calculateBoxes.boxes60;
-      }
-      if (calculateBoxes.boxes80 > 0) {
-        totalCost += shippingRates[carrier]['80'][zone] * calculateBoxes.boxes80;
-      }
+      const shippingCarriers = carriers.map(carrier => {
+        let totalCost = 0;
+        
+        if (calculateBoxes.boxes60 > 0) {
+          totalCost += shippingRates[carrier]['60'][zone] * calculateBoxes.boxes60;
+        }
+        if (calculateBoxes.boxes80 > 0) {
+          totalCost += shippingRates[carrier]['80'][zone] * calculateBoxes.boxes80;
+        }
 
-      const carrierNames = {
-        yuubin: { name: 'Japan Post (ゆうパック)', logo: '📮' },
-        yamato: { name: 'Yamato (クロネコ)', logo: '🐱' },
-        sagawa: { name: 'Sagawa (佐川急便)', logo: '📦' }
-      };
+        const carrierNames = {
+          yuubin: { name: 'Japan Post (ゆうパック)', logo: '📮' },
+          yamato: { name: 'Yamato (クロネコ)', logo: '🐱' },
+          sagawa: { name: 'Sagawa (佐川急便)', logo: '📦' }
+        };
 
-      return {
-        carrier,
-        ...carrierNames[carrier],
-        cost: totalCost,
-        estimatedDays: zone === 1 ? '1-2' : zone === 2 ? '2-3' : '3-4'
-      };
-    }).sort((a, b) => a.cost - b.cost);
+        return {
+          carrier,
+          ...carrierNames[carrier],
+          cost: totalCost,
+          estimatedDays: zone === 1 ? '1-2' : zone === 2 ? '2-3' : '3-4'
+        };
+      });
+
+      options.push(...shippingCarriers);
+    }
+
+    return options.sort((a, b) => a.cost - b.cost);
   }, [selectedPref, items, calculateBoxes]);
 
   // Notify parent when shipping is selected
@@ -125,6 +143,9 @@ const ShippingCalculator: React.FC<ShippingCalculatorProps> = ({
         <label className="block text-sm font-medium text-foreground mb-2">
           <MapPin className="w-4 h-4 inline mr-1" />
           {externalPrefecture ? 'Província selecionada' : 'Selecione sua província (都道府県)'}
+          <span className="text-muted-foreground text-xs ml-2">
+            (Opcional se for retirar no local)
+          </span>
         </label>
         <select
           value={selectedPrefecture}
@@ -181,12 +202,19 @@ const ShippingCalculator: React.FC<ShippingCalculatorProps> = ({
       )}
 
       {/* Shipping Results */}
-      {selectedPrefecture && items.length > 0 && shippingOptions.length > 0 && (
+      {items.length > 0 && shippingOptions.length > 0 && (
         <div className="space-y-3">
           <h3 className="font-medium text-foreground flex items-center gap-2">
             <Truck className="w-4 h-4" />
-            {onShippingSelect ? 'Selecione a transportadora' : 'Opções de envio'} para {selectedPref?.nameJa}
+            {onShippingSelect ? 'Selecione a forma de entrega' : 'Opções de entrega'}
+            {selectedPrefecture && ` para ${selectedPref?.nameJa}`}
           </h3>
+          
+          {!selectedPrefecture && onShippingSelect && (
+            <p className="text-sm text-muted-foreground mb-3">
+              💡 Selecione uma província acima para ver as opções de envio por transportadora
+            </p>
+          )}
           
           {shippingOptions.map((option, index) => (
             <div 
@@ -201,7 +229,8 @@ const ShippingCalculator: React.FC<ShippingCalculatorProps> = ({
                   ? "border-border hover:border-primary/50"
                   : index === 0 
                   ? "border-primary bg-primary/5" 
-                  : "border-border hover:border-primary/50"
+                  : "border-border hover:border-primary/50",
+                option.carrier === 'pickup' && "bg-green-50 dark:bg-green-950/20 border-green-500"
               )}
             >
               <div className="flex items-center justify-between">
@@ -222,16 +251,22 @@ const ShippingCalculator: React.FC<ShippingCalculatorProps> = ({
                   <div>
                     <p className="font-medium text-foreground">{option.name}</p>
                     <p className="text-sm text-muted-foreground">
-                      {option.estimatedDays} dias úteis
+                      {option.carrier === 'pickup' ? 'Retirar em Mie (Iga-shi, Kirigaoka)' : `${option.estimatedDays} dias úteis`}
                     </p>
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="font-display text-xl font-bold text-primary">
-                    ¥{option.cost.toLocaleString()}
+                  <p className={cn(
+                    "font-display text-xl font-bold",
+                    option.carrier === 'pickup' ? "text-green-600" : "text-primary"
+                  )}>
+                    {option.cost === 0 ? 'GRÁTIS' : `¥${option.cost.toLocaleString()}`}
                   </p>
-                  {!onShippingSelect && index === 0 && (
+                  {!onShippingSelect && index === 0 && option.carrier !== 'pickup' && (
                     <span className="text-xs text-primary font-medium">Mais barato</span>
+                  )}
+                  {!onShippingSelect && option.carrier === 'pickup' && (
+                    <span className="text-xs text-green-600 font-medium">Sem frete</span>
                   )}
                   {selectedCarrier === option.carrier && (
                     <span className="text-xs text-primary font-medium">Selecionado</span>

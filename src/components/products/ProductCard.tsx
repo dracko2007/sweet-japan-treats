@@ -13,6 +13,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
   const [selectedSize, setSelectedSize] = useState<'small' | 'large'>('small');
   const [quantity, setQuantity] = useState(1);
   const [added, setAdded] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
   const { addToCart } = useCart();
 
   const currentPrice = selectedSize === 'small' ? product.prices.small : product.prices.large;
@@ -26,14 +27,31 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
 
   return (
     <div className="card-product group">
-      {/* Image */}
-      <div className="aspect-square bg-secondary/50 relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-caramel-light/40 to-primary/30 flex items-center justify-center">
-          <span className="text-7xl opacity-80 group-hover:scale-110 transition-transform duration-500">🍯</span>
-        </div>
+      {/* Image/Video */}
+      <div 
+        className="aspect-square bg-secondary/50 relative overflow-hidden"
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+      >
+        {product.video && isHovered ? (
+          <video 
+            key={product.video}
+            src={product.video} 
+            autoPlay 
+            loop 
+            muted 
+            playsInline
+            className="absolute inset-0 w-full h-full object-cover"
+            onError={(e) => console.error('Erro ao carregar vídeo:', product.video, e)}
+          />
+        ) : (
+          <div className="absolute inset-0 bg-gradient-to-br from-caramel-light/40 to-primary/30 flex items-center justify-center">
+            <span className="text-7xl opacity-80 group-hover:scale-110 transition-transform duration-500">🍯</span>
+          </div>
+        )}
         
         {/* Category Badge */}
-        <div className="absolute top-4 left-4">
+        <div className="absolute top-4 left-4 z-10">
           <span className={cn(
             "px-3 py-1.5 rounded-full text-xs font-semibold uppercase tracking-wide",
             product.category === 'premium' 
@@ -45,7 +63,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
         </div>
 
         {/* Flavor tag */}
-        <div className="absolute bottom-4 right-4">
+        <div className="absolute bottom-4 right-4 z-10">
           <span className="px-3 py-1 rounded-full bg-card/90 text-sm font-medium text-foreground">
             {product.flavor}
           </span>

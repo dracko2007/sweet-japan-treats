@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { CheckCircle, Smartphone, Home, Mail, Printer } from 'lucide-react';
+import { CheckCircle, Home, Mail, Printer } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { useCart } from '@/context/CartContext';
@@ -101,7 +101,7 @@ const OrderConfirmation: React.FC = () => {
     // Show success notification
     toast({
       title: "🎉 Pedido Confirmado!",
-      description: "Seu pedido foi realizado com sucesso. Você receberá uma confirmação por email e WhatsApp.",
+      description: "Seu pedido foi realizado com sucesso. Você receberá uma confirmação por email.",
     });
 
     // Mark as loaded
@@ -361,30 +361,16 @@ _Sabor do Campo - Doce de Leite Artesanal_
             {/* Notification Status */}
             <div className="bg-card rounded-2xl border border-border p-6 mb-6 print:hidden">
               <h2 className="font-display text-xl font-semibold text-foreground mb-4">
-                Notificações Enviadas
+                Notificação Enviada
               </h2>
-              <div className="space-y-3">
-                <div className="flex items-center gap-3 text-sm">
-                  <Mail className="w-5 h-5 text-green-600" />
-                  <div className="flex-1">
-                    <p className="font-medium">Email de confirmação</p>
-                    <p className="text-muted-foreground">{formData.email}</p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {emailSent ? '✅ Enviado com sucesso' : '⏳ O email será enviado automaticamente'}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 text-sm">
-                  <Smartphone className="w-5 h-5 text-green-600" />
-                  <div className="flex-1">
-                    <p className="font-medium">Notificação WhatsApp</p>
-                    <p className="text-muted-foreground">070-1367-1679</p>
-                    <p className="text-xs text-orange-600 mt-1">
-                      💡 {TWILIO_CONFIGURED 
-                        ? 'Mensagens enviadas automaticamente!' 
-                        : 'Duas janelas do WhatsApp Web serão abertas. Clique em "Enviar" em cada uma!'}
-                    </p>
-                  </div>
+              <div className="flex items-center gap-3 text-sm">
+                <Mail className="w-5 h-5 text-green-600" />
+                <div className="flex-1">
+                  <p className="font-medium">Email de confirmação</p>
+                  <p className="text-muted-foreground">{formData.email}</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {emailSent ? '✅ Enviado com sucesso' : '⏳ O email será enviado automaticamente'}
+                  </p>
                 </div>
               </div>
             </div>

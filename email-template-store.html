@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Novo Pedido Recebido</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f5f5f5;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f5f5f5; padding: 20px 0;">
+        <tr>
+            <td align="center">
+                <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                    
+                    <!-- Header -->
+                    <tr>
+                        <td style="background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%); padding: 40px 30px; text-align: center;">
+                            <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 600;">
+                                🔔 NOVO PEDIDO RECEBIDO
+                            </h1>
+                            <p style="margin: 10px 0 0 0; color: #fecaca; font-size: 14px; letter-spacing: 1px;">
+                                AÇÃO NECESSÁRIA - PREPARAR PEDIDO
+                            </p>
+                        </td>
+                    </tr>
+
+                    <!-- Alert Message -->
+                    <tr>
+                        <td style="padding: 30px;">
+                            <div style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); padding: 20px; border-radius: 8px; border-left: 4px solid #f59e0b;">
+                                <h2 style="margin: 0 0 10px 0; color: #92400e; font-size: 18px; font-weight: 600;">
+                                    ⚡ Atenção Paula!
+                                </h2>
+                                <p style="margin: 0; color: #78350f; font-size: 14px; line-height: 1.6;">
+                                    Um novo pedido foi recebido e precisa ser preparado. Veja os detalhes abaixo e organize a produção.
+                                </p>
+                            </div>
+                        </td>
+                    </tr>
+
+                    <!-- Order Info -->
+                    <tr>
+                        <td style="padding: 0 30px 20px 30px;">
+                            <table width="100%" cellpadding="10" cellspacing="0" style="background-color: #fef2f2; border-radius: 8px; border: 2px solid #dc2626;">
+                                <tr>
+                                    <td style="padding: 15px;">
+                                        <div style="color: #991b1b; font-size: 13px; font-weight: 600; margin-bottom: 5px;">📋 PEDIDO</div>
+                                        <div style="font-family: monospace; font-size: 20px; color: #dc2626; font-weight: 700;">{{order_number}}</div>
+                                    </td>
+                                    <td style="padding: 15px; text-align: right;">
+                                        <div style="color: #991b1b; font-size: 13px; font-weight: 600; margin-bottom: 5px;">📅 DATA</div>
+                                        <div style="font-size: 18px; color: #dc2626; font-weight: 600;">{{order_date}}</div>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    <!-- Customer Info -->
+                    <tr>
+                        <td style="padding: 0 30px 20px 30px;">
+                            <h3 style="margin: 0 0 15px 0; color: #1a1a1a; font-size: 18px; font-weight: 600; border-bottom: 2px solid #dc2626; padding-bottom: 10px;">
+                                👤 Dados do Cliente
+                            </h3>
+                            <table width="100%" cellpadding="10" cellspacing="0" style="background-color: #f8f9fa; border-radius: 8px;">
+                                <tr>
+                                    <td style="color: #666666; font-size: 14px; padding: 12px;">
+                                        <strong style="color: #1a1a1a;">Nome:</strong><br>
+                                        <span style="font-size: 16px; color: #1a1a1a;">{{customer_name}}</span>
+                                    </td>
+                                </tr>
+                                <tr style="border-top: 1px solid #e5e7eb;">
+                                    <td style="color: #666666; font-size: 14px; padding: 12px;">
+                                        <strong style="color: #1a1a1a;">📧 Email:</strong><br>
+                                        <a href="mailto:{{customer_email}}" style="font-size: 16px; color: #2563eb; text-decoration: none;">{{customer_email}}</a>
+                                    </td>
+                                </tr>
+                                <tr style="border-top: 1px solid #e5e7eb;">
+                                    <td style="color: #666666; font-size: 14px; padding: 12px;">
+                                        <strong style="color: #1a1a1a;">📞 Telefone:</strong><br>
+                                        <a href="tel:{{customer_phone}}" style="font-size: 16px; color: #2563eb; text-decoration: none;">{{customer_phone}}</a>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    <!-- Products to Prepare -->
+                    <tr>
+                        <td style="padding: 0 30px 20px 30px;">
+                            <h3 style="margin: 0 0 15px 0; color: #1a1a1a; font-size: 18px; font-weight: 600; border-bottom: 2px solid #dc2626; padding-bottom: 10px;">
+                                📦 Produtos para Preparar
+                            </h3>
+                            <div style="background-color: #fef2f2; padding: 20px; border: 2px solid #dc2626; border-radius: 8px;">
+                                <pre style="margin: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 15px; color: #1a1a1a; white-space: pre-wrap; line-height: 2; font-weight: 600;">{{items_list}}</pre>
+                            </div>
+                        </td>
+                    </tr>
+
+                    <!-- Financial Summary -->
+                    <tr>
+                        <td style="padding: 0 30px 20px 30px;">
+                            <h3 style="margin: 0 0 15px 0; color: #1a1a1a; font-size: 18px; font-weight: 600; border-bottom: 2px solid #dc2626; padding-bottom: 10px;">
+                                💰 Resumo Financeiro
+                            </h3>
+                            <table width="100%" cellpadding="8" cellspacing="0" style="background-color: #f8f9fa; border-radius: 8px; padding: 15px;">
+                                <tr>
+                                    <td style="color: #666666; font-size: 15px; padding: 8px 0;">
+                                        Subtotal Produtos:
+                                    </td>
+                                    <td style="text-align: right; color: #1a1a1a; font-size: 15px; font-weight: 600; padding: 8px 0;">
+                                        {{subtotal}}
+                                    </td>
+                                </tr>
+                                {{#discount}}
+                                <tr>
+                                    <td style="color: #dc2626; font-size: 15px; padding: 8px 0;">
+                                        🎫 Desconto Aplicado:
+                                    </td>
+                                    <td style="text-align: right; color: #dc2626; font-size: 15px; font-weight: 600; padding: 8px 0;">
+                                        {{discount}}
+                                    </td>
+                                </tr>
+                                {{/discount}}
+                                <tr>
+                                    <td style="color: #666666; font-size: 15px; padding: 8px 0;">
+                                        🚚 Frete ({{shipping_carrier}}):
+                                    </td>
+                                    <td style="text-align: right; color: #1a1a1a; font-size: 15px; font-weight: 600; padding: 8px 0;">
+                                        {{shipping_cost}}
+                                    </td>
+                                </tr>
+                                <tr style="border-top: 3px solid #dc2626;">
+                                    <td style="color: #1a1a1a; font-size: 20px; font-weight: 700; padding: 15px 0 8px 0;">
+                                        💵 TOTAL A RECEBER:
+                                    </td>
+                                    <td style="text-align: right; color: #dc2626; font-size: 24px; font-weight: 700; padding: 15px 0 8px 0;">
+                                        {{total_price}}
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    <!-- Shipping Address -->
+                    <tr>
+                        <td style="padding: 0 30px 20px 30px;">
+                            <h3 style="margin: 0 0 15px 0; color: #1a1a1a; font-size: 18px; font-weight: 600; border-bottom: 2px solid #dc2626; padding-bottom: 10px;">
+                                📍 Endereço de Entrega (para etiqueta)
+                            </h3>
+                            <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; border-left: 4px solid #dc2626;">
+                                <pre style="margin: 0; font-family: 'Courier New', monospace; font-size: 15px; color: #1a1a1a; white-space: pre-wrap; line-height: 1.8; font-weight: 600;">{{shipping_address}}</pre>
+                            </div>
+                        </td>
+                    </tr>
+
+                    <!-- Payment Method -->
+                    <tr>
+                        <td style="padding: 0 30px 20px 30px;">
+                            <div style="background-color: #dbeafe; padding: 20px; border-radius: 8px; border-left: 4px solid #2563eb;">
+                                <h4 style="margin: 0 0 10px 0; color: #1e40af; font-size: 16px; font-weight: 600;">
+                                    💳 Forma de Pagamento
+                                </h4>
+                                <p style="margin: 0; color: #1e3a8a; font-size: 18px; font-weight: 700;">
+                                    {{payment_method}}
+                                </p>
+                            </div>
+                        </td>
+                    </tr>
+
+                    <!-- Action Checklist -->
+                    <tr>
+                        <td style="padding: 0 30px 30px 30px;">
+                            <div style="background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%); padding: 20px; border-radius: 8px; border-left: 4px solid #16a34a;">
+                                <h4 style="margin: 0 0 15px 0; color: #166534; font-size: 16px; font-weight: 600;">
+                                    ✅ Checklist de Ações
+                                </h4>
+                                <ul style="margin: 0; padding-left: 20px; color: #15803d; font-size: 14px; line-height: 2;">
+                                    <li><strong>Preparar os produtos</strong> listados acima</li>
+                                    <li><strong>Embalar</strong> com cuidado para transporte</li>
+                                    <li><strong>Criar etiqueta</strong> com o endereço do cliente</li>
+                                    <li><strong>Enviar</strong> pela transportadora {{shipping_carrier}}</li>
+                                    <li><strong>Atualizar</strong> status do pedido no admin</li>
+                                    <li><strong>Enviar</strong> código de rastreamento ao cliente</li>
+                                </ul>
+                            </div>
+                        </td>
+                    </tr>
+
+                    <!-- Footer -->
+                    <tr>
+                        <td style="background-color: #f8f9fa; padding: 20px; text-align: center; border-top: 1px solid #e5e7eb;">
+                            <p style="margin: 0; color: #666666; font-size: 13px;">
+                                Esta é uma notificação automática do sistema Sabor do Campo
+                            </p>
+                        </td>
+                    </tr>
+
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>

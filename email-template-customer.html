@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Confirmação de Pedido</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f5f5f5;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f5f5f5; padding: 20px 0;">
+        <tr>
+            <td align="center">
+                <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                    
+                    <!-- Header -->
+                    <tr>
+                        <td style="background: linear-gradient(135deg, #8B4513 0%, #A0522D 100%); padding: 40px 30px; text-align: center;">
+                            <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 600;">
+                                🍮 Sabor do Campo
+                            </h1>
+                            <p style="margin: 10px 0 0 0; color: #f5e6d3; font-size: 14px; letter-spacing: 1px;">
+                                DOCE DE LEITE ARTESANAL
+                            </p>
+                        </td>
+                    </tr>
+
+                    <!-- Success Message -->
+                    <tr>
+                        <td style="padding: 40px 30px 20px 30px; text-align: center;">
+                            <div style="display: inline-block; background-color: #dcfce7; border-radius: 50%; width: 60px; height: 60px; line-height: 60px; margin-bottom: 20px;">
+                                <span style="color: #16a34a; font-size: 32px;">✓</span>
+                            </div>
+                            <h2 style="margin: 0; color: #1a1a1a; font-size: 24px; font-weight: 600;">
+                                Pedido Confirmado!
+                            </h2>
+                            <p style="margin: 10px 0 0 0; color: #666666; font-size: 16px;">
+                                Olá {{to_name}}, obrigado por sua compra! 🎉
+                            </p>
+                        </td>
+                    </tr>
+
+                    <!-- Order Info -->
+                    <tr>
+                        <td style="padding: 0 30px;">
+                            <table width="100%" cellpadding="10" cellspacing="0" style="background-color: #f8f9fa; border-radius: 8px; border: 1px solid #e5e7eb;">
+                                <tr>
+                                    <td style="color: #666666; font-size: 14px; padding: 15px;">
+                                        <strong style="color: #1a1a1a;">📋 Número do Pedido:</strong><br>
+                                        <span style="font-family: monospace; font-size: 16px; color: #8B4513;">{{order_number}}</span>
+                                    </td>
+                                    <td style="color: #666666; font-size: 14px; padding: 15px; text-align: right;">
+                                        <strong style="color: #1a1a1a;">📅 Data:</strong><br>
+                                        <span style="font-size: 16px;">{{order_date}}</span>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    <!-- Products -->
+                    <tr>
+                        <td style="padding: 30px;">
+                            <h3 style="margin: 0 0 15px 0; color: #1a1a1a; font-size: 18px; font-weight: 600; border-bottom: 2px solid #8B4513; padding-bottom: 10px;">
+                                📦 Produtos
+                            </h3>
+                            <div style="background-color: #ffffff; padding: 15px; border: 1px solid #e5e7eb; border-radius: 8px;">
+                                <pre style="margin: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #1a1a1a; white-space: pre-wrap; line-height: 1.8;">{{items_list}}</pre>
+                            </div>
+                        </td>
+                    </tr>
+
+                    <!-- Pricing -->
+                    <tr>
+                        <td style="padding: 0 30px 30px 30px;">
+                            <table width="100%" cellpadding="8" cellspacing="0" style="background-color: #f8f9fa; border-radius: 8px; padding: 15px;">
+                                <tr>
+                                    <td style="color: #666666; font-size: 15px; padding: 8px 0;">
+                                        Subtotal:
+                                    </td>
+                                    <td style="text-align: right; color: #1a1a1a; font-size: 15px; font-weight: 600; padding: 8px 0;">
+                                        {{subtotal}}
+                                    </td>
+                                </tr>
+                                {{#discount}}
+                                <tr>
+                                    <td style="color: #16a34a; font-size: 15px; padding: 8px 0;">
+                                        🎫 Desconto:
+                                    </td>
+                                    <td style="text-align: right; color: #16a34a; font-size: 15px; font-weight: 600; padding: 8px 0;">
+                                        {{discount}}
+                                    </td>
+                                </tr>
+                                {{/discount}}
+                                <tr>
+                                    <td style="color: #666666; font-size: 15px; padding: 8px 0;">
+                                        🚚 Frete ({{shipping_carrier}}):
+                                    </td>
+                                    <td style="text-align: right; color: #1a1a1a; font-size: 15px; font-weight: 600; padding: 8px 0;">
+                                        {{shipping_cost}}
+                                    </td>
+                                </tr>
+                                <tr style="border-top: 2px solid #8B4513;">
+                                    <td style="color: #1a1a1a; font-size: 18px; font-weight: 700; padding: 15px 0 8px 0;">
+                                        💰 Total:
+                                    </td>
+                                    <td style="text-align: right; color: #8B4513; font-size: 22px; font-weight: 700; padding: 15px 0 8px 0;">
+                                        {{total_price}}
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    <!-- Shipping Address -->
+                    <tr>
+                        <td style="padding: 0 30px 30px 30px;">
+                            <h3 style="margin: 0 0 15px 0; color: #1a1a1a; font-size: 18px; font-weight: 600; border-bottom: 2px solid #8B4513; padding-bottom: 10px;">
+                                📍 Endereço de Entrega
+                            </h3>
+                            <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; border-left: 4px solid #8B4513;">
+                                <pre style="margin: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 14px; color: #1a1a1a; white-space: pre-wrap; line-height: 1.6;">{{shipping_address}}</pre>
+                            </div>
+                        </td>
+                    </tr>
+
+                    <!-- Payment Info -->
+                    <tr>
+                        <td style="padding: 0 30px 30px 30px;">
+                            <table width="100%" cellpadding="0" cellspacing="0">
+                                <tr>
+                                    <td width="50%" style="padding-right: 10px;">
+                                        <div style="background-color: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center;">
+                                            <div style="color: #666666; font-size: 13px; margin-bottom: 5px;">💳 Pagamento</div>
+                                            <div style="color: #1a1a1a; font-size: 16px; font-weight: 600;">{{payment_method}}</div>
+                                        </div>
+                                    </td>
+                                    <td width="50%" style="padding-left: 10px;">
+                                        <div style="background-color: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center;">
+                                            <div style="color: #666666; font-size: 13px; margin-bottom: 5px;">📞 Contato</div>
+                                            <div style="color: #1a1a1a; font-size: 16px; font-weight: 600;">{{phone}}</div>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    <!-- Next Steps -->
+                    <tr>
+                        <td style="padding: 0 30px 30px 30px;">
+                            <div style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); padding: 20px; border-radius: 8px; border-left: 4px solid #f59e0b;">
+                                <h4 style="margin: 0 0 10px 0; color: #92400e; font-size: 16px; font-weight: 600;">
+                                    🎯 Próximos Passos
+                                </h4>
+                                <ul style="margin: 0; padding-left: 20px; color: #78350f; font-size: 14px; line-height: 1.8;">
+                                    <li>Seu pedido está sendo preparado com todo carinho</li>
+                                    <li>Em breve você receberá o código de rastreamento</li>
+                                    <li>Qualquer dúvida, entre em contato conosco</li>
+                                </ul>
+                            </div>
+                        </td>
+                    </tr>
+
+                    <!-- Footer -->
+                    <tr>
+                        <td style="background-color: #f8f9fa; padding: 30px; text-align: center; border-top: 1px solid #e5e7eb;">
+                            <p style="margin: 0 0 10px 0; color: #1a1a1a; font-size: 16px; font-weight: 600;">
+                                Sabor do Campo - Doce de Leite Artesanal
+                            </p>
+                            <p style="margin: 0 0 15px 0; color: #666666; font-size: 14px; line-height: 1.6;">
+                                Doce de leite artesanal brasileiro feito com amor no Japão.<br>
+                                Ingredientes selecionados e técnicas tradicionais para trazer o verdadeiro sabor do Brasil para sua mesa.
+                            </p>
+                            <div style="margin: 20px 0;">
+                                <a href="tel:070-1367-1679" style="display: inline-block; margin: 0 10px; color: #8B4513; text-decoration: none; font-size: 14px;">
+                                    📞 070-1367-1679
+                                </a>
+                                <a href="mailto:dracko2007@gmail.com" style="display: inline-block; margin: 0 10px; color: #8B4513; text-decoration: none; font-size: 14px;">
+                                    📧 dracko2007@gmail.com
+                                </a>
+                            </div>
+                            <p style="margin: 15px 0 0 0; color: #999999; font-size: 12px;">
+                                © 2026 Sabor do Campo. Todos os direitos reservados.
+                            </p>
+                        </td>
+                    </tr>
+
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>

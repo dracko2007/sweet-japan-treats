@@ -9,6 +9,7 @@ export const products: Product[] = [
     category: 'artesanal',
     prices: { small: 1200, large: 2000 },
     image: '/products/cremoso.jpg',
+    video: '/video/tradicional.mp4',
     flavor: 'Tradicional'
   },
   {
@@ -18,6 +19,7 @@ export const products: Product[] = [
     category: 'artesanal',
     prices: { small: 1200, large: 2000 },
     image: '/products/cafe.jpg',
+    video: '/video/cafe.mp4',
     flavor: 'Café'
   },
   {
@@ -27,6 +29,7 @@ export const products: Product[] = [
     category: 'artesanal',
     prices: { small: 1200, large: 2000 },
     image: '/products/coco.jpg',
+    video: '/video/coco.mp4',
     flavor: 'Coco'
   },
   {
@@ -36,6 +39,7 @@ export const products: Product[] = [
     category: 'artesanal',
     prices: { small: 1200, large: 2000 },
     image: '/products/amendoim.jpg',
+    video: '/video/amendoim.mp4',
     flavor: 'Amendoim'
   },
   // Premium - 280g: ¥1400, 800g: ¥2400
@@ -46,6 +50,7 @@ export const products: Product[] = [
     category: 'premium',
     prices: { small: 1400, large: 2400 },
     image: '/products/amendoas.jpg',
+    video: '/video/amendoas.mp4',
     flavor: 'Amêndoas'
   },
   {
@@ -55,6 +60,7 @@ export const products: Product[] = [
     category: 'premium',
     prices: { small: 1400, large: 2400 },
     image: '/products/matcha.jpg',
+    video: '/video/cha.mp4',
     flavor: 'Matcha'
   },
   {
@@ -64,6 +70,7 @@ export const products: Product[] = [
     category: 'premium',
     prices: { small: 1400, large: 2400 },
     image: '/products/chocolate.jpg',
+    video: '/video/cholate.mp4',
     flavor: 'Chocolate'
   }
 ];

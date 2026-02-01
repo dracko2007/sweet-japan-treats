@@ -279,14 +279,28 @@ const Profile: React.FC = () => {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="prefecture">Província (都道府県)</Label>
-                    <Input
+                    <select
                       id="prefecture"
                       name="address.prefecture"
                       value={editedUser.address?.prefecture || ''}
-                      onChange={handleInputChange}
-                      readOnly
-                      className="bg-secondary/50"
-                    />
+                      onChange={(e) => {
+                        setEditedUser(prev => ({
+                          ...prev,
+                          address: {
+                            ...prev.address,
+                            prefecture: e.target.value
+                          }
+                        }));
+                      }}
+                      className="w-full p-3 rounded-lg border border-border bg-background text-foreground focus:ring-2 focus:ring-primary focus:border-primary transition-all"
+                    >
+                      <option value="">Escolha uma província...</option>
+                      {prefectures.map((pref) => (
+                        <option key={pref.name} value={pref.name}>
+                          {pref.nameJa} ({pref.name})
+                        </option>
+                      ))}
+                    </select>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="city">Cidade (市区町村)</Label>
@@ -359,7 +373,10 @@ const Profile: React.FC = () => {
                     </Label>
                     <p className="font-medium text-foreground">
                       〒{user.address.postalCode}<br />
-                      {user.address.prefecture} {user.address.city}<br />
+                      {(() => {
+                        const pref = prefectures.find(p => p.name === user.address.prefecture);
+                        return pref ? `${pref.nameJa} (${pref.name})` : user.address.prefecture;
+                      })()} {user.address.city}<br />
                       {user.address.address}
                       {user.address.building && <><br />{user.address.building}</>}
                     </p>
