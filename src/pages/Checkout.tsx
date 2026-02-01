@@ -315,7 +315,7 @@ const Checkout: React.FC = () => {
 
                       <div className="space-y-2">
                         <Label htmlFor="prefecture">
-                          Prefeitura (都道府県) *
+                          Província (都道府県) *
                         </Label>
                         <select
                           id="prefecture"
@@ -325,7 +325,7 @@ const Checkout: React.FC = () => {
                           required
                           className="w-full p-3 rounded-lg border border-border bg-background text-foreground focus:ring-2 focus:ring-primary focus:border-primary transition-all"
                         >
-                          <option value="">Escolha uma prefeitura...</option>
+                          <option value="">Escolha uma província...</option>
                           {prefectures.map((pref) => (
                             <option key={pref.name} value={pref.name}>
                               {pref.nameJa} ({pref.name})
