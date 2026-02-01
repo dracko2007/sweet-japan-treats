@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Minus, ShoppingCart, Check, Heart, Share2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Plus, Minus, ShoppingCart, Check, Heart, Share2, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Product } from '@/types';
 import { useCart } from '@/context/CartContext';
@@ -13,6 +14,7 @@ interface ProductCardProps {
 }
 
 const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
+  const navigate = useNavigate();
   const [selectedSize, setSelectedSize] = useState<'small' | 'large'>('small');
   const [quantity, setQuantity] = useState(1);
   const [added, setAdded] = useState(false);
@@ -96,7 +98,10 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
         {/* Favorite & Share Buttons */}
         <div className="absolute top-4 right-4 z-10 flex gap-2">
           <button
-            onClick={handleToggleFavorite}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleToggleFavorite();
+            }}
             className={cn(
               "p-2 rounded-full backdrop-blur-sm transition-all",
               isFavorite 
@@ -108,21 +113,33 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
             <Heart className={cn("w-5 h-5", isFavorite && "fill-current")} />
           </button>
           <button
-            onClick={handleShare}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleShare();
+            }}
             className="p-2 rounded-full bg-white/90 dark:bg-gray-800/90 text-gray-700 dark:text-gray-200 hover:bg-white dark:hover:bg-gray-800 backdrop-blur-sm transition-all"
             title="Compartilhar produto"
           >
             <Share2 className="w-5 h-5" />
           </button>
         </div>
+
+        {/* View Details Overlay */}
+        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/image:opacity-100 transition-opacity flex items-center justify-center">
+          <div className="text-white text-center">
+            <Eye className="w-8 h-8 mx-auto mb-2" />
+            <p className="text-sm font-medium">Ver Detalhes</p>
+          </div>
+        </div>
   };
 
   return (
     <div className="card-product group">
       {/* Image/Video */}
-      <div 
-        className="aspect-square bg-secondary/50 relative overflow-hidden"
+      <div  cursor-pointer group/image"
         onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+        onClick={() => navigate(`/produto/${product.id}`}
         onMouseLeave={() => setIsHovered(false)}
       >
         {product.video ? (

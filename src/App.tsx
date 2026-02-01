@@ -20,6 +20,7 @@ import Vlog from "./pages/Vlog";
 import Admin from "./pages/Admin";
 import Wishlist from "./pages/Wishlist";
 import TrackOrder from "./pages/TrackOrder";
+import ProductDetail from "./pages/ProductDetail";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -36,6 +37,7 @@ const App = () => (
               <Route path="/" element={<Index />} />
               <Route path="/produtos" element={<Products />} />
               <Route path="/produtos/:category" element={<Products />} />
+              <Route path="/produto/:id" element={<ProductDetail />} />
               <Route path="/carrinho" element={<Cart />} />
               <Route path="/checkout" element={<Checkout />} />
               <Route path="/order-review" element={<OrderReview />} />

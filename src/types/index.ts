@@ -8,6 +8,7 @@ export interface Product {
     large: number; // 800g
   };
   image: string;
+  gallery?: string[]; // Múltiplas imagens do produto
   video?: string; // Vídeo do produto (opcional)
   flavor: string;
 }
