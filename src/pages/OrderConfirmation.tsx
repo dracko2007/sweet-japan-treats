@@ -27,6 +27,7 @@ const OrderConfirmation: React.FC = () => {
   const [trackingNumber, setTrackingNumber] = useState<string>('');
   const [emailSent, setEmailSent] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [orderNumber, setOrderNumber] = useState<string>('');
   
   // Use ref to prevent processing the order multiple times
   const processedRef = useRef(false);
@@ -108,14 +109,15 @@ const OrderConfirmation: React.FC = () => {
   }, [orderData, clearCart, navigate, toast, addOrder, isAuthenticated]);
 
   const sendNotifications = async (data: OrderData) => {
-    const orderNumber = `DL-${Date.now().toString().slice(-8)}`;
+    const generatedOrderNumber = `DL-${Date.now().toString().slice(-8)}`;
+    setOrderNumber(generatedOrderNumber);
     const shipping = data.shipping || { carrier: 'N/A', cost: 0, estimatedDays: 'N/A' };
     let generatedTrackingNumber = '';
     
     // 1. Create Shipping Label via Carrier API (FIRST - to get tracking number)
     try {
       const labelData = {
-        orderNumber,
+        orderNumber: generatedOrderNumber,
         sender: {
           name: 'Paula Shiokawa',
           postalCode: '518-0225',
@@ -158,7 +160,7 @@ const OrderConfirmation: React.FC = () => {
         formData: data.formData,
         items: data.items,
         totalPrice: data.totalPrice,
-        orderNumber,
+        orderNumber: generatedOrderNumber,
         paymentMethod: data.paymentMethod,
         shipping: data.shipping
       });
@@ -170,7 +172,7 @@ const OrderConfirmation: React.FC = () => {
         formData: data.formData,
         items: data.items,
         totalPrice: data.totalPrice,
-        orderNumber,
+        orderNumber: generatedOrderNumber,
         paymentMethod: data.paymentMethod,
         shipping: data.shipping
       });
@@ -186,9 +188,9 @@ const OrderConfirmation: React.FC = () => {
     if (data.paymentMethod === 'paypay') {
       try {
         const paymentResult = await paypayService.createPayment({
-          orderNumber,
+          orderNumber: generatedOrderNumber,
           amount: (data.totalPrice || 0) + (shipping.cost || 0),
-          description: `Pedido Doce de Leite ${orderNumber}`,
+          description: `Pedido Doce de Leite ${generatedOrderNumber}`,
           customerEmail: data.formData.email,
           customerPhone: data.formData.phone
         });
@@ -206,7 +208,7 @@ const OrderConfirmation: React.FC = () => {
     const whatsappMessageToStore = `
 🎉 *NOVO PEDIDO - Doce de Leite*
 
-📋 *Pedido:* ${orderNumber}
+📋 *Pedido:* ${generatedOrderNumber}
 📅 *Data:* ${new Date().toLocaleDateString('pt-BR')}
 ${generatedTrackingNumber ? `🔢 *Rastreamento:* ${generatedTrackingNumber}\n` : ''}
 
@@ -246,7 +248,7 @@ Olá ${data.formData.name}!
 
 Seu pedido foi recebido com sucesso!
 
-📋 *Número do Pedido:* ${orderNumber}
+📋 *Número do Pedido:* ${generatedOrderNumber}
 ${generatedTrackingNumber ? `🔢 *Rastreamento:* ${generatedTrackingNumber}\n` : ''}
 
 📦 *Produtos:*
@@ -322,7 +324,6 @@ _Sabor do Campo - Doce de Leite Artesanal_
   }
 
   const { formData, paymentMethod, items, totalPrice, shipping } = orderData;
-  const orderNumber = `DL-${Date.now().toString().slice(-8)}`;
 
   const handlePrint = () => {
     window.print();
