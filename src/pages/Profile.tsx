@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, Mail, Phone, MapPin, Calendar, Gift, ShoppingBag, Edit2, LogOut, Package, RotateCcw, Trash2 } from 'lucide-react';
+import { User, Mail, Phone, MapPin, Calendar, Gift, ShoppingBag, Edit2, LogOut, Package, RotateCcw } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,7 +13,7 @@ import { addAddressHints } from '@/utils/romanize';
 import { products } from '@/data/products';
 
 const Profile: React.FC = () => {
-  const { user, isAuthenticated, coupons, orders, updateProfile, logout, clearOrderHistory } = useUser();
+  const { user, isAuthenticated, coupons, orders, updateProfile, logout } = useUser();
   const { addToCart, clearCart } = useCart();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -54,19 +54,7 @@ const Profile: React.FC = () => {
     }
   };
 
-  // Função para limpar histórico de pedidos
-  const handleClearHistory = () => {
-    if (!confirm('Tem certeza que deseja limpar todo o histórico de pedidos? Esta ação não pode ser desfeita.')) {
-      return;
-    }
 
-    clearOrderHistory();
-    
-    toast({
-      title: "Histórico limpo!",
-      description: "Todos os pedidos foram removidos.",
-    });
-  };
 
   // Redirect if not authenticated
   React.useEffect(() => {
@@ -468,17 +456,6 @@ const Profile: React.FC = () => {
                     Histórico de Compras
                   </h2>
                 </div>
-                {orders.length > 0 && (
-                  <Button
-                    onClick={handleClearHistory}
-                    variant="outline"
-                    size="sm"
-                    className="gap-2 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                    Limpar Histórico
-                  </Button>
-                )}
               </div>
 
               {orders.length > 0 ? (

@@ -253,7 +253,7 @@ _This is an automated test message_
             <h1>🍮 SABOR DO CAMPO</h1>
             <h2>Doce de Leite Artesanal</h2>
             <p class="strong">Pedido: ${order.orderNumber || 'N/A'}</p>
-            <p>Data: ${new Date(order.date).toLocaleDateString('pt-BR')}</p>
+            <p>Data: ${new Date(order.orderDate).toLocaleDateString('pt-BR')}</p>
           </div>
 
           <div class="section">
@@ -261,7 +261,7 @@ _This is an automated test message_
             ${order.items.map((item: any) => `
               <p>• ${item.productName} (${item.size}) x${item.quantity} - ¥${(item.price * item.quantity).toLocaleString()}</p>
             `).join('')}
-            <p class="strong" style="margin-top: 10px;">Total: ¥${order.totalAmount.toLocaleString()}</p>
+            <p class="strong" style="margin-top: 10px;">Total: ¥${order.totalPrice.toLocaleString()}</p>
           </div>
 
           <div class="row">
@@ -435,7 +435,7 @@ _This is an automated test message_
                 </div>
                 <p className="text-3xl font-bold text-green-600">
                   {allOrders.filter(o => {
-                    const orderDate = new Date(o.date).toDateString();
+                    const orderDate = new Date(o.orderDate).toDateString();
                     const today = new Date().toDateString();
                     return orderDate === today;
                   }).length}
@@ -470,7 +470,7 @@ _This is an automated test message_
                         </div>
                         <p className="text-sm text-muted-foreground mb-1">
                           <Calendar className="w-4 h-4 inline mr-1" />
-                          {new Date(order.date).toLocaleString('pt-BR')}
+                          {new Date(order.orderDate).toLocaleString('pt-BR')}
                         </p>
                         <p className="text-sm text-muted-foreground">
                           💳 {order.paymentMethod === 'bank' ? 'Depósito Bancário' : 'PayPay'}
@@ -531,7 +531,7 @@ _This is an automated test message_
                           ))}
                           <div className="pt-2 border-t border-border flex justify-between font-semibold">
                             <span>Total</span>
-                            <span className="text-primary">¥{order.totalAmount.toLocaleString()}</span>
+                            <span className="text-primary">¥{order.totalPrice.toLocaleString()}</span>
                           </div>
                         </div>
                       </div>
