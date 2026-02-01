@@ -60,9 +60,9 @@ export const emailServiceSimple = {
    */
   sendOrderConfirmation: async (orderData: any): Promise<boolean> => {
     console.log('📧 EmailJS - Sending order confirmation');
-    console.log('📧 Service ID:', !!EMAILJS_SERVICE_ID);
-    console.log('📧 Template ID:', !!EMAILJS_TEMPLATE_ID);
-    console.log('📧 Public Key:', !!EMAILJS_PUBLIC_KEY);
+    console.log('📧 Service ID:', EMAILJS_SERVICE_ID, '(exists:', !!EMAILJS_SERVICE_ID, ')');
+    console.log('📧 Template ID:', EMAILJS_TEMPLATE_ID, '(exists:', !!EMAILJS_TEMPLATE_ID, ')');
+    console.log('📧 Public Key:', EMAILJS_PUBLIC_KEY, '(exists:', !!EMAILJS_PUBLIC_KEY, ')');
     
     // Check if EmailJS is configured
     if (!EMAILJS_SERVICE_ID || !EMAILJS_TEMPLATE_ID || !EMAILJS_PUBLIC_KEY) {
