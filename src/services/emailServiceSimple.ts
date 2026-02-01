@@ -239,18 +239,23 @@ Tel: ${orderData.formData.phone}
         to_name: params.to_name,
         subject: `📦 Pedido Enviado - #${params.order_number}`,
         order_number: params.order_number,
+        order_date: new Date().toLocaleDateString('pt-BR'),
         tracking_number: params.tracking_number,
         carrier_name: params.carrier_name,
-        tracking_url: params.tracking_url || 'N/A',
+        tracking_url: params.tracking_url || '',
         items_list: params.items_list,
+        subtotal: params.total_price,
         total_price: params.total_price,
         shipping_address: params.shipping_address,
-        message: params.html_content, // Send full HTML as message
-        html_content: params.html_content, // Also as html_content
+        shipping_carrier: params.carrier_name,
+        shipping_cost: '¥0',
+        payment_method: 'Já pago',
+        phone: '-',
       };
       
       console.log('📤 Sending tracking email via EmailJS...');
-      console.log('📤 Params keys:', Object.keys(emailParams));
+      console.log('📤 Tracking URL:', params.tracking_url);
+      console.log('📤 Params:', emailParams);
       
       const response = await emailjs.send(
         EMAILJS_SERVICE_ID,
