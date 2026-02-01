@@ -94,53 +94,16 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
         description: "O link foi copiado para sua área de transferência",
       });
     }
-
-        {/* Favorite & Share Buttons */}
-        <div className="absolute top-4 right-4 z-10 flex gap-2">
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              handleToggleFavorite();
-            }}
-            className={cn(
-              "p-2 rounded-full backdrop-blur-sm transition-all",
-              isFavorite 
-                ? "bg-red-500 text-white hover:bg-red-600" 
-                : "bg-white/90 dark:bg-gray-800/90 text-gray-700 dark:text-gray-200 hover:bg-white dark:hover:bg-gray-800"
-            )}
-            title={isFavorite ? "Remover dos favoritos" : "Adicionar aos favoritos"}
-          >
-            <Heart className={cn("w-5 h-5", isFavorite && "fill-current")} />
-          </button>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              handleShare();
-            }}
-            className="p-2 rounded-full bg-white/90 dark:bg-gray-800/90 text-gray-700 dark:text-gray-200 hover:bg-white dark:hover:bg-gray-800 backdrop-blur-sm transition-all"
-            title="Compartilhar produto"
-          >
-            <Share2 className="w-5 h-5" />
-          </button>
-        </div>
-
-        {/* View Details Overlay */}
-        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/image:opacity-100 transition-opacity flex items-center justify-center">
-          <div className="text-white text-center">
-            <Eye className="w-8 h-8 mx-auto mb-2" />
-            <p className="text-sm font-medium">Ver Detalhes</p>
-          </div>
-        </div>
   };
 
   return (
     <div className="card-product group">
       {/* Image/Video */}
-      <div  cursor-pointer group/image"
+      <div 
+        className="aspect-square bg-secondary/50 relative overflow-hidden cursor-pointer group/image"
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
-        onClick={() => navigate(`/produto/${product.id}`}
-        onMouseLeave={() => setIsHovered(false)}
+        onClick={() => navigate(`/produto/${product.id}`)}
       >
         {product.video ? (
           <>
@@ -188,6 +151,43 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
           )}>
             {product.category === 'premium' ? '★ Premium' : 'Artesanal'}
           </span>
+        </div>
+
+        {/* Favorite & Share Buttons */}
+        <div className="absolute top-4 right-4 z-10 flex gap-2">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleToggleFavorite();
+            }}
+            className={cn(
+              "p-2 rounded-full backdrop-blur-sm transition-all",
+              isFavorite 
+                ? "bg-red-500 text-white hover:bg-red-600" 
+                : "bg-white/90 dark:bg-gray-800/90 text-gray-700 dark:text-gray-200 hover:bg-white dark:hover:bg-gray-800"
+            )}
+            title={isFavorite ? "Remover dos favoritos" : "Adicionar aos favoritos"}
+          >
+            <Heart className={cn("w-5 h-5", isFavorite && "fill-current")} />
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleShare();
+            }}
+            className="p-2 rounded-full bg-white/90 dark:bg-gray-800/90 text-gray-700 dark:text-gray-200 hover:bg-white dark:hover:bg-gray-800 backdrop-blur-sm transition-all"
+            title="Compartilhar produto"
+          >
+            <Share2 className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* View Details Overlay */}
+        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/image:opacity-100 transition-opacity flex items-center justify-center">
+          <div className="text-white text-center">
+            <Eye className="w-8 h-8 mx-auto mb-2" />
+            <p className="text-sm font-medium">Ver Detalhes</p>
+          </div>
         </div>
 
         {/* Flavor tag */}
