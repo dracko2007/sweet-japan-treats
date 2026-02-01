@@ -21,6 +21,33 @@ const Register: React.FC = () => {
     confirmPassword: '',
   });
 
+  // Test localStorage on mount
+  React.useEffect(() => {
+    console.log('🔍 [REGISTER DEBUG] Component mounted');
+    console.log('🔍 [REGISTER DEBUG] Testing localStorage access...');
+    
+    try {
+      // Test write
+      localStorage.setItem('test-key', 'test-value');
+      const testValue = localStorage.getItem('test-key');
+      localStorage.removeItem('test-key');
+      
+      console.log('✅ [REGISTER DEBUG] localStorage is accessible:', testValue === 'test-value');
+      
+      // Check current users
+      const usersData = localStorage.getItem('sweet-japan-users');
+      if (usersData) {
+        const users = JSON.parse(usersData);
+        console.log('✅ [REGISTER DEBUG] Current users in storage:', Object.keys(users).length);
+        console.log('✅ [REGISTER DEBUG] User emails:', Object.keys(users));
+      } else {
+        console.log('⚠️ [REGISTER DEBUG] No users in storage yet');
+      }
+    } catch (error) {
+      console.error('❌ [REGISTER DEBUG] localStorage access error:', error);
+    }
+  }, []);
+
   // Redirect if already authenticated
   React.useEffect(() => {
     if (isAuthenticated) {
@@ -39,8 +66,18 @@ const Register: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    console.log('🔍 [REGISTER DEBUG] ===== FORM SUBMIT START =====');
+    console.log('🔍 [REGISTER DEBUG] Form data:', {
+      name: formData.name,
+      email: formData.email,
+      phone: formData.phone,
+      hasPassword: !!formData.password,
+      hasConfirmPassword: !!formData.confirmPassword
+    });
+
     // Validate passwords match
     if (formData.password !== formData.confirmPassword) {
+      console.log('❌ [REGISTER DEBUG] Passwords do not match');
       toast({
         title: "Erro",
         description: "As senhas não coincidem.",
@@ -49,37 +86,66 @@ const Register: React.FC = () => {
       return;
     }
 
-    // Register user
-    const success = await registerUser({
-      name: formData.name,
-      email: formData.email,
-      phone: formData.phone,
-      password: formData.password,
-      address: {
-        postalCode: '',
-        prefecture: '',
-        city: '',
-        address: '',
-      }
-    });
+    console.log('✅ [REGISTER DEBUG] Passwords match, calling registerUser...');
 
-    if (success) {
-      toast({
-        title: "Cadastro realizado!",
-        description: "Bem-vindo(a) ao Doce de Leite! Você ganhou um cupom de boas-vindas!",
+    try {
+      // Register user
+      const success = await registerUser({
+        name: formData.name,
+        email: formData.email,
+        phone: formData.phone,
+        password: formData.password,
+        address: {
+          postalCode: '',
+          prefecture: '',
+          city: '',
+          address: '',
+        }
       });
 
-      // Redirect to profile
-      setTimeout(() => {
-        navigate('/perfil');
-      }, 1500);
-    } else {
+      console.log('🔍 [REGISTER DEBUG] registerUser returned:', success);
+
+      if (success) {
+        console.log('✅ [REGISTER DEBUG] Registration successful!');
+        
+        // Verify user was saved
+        const usersData = localStorage.getItem('sweet-japan-users');
+        if (usersData) {
+          const users = JSON.parse(usersData);
+          console.log('✅ [REGISTER DEBUG] Verification - User exists in storage:', !!users[formData.email]);
+          console.log('✅ [REGISTER DEBUG] Total users in storage:', Object.keys(users).length);
+        } else {
+          console.error('❌ [REGISTER DEBUG] No users data in localStorage after registration!');
+        }
+        
+        toast({
+          title: "Cadastro realizado!",
+          description: "Bem-vindo(a) ao Doce de Leite! Você ganhou um cupom de boas-vindas!",
+        });
+
+        // Redirect to profile
+        setTimeout(() => {
+          console.log('🔍 [REGISTER DEBUG] Redirecting to /perfil');
+          navigate('/perfil');
+        }, 1500);
+      } else {
+        console.log('❌ [REGISTER DEBUG] Registration failed - email already exists');
+        toast({
+          title: "Erro no cadastro",
+          description: "Este email já está cadastrado. Tente fazer login ou use outro email.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error('❌ [REGISTER DEBUG] Exception during registration:', error);
       toast({
         title: "Erro no cadastro",
-        description: "Este email já está cadastrado. Tente fazer login ou use outro email.",
+        description: "Ocorreu um erro ao criar sua conta. Tente novamente.",
         variant: "destructive",
       });
     }
+
+    console.log('🔍 [REGISTER DEBUG] ===== FORM SUBMIT END =====');
   };
 
   return (
