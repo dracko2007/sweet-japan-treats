@@ -205,5 +205,67 @@ Tel: ${orderData.formData.phone}
       console.error('❌ Error sending store notification:', error);
       return false;
     }
+  },
+
+  /**
+   * Send tracking number notification email with custom HTML
+   */
+  sendTrackingNotification: async (params: {
+    to_email: string;
+    to_name: string;
+    order_number: string;
+    tracking_number: string;
+    carrier_name: string;
+    tracking_url?: string;
+    items_list: string;
+    total_price: string;
+    shipping_address: string;
+    html_content: string;
+  }): Promise<boolean> => {
+    console.log('📧 EmailJS - Sending tracking notification to customer');
+    console.log('📧 To:', params.to_email);
+    console.log('📧 Tracking:', params.tracking_number);
+    
+    if (!EMAILJS_SERVICE_ID || !EMAILJS_TEMPLATE_ID_CUSTOMER || !EMAILJS_PUBLIC_KEY) {
+      console.error('❌ EmailJS not configured');
+      return false;
+    }
+    
+    try {
+      await loadEmailJS();
+      
+      const emailParams = {
+        to_email: params.to_email,
+        to_name: params.to_name,
+        subject: `📦 Pedido Enviado - #${params.order_number}`,
+        order_number: params.order_number,
+        tracking_number: params.tracking_number,
+        carrier_name: params.carrier_name,
+        tracking_url: params.tracking_url || 'N/A',
+        items_list: params.items_list,
+        total_price: params.total_price,
+        shipping_address: params.shipping_address,
+        message: params.html_content, // Send full HTML as message
+        html_content: params.html_content, // Also as html_content
+      };
+      
+      console.log('📤 Sending tracking email via EmailJS...');
+      console.log('📤 Params keys:', Object.keys(emailParams));
+      
+      const response = await emailjs.send(
+        EMAILJS_SERVICE_ID,
+        EMAILJS_TEMPLATE_ID_CUSTOMER,
+        emailParams
+      );
+      
+      console.log('✅ Tracking email sent successfully!');
+      console.log('📧 Response:', response);
+      return true;
+      
+    } catch (error) {
+      console.error('❌ Error sending tracking email:', error);
+      console.error('Error details:', error);
+      return false;
+    }
   }
 };

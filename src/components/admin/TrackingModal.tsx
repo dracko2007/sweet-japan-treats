@@ -192,30 +192,45 @@ const TrackingModal: React.FC<TrackingModalProps> = ({
       }
 
       if (!emailSent) {
-        // Fallback to EmailJS
-        await emailServiceSimple.sendOrderConfirmation({
-          formData: {
-            name: order.shippingAddress.name,
-            email: order.customerEmail || order.shippingAddress.email,
-            phone: order.customerPhone || '',
-            postalCode: order.shippingAddress.postalCode,
-            prefecture: order.shippingAddress.prefecture,
-            city: order.shippingAddress.city,
-            address: order.shippingAddress.address,
-            building: order.shippingAddress.building || '',
-          },
-          items: order.items,
-          totalPrice: order.totalPrice,
-          orderNumber: order.orderNumber,
-          paymentMethod: order.paymentMethod,
-          trackingNumber: trackingNumber,
+        // Fallback to EmailJS with tracking notification
+        const itemsList = order.items.map((item: any) => 
+          `${item.productName} (${item.size}) x${item.quantity} - ¥${(item.price * item.quantity).toLocaleString()}`
+        ).join('\n');
+        
+        const shippingAddress = `
+${order.shippingAddress.name}
+〒${order.shippingAddress.postalCode}
+${order.shippingAddress.prefecture} ${order.shippingAddress.city}
+${order.shippingAddress.address}
+${order.shippingAddress.building || ''}
+        `.trim();
+        
+        emailSent = await emailServiceSimple.sendTrackingNotification({
+          to_email: order.customerEmail || order.shippingAddress.email,
+          to_name: order.shippingAddress.name,
+          order_number: order.orderNumber,
+          tracking_number: trackingNumber,
+          carrier_name: carrierName,
+          tracking_url: trackingUrl,
+          items_list: itemsList,
+          total_price: `¥${order.totalPrice.toLocaleString()}`,
+          shipping_address: shippingAddress,
+          html_content: emailHTML,
         });
       }
 
-      toast({
-        title: "Email enviado!",
-        description: `Notificação de envio enviada para ${order.shippingAddress.name}`,
-      });
+      if (emailSent) {
+        toast({
+          title: "Email enviado!",
+          description: `Notificação de envio enviada para ${order.shippingAddress.name}`,
+        });
+      } else {
+        toast({
+          title: "Aviso",
+          description: "Email não pôde ser enviado, mas pedido foi marcado como enviado",
+          variant: "destructive",
+        });
+      }
 
       // Send WhatsApp message if phone is available
       const customerPhone = order.customerPhone || order.shippingAddress.phone;
