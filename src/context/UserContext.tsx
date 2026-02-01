@@ -62,6 +62,7 @@ interface UserContextType {
   addCoupon: (coupon: Coupon) => void;
   useCoupon: (couponId: string) => void;
   addOrder: (order: Omit<Order, 'id' | 'orderNumber' | 'date'>) => void;
+  clearOrderHistory: () => void;
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
@@ -296,6 +297,10 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     setOrders(prev => [newOrder, ...prev]);
   };
 
+  const clearOrderHistory = () => {
+    setOrders([]);
+  };
+
   const value: UserContextType = {
     user,
     isAuthenticated,
@@ -308,6 +313,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     addCoupon,
     useCoupon,
     addOrder,
+    clearOrderHistory,
   };
 
   return <UserContext.Provider value={value}>{children}</UserContext.Provider>;

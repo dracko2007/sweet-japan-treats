@@ -13,7 +13,7 @@ import { addAddressHints } from '@/utils/romanize';
 import { products } from '@/data/products';
 
 const Profile: React.FC = () => {
-  const { user, isAuthenticated, coupons, orders, updateProfile, logout } = useUser();
+  const { user, isAuthenticated, coupons, orders, updateProfile, logout, clearOrderHistory } = useUser();
   const { addToCart, clearCart } = useCart();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -60,22 +60,12 @@ const Profile: React.FC = () => {
       return;
     }
 
-    const usersData = localStorage.getItem('sweet-japan-users');
-    if (!usersData || !user) return;
-
-    const users = JSON.parse(usersData);
-    if (users[user.email]) {
-      users[user.email].orders = [];
-      localStorage.setItem('sweet-japan-users', JSON.stringify(users));
-      
-      // Atualiza o contexto
-      window.location.reload();
-      
-      toast({
-        title: "Histórico limpo!",
-        description: "Todos os pedidos foram removidos.",
-      });
-    }
+    clearOrderHistory();
+    
+    toast({
+      title: "Histórico limpo!",
+      description: "Todos os pedidos foram removidos.",
+    });
   };
 
   // Redirect if not authenticated
