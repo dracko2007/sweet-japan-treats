@@ -150,6 +150,37 @@ export default function FirebaseSync() {
     }
   };
 
+  const debugLocalStorage = () => {
+    addLog('🔍 Debugando localStorage...', '#3b82f6');
+    
+    const usersData = localStorage.getItem('sweet-japan-users');
+    addLog(`📦 sweet-japan-users existe? ${!!usersData}`, '#06b6d4');
+    
+    if (usersData) {
+      const users = JSON.parse(usersData);
+      const userCount = Object.keys(users).length;
+      addLog(`👥 Total de usuários: ${userCount}`, '#22c55e');
+      
+      Object.entries(users).forEach(([email, userData]: [string, any]) => {
+        addLog(`  - Email: ${email}`, '#06b6d4');
+        addLog(`    Nome: ${userData.name || 'N/A'}`, '#06b6d4');
+        addLog(`    ID: ${userData.id || 'N/A'}`, '#06b6d4');
+        addLog(`    Pedidos: ${userData.orders?.length || 0}`, '#22c55e');
+        
+        if (userData.orders && userData.orders.length > 0) {
+          userData.orders.forEach((order: any, idx: number) => {
+            addLog(`      └─ Pedido ${idx + 1}: ${order.orderNumber || 'N/A'}`, '#f59e0b');
+          });
+        }
+      });
+      
+      showStatus(`✅ ${userCount} usuários no localStorage`, 'success');
+    } else {
+      addLog('❌ localStorage vazio!', '#ef4444');
+      showStatus('❌ Nenhum dado no localStorage', 'error');
+    }
+  };
+
   const viewFirestoreData = async () => {
     if (!db) {
       addLog('❌ Firebase não inicializado', '#ef4444');
@@ -207,6 +238,9 @@ export default function FirebaseSync() {
         <div className="flex flex-wrap gap-3 mb-6">
           <Button onClick={() => testConnection()} variant="default">
             🔌 Testar Conexão
+          </Button>
+          <Button onClick={debugLocalStorage} variant="default">
+            🔍 Debug localStorage
           </Button>
           <Button onClick={migrateData} variant="default">
             🔄 Migrar Dados
