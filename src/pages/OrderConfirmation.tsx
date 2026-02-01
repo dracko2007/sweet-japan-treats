@@ -35,27 +35,50 @@ const OrderConfirmation: React.FC = () => {
 
   // Helper function to save order directly to localStorage (even if not logged in)
   const saveOrderToStorage = (email: string, orderData: any) => {
+    console.log('🔍 [DEBUG] saveOrderToStorage called with email:', email);
+    
     const usersData = localStorage.getItem('sweet-japan-users');
-    if (!usersData) return;
+    console.log('🔍 [DEBUG] sweet-japan-users exists:', !!usersData);
     
-    const users = JSON.parse(usersData);
-    
-    // Find or create user entry
-    if (!users[email]) {
-      // User exists but not in the format we need - try to find by email
-      console.log('⚠️ User not found in storage:', email);
+    if (!usersData) {
+      console.error('❌ [DEBUG] No users data in localStorage!');
       return;
     }
     
+    const users = JSON.parse(usersData);
+    console.log('🔍 [DEBUG] Total users in storage:', Object.keys(users).length);
+    console.log('🔍 [DEBUG] User emails in storage:', Object.keys(users));
+    
+    // Find or create user entry
+    if (!users[email]) {
+      console.error('❌ [DEBUG] User not found with email:', email);
+      console.log('🔍 [DEBUG] Available users:', Object.keys(users));
+      return;
+    }
+    
+    console.log('✅ [DEBUG] User found:', email);
+    console.log('🔍 [DEBUG] User data:', users[email]);
+    
     // Ensure orders array exists
     if (!users[email].orders) {
+      console.log('🔍 [DEBUG] Initializing orders array for user');
       users[email].orders = [];
     }
     
+    console.log('🔍 [DEBUG] Current orders count:', users[email].orders.length);
+    
     // Add the order
     users[email].orders.unshift(orderData);
+    console.log('🔍 [DEBUG] Order added, new count:', users[email].orders.length);
+    console.log('🔍 [DEBUG] Order data:', orderData);
+    
     localStorage.setItem('sweet-japan-users', JSON.stringify(users));
-    console.log('✅ Order saved to storage for:', email);
+    console.log('✅ [DEBUG] Order saved to localStorage successfully!');
+    
+    // Verify save
+    const verifyData = localStorage.getItem('sweet-japan-users');
+    const verifyUsers = JSON.parse(verifyData!);
+    console.log('✅ [DEBUG] Verification - orders count:', verifyUsers[email]?.orders?.length);
   };
 
   useEffect(() => {
@@ -103,8 +126,15 @@ const OrderConfirmation: React.FC = () => {
     const finalTotal = orderData.totalPrice - couponDiscount;
     const generatedOrderNumber = `DL-${Date.now().toString().slice(-8)}`;
     
+    console.log('🔍 [DEBUG] ===== ORDER SAVE START =====');
+    console.log('🔍 [DEBUG] Order number:', generatedOrderNumber);
+    console.log('🔍 [DEBUG] Is authenticated:', isAuthenticated);
+    console.log('🔍 [DEBUG] Current user:', user);
+    console.log('🔍 [DEBUG] Form email:', orderData.formData.email);
+    
     // Get customer email from form data or from logged in user
     const customerEmail = orderData.formData.email || user?.email;
+    console.log('🔍 [DEBUG] Customer email to use:', customerEmail);
     
     if (customerEmail) {
       // Create order object
@@ -142,8 +172,11 @@ const OrderConfirmation: React.FC = () => {
       // Save to storage (works for logged in or guest users)
       saveOrderToStorage(customerEmail, newOrder);
       
+      console.log('🔍 [DEBUG] ===== ORDER SAVE COMPLETE =====');
+      
       // Also add to context if authenticated
       if (isAuthenticated) {
+        console.log('🔍 [DEBUG] User is authenticated, also saving to context');
         addOrder({
           items: newOrder.items,
           totalAmount: finalTotal,
@@ -151,9 +184,13 @@ const OrderConfirmation: React.FC = () => {
           status: 'pending',
           shippingAddress: newOrder.shippingAddress
         });
+      } else {
+        console.log('⚠️ [DEBUG] User is NOT authenticated, skipping context save');
       }
     } else {
-      console.error('⚠️ No customer email available to save order');
+      console.error('❌ [DEBUG] No customer email available to save order');
+      console.error('❌ [DEBUG] orderData.formData:', orderData.formData);
+      console.error('❌ [DEBUG] user:', user);
     }
 
     // Show success notification

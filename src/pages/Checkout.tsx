@@ -182,7 +182,6 @@ const Checkout: React.FC = () => {
   const handleRemoveCoupon = () => {
     setAppliedCoupon(null);
     setCouponDiscount(0);
-    setCouponCode('');
     toast({
       title: "Cupom removido",
       description: "O desconto foi removido",
@@ -438,6 +437,58 @@ const Checkout: React.FC = () => {
                     </div>
                   )}
 
+                  {/* Coupon Section - Mobile Only */}
+                  <div className="pt-4 border-t border-border lg:hidden">
+                    <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-4 flex items-center gap-2">
+                      <Tag className="w-4 h-4" />
+                      Cupom de Desconto
+                    </h3>
+                    <CouponSelector
+                      totalPrice={totalPrice}
+                      onCouponApply={handleCouponApply}
+                      onCouponRemove={handleCouponRemove}
+                      appliedCoupon={appliedCoupon}
+                    />
+                  </div>
+
+                  {/* Order Total - Mobile Only */}
+                  <div className="pt-4 border-t border-border lg:hidden">
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Subtotal</span>
+                        <span className="font-medium">¥{totalPrice.toLocaleString()}</span>
+                      </div>
+                      {appliedCoupon && couponDiscount > 0 && (
+                        <div className="flex justify-between text-sm text-green-600 dark:text-green-400">
+                          <span>Desconto ({appliedCoupon.code})</span>
+                          <span className="font-medium">-¥{couponDiscount.toLocaleString()}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Frete</span>
+                        {selectedShipping ? (
+                          <span className="font-medium">¥{selectedShipping.cost.toLocaleString()}</span>
+                        ) : (
+                          <span className="text-muted-foreground text-xs">Selecione acima</span>
+                        )}
+                      </div>
+                      {selectedShipping && (
+                        <div className="text-xs text-muted-foreground text-right">
+                          {selectedShipping.carrier} - {selectedShipping.estimatedDays} dias
+                        </div>
+                      )}
+                      <div className="flex justify-between pt-2 border-t border-border">
+                        <span className="font-semibold text-lg">Total</span>
+                        <span className="font-bold text-2xl text-primary">
+                          ¥{selectedShipping 
+                            ? (totalPrice - couponDiscount + selectedShipping.cost).toLocaleString()
+                            : `${(totalPrice - couponDiscount).toLocaleString()}+`
+                          }
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
                   <div className="pt-4 border-t border-border">
                     <Button 
                       type="submit" 
@@ -454,19 +505,6 @@ const Checkout: React.FC = () => {
                     )}
                   </div>
                 </form>
-              </div>
-
-              {/* Shipping Calculator - Full Width on Mobile */}
-              <div className="lg:col-span-2 lg:hidden">
-                <div className="bg-card rounded-2xl border border-border p-6">
-                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-4">
-                    Calcular Frete
-                  </h3>
-                  <ShippingCalculator 
-                    selectedPrefecture={formData.prefecture}
-                    onShippingSelect={setSelectedShipping}
-                  />
-                </div>
               </div>
             </div>
 

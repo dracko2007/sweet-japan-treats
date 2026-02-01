@@ -228,12 +228,21 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
 
   const register = async (userData: Omit<UserProfile, 'id' | 'createdAt' | 'password'> & { password: string }): Promise<boolean> => {
     try {
+      console.log('🔍 [DEBUG] ===== REGISTER START =====');
+      console.log('🔍 [DEBUG] Registration data:', { 
+        email: userData.email, 
+        name: userData.name 
+      });
+      
       // Check if user with this email already exists in the users database
       const allUsers = getAllUsers();
+      console.log('🔍 [DEBUG] Total users before registration:', allUsers.length);
+      console.log('🔍 [DEBUG] Existing user emails:', allUsers.map(u => u.email));
+      
       const existingUser = allUsers.find(u => u.email === userData.email);
       
       if (existingUser) {
-        console.error('Registration failed: User with this email already exists');
+        console.error('❌ [DEBUG] Registration failed: User already exists:', userData.email);
         return false;
       }
 
@@ -245,13 +254,31 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
         orders: [], // Initialize empty orders array
       };
       
+      console.log('🔍 [DEBUG] New user created:', { 
+        id: newUser.id, 
+        email: newUser.email,
+        hasOrders: Array.isArray(newUser.orders)
+      });
+      
       // Add new user to users database
       const updatedUsers = [...allUsers, newUser];
       saveAllUsers(updatedUsers);
       
+      console.log('🔍 [DEBUG] Total users after registration:', updatedUsers.length);
+      
+      // Verify save
+      const verifyUsers = getAllUsers();
+      const verifyUser = verifyUsers.find(u => u.email === userData.email);
+      console.log('✅ [DEBUG] User saved verification:', {
+        found: !!verifyUser,
+        email: verifyUser?.email,
+        hasOrdersArray: Array.isArray(verifyUser?.orders)
+      });
+      
       // Set as current user
       setUser(newUser);
       setIsAuthenticated(true);
+      console.log('✅ [DEBUG] User set as authenticated');
 
       // Add welcome coupon for this user
       const welcomeCoupon: Coupon = {
@@ -268,11 +295,10 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       // Initialize empty orders for this user
       setOrders([]);
 
-      console.log('User registered successfully:', { email: newUser.email, id: newUser.id });
-      console.log('Total users in database:', updatedUsers.length);
+      console.log('✅ [DEBUG] ===== REGISTER COMPLETE =====');
       return true;
     } catch (error) {
-      console.error('Error registering user:', error);
+      console.error('❌ [DEBUG] Error registering user:', error);
       return false;
     }
   };
