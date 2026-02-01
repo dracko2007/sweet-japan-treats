@@ -52,6 +52,7 @@ export const emailService = {
     
     try {
       console.log('📤 Sending request to Resend API...');
+      console.log('📤 API Key configured:', !!RESEND_API_KEY, RESEND_API_KEY?.substring(0, 10) + '...');
       console.log('📤 Request body:', {
         from: FROM_EMAIL,
         to: data.to,
@@ -59,24 +60,40 @@ export const emailService = {
         htmlLength: data.html.length
       });
       
+      const requestBody = {
+        from: FROM_EMAIL,
+        to: data.to,
+        subject: data.subject,
+        html: data.html
+      };
+      
+      console.log('📤 Making fetch request...');
+      
       const response = await fetch('https://api.resend.com/emails', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${RESEND_API_KEY}`
         },
-        body: JSON.stringify({
-          from: FROM_EMAIL,
-          to: data.to,
-          subject: data.subject,
-          html: data.html
-        })
+        body: JSON.stringify(requestBody)
       });
 
+      console.log('📥 Response received!');
       console.log('📥 Response status:', response.status, response.statusText);
+      console.log('📥 Response headers:', Object.fromEntries(response.headers.entries()));
 
-      const result = await response.json();
-      console.log('📥 Response data:', result);
+      const responseText = await response.text();
+      console.log('📥 Response body (raw):', responseText);
+      
+      let result;
+      try {
+        result = JSON.parse(responseText);
+      } catch (e) {
+        console.error('❌ Failed to parse response as JSON:', e);
+        result = { error: responseText };
+      }
+      
+      console.log('📥 Response data (parsed):', result);
 
       if (!response.ok) {
         console.error('❌ Resend API error:', {

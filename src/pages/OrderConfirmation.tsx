@@ -272,22 +272,35 @@ _Sabor do Campo - Doce de Leite Artesanal_
     
     // Send WhatsApp messages (automatically if configured, or opens WhatsApp Web)
     try {
+      console.log('📱 Starting WhatsApp messages...');
+      
       // Send to store owner (Paula)
+      console.log('📱 Sending to store owner...');
+      const storePhone = '8107013671679'; // Remove all non-digits, keep country code
       await whatsappService.sendMessage({
-        to: '+81070-1367-1679',
+        to: `+${storePhone}`,
         message: whatsappMessageToStore
       });
       
+      console.log('📱 Sending to customer...');
       // Send to customer
-      const customerPhone = data.formData.phone.replace(/[^0-9]/g, '');
+      let customerPhone = data.formData.phone.replace(/[^0-9]/g, '');
+      // If phone doesn't start with 81 (Japan country code), add it
+      if (!customerPhone.startsWith('81')) {
+        customerPhone = '81' + customerPhone;
+      }
+      
+      console.log('📱 Customer phone formatted:', customerPhone);
+      
       await whatsappService.sendMessage({
-        to: `+81${customerPhone}`,
+        to: `+${customerPhone}`,
         message: whatsappMessageToCustomer
       });
       
       console.log('✅ WhatsApp messages sent/opened');
     } catch (error) {
-      console.error('Error with WhatsApp service:', error);
+      console.error('❌ Error with WhatsApp service:', error);
+      console.error('❌ Error details:', error instanceof Error ? error.message : String(error));
     }
   };
 

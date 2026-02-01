@@ -1,14 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Package, Printer, ShoppingBag, User, MapPin, Phone, Mail, Calendar } from 'lucide-react';
+import { Package, Printer, ShoppingBag, User, MapPin, Phone, Mail, Calendar, TestTube } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { useUser } from '@/context/UserContext';
+import { emailService } from '@/services/emailService';
+import { whatsappService } from '@/services/whatsappService';
+import { useToast } from '@/hooks/use-toast';
 
 const Admin: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useUser();
+  const { toast } = useToast();
   const [allOrders, setAllOrders] = useState<any[]>([]);
+  const [isTesting, setIsTesting] = useState(false);
 
   // Admin email - apenas Paula pode acessar
   const ADMIN_EMAIL = 'dracko2007@gmail.com';
@@ -51,6 +56,80 @@ const Admin: React.FC = () => {
 
     loadAllOrders();
   }, [user, navigate]);
+
+  // Test notification services
+  const testNotifications = async () => {
+    setIsTesting(true);
+    console.log('🧪 Starting notification tests...');
+    
+    try {
+      // Test Email
+      console.log('📧 Testing email service...');
+      const testEmailHTML = `
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <meta charset="utf-8">
+          </head>
+          <body style="font-family: Arial, sans-serif; padding: 20px;">
+            <h1 style="color: #22c55e;">🧪 Test Email</h1>
+            <p>This is a test email from Sabor do Campo!</p>
+            <p>If you received this, your email configuration is working correctly! ✅</p>
+            <p>Time: ${new Date().toLocaleString('pt-BR')}</p>
+          </body>
+        </html>
+      `;
+      
+      const emailResult = await emailService.sendOrderConfirmation({
+        to: ADMIN_EMAIL,
+        subject: '🧪 Test Email - Sabor do Campo',
+        html: testEmailHTML,
+        orderNumber: 'TEST-' + Date.now(),
+        customerName: 'Test User'
+      });
+      
+      console.log('📧 Email test result:', emailResult);
+      
+      // Wait a bit before WhatsApp test
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // Test WhatsApp
+      console.log('📱 Testing WhatsApp service...');
+      const testMessage = `
+🧪 *Test Message*
+
+This is a test message from Sabor do Campo!
+
+If you received this, your WhatsApp configuration is working correctly! ✅
+
+Time: ${new Date().toLocaleString('pt-BR')}
+
+_This is an automated test message_
+      `.trim();
+      
+      const whatsappResult = await whatsappService.sendMessage({
+        to: '+8107013671679',
+        message: testMessage
+      });
+      
+      console.log('📱 WhatsApp test result:', whatsappResult);
+      
+      toast({
+        title: "🧪 Testes Concluídos!",
+        description: `Email: ${emailResult ? '✅ Enviado' : '⚠️ Verifique o console'} | WhatsApp: ${whatsappResult ? '✅ Enviado' : '⚠️ Verifique o console'}`,
+      });
+      
+    } catch (error) {
+      console.error('❌ Test error:', error);
+      toast({
+        title: "❌ Erro nos Testes",
+        description: "Verifique o console (F12) para mais detalhes",
+        variant: "destructive"
+      });
+    } finally {
+      setIsTesting(false);
+    }
+  };
 
   const printShippingLabel = (order: any) => {
     const printWindow = window.open('', '_blank');
@@ -164,6 +243,29 @@ const Admin: React.FC = () => {
       <section className="py-12 bg-background">
         <div className="container mx-auto px-4">
           <div className="max-w-6xl mx-auto">
+            
+            {/* Test Button */}
+            <div className="mb-8 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950 dark:to-purple-950 rounded-2xl border-2 border-blue-200 dark:border-blue-800 p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-semibold text-lg mb-2 flex items-center gap-2">
+                    <TestTube className="w-5 h-5" />
+                    Testar Notificações
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    Envie emails e WhatsApp de teste para verificar se as configurações estão funcionando
+                  </p>
+                </div>
+                <Button 
+                  onClick={testNotifications}
+                  disabled={isTesting}
+                  size="lg"
+                  className="ml-4"
+                >
+                  {isTesting ? '⏳ Testando...' : '🧪 Testar Agora'}
+                </Button>
+              </div>
+            </div>
             
             {/* Stats */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
