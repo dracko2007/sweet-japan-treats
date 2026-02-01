@@ -7,7 +7,9 @@ import { useCart } from '@/context/CartContext';
 import { useUser } from '@/context/UserContext';
 import { useToast } from '@/hooks/use-toast';
 import { emailService } from '@/services/emailService';
+import { emailServiceSimple } from '@/services/emailServiceSimple';
 import { whatsappService } from '@/services/whatsappService';
+import { whatsappServiceSimple } from '@/services/whatsappServiceSimple';
 import { paypayService } from '@/services/paypayService';
 import { carrierService } from '@/services/carrierService';
 import type { OrderData, CartItem } from '@/types/order';
@@ -149,42 +151,56 @@ const OrderConfirmation: React.FC = () => {
     
     // 2. Send Emails - One for customer (without label) and one for store (with label)
     try {
-      // Email for CUSTOMER (without shipping label)
-      const customerEmailHTML = emailService.generateCustomerEmailHTML({
-        ...data,
-        orderNumber
-      }, generatedTrackingNumber);
+      console.log('📧 Trying to send emails...');
       
-      const customerEmailResult = await emailService.sendOrderConfirmation({
-        to: data.formData.email,
-        subject: `Confirmação de Pedido ${orderNumber} - Sabor do Campo`,
-        html: customerEmailHTML,
-        orderNumber,
-        customerName: data.formData.name,
-        trackingNumber: generatedTrackingNumber
-      });
-      
-      setEmailSent(customerEmailResult);
-      console.log('📧 Email sent to customer:', data.formData.email, customerEmailResult ? '✅' : '⏳');
-      
-      // Email for STORE OWNER (with shipping label)
-      const storeEmailHTML = emailService.generateStoreEmailHTML({
-        ...data,
-        orderNumber
-      }, generatedTrackingNumber);
-      
-      const storeEmailResult = await emailService.sendOrderConfirmation({
-        to: 'dracko2007@gmail.com', // Paula's email
-        subject: `🎉 NOVO PEDIDO ${orderNumber} - Sabor do Campo`,
-        html: storeEmailHTML,
-        orderNumber,
-        customerName: data.formData.name,
-        trackingNumber: generatedTrackingNumber
-      });
-      
-      console.log('📧 Email sent to store:', 'dracko2007@gmail.com', storeEmailResult ? '✅' : '⏳');
+      // Try with Resend first (if configured)
+      if (import.meta.env.VITE_RESEND_API_KEY) {
+        console.log('📧 Using Resend service...');
+        
+        // Email for CUSTOMER (without shipping label)
+        const customerEmailHTML = emailService.generateCustomerEmailHTML({
+          ...data,
+          orderNumber
+        }, generatedTrackingNumber);
+        
+        const customerEmailResult = await emailService.sendOrderConfirmation({
+          to: data.formData.email,
+          subject: `Confirmação de Pedido ${orderNumber} - Sabor do Campo`,
+          html: customerEmailHTML,
+          orderNumber,
+          customerName: data.formData.name,
+          trackingNumber: generatedTrackingNumber
+        });
+        
+        setEmailSent(customerEmailResult);
+        console.log('📧 Email sent to customer:', data.formData.email, customerEmailResult ? '✅' : '⏳');
+        
+        // Email for STORE OWNER (with shipping label)
+        const storeEmailHTML = emailService.generateStoreEmailHTML({
+          ...data,
+          orderNumber
+        }, generatedTrackingNumber);
+        
+        const storeEmailResult = await emailService.sendOrderConfirmation({
+          to: 'dracko2007@gmail.com', // Paula's email
+          subject: `🎉 NOVO PEDIDO ${orderNumber} - Sabor do Campo`,
+          html: storeEmailHTML,
+          orderNumber,
+          customerName: data.formData.name,
+          trackingNumber: generatedTrackingNumber
+        });
+        
+        console.log('📧 Email sent to store:', 'dracko2007@gmail.com', storeEmailResult ? '✅' : '⏳');
+      } else {
+        // Use EmailJS as alternative (opens email client if not configured)
+        console.log('📧 Using EmailJS service (simpler)...');
+        await emailServiceSimple.sendOrderConfirmation({
+          ...data,
+          orderNumber
+        });
+      }
     } catch (error) {
-      console.error('Error sending emails:', error);
+      console.error('❌ Error sending emails:', error);
     }
     
     // 3. PayPay Integration (if PayPay payment selected)
@@ -274,33 +290,65 @@ _Sabor do Campo - Doce de Leite Artesanal_
     try {
       console.log('📱 Starting WhatsApp messages...');
       
-      // Send to store owner (Paula)
-      console.log('📱 Sending to store owner...');
-      const storePhone = '8107013671679'; // Remove all non-digits, keep country code
-      await whatsappService.sendMessage({
-        to: `+${storePhone}`,
-        message: whatsappMessageToStore
-      });
-      
-      console.log('📱 Sending to customer...');
-      // Send to customer
-      let customerPhone = data.formData.phone.replace(/[^0-9]/g, '');
-      // If phone doesn't start with 81 (Japan country code), add it
-      if (!customerPhone.startsWith('81')) {
-        customerPhone = '81' + customerPhone;
+      // Try with Twilio first (if configured)
+      if (import.meta.env.VITE_TWILIO_ACCOUNT_SID && import.meta.env.VITE_TWILIO_AUTH_TOKEN) {
+        console.log('📱 Using Twilio service...');
+        
+        // Send to store owner (Paula)
+        console.log('📱 Sending to store owner...');
+        const storePhone = '8107013671679';
+        await whatsappService.sendMessage({
+          to: `+${storePhone}`,
+          message: whatsappMessageToStore
+        });
+        
+        console.log('📱 Sending to customer...');
+        // Send to customer
+        let customerPhone = data.formData.phone.replace(/[^0-9]/g, '');
+        if (!customerPhone.startsWith('81')) {
+          customerPhone = '81' + customerPhone;
+        }
+        
+        console.log('📱 Customer phone formatted:', customerPhone);
+        
+        await whatsappService.sendMessage({
+          to: `+${customerPhone}`,
+          message: whatsappMessageToCustomer
+        });
+      } else {
+        // Use simple WhatsApp service (always works!)
+        console.log('📱 Using Simple WhatsApp service (opens WhatsApp directly)...');
+        
+        // Send both messages with delay
+        await whatsappServiceSimple.sendMultiple([
+          {
+            to: '8107013671679', // Store owner
+            message: whatsappMessageToStore
+          },
+          {
+            to: data.formData.phone, // Customer
+            message: whatsappMessageToCustomer
+          }
+        ]);
       }
-      
-      console.log('📱 Customer phone formatted:', customerPhone);
-      
-      await whatsappService.sendMessage({
-        to: `+${customerPhone}`,
-        message: whatsappMessageToCustomer
-      });
       
       console.log('✅ WhatsApp messages sent/opened');
     } catch (error) {
       console.error('❌ Error with WhatsApp service:', error);
       console.error('❌ Error details:', error instanceof Error ? error.message : String(error));
+      
+      // Ultimate fallback: use simple service
+      console.log('🔄 Using fallback Simple WhatsApp service...');
+      await whatsappServiceSimple.sendMultiple([
+        {
+          to: '8107013671679',
+          message: whatsappMessageToStore
+        },
+        {
+          to: data.formData.phone,
+          message: whatsappMessageToCustomer
+        }
+      ]);
     }
   };
 
