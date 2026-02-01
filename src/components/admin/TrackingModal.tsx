@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { emailService } from '@/services/emailService';
 import { emailServiceSimple } from '@/services/emailServiceSimple';
+import { whatsappService } from '@/services/whatsappService';
 import { useToast } from '@/hooks/use-toast';
 
 interface TrackingModalProps {
@@ -25,6 +26,41 @@ const TrackingModal: React.FC<TrackingModalProps> = ({
   const [isSending, setIsSending] = useState(false);
   const { toast } = useToast();
 
+  // Get tracking URL based on carrier
+  const getTrackingUrl = (carrier: string, trackingNumber: string): string => {
+    const lowerCarrier = carrier.toLowerCase();
+    
+    if (lowerCarrier.includes('yamato') || lowerCarrier.includes('クロネコ')) {
+      return `https://toi.kuronekoyamato.co.jp/cgi-bin/tneko?number=${trackingNumber}`;
+    } else if (lowerCarrier.includes('sagawa') || lowerCarrier.includes('佐川')) {
+      return `https://k2k.sagawa-exp.co.jp/p/web/okurijosearch.do?okurijoNo=${trackingNumber}`;
+    } else if (lowerCarrier.includes('japan post') || lowerCarrier.includes('ゆうパック') || lowerCarrier.includes('post')) {
+      return `https://trackings.post.japanpost.jp/services/srv/search/?requestNo1=${trackingNumber}&locale=ja`;
+    } else if (lowerCarrier.includes('fukutsu') || lowerCarrier.includes('福通')) {
+      return `https://corp.fukutsu.co.jp/situation/tracking_no_hunt.html?tracking_no=${trackingNumber}`;
+    }
+    
+    // Default: return generic tracking message
+    return '';
+  };
+
+  // Get carrier name for display
+  const getCarrierName = (carrier: string): string => {
+    const lowerCarrier = carrier.toLowerCase();
+    
+    if (lowerCarrier.includes('yamato') || lowerCarrier.includes('クロネコ')) {
+      return 'Yamato Transport (クロネコヤマト)';
+    } else if (lowerCarrier.includes('sagawa') || lowerCarrier.includes('佐川')) {
+      return 'Sagawa Express (佐川急便)';
+    } else if (lowerCarrier.includes('japan post') || lowerCarrier.includes('ゆうパック') || lowerCarrier.includes('post')) {
+      return 'Japan Post (日本郵便)';
+    } else if (lowerCarrier.includes('fukutsu') || lowerCarrier.includes('福通')) {
+      return 'Fukutsu Express (福山通運)';
+    }
+    
+    return carrier;
+  };
+
   const handleSubmit = async () => {
     if (!trackingNumber.trim()) {
       toast({
@@ -38,6 +74,9 @@ const TrackingModal: React.FC<TrackingModalProps> = ({
     setIsSending(true);
 
     try {
+      const carrierName = getCarrierName(order.shipping?.carrier || '');
+      const trackingUrl = getTrackingUrl(order.shipping?.carrier || '', trackingNumber);
+      
       // Send shipping confirmation email
       const emailHTML = `
         <!DOCTYPE html>
@@ -50,7 +89,9 @@ const TrackingModal: React.FC<TrackingModalProps> = ({
             .header { background: linear-gradient(135deg, #D2691E 0%, #8B4513 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
             .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
             .tracking-box { background: #fff; border: 2px solid #D2691E; border-radius: 8px; padding: 20px; margin: 20px 0; text-align: center; }
-            .tracking-number { font-size: 24px; font-weight: bold; color: #D2691E; letter-spacing: 2px; }
+            .tracking-number { font-size: 24px; font-weight: bold; color: #D2691E; letter-spacing: 2px; margin: 10px 0; }
+            .tracking-button { display: inline-block; background: #D2691E; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; margin-top: 15px; font-weight: bold; }
+            .tracking-button:hover { background: #8B4513; }
             .product-list { margin: 20px 0; }
             .product-item { background: #fff; padding: 15px; margin: 10px 0; border-radius: 8px; border-left: 4px solid #D2691E; }
             .info-row { display: flex; justify-between; margin: 10px 0; padding: 10px 0; border-bottom: 1px solid #eee; }
@@ -70,11 +111,24 @@ const TrackingModal: React.FC<TrackingModalProps> = ({
               <p>Seu pedido foi enviado e está a caminho! 🎉</p>
               
               <div class="tracking-box">
+                <p style="margin: 0 0 5px 0; color: #666; font-size: 14px;">Transportadora:</p>
+                <p style="margin: 0 0 15px 0; font-weight: bold; font-size: 16px;">${carrierName}</p>
+                
                 <p style="margin: 0 0 10px 0; color: #666;">Número de Rastreamento:</p>
                 <div class="tracking-number">${trackingNumber}</div>
-                <p style="margin: 15px 0 0 0; font-size: 14px; color: #666;">
-                  Você pode rastrear seu pedido através da transportadora.
-                </p>
+                
+                ${trackingUrl ? `
+                  <a href="${trackingUrl}" class="tracking-button" target="_blank">
+                    🔍 Rastrear Pedido
+                  </a>
+                  <p style="margin: 15px 0 0 0; font-size: 12px; color: #666;">
+                    Ou copie o código acima e cole no site da transportadora
+                  </p>
+                ` : `
+                  <p style="margin: 15px 0 0 0; font-size: 14px; color: #666;">
+                    Use este código para rastrear seu pedido no site da transportadora.
+                  </p>
+                `}
               </div>
 
               <h3 style="color: #D2691E; margin-top: 30px;">📋 Resumo do Pedido</h3>
@@ -162,6 +216,45 @@ const TrackingModal: React.FC<TrackingModalProps> = ({
         title: "Email enviado!",
         description: `Notificação de envio enviada para ${order.shippingAddress.name}`,
       });
+
+      // Send WhatsApp message if phone is available
+      const customerPhone = order.customerPhone || order.shippingAddress.phone;
+      if (customerPhone) {
+        const whatsappMessage = `
+🎉 *Seu Pedido Foi Enviado!*
+
+Olá ${order.shippingAddress.name}!
+
+Seu pedido #${order.orderNumber} foi enviado e está a caminho! 📦
+
+*Transportadora:* ${carrierName}
+*Código de Rastreamento:* ${trackingNumber}
+
+${trackingUrl ? `*Rastreie seu pedido aqui:*\n${trackingUrl}\n\n` : 'Use este código para rastrear seu pedido no site da transportadora.\n\n'}*Resumo do Pedido:*
+${order.items.map((item: any) => 
+  `• ${item.productName} (${item.size}) - ${item.quantity}x - ¥${(item.price * item.quantity).toLocaleString()}`
+).join('\n')}
+
+*Total:* ¥${order.totalPrice.toLocaleString()}
+
+Obrigado por comprar na *Sabor do Campo*! 🍯
+        `.trim();
+
+        try {
+          await whatsappService.sendMessage({
+            to: customerPhone,
+            message: whatsappMessage,
+          });
+          
+          toast({
+            title: "WhatsApp enviado!",
+            description: "Mensagem de rastreamento enviada via WhatsApp",
+          });
+        } catch (error) {
+          console.error('Error sending WhatsApp:', error);
+          // Don't show error toast - email was sent successfully
+        }
+      }
 
       onSuccess(trackingNumber);
       onClose();
