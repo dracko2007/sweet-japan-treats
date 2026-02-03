@@ -35,24 +35,28 @@ const App = () => (
         <TooltipProvider>
           {typeof window !== "undefined" && new URLSearchParams(window.location.search).get("debug") === "1" && (
             <div style={{ 
-              backgroundColor: '#1e40af', 
-              color: 'white', 
-              padding: '20px', 
+              backgroundColor: 'red', 
+              color: 'yellow', 
+              padding: '30px', 
               textAlign: 'center',
-              fontSize: '16px',
+              fontSize: '24px',
               fontWeight: 'bold',
-              borderBottom: '4px solid yellow'
+              borderBottom: '10px solid yellow',
+              fontFamily: 'Arial, sans-serif'
             }}>
-              <div>DEBUG MODE ATIVO</div>
-              <div style={{ marginTop: '10px', backgroundColor: 'yellow', color: 'black', padding: '10px', display: 'inline-block' }}>
-                Source: {firebaseConfigSource}
-              </div>
-              <div style={{ marginTop: '10px', backgroundColor: 'yellow', color: 'black', padding: '10px', display: 'inline-block', marginLeft: '10px' }}>
-                Project: {firebaseConfig.projectId}
-              </div>
-              <div style={{ marginTop: '10px', backgroundColor: 'yellow', color: 'black', padding: '10px', display: 'inline-block', marginLeft: '10px' }}>
-                Auth: {firebaseConfig.authDomain}
-              </div>
+              <h1 style={{ margin: 0, fontSize: '32px' }}>TESTE DEBUG BANNER</h1>
+              <p style={{ margin: '20px 0', fontSize: '20px' }}>
+                Source: {String(firebaseConfigSource || 'UNDEFINED')}
+              </p>
+              <p style={{ margin: '20px 0', fontSize: '20px' }}>
+                Project: {String(firebaseConfig?.projectId || 'UNDEFINED')}
+              </p>
+              <p style={{ margin: '20px 0', fontSize: '20px' }}>
+                Auth: {String(firebaseConfig?.authDomain || 'UNDEFINED')}
+              </p>
+              <p style={{ margin: '20px 0', fontSize: '20px' }}>
+                API Key: {String(firebaseConfig?.apiKey?.substring(0, 20) || 'UNDEFINED')}...
+              </p>
             </div>
           )}
           {!firebaseConfigReady && (
