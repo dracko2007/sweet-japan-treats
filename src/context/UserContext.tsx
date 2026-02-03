@@ -248,6 +248,27 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
             id: firebaseUser.uid
           });
           userData = { ...localUser, id: firebaseUser.uid };
+        } else {
+           // USER HAS AUTH BUT NO PROFILE (GHOST USER)
+           // Create a partial profile to allow login
+           console.warn('👻 [LOGIN] Ghost user detected (Auth ok, but no profile). Creating basic profile...');
+           const ghostUser: UserProfile = {
+             id: firebaseUser.uid,
+             email: email,
+             name: email.split('@')[0], // Fallback name
+             phone: '',
+             password: password,
+             address: {
+               postalCode: '',
+               prefecture: '',
+               city: '',
+               address: '',
+             },
+             createdAt: new Date().toISOString(),
+           };
+           
+           await firebaseSyncService.syncUserToFirestore(firebaseUser.uid, ghostUser);
+           userData = ghostUser;
         }
       }
       
@@ -370,7 +391,36 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
 
       // Register user in Firebase Auth
       console.log('🔥 [DEBUG] Registering user in Firebase Auth...');
-      const firebaseUser = await firebaseSyncService.registerUser(userData.email, userData.password);
+      let firebaseUser;
+      try {
+        firebaseUser = await firebaseSyncService.registerUser(userData.email, userData.password);
+      } catch (authError: any) {
+        // Handle "email already in use" error
+        if (authError.message && authError.message.includes('email-already-in-use')) {
+           console.warn('⚠️ [DEBUG] Email already in use in Auth. Trying to recover/login...');
+           // Try to login with the password provided
+           try {
+             firebaseUser = await firebaseSyncService.loginUser(userData.email, userData.password);
+             console.log('✅ [DEBUG] Recovered account via login. Check if profile exists...');
+             
+             // Check if profile REALLY exists now that we are logged in
+             const existingProfile = await firebaseSyncService.getUserFromFirestore(firebaseUser.uid);
+             if (existingProfile) {
+                console.error('❌ [DEBUG] Registration failed: Profile actually exists.');
+                return false; // Real duplicate user
+             }
+             
+             // If we are here, we have Auth but NO profile.
+             // Proceed to create profile (overwriting the "ghost" user)
+             console.log('👻 [DEBUG] Ghost account confirmed. Proceeding to create profile...');
+           } catch (loginError) {
+             console.error('❌ [DEBUG] Email exists and password invalid:', loginError);
+             return false; // Wrong password for existing email
+           }
+        } else {
+           throw authError; // Other errors
+        }
+      }
       
       const newUser: UserProfile = {
         ...userData,
