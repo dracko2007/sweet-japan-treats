@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { CartProvider } from "@/context/CartContext";
 import { UserProvider } from "@/context/UserContext";
+import { firebaseConfigReady } from "@/config/firebase";
 import Index from "./pages/Index";
 import Products from "./pages/Products";
 import Cart from "./pages/Cart";
@@ -32,6 +33,11 @@ const App = () => (
     <UserProvider>
       <CartProvider>
         <TooltipProvider>
+          {!firebaseConfigReady && (
+            <div className="bg-red-600 text-white text-sm text-center py-2 px-4">
+              Firebase não configurado. Cadastros e login ficam somente no aparelho. Verifique as variáveis VITE_FIREBASE_* no Vercel e faça redeploy.
+            </div>
+          )}
           <Toaster />
           <Sonner />
           <BrowserRouter>
