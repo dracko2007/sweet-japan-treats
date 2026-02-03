@@ -331,6 +331,13 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
 
         return { success: false, error: friendlyMessage, code: authCode };
       }
+
+      if (firebaseConfigReady) {
+        const friendlyMessage = authCode
+          ? `Erro ao autenticar no Firebase: ${authCode}`
+          : 'Erro ao autenticar no Firebase. Verifique as credenciais e tente novamente.';
+        return { success: false, error: friendlyMessage, code: authCode };
+      }
       
       // Fallback to localStorage
       const allUsers = getAllUsers();
@@ -528,9 +535,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       
       if (!syncValues) {
         console.error('❌ [CRITICAL] Failed to save user to Firestore. User created in Auth but has no profile.');
-        // Optional: Retry or delete Auth user? 
-        // For now, allow proceeding as we have local backup, and auto-migration in login creates Ghost User if needed.
-        // But warning is critical.
+        return { success: false, error: 'Falha ao salvar na nuvem. Verifique a configuração do Firebase.' };
       } else {
         console.log('✅ [DEBUG] User successfully saved to Firestore');
       }
