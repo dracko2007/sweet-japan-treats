@@ -34,8 +34,11 @@ const App = () => (
       <CartProvider>
         <TooltipProvider>
           {typeof window !== "undefined" && new URLSearchParams(window.location.search).get("debug") === "1" && (
-            <div className="bg-blue-600 text-white text-xs text-center py-2 px-4">
-              Firebase Debug — source: {firebaseConfigSource} | projectId: {firebaseConfig.projectId} | authDomain: {firebaseConfig.authDomain}
+            <div className="bg-blue-700 text-white font-bold text-base text-center py-4 px-4 border-b-4 border-yellow-400">
+              🔍 FIREBASE DEBUG 🔍<br/>
+              Source: <span className="bg-yellow-400 text-black px-2 py-1 rounded">{firebaseConfigSource}</span> | 
+              ProjectId: <span className="bg-yellow-400 text-black px-2 py-1 rounded">{firebaseConfig.projectId}</span> | 
+              AuthDomain: <span className="bg-yellow-400 text-black px-2 py-1 rounded">{firebaseConfig.authDomain}</span>
             </div>
           )}
           {!firebaseConfigReady && (
