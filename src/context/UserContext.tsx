@@ -57,7 +57,7 @@ interface UserContextType {
   coupons: Coupon[];
   orders: Order[];
   login: (email: string, password: string) => Promise<boolean>;
-  register: (userData: Omit<UserProfile, 'id' | 'createdAt' | 'password'> & { password: string }) => Promise<boolean>;
+  register: (userData: Omit<UserProfile, 'id' | 'createdAt' | 'password'> & { password: string }) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
   updateProfile: (userData: Partial<UserProfile>) => void;
   addCoupon: (coupon: Coupon) => void;
@@ -85,6 +85,8 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  const normalizeEmail = (email: string) => email.trim().toLowerCase();
 
   // Helper functions for users database
   const getAllUsers = (): UserProfile[] => {
@@ -192,6 +194,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
   }, [orders, user]);
 
   const login = async (email: string, password: string): Promise<boolean> => {
+    const normalizedEmail = normalizeEmail(email);
     // Admin default - sempre disponível
     const ADMIN_EMAIL = 'dracko2007@gmail.com';
     const ADMIN_PASSWORD = 'admin123';
@@ -229,7 +232,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     try {
       // Try to login with Firebase Auth first
       console.log('🔥 [LOGIN] Attempting Firebase Auth login...');
-      const firebaseUser = await firebaseSyncService.loginUser(email, password);
+      const firebaseUser = await firebaseSyncService.loginUser(normalizedEmail, password);
       
       // Get user data from Firestore
       console.log('🔥 [LOGIN] Fetching user data from Firestore...');
@@ -239,7 +242,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       if (!userData) {
         console.log('⚠️ [LOGIN] User not in Firestore, checking localStorage...');
         const allUsers = getAllUsers();
-        const localUser = allUsers.find(u => u.email === email);
+        const localUser = allUsers.find(u => normalizeEmail(u.email) === normalizedEmail);
         
         if (localUser) {
           // Sync to Firestore
@@ -254,8 +257,8 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
            console.warn('👻 [LOGIN] Ghost user detected (Auth ok, but no profile). Creating basic profile...');
            const ghostUser: UserProfile = {
              id: firebaseUser.uid,
-             email: email,
-             name: email.split('@')[0], // Fallback name
+             email: normalizedEmail,
+             name: normalizedEmail.split('@')[0], // Fallback name
              phone: '',
              password: password,
              address: {
@@ -298,17 +301,17 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       console.log('📦 Total users in database:', allUsers.length);
       console.log('👥 All registered users:', allUsers.map(u => ({ email: u.email, id: u.id })));
       
-      const foundUser = allUsers.find(u => u.email === email && u.password === password);
+      const foundUser = allUsers.find(u => normalizeEmail(u.email) === normalizedEmail && u.password === password);
       
       if (foundUser) {
         try {
           // AUTO-MIGRATION: If local user exists but Firebase failed, try to CREATE Firebase account
           console.log('🔄 [LOGIN] Auto-migrating local user to Firebase...');
-          const firebaseUser = await firebaseSyncService.registerUser(email, password);
+          const firebaseUser = await firebaseSyncService.registerUser(normalizedEmail, password);
           
           if (firebaseUser) {
              // Sync user data to Firestore
-             const migratedUser = { ...foundUser, id: firebaseUser.uid };
+             const migratedUser = { ...foundUser, id: firebaseUser.uid, email: normalizedEmail };
              await firebaseSyncService.syncUserToFirestore(firebaseUser.uid, migratedUser);
              
              // Sync orders if any
@@ -324,7 +327,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
              setOrders(userOrders);
              
              // Update in localStorage users database (replace old ID with new UID)
-             const updatedUsers = allUsers.map(u => u.email === email ? migratedUser : u);
+             const updatedUsers = allUsers.map(u => normalizeEmail(u.email) === normalizedEmail ? migratedUser : u);
              saveAllUsers(updatedUsers);
              
              console.log('✅ [LOGIN] Auto-migration complete! User synced to cloud.');
@@ -362,11 +365,12 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     return false;
   };
 
-  const register = async (userData: Omit<UserProfile, 'id' | 'createdAt' | 'password'> & { password: string }): Promise<boolean> => {
+  const register = async (userData: Omit<UserProfile, 'id' | 'createdAt' | 'password'> & { password: string }): Promise<{ success: boolean; error?: string }> => {
     try {
+      const normalizedEmail = normalizeEmail(userData.email);
       console.log('🔍 [DEBUG] ===== REGISTER START =====');
       console.log('🔍 [DEBUG] Registration data:', { 
-        email: userData.email, 
+        email: normalizedEmail, 
         name: userData.name 
       });
       
@@ -378,7 +382,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       console.log('🔍 [DEBUG] Total users before registration:', allUsers.length);
       console.log('🔍 [DEBUG] Existing user emails:', allUsers.map(u => u.email));
       
-      const existingUser = allUsers.find(u => u.email === userData.email);
+      const existingUser = allUsers.find(u => normalizeEmail(u.email) === normalizedEmail);
       
       if (existingUser) {
         console.warn('⚠️ [DEBUG] User already exists locally. Attempting auto-login instead of register.');
@@ -393,24 +397,24 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
           setOrders(userOrders);
           
           localStorage.setItem('user', JSON.stringify(existingUser));
-          return true;
+          return { success: true };
         }
         console.error('❌ [DEBUG] Registration failed: User exists locally and password mismatch.');
-        return false;
+        return { success: false, error: 'Este email já está cadastrado. Verifique a senha.' };
       }
 
       // Register user in Firebase Auth
       console.log('🔥 [DEBUG] Registering user in Firebase Auth...');
       let firebaseUser;
       try {
-        firebaseUser = await firebaseSyncService.registerUser(userData.email, userData.password);
+        firebaseUser = await firebaseSyncService.registerUser(normalizedEmail, userData.password);
       } catch (authError: any) {
         // Handle "email already in use" error
-        if (authError.message && authError.message.includes('email-already-in-use')) {
+        if ((authError.code && authError.code.includes('email-already-in-use')) || (authError.message && authError.message.includes('email-already-in-use'))) {
            console.warn('⚠️ [DEBUG] Email already in use in Auth. Trying to recover/login...');
            // Try to login with the password provided
            try {
-             firebaseUser = await firebaseSyncService.loginUser(userData.email, userData.password);
+             firebaseUser = await firebaseSyncService.loginUser(normalizedEmail, userData.password);
              console.log('✅ [DEBUG] Recovered account via login. Check if profile exists...');
              
              // Check if profile REALLY exists now that we are logged in
@@ -427,7 +431,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
                setOrders(userOrders);
                 
                localStorage.setItem('user', JSON.stringify(existingProfile));
-               return true; // Treat as login success
+               return { success: true }; // Treat as login success
              }
              
              // If we are here, we have Auth but NO profile.
@@ -435,15 +439,19 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
              console.log('👻 [DEBUG] Ghost account confirmed. Proceeding to create profile...');
            } catch (loginError) {
              console.error('❌ [DEBUG] Email exists and password invalid:', loginError);
-             return false; // Wrong password for existing email
+             return { success: false, error: 'Email já está cadastrado com outra senha.' }; // Wrong password for existing email
            }
         } else {
-           throw authError; // Other errors
+           const errorMessage = authError?.code
+             ? `Erro no cadastro: ${authError.code}`
+             : 'Erro ao criar conta. Tente novamente.';
+           return { success: false, error: errorMessage }; // Other errors
         }
       }
       
       const newUser: UserProfile = {
         ...userData,
+        email: normalizedEmail,
         id: firebaseUser.uid, // Use Firebase UID
         createdAt: new Date().toISOString(),
         password: userData.password, // Store password (demo only - use backend auth in production)
@@ -477,7 +485,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       
       // Verify save
       const verifyUsers = getAllUsers();
-      const verifyUser = verifyUsers.find(u => u.email === userData.email);
+      const verifyUser = verifyUsers.find(u => normalizeEmail(u.email) === normalizedEmail);
       console.log('✅ [DEBUG] User saved verification:', {
         found: !!verifyUser,
         email: verifyUser?.email,
@@ -505,10 +513,10 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       setOrders([]);
 
       console.log('✅ [DEBUG] ===== REGISTER COMPLETE =====');
-      return true;
+      return { success: true };
     } catch (error) {
       console.error('❌ [DEBUG] Error registering user:', error);
-      return false;
+      return { success: false, error: 'Erro ao criar conta. Tente novamente.' };
     }
   };
 

@@ -195,7 +195,7 @@ export const firebaseSyncService = {
       return userCredential.user;
     } catch (error: any) {
       console.error('❌ [FIREBASE AUTH] Registration error:', error);
-      throw new Error(error.message);
+      throw error;
     }
   },
 
@@ -209,7 +209,7 @@ export const firebaseSyncService = {
       return userCredential.user;
     } catch (error: any) {
       console.error('❌ [FIREBASE AUTH] Login error:', error);
-      throw new Error(error.message);
+      throw error;
     }
   },
 

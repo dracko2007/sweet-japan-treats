@@ -90,7 +90,7 @@ const Register: React.FC = () => {
 
     try {
       // Register user
-      const success = await registerUser({
+      const result = await registerUser({
         name: formData.name,
         email: formData.email,
         phone: formData.phone,
@@ -103,9 +103,9 @@ const Register: React.FC = () => {
         }
       });
 
-      console.log('🔍 [REGISTER DEBUG] registerUser returned:', success);
+      console.log('🔍 [REGISTER DEBUG] registerUser returned:', result);
 
-      if (success) {
+      if (result.success) {
         console.log('✅ [REGISTER DEBUG] Registration successful!');
         
         // Verify user was saved
@@ -132,7 +132,7 @@ const Register: React.FC = () => {
         console.log('❌ [REGISTER DEBUG] Registration failed - email already exists');
         toast({
           title: "Erro no cadastro",
-          description: "Este email já está cadastrado. Tente fazer login ou use outro email.",
+          description: result.error || "Não foi possível criar sua conta. Tente novamente.",
           variant: "destructive",
         });
       }
