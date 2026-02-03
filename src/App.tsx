@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { CartProvider } from "@/context/CartContext";
 import { UserProvider } from "@/context/UserContext";
-import { firebaseConfigReady, firebaseConfigSource } from "@/config/firebase";
+import { firebaseConfigReady, firebaseConfigSource, firebaseConfig } from "@/config/firebase";
 import Index from "./pages/Index";
 import Products from "./pages/Products";
 import Cart from "./pages/Cart";
@@ -33,6 +33,11 @@ const App = () => (
     <UserProvider>
       <CartProvider>
         <TooltipProvider>
+          {typeof window !== "undefined" && new URLSearchParams(window.location.search).get("debug") === "1" && (
+            <div className="bg-blue-600 text-white text-xs text-center py-2 px-4">
+              Firebase Debug — source: {firebaseConfigSource} | projectId: {firebaseConfig.projectId} | authDomain: {firebaseConfig.authDomain}
+            </div>
+          )}
           {!firebaseConfigReady && (
             <div className="bg-red-600 text-white text-sm text-center py-2 px-4">
               Firebase não configurado. Fonte: {firebaseConfigSource}. Verifique as variáveis VITE_FIREBASE_* no Vercel e faça redeploy.
