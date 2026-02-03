@@ -23,7 +23,15 @@ import {
   onAuthStateChanged
 } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
 
-import { auth, db } from '@/config/firebase';
+import { auth, db, firebaseConfigReady } from '@/config/firebase';
+
+const ensureFirebaseReady = () => {
+  if (!firebaseConfigReady || !auth || !db) {
+    const error: any = new Error('Firebase not configured');
+    error.code = 'auth/configuration-not-found';
+    throw error;
+  }
+};
 
 // Helper to remove undefined values
 const sanitizeData = (data: any): any => {
@@ -48,6 +56,7 @@ export const firebaseSyncService = {
    */
   async syncUserToFirestore(userId: string, userData: any) {
     try {
+      ensureFirebaseReady();
       const userRef = doc(db, 'users', userId);
       // Clean data before sending (Firestore doesn't like undefined)
       const cleanData = sanitizeData(userData);
@@ -70,6 +79,7 @@ export const firebaseSyncService = {
    */
   async getUserFromFirestore(userId: string) {
     try {
+      ensureFirebaseReady();
       const userRef = doc(db, 'users', userId);
       const userSnap = await getDoc(userRef);
       
@@ -88,6 +98,7 @@ export const firebaseSyncService = {
    */
   async getUserByEmail(email: string) {
     try {
+      ensureFirebaseReady();
       const usersRef = collection(db, 'users');
       const q = query(usersRef, where('email', '==', email));
       const querySnapshot = await getDocs(q);
@@ -108,6 +119,7 @@ export const firebaseSyncService = {
    */
   async syncOrderToFirestore(userId: string, order: any) {
     try {
+      ensureFirebaseReady();
       const orderRef = doc(db, 'orders', order.orderNumber);
       const cleanOrder = sanitizeData(order);
       
@@ -130,6 +142,7 @@ export const firebaseSyncService = {
    */
   async getOrdersFromFirestore(userId: string) {
     try {
+      ensureFirebaseReady();
       const ordersRef = collection(db, 'orders');
       const q = query(ordersRef, where('userId', '==', userId));
       const querySnapshot = await getDocs(q);
@@ -151,6 +164,7 @@ export const firebaseSyncService = {
    */
   async getAllOrdersFromFirestore() {
     try {
+      ensureFirebaseReady();
       const ordersRef = collection(db, 'orders');
       const querySnapshot = await getDocs(ordersRef);
       
@@ -171,6 +185,7 @@ export const firebaseSyncService = {
    */
   async updateOrderStatus(orderNumber: string, status: string) {
     try {
+      ensureFirebaseReady();
       const orderRef = doc(db, 'orders', orderNumber);
       await updateDoc(orderRef, {
         status,
@@ -190,6 +205,7 @@ export const firebaseSyncService = {
    */
   async registerUser(email: string, password: string) {
     try {
+      ensureFirebaseReady();
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       console.log('✅ [FIREBASE AUTH] User registered:', userCredential.user.uid);
       return userCredential.user;
@@ -204,6 +220,7 @@ export const firebaseSyncService = {
    */
   async loginUser(email: string, password: string) {
     try {
+      ensureFirebaseReady();
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       console.log('✅ [FIREBASE AUTH] User logged in:', userCredential.user.uid);
       return userCredential.user;
@@ -218,6 +235,7 @@ export const firebaseSyncService = {
    */
   async logoutUser() {
     try {
+      ensureFirebaseReady();
       await firebaseSignOut(auth);
       console.log('✅ [FIREBASE AUTH] User logged out');
       return true;
@@ -231,6 +249,10 @@ export const firebaseSyncService = {
    * Observa mudanças de autenticação
    */
   onAuthChange(callback: (user: any) => void) {
+    if (!firebaseConfigReady || !auth) {
+      console.warn('⚠️ [FIREBASE AUTH] onAuthChange skipped: Firebase not configured');
+      return () => undefined;
+    }
     return onAuthStateChanged(auth, callback);
   },
 

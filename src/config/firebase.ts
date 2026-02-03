@@ -17,13 +17,25 @@ const missingKeys = Object.entries(firebaseConfig)
   .filter(([, value]) => !value)
   .map(([key]) => key);
 
-if (missingKeys.length > 0) {
+const firebaseConfigReady = missingKeys.length === 0;
+
+if (!firebaseConfigReady) {
   console.error(`❌ Firebase config missing: ${missingKeys.join(', ')}. Configure VITE_FIREBASE_* env vars.`);
 }
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
+// Initialize Firebase (only if config is ready)
+let app: ReturnType<typeof initializeApp> | null = null;
+let auth: ReturnType<typeof getAuth> | null = null;
+let db: ReturnType<typeof getFirestore> | null = null;
 
-export { app, auth, db, firebaseConfig };
+if (firebaseConfigReady) {
+  try {
+    app = initializeApp(firebaseConfig);
+    auth = getAuth(app);
+    db = getFirestore(app);
+  } catch (error) {
+    console.error('❌ Firebase initialization failed:', error);
+  }
+}
+
+export { app, auth, db, firebaseConfig, firebaseConfigReady };
