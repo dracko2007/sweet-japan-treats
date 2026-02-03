@@ -3,6 +3,8 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebas
 import { getAuth } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
 import { getFirestore } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
 
+const firebaseDisabled = import.meta.env.VITE_DISABLE_FIREBASE === 'true';
+
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
@@ -17,7 +19,7 @@ const missingKeys = Object.entries(firebaseConfig)
   .filter(([, value]) => !value)
   .map(([key]) => key);
 
-const firebaseConfigReady = missingKeys.length === 0;
+const firebaseConfigReady = !firebaseDisabled && missingKeys.length === 0;
 
 if (!firebaseConfigReady) {
   console.error(`❌ Firebase config missing: ${missingKeys.join(', ')}. Configure VITE_FIREBASE_* env vars.`);

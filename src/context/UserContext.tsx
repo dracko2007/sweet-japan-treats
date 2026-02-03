@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { firebaseSyncService } from '@/services/firebaseSyncService';
+import { firebaseConfigReady } from '@/config/firebase';
 
 export interface UserProfile {
   id: string;
@@ -229,6 +230,23 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       return { success: true };
     }
     
+    if (!firebaseConfigReady) {
+      // Local-only login when Firebase is disabled/unavailable
+      const allUsers = getAllUsers();
+      const foundUser = allUsers.find(u => normalizeEmail(u.email) === normalizedEmail && u.password === password);
+      if (foundUser) {
+        setUser(foundUser);
+        setIsAuthenticated(true);
+        const userCoupons = getUserCoupons(foundUser.id);
+        const userOrders = getUserOrders(foundUser.id);
+        setCoupons(userCoupons);
+        setOrders(userOrders);
+        localStorage.setItem('user', JSON.stringify(foundUser));
+        return { success: true };
+      }
+      return { success: false, error: 'Email ou senha incorretos. Verifique seus dados ou cadastre-se.' };
+    }
+
     try {
       // Try to login with Firebase Auth first
       console.log('🔥 [LOGIN] Attempting Firebase Auth login...');
@@ -420,6 +438,27 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
         }
         console.error('❌ [DEBUG] Registration failed: User exists locally and password mismatch.');
         return { success: false, error: 'Este email já está cadastrado. Verifique a senha.' };
+      }
+
+      if (!firebaseConfigReady) {
+        // Local-only register when Firebase is disabled/unavailable
+        const newUser: UserProfile = {
+          ...userData,
+          email: normalizedEmail,
+          id: `user-${Date.now()}`,
+          createdAt: new Date().toISOString(),
+          password: userData.password,
+          orders: [],
+        };
+
+        const updatedUsers = [...allUsers, newUser];
+        saveAllUsers(updatedUsers);
+        setUser(newUser);
+        setIsAuthenticated(true);
+        setCoupons([]);
+        setOrders([]);
+        localStorage.setItem('user', JSON.stringify(newUser));
+        return { success: true };
       }
 
       // Register user in Firebase Auth
