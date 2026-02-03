@@ -280,6 +280,47 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       const foundUser = allUsers.find(u => u.email === email && u.password === password);
       
       if (foundUser) {
+        try {
+          // AUTO-MIGRATION: If local user exists but Firebase failed, try to CREATE Firebase account
+          console.log('🔄 [LOGIN] Auto-migrating local user to Firebase...');
+          const firebaseUser = await firebaseSyncService.registerUser(email, password);
+          
+          if (firebaseUser) {
+             // Sync user data to Firestore
+             const migratedUser = { ...foundUser, id: firebaseUser.uid };
+             await firebaseSyncService.syncUserToFirestore(firebaseUser.uid, migratedUser);
+             
+             // Sync orders if any
+             const userOrders = getUserOrders(foundUser.id);
+             for (const order of userOrders) {
+               await firebaseSyncService.syncOrderToFirestore(firebaseUser.uid, order);
+             }
+             
+             // Update local state with new ID
+             setUser(migratedUser);
+             setIsAuthenticated(true);
+             setCoupons(getUserCoupons(foundUser.id)); // Keep coupons
+             setOrders(userOrders);
+             
+             // Update in localStorage users database (replace old ID with new UID)
+             const updatedUsers = allUsers.map(u => u.email === email ? migratedUser : u);
+             saveAllUsers(updatedUsers);
+             
+             console.log('✅ [LOGIN] Auto-migration complete! User synced to cloud.');
+             return true;
+          }
+        } catch (migrationError: any) {
+          // If migration fails (e.g. email already exists in auth but not syncronized?)
+          console.warn('⚠️ [LOGIN] Auto-migration failed, falling back to local only:', migrationError.message);
+          
+          if (migrationError.message.includes('email-already-in-use')) {
+             // Edge case: Account exists in Auth but login failed previously (wrong password?)
+             // OR password is correct but login code above failed for network reasons?
+             // We just continue with local login.
+          }
+        }
+
+        // Standard local login (fallback)
         setUser(foundUser);
         setIsAuthenticated(true);
         
