@@ -34,11 +34,25 @@ const App = () => (
       <CartProvider>
         <TooltipProvider>
           {typeof window !== "undefined" && new URLSearchParams(window.location.search).get("debug") === "1" && (
-            <div className="bg-blue-700 text-white font-bold text-base text-center py-4 px-4 border-b-4 border-yellow-400">
-              🔍 FIREBASE DEBUG 🔍<br/>
-              Source: <span className="bg-yellow-400 text-black px-2 py-1 rounded">{firebaseConfigSource}</span> | 
-              ProjectId: <span className="bg-yellow-400 text-black px-2 py-1 rounded">{firebaseConfig.projectId}</span> | 
-              AuthDomain: <span className="bg-yellow-400 text-black px-2 py-1 rounded">{firebaseConfig.authDomain}</span>
+            <div style={{ 
+              backgroundColor: '#1e40af', 
+              color: 'white', 
+              padding: '20px', 
+              textAlign: 'center',
+              fontSize: '16px',
+              fontWeight: 'bold',
+              borderBottom: '4px solid yellow'
+            }}>
+              <div>DEBUG MODE ATIVO</div>
+              <div style={{ marginTop: '10px', backgroundColor: 'yellow', color: 'black', padding: '10px', display: 'inline-block' }}>
+                Source: {firebaseConfigSource}
+              </div>
+              <div style={{ marginTop: '10px', backgroundColor: 'yellow', color: 'black', padding: '10px', display: 'inline-block', marginLeft: '10px' }}>
+                Project: {firebaseConfig.projectId}
+              </div>
+              <div style={{ marginTop: '10px', backgroundColor: 'yellow', color: 'black', padding: '10px', display: 'inline-block', marginLeft: '10px' }}>
+                Auth: {firebaseConfig.authDomain}
+              </div>
             </div>
           )}
           {!firebaseConfigReady && (
