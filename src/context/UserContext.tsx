@@ -381,7 +381,21 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       const existingUser = allUsers.find(u => u.email === userData.email);
       
       if (existingUser) {
-        console.error('❌ [DEBUG] Registration failed: User already exists:', userData.email);
+        console.warn('⚠️ [DEBUG] User already exists locally. Attempting auto-login instead of register.');
+        if (existingUser.password === userData.password) {
+          setUser(existingUser);
+          setIsAuthenticated(true);
+          
+          const userCoupons = getUserCoupons(existingUser.id);
+          const userOrders = getUserOrders(existingUser.id);
+          
+          setCoupons(userCoupons);
+          setOrders(userOrders);
+          
+          localStorage.setItem('user', JSON.stringify(existingUser));
+          return true;
+        }
+        console.error('❌ [DEBUG] Registration failed: User exists locally and password mismatch.');
         return false;
       }
 
@@ -402,8 +416,18 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
              // Check if profile REALLY exists now that we are logged in
              const existingProfile = await firebaseSyncService.getUserFromFirestore(firebaseUser.uid);
              if (existingProfile) {
-                console.error('❌ [DEBUG] Registration failed: Profile actually exists.');
-                return false; // Real duplicate user
+               console.warn('⚠️ [DEBUG] Profile already exists. Logging in instead of registering.');
+               setUser(existingProfile as UserProfile);
+               setIsAuthenticated(true);
+                
+               const userCoupons = getUserCoupons((existingProfile as UserProfile).id);
+               const userOrders = getUserOrders((existingProfile as UserProfile).id);
+                
+               setCoupons(userCoupons);
+               setOrders(userOrders);
+                
+               localStorage.setItem('user', JSON.stringify(existingProfile));
+               return true; // Treat as login success
              }
              
              // If we are here, we have Auth but NO profile.
