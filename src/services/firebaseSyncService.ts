@@ -25,6 +25,23 @@ import {
 
 import { auth, db } from '@/config/firebase';
 
+// Helper to remove undefined values
+const sanitizeData = (data: any): any => {
+  if (data === null || data === undefined) return null;
+  if (Array.isArray(data)) return data.map(sanitizeData);
+  if (typeof data === 'object' && data !== null) {
+    if (data instanceof Date) return data.toISOString(); // Convert Dates to string
+    return Object.keys(data).reduce((acc, key) => {
+      const value = sanitizeData(data[key]);
+      if (value !== undefined) {
+        acc[key] = value;
+      }
+      return acc;
+    }, {} as any);
+  }
+  return data;
+};
+
 export const firebaseSyncService = {
   /**
    * Sincroniza usuário do localStorage para Firestore
@@ -32,8 +49,11 @@ export const firebaseSyncService = {
   async syncUserToFirestore(userId: string, userData: any) {
     try {
       const userRef = doc(db, 'users', userId);
+      // Clean data before sending (Firestore doesn't like undefined)
+      const cleanData = sanitizeData(userData);
+      
       await setDoc(userRef, {
-        ...userData,
+        ...cleanData,
         lastSyncAt: new Date().toISOString()
       }, { merge: true });
       
@@ -89,8 +109,10 @@ export const firebaseSyncService = {
   async syncOrderToFirestore(userId: string, order: any) {
     try {
       const orderRef = doc(db, 'orders', order.orderNumber);
+      const cleanOrder = sanitizeData(order);
+      
       await setDoc(orderRef, {
-        ...order,
+        ...cleanOrder,
         userId,
         syncedAt: new Date().toISOString()
       });

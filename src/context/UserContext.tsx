@@ -438,7 +438,16 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       
       // Save to Firestore
       console.log('🔥 [DEBUG] Saving user to Firestore...');
-      await firebaseSyncService.syncUserToFirestore(newUser.id, newUser);
+      const syncValues = await firebaseSyncService.syncUserToFirestore(newUser.id, newUser);
+      
+      if (!syncValues) {
+        console.error('❌ [CRITICAL] Failed to save user to Firestore. User created in Auth but has no profile.');
+        // Optional: Retry or delete Auth user? 
+        // For now, allow proceeding as we have local backup, and auto-migration in login creates Ghost User if needed.
+        // But warning is critical.
+      } else {
+        console.log('✅ [DEBUG] User successfully saved to Firestore');
+      }
       
       // Add new user to users database (localStorage for backup)
       const updatedUsers = [...allUsers, newUser];
