@@ -314,6 +314,13 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       console.log('⚠️ [LOGIN] Firebase Auth failed, trying localStorage...', error);
       
       const authCode = error?.code || '';
+      if (authCode.includes('api-key-not-valid')) {
+        return {
+          success: false,
+          error: 'API Key inválida. Confirme se a chave é do projeto correto e se não há restrições no Google Cloud (HTTP referrers). Depois faça redeploy.',
+          code: authCode
+        };
+      }
       const isConnectivityError = [
         'auth/unauthorized-domain',
         'auth/network-request-failed',
@@ -475,6 +482,9 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
         firebaseUser = await firebaseSyncService.registerUser(normalizedEmail, userData.password);
       } catch (authError: any) {
         // Handle "email already in use" error
+        if (authError.code && authError.code.includes('api-key-not-valid')) {
+          return { success: false, error: 'API Key inválida. Verifique se a chave é do projeto correto e se não há restrições no Google Cloud.' };
+        }
         if ((authError.code && authError.code.includes('email-already-in-use')) || (authError.message && authError.message.includes('email-already-in-use'))) {
            console.warn('⚠️ [DEBUG] Email already in use in Auth. Trying to recover/login...');
            // Try to login with the password provided
