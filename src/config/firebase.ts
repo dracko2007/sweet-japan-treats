@@ -7,13 +7,13 @@ const firebaseDisabled = import.meta.env.VITE_DISABLE_FIREBASE === 'true';
 const allowLocalOnly = import.meta.env.VITE_ALLOW_LOCAL_ONLY === 'true';
 
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyCKf6fYQQRk9VUPTZNcZ8gVEEn5sAdwr0g",
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "localstorage-98492.firebaseapp.com",
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "localstorage-98492",
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "localstorage-98492.appspot.com",
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "1087648598267",
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:1087648598267:web:fbfbc19ad31aa05839885e",
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || "G-BH2VFVJC2J"
 };
 
 const missingKeys = Object.entries(firebaseConfig)
