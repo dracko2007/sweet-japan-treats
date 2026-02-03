@@ -370,12 +370,8 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
         name: userData.name 
       });
       
-      // Check if user already exists in Firestore first
-      const existingFirebaseUser = await firebaseSyncService.getUserByEmail(userData.email);
-      if (existingFirebaseUser) {
-        console.error('❌ [DEBUG] Registration failed: User already exists in Firebase:', userData.email);
-        return false;
-      }
+      // Removed preemptive Firestore check to allow recovery of Ghost Users
+      // We rely on Auth uniqueness and the catch block below to handle duplicates
       
       // Check if user with this email already exists in the users database (localStorage)
       const allUsers = getAllUsers();
