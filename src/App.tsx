@@ -23,6 +23,7 @@ import TrackOrder from "./pages/TrackOrder";
 import ProductDetail from "./pages/ProductDetail";
 import NotFound from "./pages/NotFound";
 import FirebaseSync from "./pages/FirebaseSync";
+import SyncData from "./pages/SyncData";
 
 const queryClient = new QueryClient();
 
@@ -53,6 +54,7 @@ const App = () => (
               <Route path="/favoritos" element={<Wishlist />} />
               <Route path="/rastrear" element={<TrackOrder />} />
               <Route path="/firebase-sync" element={<FirebaseSync />} />
+              <Route path="/sync-data" element={<SyncData />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>

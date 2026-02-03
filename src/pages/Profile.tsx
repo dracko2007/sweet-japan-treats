@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, Mail, Phone, MapPin, Calendar, Gift, ShoppingBag, Edit2, LogOut, Package, RotateCcw } from 'lucide-react';
+import { User, Mail, Phone, MapPin, Calendar, Gift, ShoppingBag, Edit2, LogOut, Package, RotateCcw, Cloud } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -550,7 +550,15 @@ const Profile: React.FC = () => {
             </div>
 
             {/* Logout Button */}
-            <div className="flex justify-center pt-6">
+            <div className="flex flex-col sm:flex-row gap-3 justify-center pt-6">
+              <Button 
+                variant="outline" 
+                onClick={() => navigate('/sync-data')}
+                className="text-blue-600 hover:bg-blue-50"
+              >
+                <Cloud className="w-4 h-4 mr-2" />
+                Sincronizar Dados
+              </Button>
               <Button 
                 variant="outline" 
                 onClick={handleLogout}

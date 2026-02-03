@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { firebaseSyncService } from '@/services/firebaseSyncService';
 
 export interface UserProfile {
   id: string;
@@ -122,22 +123,49 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     localStorage.setItem(`orders_${userId}`, JSON.stringify(orders));
   };
 
-  // Load user data from localStorage on mount
+  // Load user data from localStorage on mount AND listen to Firebase auth
   useEffect(() => {
-    const storedUser = localStorage.getItem('user');
+    // Listener do Firebase Auth
+    const unsubscribe = firebaseSyncService.onAuthChange(async (firebaseUser) => {
+      if (firebaseUser) {
+        console.log('🔥 [FIREBASE] Auth state changed - user logged in:', firebaseUser.uid);
+        
+        // Busca dados do usuário no Firestore
+        const firestoreUser = await firebaseSyncService.getUserFromFirestore(firebaseUser.uid);
+        
+        if (firestoreUser) {
+          setUser(firestoreUser as UserProfile);
+          setIsAuthenticated(true);
+          
+          // Load user-specific coupons and orders from localStorage (temporariamente)
+          const userCoupons = getUserCoupons(firestoreUser.id);
+          const userOrders = getUserOrders(firestoreUser.id);
+          
+          setCoupons(userCoupons);
+          setOrders(userOrders);
+          
+          // Também salva no localStorage para backup
+          localStorage.setItem('user', JSON.stringify(firestoreUser));
+        }
+      } else {
+        console.log('🔥 [FIREBASE] Auth state changed - user logged out');
+        // Tenta carregar do localStorage como fallback
+        const storedUser = localStorage.getItem('user');
+        if (storedUser) {
+          const userData = JSON.parse(storedUser);
+          setUser(userData);
+          setIsAuthenticated(true);
+          
+          const userCoupons = getUserCoupons(userData.id);
+          const userOrders = getUserOrders(userData.id);
+          
+          setCoupons(userCoupons);
+          setOrders(userOrders);
+        }
+      }
+    });
 
-    if (storedUser) {
-      const userData = JSON.parse(storedUser);
-      setUser(userData);
-      setIsAuthenticated(true);
-      
-      // Load user-specific coupons and orders
-      const userCoupons = getUserCoupons(userData.id);
-      const userOrders = getUserOrders(userData.id);
-      
-      setCoupons(userCoupons);
-      setOrders(userOrders);
-    }
+    return () => unsubscribe();
   }, []);
 
   // Save current user session to localStorage
@@ -198,27 +226,73 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       return true;
     }
     
-    // Search in users database for matching credentials
-    const allUsers = getAllUsers();
-    console.log('🔍 Login attempt:', { email });
-    console.log('📦 Total users in database:', allUsers.length);
-    console.log('👥 All registered users:', allUsers.map(u => ({ email: u.email, id: u.id })));
-    
-    const foundUser = allUsers.find(u => u.email === email && u.password === password);
-    
-    if (foundUser) {
-      setUser(foundUser);
-      setIsAuthenticated(true);
+    try {
+      // Try to login with Firebase Auth first
+      console.log('🔥 [LOGIN] Attempting Firebase Auth login...');
+      const firebaseUser = await firebaseSyncService.loginUser(email, password);
       
-      // Load user-specific coupons and orders
-      const userCoupons = getUserCoupons(foundUser.id);
-      const userOrders = getUserOrders(foundUser.id);
+      // Get user data from Firestore
+      console.log('🔥 [LOGIN] Fetching user data from Firestore...');
+      let userData = await firebaseSyncService.getUserFromFirestore(firebaseUser.uid);
       
-      setCoupons(userCoupons);
-      setOrders(userOrders);
+      // If not in Firestore, check localStorage
+      if (!userData) {
+        console.log('⚠️ [LOGIN] User not in Firestore, checking localStorage...');
+        const allUsers = getAllUsers();
+        const localUser = allUsers.find(u => u.email === email);
+        
+        if (localUser) {
+          // Sync to Firestore
+          await firebaseSyncService.syncUserToFirestore(firebaseUser.uid, {
+            ...localUser,
+            id: firebaseUser.uid
+          });
+          userData = { ...localUser, id: firebaseUser.uid };
+        }
+      }
       
-      console.log('✅ User logged in successfully:', { email: foundUser.email, id: foundUser.id });
-      return true;
+      if (userData) {
+        setUser(userData as UserProfile);
+        setIsAuthenticated(true);
+        
+        // Load user-specific coupons and orders
+        const userCoupons = getUserCoupons(userData.id);
+        const userOrders = getUserOrders(userData.id);
+        
+        setCoupons(userCoupons);
+        setOrders(userOrders);
+        
+        // Also save to localStorage for backup
+        localStorage.setItem('user', JSON.stringify(userData));
+        
+        console.log('✅ User logged in successfully via Firebase:', { email: userData.email, id: userData.id });
+        return true;
+      }
+    } catch (error) {
+      console.log('⚠️ [LOGIN] Firebase Auth failed, trying localStorage...', error);
+      
+      // Fallback to localStorage
+      const allUsers = getAllUsers();
+      console.log('🔍 Login attempt (localStorage):', { email });
+      console.log('📦 Total users in database:', allUsers.length);
+      console.log('👥 All registered users:', allUsers.map(u => ({ email: u.email, id: u.id })));
+      
+      const foundUser = allUsers.find(u => u.email === email && u.password === password);
+      
+      if (foundUser) {
+        setUser(foundUser);
+        setIsAuthenticated(true);
+        
+        // Load user-specific coupons and orders
+        const userCoupons = getUserCoupons(foundUser.id);
+        const userOrders = getUserOrders(foundUser.id);
+        
+        setCoupons(userCoupons);
+        setOrders(userOrders);
+        
+        console.log('✅ User logged in successfully (localStorage):', { email: foundUser.email, id: foundUser.id });
+        return true;
+      }
     }
     
     console.log('❌ Login failed: User not found or incorrect password');
@@ -234,7 +308,14 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
         name: userData.name 
       });
       
-      // Check if user with this email already exists in the users database
+      // Check if user already exists in Firestore first
+      const existingFirebaseUser = await firebaseSyncService.getUserByEmail(userData.email);
+      if (existingFirebaseUser) {
+        console.error('❌ [DEBUG] Registration failed: User already exists in Firebase:', userData.email);
+        return false;
+      }
+      
+      // Check if user with this email already exists in the users database (localStorage)
       const allUsers = getAllUsers();
       console.log('🔍 [DEBUG] Total users before registration:', allUsers.length);
       console.log('🔍 [DEBUG] Existing user emails:', allUsers.map(u => u.email));
@@ -246,9 +327,13 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
         return false;
       }
 
+      // Register user in Firebase Auth
+      console.log('🔥 [DEBUG] Registering user in Firebase Auth...');
+      const firebaseUser = await firebaseSyncService.registerUser(userData.email, userData.password);
+      
       const newUser: UserProfile = {
         ...userData,
-        id: `user-${Date.now()}`,
+        id: firebaseUser.uid, // Use Firebase UID
         createdAt: new Date().toISOString(),
         password: userData.password, // Store password (demo only - use backend auth in production)
         orders: [], // Initialize empty orders array
@@ -260,7 +345,11 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
         hasOrders: Array.isArray(newUser.orders)
       });
       
-      // Add new user to users database
+      // Save to Firestore
+      console.log('🔥 [DEBUG] Saving user to Firestore...');
+      await firebaseSyncService.syncUserToFirestore(newUser.id, newUser);
+      
+      // Add new user to users database (localStorage for backup)
       const updatedUsers = [...allUsers, newUser];
       saveAllUsers(updatedUsers);
       
@@ -303,8 +392,11 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     }
   };
 
-  const logout = () => {
+  const logout = async () => {
     // Save current user's data before logging out (already done by useEffect)
+    // Logout from Firebase Auth
+    await firebaseSyncService.logoutUser();
+    
     // Just clear the current session
     setUser(null);
     setIsAuthenticated(false);
