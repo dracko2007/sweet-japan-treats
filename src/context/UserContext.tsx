@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { firebaseSyncService } from '@/services/firebaseSyncService';
-import { firebaseConfigReady } from '@/config/firebase';
+import { firebaseConfigReady, allowLocalOnly } from '@/config/firebase';
 
 export interface UserProfile {
   id: string;
@@ -230,7 +230,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       return { success: true };
     }
     
-    if (!firebaseConfigReady) {
+    if (!firebaseConfigReady && allowLocalOnly) {
       // Local-only login when Firebase is disabled/unavailable
       const allUsers = getAllUsers();
       const foundUser = allUsers.find(u => normalizeEmail(u.email) === normalizedEmail && u.password === password);
@@ -447,7 +447,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
         return { success: false, error: 'Este email já está cadastrado. Verifique a senha.' };
       }
 
-      if (!firebaseConfigReady) {
+      if (!firebaseConfigReady && allowLocalOnly) {
         // Local-only register when Firebase is disabled/unavailable
         const newUser: UserProfile = {
           ...userData,

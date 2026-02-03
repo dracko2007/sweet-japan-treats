@@ -4,6 +4,7 @@ import { getAuth } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth
 import { getFirestore } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
 
 const firebaseDisabled = import.meta.env.VITE_DISABLE_FIREBASE === 'true';
+const allowLocalOnly = import.meta.env.VITE_ALLOW_LOCAL_ONLY === 'true';
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -40,4 +41,4 @@ if (firebaseConfigReady) {
   }
 }
 
-export { app, auth, db, firebaseConfig, firebaseConfigReady };
+export { app, auth, db, firebaseConfig, firebaseConfigReady, firebaseDisabled, allowLocalOnly };
