@@ -35,28 +35,21 @@ const App = () => (
         <TooltipProvider>
           {typeof window !== "undefined" && new URLSearchParams(window.location.search).get("debug") === "1" && (
             <div style={{ 
-              backgroundColor: 'red', 
-              color: 'yellow', 
-              padding: '30px', 
-              textAlign: 'center',
-              fontSize: '24px',
-              fontWeight: 'bold',
-              borderBottom: '10px solid yellow',
-              fontFamily: 'Arial, sans-serif'
+              backgroundColor: '#dc2626', 
+              color: '#fef08a', 
+              padding: '20px', 
+              fontFamily: 'monospace',
+              fontSize: '14px',
+              lineHeight: '1.8'
             }}>
-              <h1 style={{ margin: 0, fontSize: '32px' }}>TESTE DEBUG BANNER</h1>
-              <p style={{ margin: '20px 0', fontSize: '20px' }}>
-                Source: {String(firebaseConfigSource || 'UNDEFINED')}
-              </p>
-              <p style={{ margin: '20px 0', fontSize: '20px' }}>
-                Project: {String(firebaseConfig?.projectId || 'UNDEFINED')}
-              </p>
-              <p style={{ margin: '20px 0', fontSize: '20px' }}>
-                Auth: {String(firebaseConfig?.authDomain || 'UNDEFINED')}
-              </p>
-              <p style={{ margin: '20px 0', fontSize: '20px' }}>
-                API Key: {String(firebaseConfig?.apiKey?.substring(0, 20) || 'UNDEFINED')}...
-              </p>
+              <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
+                <div style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '15px' }}>🔍 DEBUG FIREBASE</div>
+                <div><strong>Source:</strong> {String(firebaseConfigSource || 'UNDEFINED')}</div>
+                <div><strong>ProjectId:</strong> {String(firebaseConfig?.projectId || 'UNDEFINED')}</div>
+                <div><strong>AuthDomain:</strong> {String(firebaseConfig?.authDomain || 'UNDEFINED')}</div>
+                <div><strong>API Key (primeiros 30):</strong> {String(firebaseConfig?.apiKey?.substring(0, 30) || 'UNDEFINED')}...</div>
+                <div><strong>Storage Bucket:</strong> {String(firebaseConfig?.storageBucket || 'UNDEFINED')}</div>
+              </div>
             </div>
           )}
           {!firebaseConfigReady && (
