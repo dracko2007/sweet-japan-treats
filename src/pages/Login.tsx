@@ -39,9 +39,9 @@ const Login: React.FC = () => {
     setIsLoading(true);
 
     try {
-      const success = await login(formData.email, formData.password);
+      const result = await login(formData.email, formData.password);
 
-      if (success) {
+      if (result.success) {
         toast({
           title: "Login realizado!",
           description: "Bem-vindo(a) de volta!",
@@ -54,7 +54,7 @@ const Login: React.FC = () => {
       } else {
         toast({
           title: "Erro ao fazer login",
-          description: "Email ou senha incorretos. Verifique seus dados ou cadastre-se.",
+          description: result.error || "Email ou senha incorretos. Verifique seus dados ou cadastre-se.",
           variant: "destructive",
         });
       }

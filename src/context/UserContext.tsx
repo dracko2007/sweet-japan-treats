@@ -56,7 +56,7 @@ interface UserContextType {
   isAuthenticated: boolean;
   coupons: Coupon[];
   orders: Order[];
-  login: (email: string, password: string) => Promise<boolean>;
+  login: (email: string, password: string) => Promise<{ success: boolean; error?: string; code?: string }>;
   register: (userData: Omit<UserProfile, 'id' | 'createdAt' | 'password'> & { password: string }) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
   updateProfile: (userData: Partial<UserProfile>) => void;
@@ -193,7 +193,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     }
   }, [orders, user]);
 
-  const login = async (email: string, password: string): Promise<boolean> => {
+  const login = async (email: string, password: string): Promise<{ success: boolean; error?: string; code?: string }> => {
     const normalizedEmail = normalizeEmail(email);
     // Admin default - sempre disponível
     const ADMIN_EMAIL = 'dracko2007@gmail.com';
@@ -226,7 +226,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       setOrders(userOrders);
       
       console.log('✅ Admin logged in successfully');
-      return true;
+      return { success: true };
     }
     
     try {
@@ -290,10 +290,29 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
         localStorage.setItem('user', JSON.stringify(userData));
         
         console.log('✅ User logged in successfully via Firebase:', { email: userData.email, id: userData.id });
-        return true;
+        return { success: true };
       }
-    } catch (error) {
+    } catch (error: any) {
       console.log('⚠️ [LOGIN] Firebase Auth failed, trying localStorage...', error);
+      
+      const authCode = error?.code || '';
+      const isConnectivityError = [
+        'auth/unauthorized-domain',
+        'auth/network-request-failed',
+        'auth/invalid-api-key',
+        'auth/operation-not-allowed',
+        'auth/configuration-not-found'
+      ].some(code => authCode.includes(code));
+
+      if (isConnectivityError) {
+        const friendlyMessage = authCode.includes('unauthorized-domain')
+          ? `Domínio não autorizado no Firebase. Adicione ${window.location.hostname} em Authentication > Settings > Authorized domains.`
+          : authCode.includes('network-request-failed')
+            ? 'Falha de rede ao conectar no Firebase. Verifique sua conexão e tente novamente.'
+            : 'Erro de configuração do Firebase. Verifique as credenciais e o domínio autorizado.';
+
+        return { success: false, error: friendlyMessage, code: authCode };
+      }
       
       // Fallback to localStorage
       const allUsers = getAllUsers();
@@ -331,7 +350,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
              saveAllUsers(updatedUsers);
              
              console.log('✅ [LOGIN] Auto-migration complete! User synced to cloud.');
-             return true;
+             return { success: true };
           }
         } catch (migrationError: any) {
           // If migration fails (e.g. email already exists in auth but not syncronized?)
@@ -356,13 +375,13 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
         setOrders(userOrders);
         
         console.log('✅ User logged in successfully (localStorage):', { email: foundUser.email, id: foundUser.id });
-        return true;
+        return { success: true };
       }
     }
     
     console.log('❌ Login failed: User not found or incorrect password');
     console.log('💡 Hint: Did you register first? Check the Register page.');
-    return false;
+    return { success: false, error: 'Email ou senha incorretos. Verifique seus dados ou cadastre-se.' };
   };
 
   const register = async (userData: Omit<UserProfile, 'id' | 'createdAt' | 'password'> & { password: string }): Promise<{ success: boolean; error?: string }> => {
