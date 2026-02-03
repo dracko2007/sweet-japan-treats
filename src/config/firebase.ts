@@ -6,6 +6,16 @@ import { getFirestore } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase
 const firebaseDisabled = import.meta.env.VITE_DISABLE_FIREBASE === 'true';
 const allowLocalOnly = import.meta.env.VITE_ALLOW_LOCAL_ONLY === 'true';
 
+// Debug: Log all environment variables
+console.log('🔍 DEBUG ENV VARS:', {
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY ? 'SET' : 'MISSING',
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID ? 'SET' : 'MISSING',
+});
+
 const firebaseEnvConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
@@ -29,6 +39,8 @@ const firebaseFallbackConfig = {
 const missingEnvKeys = Object.entries(firebaseEnvConfig)
   .filter(([, value]) => !value)
   .map(([key]) => key);
+
+console.log('🔍 Missing env keys:', missingEnvKeys);
 
 const firebaseConfig = missingEnvKeys.length === 0 ? firebaseEnvConfig : firebaseFallbackConfig;
 
