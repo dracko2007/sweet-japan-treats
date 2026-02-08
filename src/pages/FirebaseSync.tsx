@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
+import { db as firebaseDb, auth as firebaseAuth } from '@/config/firebase';
+import { collection, doc, setDoc, getDocs } from 'firebase/firestore';
 
 export default function FirebaseSync() {
   const [logs, setLogs] = useState<Array<{ time: string; message: string; color: string }>>([]);
@@ -13,29 +15,14 @@ export default function FirebaseSync() {
 
   const initializeFirebase = async () => {
     try {
-      const { initializeApp } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js');
-      const { getAuth } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js');
-      const { getFirestore } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js');
-
-      const firebaseConfig = {
-        apiKey: "AIzaSyCKf6fYQQRk9VUPTzNr28gVEEn5sAdwr0g",
-        authDomain: "localstorage-98492.firebaseapp.com",
-        projectId: "localstorage-98492",
-        storageBucket: "localstorage-98492.firebasestorage.app",
-        messagingSenderId: "1087648598267",
-        appId: "1:1087648598267:web:fbfbc19ad31aa05839885e",
-        measurementId: "G-BH2VFVJC2J"
-      };
-
-      const app = initializeApp(firebaseConfig);
-      const authInstance = getAuth(app);
-      const dbInstance = getFirestore(app);
-
-      setAuth(authInstance);
-      setDb(dbInstance);
+      if (!firebaseDb || !firebaseAuth) {
+        throw new Error('Firebase not initialized');
+      }
+      setAuth(firebaseAuth);
+      setDb(firebaseDb);
 
       addLog('✅ Firebase inicializado com sucesso', '#22c55e');
-      setTimeout(() => testConnection(dbInstance), 500);
+      setTimeout(() => testConnection(firebaseDb), 500);
     } catch (error: any) {
       addLog('❌ Erro ao inicializar Firebase: ' + error.message, '#ef4444');
     }
@@ -66,7 +53,6 @@ export default function FirebaseSync() {
       addLog('🔍 Testando conexão com Firebase...', '#3b82f6');
       showStatus('🔄 Testando conexão...', 'info');
 
-      const { collection } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js');
       const testCollection = collection(database, 'test');
       addLog('✅ Firestore conectado!', '#22c55e');
       addLog('✅ Authentication conectado!', '#22c55e');
@@ -108,8 +94,6 @@ export default function FirebaseSync() {
       const users = JSON.parse(usersData);
       const userCount = Object.keys(users).length;
       addLog(`📊 Migrando ${userCount} usuários...`, '#06b6d4');
-
-      const { doc, setDoc } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js');
 
       let migratedUsers = 0;
       let migratedOrders = 0;
@@ -190,8 +174,6 @@ export default function FirebaseSync() {
     try {
       addLog('👀 Buscando dados do Firestore...', '#3b82f6');
       showStatus('🔄 Carregando dados...', 'info');
-
-      const { collection, getDocs } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js');
 
       const usersSnapshot = await getDocs(collection(db, 'users'));
       addLog(`📊 Usuários na nuvem: ${usersSnapshot.size}`, '#06b6d4');

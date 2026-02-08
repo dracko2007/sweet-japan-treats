@@ -1,12 +1,9 @@
 // Firebase Configuration and Initialization
-import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
-import { getAuth } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
-import { getFirestore } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+import { initializeApp } from 'firebase/app';
+import { getAuth } from 'firebase/auth';
+import { getFirestore } from 'firebase/firestore';
 
-const firebaseDisabled = import.meta.env.VITE_DISABLE_FIREBASE === 'true';
-const allowLocalOnly = import.meta.env.VITE_ALLOW_LOCAL_ONLY === 'true';
-
-// Firebase Configuration - Using direct config (Vercel env vars not being injected properly)
+// Firebase Configuration
 const firebaseConfig = {
   apiKey: "AIzaSyCKf6fYQQRk9VUPTZNcZ8gVEEn5sAdwr0g",
   authDomain: "localstorage-98492.firebaseapp.com",
@@ -19,8 +16,8 @@ const firebaseConfig = {
 
 const firebaseConfigReady = true;
 const firebaseConfigSource = 'direct-config';
-const firebaseDisabled = false;
-const allowLocalOnly = false;
+const firebaseDisabled = import.meta.env.VITE_DISABLE_FIREBASE === 'true';
+const allowLocalOnly = import.meta.env.VITE_ALLOW_LOCAL_ONLY === 'true';
 
 // Initialize Firebase
 let app: ReturnType<typeof initializeApp> | null = null;
