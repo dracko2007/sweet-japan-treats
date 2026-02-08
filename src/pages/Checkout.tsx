@@ -62,6 +62,15 @@ const Checkout: React.FC = () => {
     
     setAppliedCoupon(coupon);
     setCouponDiscount(discount);
+    
+    // If coupon gives free shipping, override shipping cost
+    if (coupon.freeShipping && selectedShipping) {
+      setSelectedShipping({
+        ...selectedShipping,
+        cost: 0,
+        carrier: selectedShipping.carrier + ' (Frete Grátis - Cupom)',
+      });
+    }
   };
 
   const handleCouponRemove = () => {

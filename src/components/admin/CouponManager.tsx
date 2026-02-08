@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Tag, Plus, Trash2, Edit2, Calendar, Percent, DollarSign, Check, X } from 'lucide-react';
+import { Tag, Plus, Trash2, Edit2, Calendar, Percent, DollarSign, Check, X, Gift, Star, Users, Truck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -20,6 +20,10 @@ const CouponManager: React.FC = () => {
     expiryDate: '',
     usageLimit: 0,
     description: '',
+    targetType: 'all' as 'all' | 'specific' | 'birthday' | 'loyalty',
+    targetEmails: '',
+    minOrders: 0,
+    freeShipping: false,
   });
 
   useEffect(() => {
@@ -33,10 +37,10 @@ const CouponManager: React.FC = () => {
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value, type } = e.target;
+    const { name, value, type, checked } = e.target;
     setFormData(prev => ({
       ...prev,
-      [name]: type === 'number' ? Number(value) : value
+      [name]: type === 'checkbox' ? checked : type === 'number' ? Number(value) : value
     }));
   };
 
@@ -84,6 +88,10 @@ const CouponManager: React.FC = () => {
         usageLimit: formData.usageLimit || undefined,
         description: formData.description || 'Cupom de desconto',
         isActive: true,
+        targetType: formData.targetType,
+        targetEmails: formData.targetType === 'specific' && formData.targetEmails ? formData.targetEmails.split(',').map(e => e.trim()).filter(Boolean) : undefined,
+        minOrders: formData.targetType === 'loyalty' ? formData.minOrders : undefined,
+        freeShipping: formData.freeShipping,
       });
 
       toast({
@@ -99,6 +107,10 @@ const CouponManager: React.FC = () => {
         expiryDate: '',
         usageLimit: 0,
         description: '',
+        targetType: 'all',
+        targetEmails: '',
+        minOrders: 0,
+        freeShipping: false,
       });
       setIsCreating(false);
       loadCoupons();
@@ -251,6 +263,73 @@ const CouponManager: React.FC = () => {
                   placeholder="Ex: Cupom de boas-vindas"
                 />
               </div>
+
+              {/* Targeting */}
+              <div className="space-y-2 md:col-span-2">
+                <Label>Quem pode usar este cupom?</Label>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { value: 'all', label: 'Todos', icon: <Users className="w-4 h-4 mr-1" /> },
+                    { value: 'specific', label: 'Clientes Específicos', icon: <Tag className="w-4 h-4 mr-1" /> },
+                    { value: 'birthday', label: 'Aniversariantes do Mês', icon: <Gift className="w-4 h-4 mr-1" /> },
+                    { value: 'loyalty', label: 'Fidelidade (Qtd Pedidos)', icon: <Star className="w-4 h-4 mr-1" /> },
+                  ].map(opt => (
+                    <Button
+                      key={opt.value}
+                      type="button"
+                      variant={formData.targetType === opt.value ? 'default' : 'outline'}
+                      onClick={() => setFormData(prev => ({ ...prev, targetType: opt.value as any }))}
+                      className="flex items-center"
+                      size="sm"
+                    >
+                      {opt.icon}
+                      {opt.label}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+
+              {formData.targetType === 'specific' && (
+                <div className="space-y-2 md:col-span-2">
+                  <Label htmlFor="targetEmails">Emails dos clientes (separados por vírgula)</Label>
+                  <Input
+                    id="targetEmails"
+                    name="targetEmails"
+                    value={formData.targetEmails}
+                    onChange={handleInputChange}
+                    placeholder="email1@exemplo.com, email2@exemplo.com"
+                  />
+                </div>
+              )}
+
+              {formData.targetType === 'loyalty' && (
+                <div className="space-y-2">
+                  <Label htmlFor="minOrders">Mínimo de pedidos no histórico</Label>
+                  <Input
+                    id="minOrders"
+                    name="minOrders"
+                    type="number"
+                    min="1"
+                    value={formData.minOrders}
+                    onChange={handleInputChange}
+                  />
+                </div>
+              )}
+
+              {/* Free Shipping option */}
+              <div className="space-y-2 md:col-span-2">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    name="freeShipping"
+                    checked={formData.freeShipping}
+                    onChange={handleInputChange}
+                    className="w-4 h-4 rounded border-gray-300"
+                  />
+                  <Truck className="w-4 h-4 text-primary" />
+                  <span className="text-sm font-medium">Frete Grátis (cupom dá frete grátis ao invés de desconto no valor)</span>
+                </label>
+              </div>
             </div>
 
             <div className="flex gap-2 justify-end">
@@ -310,14 +389,28 @@ const CouponManager: React.FC = () => {
                       )}
                     </div>
                     <p className="text-muted-foreground mb-4">{coupon.description}</p>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
                       <div>
                         <p className="text-muted-foreground text-xs mb-1">Desconto</p>
                         <p className="font-semibold">
-                          {coupon.type === 'percent'
+                          {coupon.freeShipping ? '🚚 Frete Grátis' : coupon.type === 'percent'
                             ? `${coupon.discountPercent}%`
                             : `¥${coupon.discount.toLocaleString()}`}
                         </p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground text-xs mb-1">Público</p>
+                        <p className="font-semibold flex items-center gap-1">
+                          {(!coupon.targetType || coupon.targetType === 'all') && <><Users className="w-3 h-3" /> Todos</>}
+                          {coupon.targetType === 'specific' && <><Tag className="w-3 h-3" /> Específico</>}
+                          {coupon.targetType === 'birthday' && <><Gift className="w-3 h-3" /> Aniversário</>}
+                          {coupon.targetType === 'loyalty' && <><Star className="w-3 h-3" /> {coupon.minOrders}+ pedidos</>}
+                        </p>
+                        {coupon.targetType === 'specific' && coupon.targetEmails && (
+                          <p className="text-xs text-muted-foreground mt-1 truncate max-w-[180px]" title={coupon.targetEmails.join(', ')}>
+                            {coupon.targetEmails.join(', ')}
+                          </p>
+                        )}
                       </div>
                       <div>
                         <p className="text-muted-foreground text-xs mb-1">Validade</p>

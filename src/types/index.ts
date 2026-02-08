@@ -41,4 +41,9 @@ export interface Coupon {
   usedCount: number;
   description: string;
   createdAt: string;
+  // Targeting rules
+  targetType?: 'all' | 'specific' | 'birthday' | 'loyalty'; // Quem pode usar
+  targetEmails?: string[]; // Lista de emails específicos (quando targetType = 'specific')
+  minOrders?: number; // Mínimo de pedidos no histórico (quando targetType = 'loyalty')
+  freeShipping?: boolean; // Se o cupom dá frete grátis em vez de desconto
 }

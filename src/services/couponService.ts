@@ -57,6 +57,10 @@ const loadCouponsFromFirestore = async (): Promise<Coupon[]> => {
         usedCount: data.usedCount || 0,
         description: data.description || '',
         createdAt: data.createdAt || new Date().toISOString(),
+        targetType: data.targetType || 'all',
+        targetEmails: data.targetEmails || undefined,
+        minOrders: data.minOrders || undefined,
+        freeShipping: data.freeShipping || false,
       });
     });
     
@@ -120,6 +124,35 @@ const checkUsageFromFirestore = async (couponCode: string, userEmail: string): P
 };
 
 export const couponService = {
+  // Check if a coupon is eligible for a given user based on targeting rules
+  checkTargetEligibility: (coupon: Coupon, userEmail?: string, userBirthdate?: string, userTotalOrders?: number): boolean => {
+    const targetType = coupon.targetType || 'all';
+    
+    if (targetType === 'all') return true;
+    
+    if (targetType === 'specific') {
+      // Only specific emails can use this coupon
+      if (!userEmail || !coupon.targetEmails?.length) return false;
+      return coupon.targetEmails.some(e => e.toLowerCase() === userEmail.toLowerCase());
+    }
+    
+    if (targetType === 'birthday') {
+      // Only users whose birthday month matches current month
+      if (!userBirthdate) return false;
+      const now = new Date();
+      const birthDate = new Date(userBirthdate);
+      return birthDate.getMonth() === now.getMonth();
+    }
+    
+    if (targetType === 'loyalty') {
+      // Only users with at least N total orders
+      const minOrders = coupon.minOrders || 1;
+      return (userTotalOrders || 0) >= minOrders;
+    }
+    
+    return true;
+  },
+
   // Get all coupons from localStorage (sync/fast)
   getAll: (): Coupon[] => {
     const stored = localStorage.getItem(STORAGE_KEY);

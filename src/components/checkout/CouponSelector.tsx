@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Tag, X, Check } from 'lucide-react';
+import { Tag, X, Check, Gift, Truck, Star } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { couponService } from '@/services/couponService';
@@ -23,7 +23,7 @@ const CouponSelector: React.FC<CouponSelectorProps> = ({
 }) => {
   const [availableCoupons, setAvailableCoupons] = useState<Coupon[]>([]);
   const [showCoupons, setShowCoupons] = useState(false);
-  const { user } = useUser();
+  const { user, orders } = useUser();
   const { toast } = useToast();
 
   // Reload coupons when user changes or when returning from order
@@ -35,10 +35,17 @@ const CouponSelector: React.FC<CouponSelectorProps> = ({
     // Load latest coupons from Firestore first (so client sees admin-created ones)
     const active = await couponService.getActiveAsync();
     const userEmail = user?.email || '';
+    const userBirthdate = user?.birthdate || '';
+    const userTotalOrders = orders?.length || 0;
     
-    // Filter coupons: check both localStorage AND Firestore
+    // Filter coupons: check targeting, then usage
     const filtered: typeof active = [];
     for (const coupon of active) {
+      // Check targeting eligibility first
+      if (!couponService.checkTargetEligibility(coupon, userEmail, userBirthdate, userTotalOrders)) {
+        continue;
+      }
+      
       // Check localStorage first (fast)
       const usedBy = couponService.getCouponUsage(coupon.code);
       if (usedBy.includes(userEmail)) continue;
@@ -110,11 +117,21 @@ const CouponSelector: React.FC<CouponSelectorProps> = ({
                       >
                         <div className="flex items-start justify-between">
                           <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-1">
+                            <div className="flex items-center gap-2 mb-1 flex-wrap">
                               <span className="font-bold text-primary">{coupon.code}</span>
                               <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300">
-                                -{discountText}
+                                {coupon.freeShipping ? '🚚 Frete Grátis' : `-${discountText}`}
                               </span>
+                              {coupon.targetType === 'birthday' && (
+                                <span className="text-xs px-2 py-0.5 rounded-full bg-pink-100 dark:bg-pink-900 text-pink-700 dark:text-pink-300 flex items-center gap-1">
+                                  <Gift className="w-3 h-3" /> Aniversário
+                                </span>
+                              )}
+                              {coupon.targetType === 'loyalty' && (
+                                <span className="text-xs px-2 py-0.5 rounded-full bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300 flex items-center gap-1">
+                                  <Star className="w-3 h-3" /> Fidelidade
+                                </span>
+                              )}
                             </div>
                             <p className="text-sm text-muted-foreground mb-1">
                               {coupon.description}
