@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, Mail, Phone, MapPin, Calendar, Gift, ShoppingBag, Edit2, LogOut, Package, RotateCcw, Cloud } from 'lucide-react';
+import { User, Mail, Phone, MapPin, Calendar, Gift, ShoppingBag, Edit2, LogOut, Package, RotateCcw, Cloud, Truck, Tag } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -571,10 +571,51 @@ const Profile: React.FC = () => {
                             <span className="text-muted-foreground">
                               {item.productName} ({item.size}) × {item.quantity}
                             </span>
-                            <span className="font-medium">¥{item.price.toLocaleString()}</span>
+                            <span className="font-medium">¥{(item.price * item.quantity).toLocaleString()}</span>
                           </div>
                         ))}
                       </div>
+
+                      {/* Order breakdown: subtotal, coupon, shipping, total */}
+                      {(() => {
+                        const itemsSubtotal = order.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+                        const discount = (order as any).couponDiscount || (itemsSubtotal > order.totalAmount ? itemsSubtotal - order.totalAmount : 0);
+                        const shippingData = (order as any).shipping;
+                        const shippingCost = shippingData?.cost ?? null;
+                        const carrierName = shippingData?.carrier || '';
+                        const couponCode = (order as any).couponCode || (order as any).appliedCoupon?.code || '';
+                        
+                        return (
+                          <div className="mt-2 pt-2 border-t border-border space-y-1 text-sm">
+                            <div className="flex justify-between text-muted-foreground">
+                              <span>Subtotal</span>
+                              <span>¥{itemsSubtotal.toLocaleString()}</span>
+                            </div>
+                            {discount > 0 && (
+                              <div className="flex justify-between text-green-600">
+                                <span className="flex items-center gap-1">
+                                  <Tag className="w-3 h-3" />
+                                  Cupom {couponCode && <span className="font-mono text-xs">({couponCode})</span>}
+                                </span>
+                                <span>-¥{discount.toLocaleString()}</span>
+                              </div>
+                            )}
+                            {shippingCost != null && (
+                              <div className="flex justify-between text-muted-foreground">
+                                <span className="flex items-center gap-1">
+                                  <Truck className="w-3 h-3" />
+                                  Frete {carrierName && <span className="text-xs">({carrierName})</span>}
+                                </span>
+                                <span>{shippingCost === 0 ? <span className="text-green-600">Grátis</span> : `¥${shippingCost.toLocaleString()}`}</span>
+                              </div>
+                            )}
+                            <div className="flex justify-between font-semibold pt-1 border-t border-border">
+                              <span>Total</span>
+                              <span className="text-primary">¥{order.totalAmount.toLocaleString()}</span>
+                            </div>
+                          </div>
+                        );
+                      })()}
 
                       <div className="mt-3 pt-3 border-t border-border">
                         <div className="flex items-center justify-between">
