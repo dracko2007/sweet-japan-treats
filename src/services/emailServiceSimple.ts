@@ -251,6 +251,7 @@ Tel: ${orderData.formData.phone}
         shipping_cost: '¥0',
         payment_method: 'Já pago',
         phone: '-',
+        message: params.html_content,
       };
       
       console.log('📤 Sending tracking email via EmailJS...');

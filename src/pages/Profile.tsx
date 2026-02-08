@@ -500,32 +500,60 @@ const Profile: React.FC = () => {
                       </div>
 
                       {/* Tracking Info */}
-                      {order.status === 'shipped' && (order as any).trackingNumber && (
-                        <div className="mb-3 p-3 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800">
-                          <div className="flex items-center gap-2 mb-1">
-                            <Package className="w-4 h-4 text-blue-600" />
-                            <span className="text-sm font-semibold text-blue-800 dark:text-blue-200">Rastreamento</span>
-                          </div>
-                          <p className="text-sm text-blue-700 dark:text-blue-300 font-mono">
-                            Código: {(order as any).trackingNumber}
-                          </p>
-                          {(order as any).carrier && (
-                            <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
-                              Transportadora: {(order as any).carrier}
+                      {order.status === 'shipped' && (order as any).trackingNumber && (() => {
+                        const trackingNumber = (order as any).trackingNumber;
+                        const carrierRaw = (order as any).carrier || (order as any).shipping?.carrier || '';
+                        
+                        // Derive carrier display name
+                        const getCarrierName = (c: string) => {
+                          const lc = c.toLowerCase();
+                          if (lc.includes('yamato') || lc.includes('クロネコ')) return 'Yamato Transport (クロネコヤマト)';
+                          if (lc.includes('sagawa') || lc.includes('佐川')) return 'Sagawa Express (佐川急便)';
+                          if (lc.includes('japan post') || lc.includes('ゆうパック') || lc.includes('post')) return 'Japan Post (日本郵便)';
+                          if (lc.includes('fukutsu') || lc.includes('福通')) return 'Fukutsu Express (福山通運)';
+                          return c;
+                        };
+                        
+                        // Derive tracking URL (use saved or reconstruct)
+                        const getTrackingUrl = (c: string, tn: string) => {
+                          const lc = c.toLowerCase();
+                          if (lc.includes('yamato') || lc.includes('クロネコ')) return `https://toi.kuronekoyamato.co.jp/cgi-bin/tneko?number=${tn}`;
+                          if (lc.includes('sagawa') || lc.includes('佐川')) return `https://k2k.sagawa-exp.co.jp/p/web/okurijosearch.do?okurijoNo=${tn}`;
+                          if (lc.includes('japan post') || lc.includes('ゆうパック') || lc.includes('post')) return `https://trackings.post.japanpost.jp/services/srv/search/?requestNo1=${tn}&locale=ja`;
+                          if (lc.includes('fukutsu') || lc.includes('福通')) return `https://corp.fukutsu.co.jp/situation/tracking_no_hunt.html?tracking_no=${tn}`;
+                          return '';
+                        };
+                        
+                        const carrierName = getCarrierName(carrierRaw);
+                        const trackingUrl = (order as any).trackingUrl || getTrackingUrl(carrierRaw, trackingNumber);
+                        
+                        return (
+                          <div className="mb-3 p-3 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800">
+                            <div className="flex items-center gap-2 mb-1">
+                              <Package className="w-4 h-4 text-blue-600" />
+                              <span className="text-sm font-semibold text-blue-800 dark:text-blue-200">Rastreamento</span>
+                            </div>
+                            <p className="text-sm text-blue-700 dark:text-blue-300 font-mono">
+                              Código: {trackingNumber}
                             </p>
-                          )}
-                          {(order as any).trackingUrl && (
-                            <a
-                              href={(order as any).trackingUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 mt-2 px-3 py-1.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
-                            >
-                              🔍 Rastrear Pedido
-                            </a>
-                          )}
-                        </div>
-                      )}
+                            {carrierName && (
+                              <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                                Transportadora: {carrierName}
+                              </p>
+                            )}
+                            {trackingUrl && (
+                              <a
+                                href={trackingUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 mt-2 px-3 py-1.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                              >
+                                🔍 Rastrear Pedido
+                              </a>
+                            )}
+                          </div>
+                        );
+                      })()}
 
                       <div className="space-y-2">
                         {order.items.map((item, idx) => (

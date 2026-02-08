@@ -182,7 +182,8 @@ const OrderConfirmation: React.FC = () => {
           totalAmount: finalTotal,
           paymentMethod: orderData.paymentMethod,
           status: 'pending',
-          shippingAddress: newOrder.shippingAddress
+          shippingAddress: newOrder.shippingAddress,
+          shipping: orderData.shipping,
         });
       } else {
         console.log('⚠️ [DEBUG] User is NOT authenticated, skipping context save');

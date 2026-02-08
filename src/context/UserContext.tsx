@@ -45,6 +45,11 @@ export interface Order {
   trackingNumber?: string;
   trackingUrl?: string;
   carrier?: string;
+  shipping?: {
+    carrier: string;
+    cost: number;
+    estimatedDays?: string;
+  };
   shippingAddress: {
     name: string;
     postalCode: string;
@@ -166,6 +171,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
         ...(o.carrier && { carrier: o.carrier }),
         ...(o.shipping && { shipping: o.shipping }),
       })) as Order[];
+      // Note: shipping field contains { carrier, cost, estimatedDays }
     } catch (err) {
       console.warn('⚠️ [SYNC] Could not load orders from Firestore:', err);
       return [];
