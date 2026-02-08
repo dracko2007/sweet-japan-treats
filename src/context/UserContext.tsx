@@ -153,25 +153,62 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     console.log('✅ [SYNC] Local orders synced to Firestore');
   };
 
+  // Helper: fix old tracking URLs to use the correct format (direct results)
+  const fixTrackingUrl = (order: any): any => {
+    const trackingNumber = order.trackingNumber;
+    const savedUrl = order.trackingUrl || '';
+    let carrier = order.carrier || order.shipping?.carrier || '';
+    
+    // Detect carrier from saved URL if carrier field is empty
+    if (!carrier && savedUrl) {
+      if (savedUrl.includes('kuronekoyamato')) carrier = 'Yamato';
+      else if (savedUrl.includes('sagawa')) carrier = 'Sagawa';
+      else if (savedUrl.includes('japanpost')) carrier = 'Japan Post';
+      else if (savedUrl.includes('fukutsu')) carrier = 'Fukutsu';
+    }
+    
+    if (!trackingNumber || !carrier) return order;
+    
+    const lc = carrier.toLowerCase();
+    let newUrl = '';
+    if (lc.includes('yamato') || lc.includes('クロネコ')) {
+      newUrl = `https://toi.kuronekoyamato.co.jp/cgi-bin/tneko?number00=1&number01=${trackingNumber}`;
+    } else if (lc.includes('sagawa') || lc.includes('佐川')) {
+      newUrl = `https://k2k.sagawa-exp.co.jp/p/web/okurijosearch.do?okurijoNo=${trackingNumber}`;
+    } else if (lc.includes('japan post') || lc.includes('ゆうパック') || lc.includes('post')) {
+      newUrl = `https://trackings.post.japanpost.jp/services/srv/search?requestNo1=${trackingNumber}&requestNo2=&requestNo3=&requestNo4=&requestNo5=&requestNo6=&requestNo7=&requestNo8=&requestNo9=&requestNo10=&locale=ja`;
+    } else if (lc.includes('fukutsu') || lc.includes('福通')) {
+      newUrl = `https://corp.fukutsu.co.jp/situation/tracking_no_hunt.html?tracking_no=${trackingNumber}`;
+    }
+    
+    if (newUrl) {
+      return { ...order, trackingUrl: newUrl, carrier: carrier };
+    }
+    return order;
+  };
+
   // Helper: load orders from Firestore for a user
   const loadOrdersFromFirestore = async (userId: string): Promise<Order[]> => {
     try {
       const firestoreOrders = await firebaseSyncService.getOrdersFromFirestore(userId);
-      return firestoreOrders.map((o: any) => ({
-        id: o.id || o.orderNumber,
-        orderNumber: o.orderNumber || o.id,
-        date: o.date || o.orderDate || o.syncedAt,
-        items: o.items || [],
-        totalAmount: o.totalAmount || o.totalPrice || 0,
-        paymentMethod: o.paymentMethod || '',
-        status: o.status || 'pending',
-        shippingAddress: o.shippingAddress || {},
-        ...(o.trackingNumber && { trackingNumber: o.trackingNumber }),
-        ...(o.trackingUrl && { trackingUrl: o.trackingUrl }),
-        ...(o.carrier && { carrier: o.carrier }),
-        ...(o.shipping && { shipping: o.shipping }),
-      })) as Order[];
-      // Note: shipping field contains { carrier, cost, estimatedDays }
+      return firestoreOrders.map((o: any) => {
+        const mapped = {
+          id: o.id || o.orderNumber,
+          orderNumber: o.orderNumber || o.id,
+          date: o.date || o.orderDate || o.syncedAt,
+          items: o.items || [],
+          totalAmount: o.totalAmount || o.totalPrice || 0,
+          paymentMethod: o.paymentMethod || '',
+          status: o.status || 'pending',
+          shippingAddress: o.shippingAddress || {},
+          ...(o.trackingNumber && { trackingNumber: o.trackingNumber }),
+          ...(o.trackingUrl && { trackingUrl: o.trackingUrl }),
+          ...(o.carrier && { carrier: o.carrier }),
+          ...(o.shipping && { shipping: o.shipping }),
+        };
+        // Fix old tracking URLs to use correct format
+        return fixTrackingUrl(mapped);
+      }) as Order[];
     } catch (err) {
       console.warn('⚠️ [SYNC] Could not load orders from Firestore:', err);
       return [];
@@ -186,11 +223,11 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     // Local orders: merge but keep Firestore tracking fields if they exist
     local.forEach(o => {
       if (!map.has(o.orderNumber)) {
-        map.set(o.orderNumber, o);
+        map.set(o.orderNumber, fixTrackingUrl(o));
       } else {
         // Firestore already has this order — keep Firestore version (has tracking data)
         const existing = map.get(o.orderNumber)!;
-        map.set(o.orderNumber, { ...o, ...existing });
+        map.set(o.orderNumber, fixTrackingUrl({ ...o, ...existing }));
       }
     });
     return Array.from(map.values()).sort((a, b) =>
@@ -209,7 +246,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
         setUser(userData);
         setIsAuthenticated(true);
         const userCoupons = getUserCoupons(userData.id);
-        const userOrders = getUserOrders(userData.id);
+        const userOrders = getUserOrders(userData.id).map(fixTrackingUrl);
         setCoupons(userCoupons);
         setOrders(userOrders);
       } catch (e) {
