@@ -161,6 +161,10 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
         paymentMethod: o.paymentMethod || '',
         status: o.status || 'pending',
         shippingAddress: o.shippingAddress || {},
+        ...(o.trackingNumber && { trackingNumber: o.trackingNumber }),
+        ...(o.trackingUrl && { trackingUrl: o.trackingUrl }),
+        ...(o.carrier && { carrier: o.carrier }),
+        ...(o.shipping && { shipping: o.shipping }),
       })) as Order[];
     } catch (err) {
       console.warn('⚠️ [SYNC] Could not load orders from Firestore:', err);
@@ -168,13 +172,21 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     }
   };
 
-  // Merge local + Firestore orders (deduplicate by orderNumber)
+  // Merge local + Firestore orders (deduplicate by orderNumber, Firestore takes priority)
   const mergeOrders = (local: Order[], firestore: Order[]): Order[] => {
     const map = new Map<string, Order>();
-    // Firestore orders first (source of truth)
+    // Firestore orders first (source of truth, includes tracking data)
     firestore.forEach(o => map.set(o.orderNumber, o));
-    // Local orders (only if not already from Firestore)
-    local.forEach(o => { if (!map.has(o.orderNumber)) map.set(o.orderNumber, o); });
+    // Local orders: merge but keep Firestore tracking fields if they exist
+    local.forEach(o => {
+      if (!map.has(o.orderNumber)) {
+        map.set(o.orderNumber, o);
+      } else {
+        // Firestore already has this order — keep Firestore version (has tracking data)
+        const existing = map.get(o.orderNumber)!;
+        map.set(o.orderNumber, { ...o, ...existing });
+      }
+    });
     return Array.from(map.values()).sort((a, b) =>
       new Date(b.date).getTime() - new Date(a.date).getTime()
     );
