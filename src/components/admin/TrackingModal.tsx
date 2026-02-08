@@ -32,7 +32,7 @@ const TrackingModal: React.FC<TrackingModalProps> = ({
     const lowerCarrier = carrier.toLowerCase();
     
     if (lowerCarrier.includes('yamato') || lowerCarrier.includes('クロネコ')) {
-      return `https://toi.kuronekoyamato.co.jp/cgi-bin/tneko?number=${trackingNumber}`;
+      return `https://toi.kuronekoyamato.co.jp/cgi-bin/tneko?number00=1&number01=${trackingNumber}`;
     } else if (lowerCarrier.includes('sagawa') || lowerCarrier.includes('佐川')) {
       return `https://k2k.sagawa-exp.co.jp/p/web/okurijosearch.do?okurijoNo=${trackingNumber}`;
     } else if (lowerCarrier.includes('japan post') || lowerCarrier.includes('ゆうパック') || lowerCarrier.includes('post')) {
