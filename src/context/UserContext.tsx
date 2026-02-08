@@ -419,11 +419,18 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       // Check email verification
       if (!firebaseUser.emailVerified) {
         console.log('⚠️ [LOGIN] Email not verified:', normalizedEmail);
+        // Resend verification email before signing out
+        try {
+          await firebaseSyncService.resendVerificationEmail();
+          console.log('📧 [LOGIN] Verification email resent to:', normalizedEmail);
+        } catch (e) {
+          console.warn('⚠️ [LOGIN] Could not resend verification email:', e);
+        }
         // Sign out since unverified
         await firebaseSyncService.logoutUser();
         return { 
           success: false, 
-          error: 'Seu email ainda não foi verificado. Verifique sua caixa de entrada e clique no link de confirmação.',
+          error: 'Seu email ainda não foi verificado. Reenviamos o link de confirmação para sua caixa de entrada.',
           needsVerification: true
         };
       }
@@ -501,7 +508,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
         return { success: false, error: friendlyMessage, code: authCode };
       }
 
-      // For invalid credentials - user doesn't exist or wrong password
+      // For invalid credentials - distinguish between unregistered vs wrong password
       const isCredentialError = [
         'auth/invalid-credential',
         'auth/user-not-found',
@@ -509,14 +516,28 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       ].some(code => authCode.includes(code));
 
       if (isCredentialError) {
+        // Check if user exists in Firestore to give proper error message
+        try {
+          const existingUser = await firebaseSyncService.getUserByEmail(normalizedEmail);
+          if (existingUser) {
+            // User registered but password is wrong
+            return { 
+              success: false, 
+              error: 'Senha incorreta. Tente novamente ou use "Esqueceu a senha?" para redefinir.' 
+            };
+          }
+        } catch (e) {
+          // Firestore check failed, fall through to generic message
+        }
+        // User not found in Firestore - not registered
         return { 
           success: false, 
-          error: 'Email ou senha incorretos. Caso não tenha uma conta, cadastre-se primeiro.' 
+          error: 'Usuário não cadastrado. Crie uma conta primeiro.' 
         };
       }
     }
     
-    return { success: false, error: 'Email ou senha incorretos. Caso não tenha uma conta, cadastre-se primeiro.' };
+    return { success: false, error: 'Erro ao fazer login. Tente novamente.' };
   };
 
   const register = async (userData: Omit<UserProfile, 'id' | 'createdAt' | 'password'> & { password: string }): Promise<{ success: boolean; error?: string }> => {
