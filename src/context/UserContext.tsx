@@ -339,14 +339,64 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
         return { success: false, error: friendlyMessage, code: authCode };
       }
 
-      // For invalid-credential or user-not-found, try localStorage fallback + auto-migration
+      // For invalid-credential or user-not-found, try Firestore + localStorage fallback + auto-migration
       const isCredentialError = [
         'auth/invalid-credential',
         'auth/user-not-found',
         'auth/wrong-password'
       ].some(code => authCode.includes(code));
 
-      // Fallback to localStorage (for users created before Firebase Auth was working)
+      if (isCredentialError) {
+        // Step 1: Check Firestore for migrated users (works from any device)
+        console.log('🔍 [LOGIN] Checking Firestore for migrated user...');
+        try {
+          const firestoreUser = await firebaseSyncService.getUserByEmail(normalizedEmail);
+          if (firestoreUser && (firestoreUser as any).password === password) {
+            console.log('✅ [LOGIN] User found in Firestore! Auto-creating Firebase Auth account...');
+            
+            // Create Firebase Auth account for this user
+            try {
+              const firebaseUser = await firebaseSyncService.registerUser(normalizedEmail, password);
+              
+              if (firebaseUser) {
+                // Update user in Firestore with new Firebase UID
+                const migratedUser = { ...(firestoreUser as UserProfile), id: firebaseUser.uid };
+                await firebaseSyncService.syncUserToFirestore(firebaseUser.uid, migratedUser);
+                
+                setUser(migratedUser);
+                setIsAuthenticated(true);
+                
+                // Load orders from Firestore
+                const firestoreOrders = await firebaseSyncService.getOrdersFromFirestore(firebaseUser.uid);
+                setOrders(firestoreOrders as Order[]);
+                setCoupons(getUserCoupons(firebaseUser.uid));
+                
+                localStorage.setItem('user', JSON.stringify(migratedUser));
+                console.log('✅ [LOGIN] Migrated user now has Firebase Auth! ID:', firebaseUser.uid);
+                return { success: true };
+              }
+            } catch (regError: any) {
+              console.warn('⚠️ [LOGIN] Could not auto-register in Auth:', regError.message);
+              // Still allow login with Firestore data
+              const userData = firestoreUser as UserProfile;
+              setUser(userData);
+              setIsAuthenticated(true);
+              setCoupons(getUserCoupons(userData.id));
+              setOrders(getUserOrders(userData.id));
+              localStorage.setItem('user', JSON.stringify(userData));
+              console.log('✅ [LOGIN] Logged in via Firestore data (no Auth account yet)');
+              return { success: true };
+            }
+          } else if (firestoreUser) {
+            console.log('❌ [LOGIN] User found in Firestore but password mismatch');
+            return { success: false, error: 'Senha incorreta. Verifique seus dados.' };
+          }
+        } catch (firestoreError) {
+          console.warn('⚠️ [LOGIN] Firestore lookup failed:', firestoreError);
+        }
+      }
+
+      // Step 2: Fallback to localStorage (for users on the same device)
       const allUsers = getAllUsers();
       console.log('🔍 Login attempt (localStorage):', { email });
       console.log('📦 Total users in database:', allUsers.length);
