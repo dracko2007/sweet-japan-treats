@@ -66,57 +66,169 @@ export const emailServiceSimple = {
    */
   sendOrderConfirmation: async (orderData: any): Promise<boolean> => {
     console.log('📧 EmailJS - Sending order confirmation to customer');
-    console.log('📧 Service ID:', EMAILJS_SERVICE_ID, '(exists:', !!EMAILJS_SERVICE_ID, ')');
-    console.log('📧 Template ID:', EMAILJS_TEMPLATE_ID_CUSTOMER, '(exists:', !!EMAILJS_TEMPLATE_ID_CUSTOMER, ')');
-    console.log('📧 Public Key:', EMAILJS_PUBLIC_KEY, '(exists:', !!EMAILJS_PUBLIC_KEY, ')');
     
-    // Check if EmailJS is configured
     if (!EMAILJS_SERVICE_ID || !EMAILJS_TEMPLATE_ID_CUSTOMER || !EMAILJS_PUBLIC_KEY) {
-      console.error('❌ EmailJS NÃO configurado - emails não serão enviados automaticamente');
-      console.log('💡 Configure EmailJS no .env para enviar emails automaticamente');
+      console.error('❌ EmailJS NÃO configurado');
       return false;
     }
     
     try {
-      // Load EmailJS library
       await loadEmailJS();
       
-      // Prepare email parameters
       const itemsList = orderData.items.map((item: CartItem) => 
         `${item.product.name} (${item.size}) x${item.quantity} - ¥${(item.product.prices[item.size] * item.quantity).toLocaleString()}`
-      ).join('\n');
-      
-      const shippingAddress = `
-${orderData.formData.name}
-〒${orderData.formData.postalCode}
-${orderData.formData.prefecture} ${orderData.formData.city}
-${orderData.formData.address}
-${orderData.formData.building || ''}
-Tel: ${orderData.formData.phone}
-      `.trim();
+      );
       
       const couponDiscount = orderData.couponDiscount || 0;
       const finalTotal = orderData.totalPrice - couponDiscount;
       const shipping = orderData.shipping || { carrier: 'N/A', cost: 0 };
+      const paymentMethod = orderData.paymentMethod === 'bank' ? 'Depósito Bancário' : 'PayPay';
       
-      const emailParams: EmailParams = {
+      // Generate full HTML email body
+      const htmlContent = `
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;background-color:#f5f5f5;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f5f5f5;padding:20px 0;">
+<tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.1);">
+
+<!-- Header -->
+<tr><td style="background:linear-gradient(135deg,#8B4513 0%,#A0522D 100%);padding:40px 30px;text-align:center;">
+<h1 style="margin:0;color:#ffffff;font-size:28px;font-weight:600;">🍮 Sabor do Campo</h1>
+<p style="margin:10px 0 0 0;color:#f5e6d3;font-size:14px;letter-spacing:1px;">DOCE DE LEITE ARTESANAL</p>
+</td></tr>
+
+<!-- Success -->
+<tr><td style="padding:40px 30px 20px 30px;text-align:center;">
+<div style="display:inline-block;background-color:#dcfce7;border-radius:50%;width:60px;height:60px;line-height:60px;margin-bottom:20px;">
+<span style="color:#16a34a;font-size:32px;">✓</span>
+</div>
+<h2 style="margin:0;color:#1a1a1a;font-size:24px;font-weight:600;">Pedido Confirmado!</h2>
+<p style="margin:10px 0 0 0;color:#666666;font-size:16px;">Olá ${orderData.formData.name}, obrigado por sua compra! 🎉</p>
+</td></tr>
+
+<!-- Order Info -->
+<tr><td style="padding:0 30px;">
+<table width="100%" cellpadding="10" cellspacing="0" style="background-color:#f8f9fa;border-radius:8px;border:1px solid #e5e7eb;">
+<tr>
+<td style="color:#666666;font-size:14px;padding:15px;">
+<strong style="color:#1a1a1a;">📋 Número do Pedido:</strong><br>
+<span style="font-family:monospace;font-size:16px;color:#8B4513;">${orderData.orderNumber}</span>
+</td>
+<td style="color:#666666;font-size:14px;padding:15px;text-align:right;">
+<strong style="color:#1a1a1a;">📅 Data:</strong><br>
+<span style="font-size:16px;">${new Date().toLocaleDateString('pt-BR')}</span>
+</td>
+</tr>
+</table>
+</td></tr>
+
+<!-- Products -->
+<tr><td style="padding:30px;">
+<h3 style="margin:0 0 15px 0;color:#1a1a1a;font-size:18px;font-weight:600;border-bottom:2px solid #8B4513;padding-bottom:10px;">📦 Produtos</h3>
+<div style="background-color:#ffffff;padding:15px;border:1px solid #e5e7eb;border-radius:8px;">
+${itemsList.map((item: string) => `<p style="margin:5px 0;font-size:14px;color:#1a1a1a;">${item}</p>`).join('')}
+</div>
+</td></tr>
+
+<!-- Pricing -->
+<tr><td style="padding:0 30px 30px 30px;">
+<table width="100%" cellpadding="8" cellspacing="0" style="background-color:#f8f9fa;border-radius:8px;padding:15px;">
+<tr>
+<td style="color:#666666;font-size:15px;padding:8px 0;">Subtotal:</td>
+<td style="text-align:right;color:#1a1a1a;font-size:15px;font-weight:600;padding:8px 0;">¥${orderData.totalPrice.toLocaleString()}</td>
+</tr>
+${couponDiscount > 0 ? `
+<tr>
+<td style="color:#16a34a;font-size:15px;padding:8px 0;">🎫 Desconto:</td>
+<td style="text-align:right;color:#16a34a;font-size:15px;font-weight:600;padding:8px 0;">-¥${couponDiscount.toLocaleString()}</td>
+</tr>` : ''}
+<tr>
+<td style="color:#666666;font-size:15px;padding:8px 0;">🚚 Frete (${shipping.carrier}):</td>
+<td style="text-align:right;color:#1a1a1a;font-size:15px;font-weight:600;padding:8px 0;">¥${shipping.cost.toLocaleString()}</td>
+</tr>
+<tr style="border-top:2px solid #8B4513;">
+<td style="color:#1a1a1a;font-size:18px;font-weight:700;padding:15px 0 8px 0;">💰 Total:</td>
+<td style="text-align:right;color:#8B4513;font-size:22px;font-weight:700;padding:15px 0 8px 0;">¥${(finalTotal + shipping.cost).toLocaleString()}</td>
+</tr>
+</table>
+</td></tr>
+
+<!-- Address -->
+<tr><td style="padding:0 30px 30px 30px;">
+<h3 style="margin:0 0 15px 0;color:#1a1a1a;font-size:18px;font-weight:600;border-bottom:2px solid #8B4513;padding-bottom:10px;">📍 Endereço de Entrega</h3>
+<div style="background-color:#f8f9fa;padding:20px;border-radius:8px;border-left:4px solid #8B4513;">
+<p style="margin:5px 0;font-size:14px;color:#1a1a1a;"><strong>${orderData.formData.name}</strong></p>
+<p style="margin:5px 0;font-size:14px;color:#1a1a1a;">〒${orderData.formData.postalCode}</p>
+<p style="margin:5px 0;font-size:14px;color:#1a1a1a;">${orderData.formData.prefecture} ${orderData.formData.city}</p>
+<p style="margin:5px 0;font-size:14px;color:#1a1a1a;">${orderData.formData.address}</p>
+${orderData.formData.building ? `<p style="margin:5px 0;font-size:14px;color:#1a1a1a;">${orderData.formData.building}</p>` : ''}
+<p style="margin:5px 0;font-size:14px;color:#1a1a1a;">Tel: ${orderData.formData.phone}</p>
+</div>
+</td></tr>
+
+<!-- Payment -->
+<tr><td style="padding:0 30px 30px 30px;">
+<table width="100%" cellpadding="0" cellspacing="0">
+<tr>
+<td width="50%" style="padding-right:10px;">
+<div style="background-color:#f8f9fa;padding:15px;border-radius:8px;text-align:center;">
+<div style="color:#666666;font-size:13px;margin-bottom:5px;">💳 Pagamento</div>
+<div style="color:#1a1a1a;font-size:16px;font-weight:600;">${paymentMethod}</div>
+</div>
+</td>
+<td width="50%" style="padding-left:10px;">
+<div style="background-color:#f8f9fa;padding:15px;border-radius:8px;text-align:center;">
+<div style="color:#666666;font-size:13px;margin-bottom:5px;">📞 Contato</div>
+<div style="color:#1a1a1a;font-size:16px;font-weight:600;">${orderData.formData.phone}</div>
+</div>
+</td>
+</tr>
+</table>
+</td></tr>
+
+<!-- Next Steps -->
+<tr><td style="padding:0 30px 30px 30px;">
+<div style="background:linear-gradient(135deg,#fef3c7 0%,#fde68a 100%);padding:20px;border-radius:8px;border-left:4px solid #f59e0b;">
+<h4 style="margin:0 0 10px 0;color:#92400e;font-size:16px;font-weight:600;">🎯 Próximos Passos</h4>
+<ul style="margin:0;padding-left:20px;color:#78350f;font-size:14px;line-height:1.8;">
+<li>Seu pedido está sendo preparado com todo carinho</li>
+<li>Em breve você receberá o código de rastreamento</li>
+<li>Qualquer dúvida, entre em contato conosco</li>
+</ul>
+</div>
+</td></tr>
+
+<!-- Footer -->
+<tr><td style="background-color:#f8f9fa;padding:30px;text-align:center;border-top:1px solid #e5e7eb;">
+<p style="margin:0 0 10px 0;color:#1a1a1a;font-size:16px;font-weight:600;">Sabor do Campo - Doce de Leite Artesanal</p>
+<p style="margin:0 0 15px 0;color:#666666;font-size:14px;line-height:1.6;">
+Doce de leite artesanal brasileiro feito com amor no Japão.<br>
+Ingredientes selecionados e técnicas tradicionais.
+</p>
+<div style="margin:20px 0;">
+<a href="tel:070-1367-1679" style="display:inline-block;margin:0 10px;color:#8B4513;text-decoration:none;font-size:14px;">📞 070-1367-1679</a>
+<a href="mailto:dracko2007@gmail.com" style="display:inline-block;margin:0 10px;color:#8B4513;text-decoration:none;font-size:14px;">📧 dracko2007@gmail.com</a>
+</div>
+<p style="margin:15px 0 0 0;color:#999999;font-size:12px;">© 2026 Sabor do Campo. Todos os direitos reservados.</p>
+</td></tr>
+
+</table>
+</td></tr>
+</table>
+</body>
+</html>`;
+      
+      const emailParams = {
         to_email: orderData.formData.email,
         to_name: orderData.formData.name,
-        order_number: orderData.orderNumber,
-        order_date: new Date().toLocaleDateString('pt-BR'),
-        items_list: itemsList,
-        subtotal: `¥${orderData.totalPrice.toLocaleString()}`,
-        discount: couponDiscount > 0 ? `-¥${couponDiscount.toLocaleString()}` : undefined,
-        shipping_cost: `¥${shipping.cost.toLocaleString()}`,
-        shipping_carrier: shipping.carrier,
-        total_price: `¥${(finalTotal + shipping.cost).toLocaleString()}`,
-        shipping_address: shippingAddress,
-        payment_method: orderData.paymentMethod === 'bank' ? 'Depósito Bancário' : 'PayPay',
-        phone: orderData.formData.phone
+        subject: `✅ Pedido Confirmado - #${orderData.orderNumber}`,
+        message: htmlContent,
       };
       
-      console.log('📤 Sending email via EmailJS...');
-      console.log('📤 Params:', emailParams);
+      console.log('📤 Sending order confirmation email via EmailJS...');
       
       const response = await emailjs.send(
         EMAILJS_SERVICE_ID,
@@ -234,29 +346,17 @@ Tel: ${orderData.formData.phone}
     try {
       await loadEmailJS();
       
+      // Send the full HTML content as 'message' - the EmailJS template just renders {{message}}
       const emailParams = {
         to_email: params.to_email,
         to_name: params.to_name,
-        subject: `📦 Pedido Enviado - #${params.order_number}`,
-        order_number: params.order_number,
-        order_date: new Date().toLocaleDateString('pt-BR'),
-        tracking_number: params.tracking_number,
-        carrier_name: params.carrier_name,
-        tracking_url: params.tracking_url || '',
-        items_list: params.items_list,
-        subtotal: params.total_price,
-        total_price: params.total_price,
-        shipping_address: params.shipping_address,
-        shipping_carrier: params.carrier_name,
-        shipping_cost: '¥0',
-        payment_method: 'Já pago',
-        phone: '-',
+        subject: `📦 Pedido Enviado - #${params.order_number} - Rastreamento: ${params.tracking_number}`,
         message: params.html_content,
       };
       
       console.log('📤 Sending tracking email via EmailJS...');
+      console.log('📤 Carrier:', params.carrier_name);
       console.log('📤 Tracking URL:', params.tracking_url);
-      console.log('📤 Params:', emailParams);
       
       const response = await emailjs.send(
         EMAILJS_SERVICE_ID,
@@ -265,12 +365,10 @@ Tel: ${orderData.formData.phone}
       );
       
       console.log('✅ Tracking email sent successfully!');
-      console.log('📧 Response:', response);
       return true;
       
     } catch (error) {
       console.error('❌ Error sending tracking email:', error);
-      console.error('Error details:', error);
       return false;
     }
   }

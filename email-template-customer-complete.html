@@ -1,11 +1,20 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{subject}}</title>
-</head>
-<body>
-    {{{message}}}
-</body>
-</html>
+<!--
+  EmailJS Template - Sabor do Campo
+  
+  INSTRUÇÕES PARA O EMAILJS:
+  No painel do EmailJS (https://dashboard.emailjs.com), 
+  o template do CLIENTE deve ter APENAS isto no corpo:
+  
+  {{message}}
+  
+  O HTML completo é gerado pelo código e enviado como 'message'.
+  Isso permite que TANTO emails de confirmação QUANTO de rastreamento
+  funcionem com o mesmo template.
+  
+  Variáveis enviadas pelo código:
+  - to_email: email do destinatário
+  - to_name: nome do destinatário  
+  - subject: assunto do email
+  - message: HTML completo do email (gerado no código)
+-->
+{{message}}
