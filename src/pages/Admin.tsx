@@ -632,9 +632,9 @@ _This is an automated test message_
             setTrackingModalOpen(false);
             setSelectedOrder(null);
           }}
-          onSuccess={async (trackingNumber) => {
-            // Get carrier info and tracking URL
-            const carrier = selectedOrder.shipping?.carrier || '';
+          onSuccess={async (trackingNumber, carrierFromModal) => {
+            // Get carrier info from modal (which reads from order.shipping.carrier) or fallback
+            const carrier = carrierFromModal || selectedOrder.shipping?.carrier || selectedOrder.carrier || '';
             const getTrackingUrl = (c: string, tn: string) => {
               const lc = c.toLowerCase();
               if (lc.includes('yamato') || lc.includes('クロネコ')) return `https://toi.kuronekoyamato.co.jp/cgi-bin/tneko?number=${tn}`;

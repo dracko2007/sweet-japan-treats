@@ -13,7 +13,7 @@ interface TrackingModalProps {
   order: any;
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: (trackingNumber: string) => void;
+  onSuccess: (trackingNumber: string, carrier: string) => void;
 }
 
 const TrackingModal: React.FC<TrackingModalProps> = ({
@@ -23,6 +23,7 @@ const TrackingModal: React.FC<TrackingModalProps> = ({
   onSuccess,
 }) => {
   const [trackingNumber, setTrackingNumber] = useState('');
+  const [selectedCarrier, setSelectedCarrier] = useState(order?.shipping?.carrier || '');
   const [isSending, setIsSending] = useState(false);
   const { toast } = useToast();
 
@@ -74,8 +75,8 @@ const TrackingModal: React.FC<TrackingModalProps> = ({
     setIsSending(true);
 
     try {
-      const carrierName = getCarrierName(order.shipping?.carrier || '');
-      const trackingUrl = getTrackingUrl(order.shipping?.carrier || '', trackingNumber);
+      const carrierName = getCarrierName(selectedCarrier || order.shipping?.carrier || '');
+      const trackingUrl = getTrackingUrl(selectedCarrier || order.shipping?.carrier || '', trackingNumber);
       
       // Send shipping confirmation email
       const emailHTML = `
@@ -271,7 +272,7 @@ Obrigado por comprar na *Sabor do Campo*! 🍯
         }
       }
 
-      onSuccess(trackingNumber);
+      onSuccess(trackingNumber, selectedCarrier || order.shipping?.carrier || '');
       onClose();
     } catch (error) {
       console.error('Error sending email:', error);
@@ -280,7 +281,7 @@ Obrigado por comprar na *Sabor do Campo*! 🍯
         description: "Mas o pedido foi marcado como enviado",
         variant: "destructive",
       });
-      onSuccess(trackingNumber);
+      onSuccess(trackingNumber, selectedCarrier || order.shipping?.carrier || '');
       onClose();
     } finally {
       setIsSending(false);
@@ -316,6 +317,27 @@ Obrigado por comprar na *Sabor do Campo*! 🍯
             </p>
           </div>
 
+          <div>
+            <Label htmlFor="carrier">Transportadora *</Label>
+            <select
+              id="carrier"
+              value={selectedCarrier}
+              onChange={(e) => setSelectedCarrier(e.target.value)}
+              className="mt-2 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <option value="">Selecione a transportadora</option>
+              <option value="Yamato">Yamato Transport (クロネコヤマト)</option>
+              <option value="Sagawa">Sagawa Express (佐川急便)</option>
+              <option value="Japan Post">Japan Post (日本郵便)</option>
+              <option value="Fukutsu">Fukutsu Express (福山通運)</option>
+            </select>
+            {order?.shipping?.carrier && (
+              <p className="text-xs text-muted-foreground mt-1">
+                Transportadora do pedido: {order.shipping.carrier}
+              </p>
+            )}
+          </div>
+
           <div className="bg-secondary/30 rounded-lg p-4 text-sm space-y-2">
             <p><strong>O que acontecerá:</strong></p>
             <ul className="list-disc list-inside space-y-1 text-muted-foreground">
@@ -336,7 +358,7 @@ Obrigado por comprar na *Sabor do Campo*! 🍯
           </Button>
           <Button
             onClick={handleSubmit}
-            disabled={isSending || !trackingNumber.trim()}
+            disabled={isSending || !trackingNumber.trim() || !selectedCarrier}
             className="gap-2"
           >
             {isSending ? (

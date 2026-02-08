@@ -1,6 +1,48 @@
 import type { Coupon } from '@/types';
 
 const STORAGE_KEY = 'sweet-japan-coupons';
+const USAGE_FIRESTORE_KEY = 'coupon_usage';
+
+// Helper: sync coupon usage to Firestore
+const syncUsageToFirestore = async (couponCode: string, userEmail: string) => {
+  try {
+    const { doc, setDoc, getDoc } = await import('firebase/firestore');
+    const { db } = await import('@/config/firebase');
+    if (!db) return;
+    
+    const usageRef = doc(db, USAGE_FIRESTORE_KEY, couponCode.toUpperCase());
+    const usageDoc = await getDoc(usageRef);
+    const usedBy = usageDoc.exists() ? (usageDoc.data().usedBy || []) : [];
+    
+    if (!usedBy.includes(userEmail)) {
+      usedBy.push(userEmail);
+      await setDoc(usageRef, { usedBy, updatedAt: new Date().toISOString() });
+      console.log('✅ [COUPON] Usage synced to Firestore:', couponCode, userEmail);
+    }
+  } catch (err) {
+    console.warn('⚠️ [COUPON] Failed to sync usage to Firestore:', err);
+  }
+};
+
+// Helper: check coupon usage from Firestore
+const checkUsageFromFirestore = async (couponCode: string, userEmail: string): Promise<boolean> => {
+  try {
+    const { doc, getDoc } = await import('firebase/firestore');
+    const { db } = await import('@/config/firebase');
+    if (!db) return false;
+    
+    const usageRef = doc(db, USAGE_FIRESTORE_KEY, couponCode.toUpperCase());
+    const usageDoc = await getDoc(usageRef);
+    if (usageDoc.exists()) {
+      const usedBy = usageDoc.data().usedBy || [];
+      return usedBy.includes(userEmail);
+    }
+    return false;
+  } catch (err) {
+    console.warn('⚠️ [COUPON] Failed to check usage from Firestore:', err);
+    return false;
+  }
+};
 
 export const couponService = {
   // Get all coupons
@@ -53,6 +95,23 @@ export const couponService = {
     return { valid: true, coupon };
   },
 
+  // Async validation that also checks Firestore (use this for checkout)
+  validateCouponAsync: async (code: string, userEmail?: string): Promise<{ valid: boolean; coupon?: Coupon; error?: string }> => {
+    // First do local validation
+    const localResult = couponService.validateCoupon(code, userEmail);
+    if (!localResult.valid) return localResult;
+    
+    // Then check Firestore for usage
+    if (userEmail) {
+      const usedInFirestore = await checkUsageFromFirestore(code, userEmail);
+      if (usedInFirestore) {
+        return { valid: false, error: 'Você já usou este cupom' };
+      }
+    }
+    
+    return localResult;
+  },
+
   // Calculate discount
   calculateDiscount: (coupon: Coupon, subtotal: number): number => {
     if (coupon.type === 'fixed') {
@@ -62,7 +121,7 @@ export const couponService = {
     }
   },
 
-  // Use coupon (increment usage and track user)
+  // Use coupon (increment usage and track user) - saves to localStorage AND Firestore
   useCoupon: (code: string, userEmail: string): void => {
     const coupons = couponService.getAll();
     const index = coupons.findIndex(c => c.code.toUpperCase() === code.toUpperCase());
@@ -70,7 +129,7 @@ export const couponService = {
     if (index !== -1) {
       coupons[index].usedCount += 1;
       
-      // Track which users have used this coupon
+      // Track which users have used this coupon (localStorage)
       const usageKey = `coupon_usage_${code.toUpperCase()}`;
       const usedBy = JSON.parse(localStorage.getItem(usageKey) || '[]');
       if (!usedBy.includes(userEmail)) {
@@ -79,6 +138,9 @@ export const couponService = {
       }
       
       localStorage.setItem(STORAGE_KEY, JSON.stringify(coupons));
+      
+      // Also sync to Firestore (async, fire-and-forget)
+      syncUsageToFirestore(code, userEmail);
     }
   },
 

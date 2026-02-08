@@ -46,10 +46,10 @@ const Checkout: React.FC = () => {
   const [couponDiscount, setCouponDiscount] = useState(0);
 
   // Handlers for coupon
-  const handleCouponApply = (coupon: Coupon, discount: number) => {
-    // Double-check if user hasn't already used this coupon
+  const handleCouponApply = async (coupon: Coupon, discount: number) => {
+    // Double-check if user hasn't already used this coupon (checks Firestore too)
     if (user?.email) {
-      const validation = couponService.validateCoupon(coupon.code, user.email);
+      const validation = await couponService.validateCouponAsync(coupon.code, user.email);
       if (!validation.valid) {
         toast({
           title: "Cupom inválido",

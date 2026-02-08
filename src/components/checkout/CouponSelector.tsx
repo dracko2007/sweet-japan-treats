@@ -31,17 +31,27 @@ const CouponSelector: React.FC<CouponSelectorProps> = ({
     loadAvailableCoupons();
   }, [user, appliedCoupon]);
 
-  const loadAvailableCoupons = () => {
+  const loadAvailableCoupons = async () => {
     const active = couponService.getActive();
-    
-    // Filtrar cupons que o usuário ainda não usou
     const userEmail = user?.email || '';
-    const filteredCoupons = active.filter(coupon => {
+    
+    // Filter coupons: check both localStorage AND Firestore
+    const filtered: typeof active = [];
+    for (const coupon of active) {
+      // Check localStorage first (fast)
       const usedBy = couponService.getCouponUsage(coupon.code);
-      return !usedBy.includes(userEmail);
-    });
+      if (usedBy.includes(userEmail)) continue;
+      
+      // Check Firestore too (persistent)
+      if (userEmail) {
+        const asyncResult = await couponService.validateCouponAsync(coupon.code, userEmail);
+        if (!asyncResult.valid) continue;
+      }
+      
+      filtered.push(coupon);
+    }
 
-    setAvailableCoupons(filteredCoupons);
+    setAvailableCoupons(filtered);
   };
 
   const handleSelectCoupon = (coupon: Coupon) => {
