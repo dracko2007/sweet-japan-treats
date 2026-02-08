@@ -122,9 +122,14 @@ const CustomerList: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Lista de Clientes */}
         <div className="space-y-4">
-          <h2 className="text-2xl font-bold">Clientes</h2>
-          <div className="space-y-3 max-h-[600px] overflow-y-auto">
-            {customers.map((customer) => (
+          <h2 className="text-xl sm:text-2xl font-bold">Clientes</h2>
+          <div className="space-y-3 max-h-[500px] lg:max-h-[600px] overflow-y-auto">
+            {customers.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p>Nenhum cliente encontrado</p>
+              </div>
+            ) : customers.map((customer) => (
               <Card
                 key={customer.email}
                 className={`cursor-pointer transition-all hover:shadow-md ${
@@ -132,24 +137,24 @@ const CustomerList: React.FC = () => {
                 }`}
                 onClick={() => setSelectedCustomer(customer)}
               >
-                <CardContent className="p-4">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-lg">{customer.name}</h3>
-                      <p className="text-sm text-muted-foreground flex items-center gap-1">
-                        <Mail className="h-3 w-3" />
-                        {customer.email}
+                <CardContent className="p-3 sm:p-4">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-base sm:text-lg truncate">{customer.name}</h3>
+                      <p className="text-xs sm:text-sm text-muted-foreground flex items-center gap-1 truncate">
+                        <Mail className="h-3 w-3 flex-shrink-0" />
+                        <span className="truncate">{customer.email}</span>
                       </p>
                       {customer.phone !== 'N/A' && (
-                        <p className="text-sm text-muted-foreground flex items-center gap-1">
-                          <Phone className="h-3 w-3" />
+                        <p className="text-xs sm:text-sm text-muted-foreground flex items-center gap-1">
+                          <Phone className="h-3 w-3 flex-shrink-0" />
                           {customer.phone}
                         </p>
                       )}
                     </div>
-                    <div className="text-right">
-                      <div className="text-lg font-bold text-primary">{formatCurrency(customer.totalSpent)}</div>
-                      <div className="text-sm text-muted-foreground">{customer.totalOrders} pedidos</div>
+                    <div className="text-right flex-shrink-0">
+                      <div className="text-base sm:text-lg font-bold text-primary">{formatCurrency(customer.totalSpent)}</div>
+                      <div className="text-xs sm:text-sm text-muted-foreground">{customer.totalOrders} pedidos</div>
                     </div>
                   </div>
                   

@@ -343,50 +343,51 @@ _This is an automated test message_
             {/* Tabs */}
             <div className="mb-8">
               <div className="border-b border-border">
-                <nav className="-mb-px flex space-x-8">
+                <nav className="-mb-px flex overflow-x-auto scrollbar-hide space-x-2 sm:space-x-6">
                   <button
                     onClick={() => setActiveTab('orders')}
-                    className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                    className={`py-3 sm:py-4 px-3 sm:px-1 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap flex items-center gap-1.5 ${
                       activeTab === 'orders'
                         ? 'border-primary text-primary'
                         : 'border-transparent text-muted-foreground hover:text-foreground hover:border-gray-300'
                     }`}
                   >
-                    <Package className="w-4 h-4 inline mr-2" />
-                    Pedidos
+                    <Package className="w-4 h-4 flex-shrink-0" />
+                    <span>Pedidos</span>
                   </button>
                   <button
                     onClick={() => setActiveTab('coupons')}
-                    className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                    className={`py-3 sm:py-4 px-3 sm:px-1 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap flex items-center gap-1.5 ${
                       activeTab === 'coupons'
                         ? 'border-primary text-primary'
                         : 'border-transparent text-muted-foreground hover:text-foreground hover:border-gray-300'
                     }`}
                   >
-                    <Tag className="w-4 h-4 inline mr-2" />
-                    Cupons de Desconto
+                    <Tag className="w-4 h-4 flex-shrink-0" />
+                    <span className="hidden sm:inline">Cupons de Desconto</span>
+                    <span className="sm:hidden">Cupons</span>
                   </button>
                   <button
                     onClick={() => setActiveTab('dashboard')}
-                    className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                    className={`py-3 sm:py-4 px-3 sm:px-1 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap flex items-center gap-1.5 ${
                       activeTab === 'dashboard'
                         ? 'border-primary text-primary'
                         : 'border-transparent text-muted-foreground hover:text-foreground hover:border-gray-300'
                     }`}
                   >
-                    <BarChart3 className="w-4 h-4 inline mr-2" />
-                    Dashboard
+                    <BarChart3 className="w-4 h-4 flex-shrink-0" />
+                    <span>Dashboard</span>
                   </button>
                   <button
                     onClick={() => setActiveTab('customers')}
-                    className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                    className={`py-3 sm:py-4 px-3 sm:px-1 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap flex items-center gap-1.5 ${
                       activeTab === 'customers'
                         ? 'border-primary text-primary'
                         : 'border-transparent text-muted-foreground hover:text-foreground hover:border-gray-300'
                     }`}
                   >
-                    <Users className="w-4 h-4 inline mr-2" />
-                    Clientes
+                    <Users className="w-4 h-4 flex-shrink-0" />
+                    <span>Clientes</span>
                   </button>
                 </nav>
               </div>
