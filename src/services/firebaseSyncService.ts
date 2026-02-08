@@ -20,7 +20,9 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signOut as firebaseSignOut,
-  onAuthStateChanged
+  onAuthStateChanged,
+  sendEmailVerification,
+  sendPasswordResetEmail
 } from 'firebase/auth';
 
 import { auth, db, firebaseConfigReady } from '@/config/firebase';
@@ -208,10 +210,77 @@ export const firebaseSyncService = {
       ensureFirebaseReady();
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       console.log('✅ [FIREBASE AUTH] User registered:', userCredential.user.uid);
+      
+      // Send email verification
+      try {
+        await sendEmailVerification(userCredential.user);
+        console.log('📧 [FIREBASE AUTH] Verification email sent to:', email);
+      } catch (verifyError) {
+        console.warn('⚠️ [FIREBASE AUTH] Could not send verification email:', verifyError);
+      }
+      
       return userCredential.user;
     } catch (error: any) {
       console.error('❌ [FIREBASE AUTH] Registration error:', error);
       throw error;
+    }
+  },
+
+  /**
+   * Resend email verification
+   */
+  async resendVerificationEmail() {
+    try {
+      ensureFirebaseReady();
+      const currentUser = auth.currentUser;
+      if (currentUser) {
+        await sendEmailVerification(currentUser);
+        console.log('📧 [FIREBASE AUTH] Verification email resent');
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('❌ [FIREBASE AUTH] Resend verification error:', error);
+      return false;
+    }
+  },
+
+  /**
+   * Send password reset email
+   */
+  async sendPasswordReset(email: string) {
+    try {
+      ensureFirebaseReady();
+      await sendPasswordResetEmail(auth, email);
+      console.log('📧 [FIREBASE AUTH] Password reset email sent to:', email);
+      return true;
+    } catch (error: any) {
+      console.error('❌ [FIREBASE AUTH] Password reset error:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Check if current user's email is verified
+   */
+  isEmailVerified() {
+    if (!auth?.currentUser) return false;
+    return auth.currentUser.emailVerified;
+  },
+
+  /**
+   * Reload current user to get updated emailVerified status
+   */
+  async reloadCurrentUser() {
+    try {
+      if (auth?.currentUser) {
+        await auth.currentUser.reload();
+        return auth.currentUser.emailVerified;
+      }
+      return false;
+    } catch (error) {
+      console.error('❌ [FIREBASE AUTH] Reload error:', error);
+      return false;
     }
   },
 

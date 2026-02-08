@@ -65,7 +65,7 @@ interface UserContextType {
   isAuthenticated: boolean;
   coupons: Coupon[];
   orders: Order[];
-  login: (email: string, password: string) => Promise<{ success: boolean; error?: string; code?: string }>;
+  login: (email: string, password: string) => Promise<{ success: boolean; error?: string; code?: string; needsVerification?: boolean }>;
   register: (userData: Omit<UserProfile, 'id' | 'createdAt' | 'password'> & { password: string }) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
   updateProfile: (userData: Partial<UserProfile>) => void;
@@ -73,6 +73,8 @@ interface UserContextType {
   useCoupon: (couponId: string) => void;
   addOrder: (order: Omit<Order, 'id' | 'orderNumber' | 'date'>) => Promise<void> | void;
   clearOrderHistory: () => void;
+  sendPasswordReset: (email: string) => Promise<{ success: boolean; error?: string }>;
+  resendVerificationEmail: () => Promise<boolean>;
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
@@ -259,6 +261,13 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       if (firebaseUser) {
         console.log('🔥 [FIREBASE] Auth state changed - user logged in:', firebaseUser.uid);
         
+        // Block unverified users (except admin)
+        if (!firebaseUser.emailVerified && firebaseUser.email !== 'dracko2007@gmail.com') {
+          console.log('🔥 [FIREBASE] User email not verified, signing out:', firebaseUser.email);
+          await firebaseSyncService.logoutUser();
+          return;
+        }
+        
         // Busca dados do usuário no Firestore
         const firestoreUser = await firebaseSyncService.getUserFromFirestore(firebaseUser.uid);
         
@@ -350,7 +359,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     }
   }, [orders, user]);
 
-  const login = async (email: string, password: string): Promise<{ success: boolean; error?: string; code?: string }> => {
+  const login = async (email: string, password: string): Promise<{ success: boolean; error?: string; code?: string; needsVerification?: boolean }> => {
     const normalizedEmail = normalizeEmail(email);
     // Admin default - sempre disponível
     const ADMIN_EMAIL = 'dracko2007@gmail.com';
@@ -375,7 +384,6 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       setUser(adminUser);
       setIsAuthenticated(true);
       
-      // Load admin coupons and orders
       const userCoupons = getUserCoupons(adminUser.id);
       const userOrders = getUserOrders(adminUser.id);
       
@@ -400,52 +408,40 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
         localStorage.setItem('user', JSON.stringify(foundUser));
         return { success: true };
       }
-      return { success: false, error: 'Email ou senha incorretos. Verifique seus dados ou cadastre-se.' };
+      return { success: false, error: 'Email ou senha incorretos. Cadastre-se primeiro caso não tenha uma conta.' };
     }
 
     try {
-      // Try to login with Firebase Auth first
+      // Login with Firebase Auth - STRICT: user must exist
       console.log('🔥 [LOGIN] Attempting Firebase Auth login...');
       const firebaseUser = await firebaseSyncService.loginUser(normalizedEmail, password);
+      
+      // Check email verification
+      if (!firebaseUser.emailVerified) {
+        console.log('⚠️ [LOGIN] Email not verified:', normalizedEmail);
+        // Sign out since unverified
+        await firebaseSyncService.logoutUser();
+        return { 
+          success: false, 
+          error: 'Seu email ainda não foi verificado. Verifique sua caixa de entrada e clique no link de confirmação.',
+          needsVerification: true
+        };
+      }
       
       // Get user data from Firestore
       console.log('🔥 [LOGIN] Fetching user data from Firestore...');
       let userData = await firebaseSyncService.getUserFromFirestore(firebaseUser.uid);
       
-      // If not in Firestore, check localStorage
       if (!userData) {
-        console.log('⚠️ [LOGIN] User not in Firestore, checking localStorage...');
+        // Check localStorage as backup
         const allUsers = getAllUsers();
         const localUser = allUsers.find(u => normalizeEmail(u.email) === normalizedEmail);
-        
         if (localUser) {
-          // Sync to Firestore
-          await firebaseSyncService.syncUserToFirestore(firebaseUser.uid, {
-            ...localUser,
-            id: firebaseUser.uid
-          });
+          await firebaseSyncService.syncUserToFirestore(firebaseUser.uid, { ...localUser, id: firebaseUser.uid });
           userData = { ...localUser, id: firebaseUser.uid };
         } else {
-           // USER HAS AUTH BUT NO PROFILE (GHOST USER)
-           // Create a partial profile to allow login
-           console.warn('👻 [LOGIN] Ghost user detected (Auth ok, but no profile). Creating basic profile...');
-           const ghostUser: UserProfile = {
-             id: firebaseUser.uid,
-             email: normalizedEmail,
-             name: normalizedEmail.split('@')[0], // Fallback name
-             phone: '',
-             password: password,
-             address: {
-               postalCode: '',
-               prefecture: '',
-               city: '',
-               address: '',
-             },
-             createdAt: new Date().toISOString(),
-           };
-           
-           await firebaseSyncService.syncUserToFirestore(firebaseUser.uid, ghostUser);
-           userData = ghostUser;
+          // No profile anywhere - user might have been deleted
+          return { success: false, error: 'Perfil não encontrado. Por favor, cadastre-se novamente.' };
         }
       }
       
@@ -453,7 +449,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
         setUser(userData as UserProfile);
         setIsAuthenticated(true);
         
-        // Load local orders + Firestore orders and merge
+        // Load and merge orders
         const localOrders = getUserOrders(userData.id);
         const firestoreOrders = await loadOrdersFromFirestore(firebaseUser.uid);
         const allOrders = mergeOrders(localOrders, firestoreOrders);
@@ -470,23 +466,24 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
           syncLocalOrdersToFirestore(firebaseUser.uid, (userData as any).email, localOnlyOrders);
         }
         
-        // Also save to localStorage for backup
         localStorage.setItem('user', JSON.stringify(userData));
         
         console.log('✅ User logged in successfully via Firebase:', { email: userData.email, id: userData.id });
         return { success: true };
       }
     } catch (error: any) {
-      console.log('⚠️ [LOGIN] Firebase Auth failed, trying localStorage...', error);
+      console.log('⚠️ [LOGIN] Firebase Auth failed:', error?.code);
       
       const authCode = error?.code || '';
+      
       if (authCode.includes('api-key-not-valid')) {
         return {
           success: false,
-          error: 'API Key inválida. Confirme se a chave é do projeto correto e se não há restrições no Google Cloud (HTTP referrers). Depois faça redeploy.',
+          error: 'API Key inválida. Confirme se a chave é do projeto correto.',
           code: authCode
         };
       }
+      
       const isConnectivityError = [
         'auth/unauthorized-domain',
         'auth/network-request-failed',
@@ -499,13 +496,12 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
         const friendlyMessage = authCode.includes('unauthorized-domain')
           ? `Domínio não autorizado no Firebase. Adicione ${window.location.hostname} em Authentication > Settings > Authorized domains.`
           : authCode.includes('network-request-failed')
-            ? 'Falha de rede ao conectar no Firebase. Verifique sua conexão e tente novamente.'
-            : 'Erro de configuração do Firebase. Verifique as credenciais e o domínio autorizado.';
-
+            ? 'Falha de rede ao conectar. Verifique sua conexão e tente novamente.'
+            : 'Erro de configuração do Firebase.';
         return { success: false, error: friendlyMessage, code: authCode };
       }
 
-      // For invalid-credential or user-not-found, try Firestore + localStorage fallback + auto-migration
+      // For invalid credentials - user doesn't exist or wrong password
       const isCredentialError = [
         'auth/invalid-credential',
         'auth/user-not-found',
@@ -513,123 +509,14 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       ].some(code => authCode.includes(code));
 
       if (isCredentialError) {
-        // Step 1: Check Firestore for migrated users (works from any device)
-        console.log('🔍 [LOGIN] Checking Firestore for migrated user...');
-        try {
-          const firestoreUser = await firebaseSyncService.getUserByEmail(normalizedEmail);
-          if (firestoreUser && (firestoreUser as any).password === password) {
-            console.log('✅ [LOGIN] User found in Firestore! Auto-creating Firebase Auth account...');
-            
-            // Create Firebase Auth account for this user
-            try {
-              const firebaseUser = await firebaseSyncService.registerUser(normalizedEmail, password);
-              
-              if (firebaseUser) {
-                // Update user in Firestore with new Firebase UID
-                const migratedUser = { ...(firestoreUser as UserProfile), id: firebaseUser.uid };
-                await firebaseSyncService.syncUserToFirestore(firebaseUser.uid, migratedUser);
-                
-                setUser(migratedUser);
-                setIsAuthenticated(true);
-                
-                // Load orders from Firestore
-                const firestoreOrders = await firebaseSyncService.getOrdersFromFirestore(firebaseUser.uid);
-                setOrders(firestoreOrders as Order[]);
-                setCoupons(getUserCoupons(firebaseUser.uid));
-                
-                localStorage.setItem('user', JSON.stringify(migratedUser));
-                console.log('✅ [LOGIN] Migrated user now has Firebase Auth! ID:', firebaseUser.uid);
-                return { success: true };
-              }
-            } catch (regError: any) {
-              console.warn('⚠️ [LOGIN] Could not auto-register in Auth:', regError.message);
-              // Still allow login with Firestore data
-              const userData = firestoreUser as UserProfile;
-              setUser(userData);
-              setIsAuthenticated(true);
-              setCoupons(getUserCoupons(userData.id));
-              setOrders(getUserOrders(userData.id));
-              localStorage.setItem('user', JSON.stringify(userData));
-              console.log('✅ [LOGIN] Logged in via Firestore data (no Auth account yet)');
-              return { success: true };
-            }
-          } else if (firestoreUser) {
-            console.log('❌ [LOGIN] User found in Firestore but password mismatch');
-            return { success: false, error: 'Senha incorreta. Verifique seus dados.' };
-          }
-        } catch (firestoreError) {
-          console.warn('⚠️ [LOGIN] Firestore lookup failed:', firestoreError);
-        }
-      }
-
-      // Step 2: Fallback to localStorage (for users on the same device)
-      const allUsers = getAllUsers();
-      console.log('🔍 Login attempt (localStorage):', { email });
-      console.log('📦 Total users in database:', allUsers.length);
-      console.log('👥 All registered users:', allUsers.map(u => ({ email: u.email, id: u.id })));
-      
-      const foundUser = allUsers.find(u => normalizeEmail(u.email) === normalizedEmail && u.password === password);
-      
-      if (foundUser) {
-        try {
-          // AUTO-MIGRATION: If local user exists but Firebase failed, try to CREATE Firebase account
-          console.log('🔄 [LOGIN] Auto-migrating local user to Firebase...');
-          const firebaseUser = await firebaseSyncService.registerUser(normalizedEmail, password);
-          
-          if (firebaseUser) {
-             // Sync user data to Firestore
-             const migratedUser = { ...foundUser, id: firebaseUser.uid, email: normalizedEmail };
-             await firebaseSyncService.syncUserToFirestore(firebaseUser.uid, migratedUser);
-             
-             // Sync orders if any
-             const userOrders = getUserOrders(foundUser.id);
-             for (const order of userOrders) {
-               await firebaseSyncService.syncOrderToFirestore(firebaseUser.uid, order);
-             }
-             
-             // Update local state with new ID
-             setUser(migratedUser);
-             setIsAuthenticated(true);
-             setCoupons(getUserCoupons(foundUser.id)); // Keep coupons
-             setOrders(userOrders);
-             
-             // Update in localStorage users database (replace old ID with new UID)
-             const updatedUsers = allUsers.map(u => normalizeEmail(u.email) === normalizedEmail ? migratedUser : u);
-             saveAllUsers(updatedUsers);
-             
-             console.log('✅ [LOGIN] Auto-migration complete! User synced to cloud.');
-             return { success: true };
-          }
-        } catch (migrationError: any) {
-          // If migration fails (e.g. email already exists in auth but not syncronized?)
-          console.warn('⚠️ [LOGIN] Auto-migration failed, falling back to local only:', migrationError.message);
-          
-          if (migrationError.message.includes('email-already-in-use')) {
-             // Edge case: Account exists in Auth but login failed previously (wrong password?)
-             // OR password is correct but login code above failed for network reasons?
-             // We just continue with local login.
-          }
-        }
-
-        // Standard local login (fallback)
-        setUser(foundUser);
-        setIsAuthenticated(true);
-        
-        // Load user-specific coupons and orders
-        const userCoupons = getUserCoupons(foundUser.id);
-        const userOrders = getUserOrders(foundUser.id);
-        
-        setCoupons(userCoupons);
-        setOrders(userOrders);
-        
-        console.log('✅ User logged in successfully (localStorage):', { email: foundUser.email, id: foundUser.id });
-        return { success: true };
+        return { 
+          success: false, 
+          error: 'Email ou senha incorretos. Caso não tenha uma conta, cadastre-se primeiro.' 
+        };
       }
     }
     
-    console.log('❌ Login failed: User not found or incorrect password');
-    console.log('💡 Hint: Did you register first? Check the Register page.');
-    return { success: false, error: 'Email ou senha incorretos. Verifique seus dados ou cadastre-se.' };
+    return { success: false, error: 'Email ou senha incorretos. Caso não tenha uma conta, cadastre-se primeiro.' };
   };
 
   const register = async (userData: Omit<UserProfile, 'id' | 'createdAt' | 'password'> & { password: string }): Promise<{ success: boolean; error?: string }> => {
@@ -640,168 +527,54 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
         email: normalizedEmail, 
         name: userData.name 
       });
-      
-      // Removed preemptive Firestore check to allow recovery of Ghost Users
-      // We rely on Auth uniqueness and the catch block below to handle duplicates
-      
-      // Check if user with this email already exists in the users database (localStorage)
-      const allUsers = getAllUsers();
-      console.log('🔍 [DEBUG] Total users before registration:', allUsers.length);
-      console.log('🔍 [DEBUG] Existing user emails:', allUsers.map(u => u.email));
-      
-      const existingUser = allUsers.find(u => normalizeEmail(u.email) === normalizedEmail);
-      
-      if (existingUser) {
-        console.warn('⚠️ [DEBUG] User already exists locally. Attempting auto-login instead of register.');
-        if (existingUser.password === userData.password) {
-          setUser(existingUser);
-          setIsAuthenticated(true);
-          
-          const userCoupons = getUserCoupons(existingUser.id);
-          const userOrders = getUserOrders(existingUser.id);
-          
-          setCoupons(userCoupons);
-          setOrders(userOrders);
-          
-          localStorage.setItem('user', JSON.stringify(existingUser));
-          return { success: true };
-        }
-        console.error('❌ [DEBUG] Registration failed: User exists locally and password mismatch.');
-        return { success: false, error: 'Este email já está cadastrado. Verifique a senha.' };
-      }
 
-      if (!firebaseConfigReady && allowLocalOnly) {
-        // Local-only register when Firebase is disabled/unavailable
-        const newUser: UserProfile = {
-          ...userData,
-          email: normalizedEmail,
-          id: `user-${Date.now()}`,
-          createdAt: new Date().toISOString(),
-          password: userData.password,
-          orders: [],
-        };
-
-        const updatedUsers = [...allUsers, newUser];
-        saveAllUsers(updatedUsers);
-        setUser(newUser);
-        setIsAuthenticated(true);
-        setCoupons([]);
-        setOrders([]);
-        localStorage.setItem('user', JSON.stringify(newUser));
-        return { success: true };
-      }
-
-      // Register user in Firebase Auth
+      // Register user in Firebase Auth (with email verification)
       console.log('🔥 [DEBUG] Registering user in Firebase Auth...');
       let firebaseUser;
       try {
         firebaseUser = await firebaseSyncService.registerUser(normalizedEmail, userData.password);
       } catch (authError: any) {
-        // Handle "email already in use" error
         if (authError.code && authError.code.includes('api-key-not-valid')) {
-          return { success: false, error: 'API Key inválida. Verifique se a chave é do projeto correto e se não há restrições no Google Cloud.' };
+          return { success: false, error: 'API Key inválida. Verifique se a chave é do projeto correto.' };
         }
         if ((authError.code && authError.code.includes('email-already-in-use')) || (authError.message && authError.message.includes('email-already-in-use'))) {
-           console.warn('⚠️ [DEBUG] Email already in use in Auth. Trying to recover/login...');
-           // Try to login with the password provided
-           try {
-             firebaseUser = await firebaseSyncService.loginUser(normalizedEmail, userData.password);
-             console.log('✅ [DEBUG] Recovered account via login. Check if profile exists...');
-             
-             // Check if profile REALLY exists now that we are logged in
-             const existingProfile = await firebaseSyncService.getUserFromFirestore(firebaseUser.uid);
-             if (existingProfile) {
-               console.warn('⚠️ [DEBUG] Profile already exists. Logging in instead of registering.');
-               setUser(existingProfile as UserProfile);
-               setIsAuthenticated(true);
-                
-               const userCoupons = getUserCoupons((existingProfile as UserProfile).id);
-               const userOrders = getUserOrders((existingProfile as UserProfile).id);
-                
-               setCoupons(userCoupons);
-               setOrders(userOrders);
-                
-               localStorage.setItem('user', JSON.stringify(existingProfile));
-               return { success: true }; // Treat as login success
-             }
-             
-             // If we are here, we have Auth but NO profile.
-             // Proceed to create profile (overwriting the "ghost" user)
-             console.log('👻 [DEBUG] Ghost account confirmed. Proceeding to create profile...');
-           } catch (loginError) {
-             console.error('❌ [DEBUG] Email exists and password invalid:', loginError);
-             return { success: false, error: 'Email já está cadastrado com outra senha.' }; // Wrong password for existing email
-           }
-        } else {
-           const errorMessage = authError?.code
-             ? `Erro no cadastro: ${authError.code}`
-             : 'Erro ao criar conta. Tente novamente.';
-           return { success: false, error: errorMessage }; // Other errors
+          return { success: false, error: 'Este email já está cadastrado. Faça login na página de login.' };
         }
+        if (authError.code && authError.code.includes('weak-password')) {
+          return { success: false, error: 'Senha muito fraca. Use pelo menos 6 caracteres.' };
+        }
+        const errorMessage = authError?.code
+          ? `Erro no cadastro: ${authError.code}`
+          : 'Erro ao criar conta. Tente novamente.';
+        return { success: false, error: errorMessage };
       }
       
       const newUser: UserProfile = {
         ...userData,
         email: normalizedEmail,
-        id: firebaseUser.uid, // Use Firebase UID
+        id: firebaseUser.uid,
         createdAt: new Date().toISOString(),
-        password: userData.password, // Store password (demo only - use backend auth in production)
-        orders: [], // Initialize empty orders array
+        password: userData.password,
       };
       
-      console.log('🔍 [DEBUG] New user created:', { 
-        id: newUser.id, 
-        email: newUser.email,
-        hasOrders: Array.isArray(newUser.orders)
-      });
-      
       // Save to Firestore
-      console.log('🔥 [DEBUG] Saving user to Firestore...');
-      const syncValues = await firebaseSyncService.syncUserToFirestore(newUser.id, newUser);
+      const syncResult = await firebaseSyncService.syncUserToFirestore(newUser.id, newUser);
       
-      if (!syncValues) {
+      if (!syncResult) {
         console.error('❌ [CRITICAL] Failed to save user to Firestore. User created in Auth but has no profile.');
         return { success: false, error: 'Falha ao salvar na nuvem. Verifique a configuração do Firebase.' };
-      } else {
-        console.log('✅ [DEBUG] User successfully saved to Firestore');
       }
       
-      // Add new user to users database (localStorage for backup)
+      // Also save to localStorage as backup
+      const allUsers = getAllUsers();
       const updatedUsers = [...allUsers, newUser];
       saveAllUsers(updatedUsers);
       
-      console.log('🔍 [DEBUG] Total users after registration:', updatedUsers.length);
+      // DO NOT auto-login - user must verify email first
+      // Sign out the Firebase user created during registration
+      await firebaseSyncService.logoutUser();
       
-      // Verify save
-      const verifyUsers = getAllUsers();
-      const verifyUser = verifyUsers.find(u => normalizeEmail(u.email) === normalizedEmail);
-      console.log('✅ [DEBUG] User saved verification:', {
-        found: !!verifyUser,
-        email: verifyUser?.email,
-        hasOrdersArray: Array.isArray(verifyUser?.orders)
-      });
-      
-      // Set as current user
-      setUser(newUser);
-      setIsAuthenticated(true);
-      console.log('✅ [DEBUG] User set as authenticated');
-
-      // Add welcome coupon for this user
-      const welcomeCoupon: Coupon = {
-        id: `coupon-${Date.now()}`,
-        code: 'BEMVINDO10',
-        description: 'Cupom de boas-vindas - 10% de desconto',
-        discount: 10,
-        discountType: 'percentage',
-        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days
-        isUsed: false,
-      };
-      setCoupons([welcomeCoupon]);
-      
-      // Initialize empty orders for this user
-      setOrders([]);
-
-      console.log('✅ [DEBUG] ===== REGISTER COMPLETE =====');
+      console.log('✅ [DEBUG] ===== REGISTER COMPLETE - Email verification required =====');
       return { success: true };
     } catch (error) {
       console.error('❌ [DEBUG] Error registering user:', error);
@@ -931,6 +704,26 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     setOrders([]);
   };
 
+  const sendPasswordReset = async (email: string): Promise<{ success: boolean; error?: string }> => {
+    try {
+      await firebaseSyncService.sendPasswordReset(normalizeEmail(email));
+      return { success: true };
+    } catch (error: any) {
+      const code = error?.code || '';
+      if (code.includes('user-not-found')) {
+        return { success: false, error: 'Nenhuma conta encontrada com este email.' };
+      }
+      if (code.includes('too-many-requests')) {
+        return { success: false, error: 'Muitas tentativas. Aguarde alguns minutos e tente novamente.' };
+      }
+      return { success: false, error: 'Erro ao enviar email de recuperação. Tente novamente.' };
+    }
+  };
+
+  const resendVerificationEmail = async (): Promise<boolean> => {
+    return await firebaseSyncService.resendVerificationEmail();
+  };
+
   const value: UserContextType = {
     user,
     isAuthenticated,
@@ -944,6 +737,8 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     useCoupon,
     addOrder,
     clearOrderHistory,
+    sendPasswordReset,
+    resendVerificationEmail,
   };
 
   return <UserContext.Provider value={value}>{children}</UserContext.Provider>;
