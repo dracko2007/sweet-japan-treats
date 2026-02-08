@@ -5,10 +5,10 @@ import { getFirestore } from 'firebase/firestore';
 
 // Firebase Configuration
 const firebaseConfig = {
-  apiKey: "AIzaSyCKf6fYQQRk9VUPTZNcZ8gVEEn5sAdwr0g",
+  apiKey: "AIzaSyCKf6f9QqRk9VUPTzNr28gVEEn5sAdwr0g",
   authDomain: "localstorage-98492.firebaseapp.com",
   projectId: "localstorage-98492",
-  storageBucket: "localstorage-98492.appspot.com",
+  storageBucket: "localstorage-98492.firebasestorage.app",
   messagingSenderId: "1087648598267",
   appId: "1:1087648598267:web:fbfbc19ad31aa05839885e",
   measurementId: "G-BH2VFVJC2J"
