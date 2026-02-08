@@ -499,6 +499,34 @@ const Profile: React.FC = () => {
                         </div>
                       </div>
 
+                      {/* Tracking Info */}
+                      {order.status === 'shipped' && (order as any).trackingNumber && (
+                        <div className="mb-3 p-3 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800">
+                          <div className="flex items-center gap-2 mb-1">
+                            <Package className="w-4 h-4 text-blue-600" />
+                            <span className="text-sm font-semibold text-blue-800 dark:text-blue-200">Rastreamento</span>
+                          </div>
+                          <p className="text-sm text-blue-700 dark:text-blue-300 font-mono">
+                            Código: {(order as any).trackingNumber}
+                          </p>
+                          {(order as any).carrier && (
+                            <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                              Transportadora: {(order as any).carrier}
+                            </p>
+                          )}
+                          {(order as any).trackingUrl && (
+                            <a
+                              href={(order as any).trackingUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 mt-2 px-3 py-1.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                            >
+                              🔍 Rastrear Pedido
+                            </a>
+                          )}
+                        </div>
+                      )}
+
                       <div className="space-y-2">
                         {order.items.map((item, idx) => (
                           <div key={idx} className="flex justify-between text-sm">

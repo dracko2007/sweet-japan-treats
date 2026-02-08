@@ -42,6 +42,9 @@ export interface Order {
   totalAmount: number;
   paymentMethod: string;
   status: 'pending' | 'confirmed' | 'shipped' | 'delivered' | 'cancelled';
+  trackingNumber?: string;
+  trackingUrl?: string;
+  carrier?: string;
   shippingAddress: {
     name: string;
     postalCode: string;

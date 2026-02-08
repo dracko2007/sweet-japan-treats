@@ -624,8 +624,24 @@ _This is an automated test message_
             setTrackingModalOpen(false);
             setSelectedOrder(null);
           }}
-          onSuccess={(trackingNumber) => {
-            handleUpdateStatus(selectedOrder.orderNumber, 'shipped');
+          onSuccess={async (trackingNumber) => {
+            // Get carrier info and tracking URL
+            const carrier = selectedOrder.shipping?.carrier || '';
+            const getTrackingUrl = (c: string, tn: string) => {
+              const lc = c.toLowerCase();
+              if (lc.includes('yamato') || lc.includes('クロネコ')) return `https://toi.kuronekoyamato.co.jp/cgi-bin/tneko?number=${tn}`;
+              if (lc.includes('sagawa') || lc.includes('佐川')) return `https://k2k.sagawa-exp.co.jp/p/web/okurijosearch.do?okurijoNo=${tn}`;
+              if (lc.includes('japan post') || lc.includes('ゆうパック') || lc.includes('post')) return `https://trackings.post.japanpost.jp/services/srv/search/?requestNo1=${tn}&locale=ja`;
+              if (lc.includes('fukutsu') || lc.includes('福通')) return `https://corp.fukutsu.co.jp/situation/tracking_no_hunt.html?tracking_no=${tn}`;
+              return '';
+            };
+            const trackingUrl = getTrackingUrl(carrier, trackingNumber);
+            
+            // Save tracking info to order (Firestore + localStorage)
+            await orderService.updateOrderTracking(selectedOrder.orderNumber, trackingNumber, trackingUrl, carrier);
+            
+            // Also update status
+            await handleUpdateStatus(selectedOrder.orderNumber, 'shipped');
             toast({
               title: "Pedido marcado como enviado!",
               description: `Tracking: ${trackingNumber}`,

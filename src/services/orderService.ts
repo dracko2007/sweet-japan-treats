@@ -133,6 +133,73 @@ export const orderService = {
     return deleted;
   },
 
+  // Update order tracking info (both Firestore and localStorage)
+  updateOrderTracking: async (orderNumber: string, trackingNumber: string, trackingUrl: string, carrier: string): Promise<boolean> => {
+    let updated = false;
+
+    // Update in Firestore
+    try {
+      const { doc, updateDoc } = await import('firebase/firestore');
+      const { db } = await import('@/config/firebase');
+      if (db) {
+        const orderRef = doc(db, 'orders', orderNumber);
+        await updateDoc(orderRef, {
+          trackingNumber,
+          trackingUrl,
+          carrier,
+          status: 'shipped',
+          updatedAt: new Date().toISOString()
+        });
+        updated = true;
+        console.log('✅ [ORDER] Tracking saved to Firestore:', orderNumber);
+      }
+    } catch (err) {
+      console.error('❌ [ORDER] Firestore tracking update failed:', err);
+    }
+
+    // Also update in localStorage
+    const users = JSON.parse(localStorage.getItem('sweet-japan-users') || '{}');
+    Object.keys(users).forEach((email) => {
+      const user = users[email];
+      if (user.orders && user.orders.length > 0) {
+        user.orders.forEach((order: any, orderIndex: number) => {
+          if (order.orderNumber === orderNumber) {
+            users[email].orders[orderIndex].trackingNumber = trackingNumber;
+            users[email].orders[orderIndex].trackingUrl = trackingUrl;
+            users[email].orders[orderIndex].carrier = carrier;
+            users[email].orders[orderIndex].status = 'shipped';
+            users[email].orders[orderIndex].updatedAt = new Date().toISOString();
+            updated = true;
+          }
+        });
+      }
+    });
+    localStorage.setItem('sweet-japan-users', JSON.stringify(users));
+
+    // Also update per-user orders storage
+    const allKeys = Object.keys(localStorage);
+    allKeys.forEach(key => {
+      if (key.startsWith('orders_')) {
+        try {
+          const userOrders = JSON.parse(localStorage.getItem(key) || '[]');
+          let changed = false;
+          userOrders.forEach((order: any, idx: number) => {
+            if (order.orderNumber === orderNumber) {
+              userOrders[idx].trackingNumber = trackingNumber;
+              userOrders[idx].trackingUrl = trackingUrl;
+              userOrders[idx].carrier = carrier;
+              userOrders[idx].status = 'shipped';
+              changed = true;
+            }
+          });
+          if (changed) localStorage.setItem(key, JSON.stringify(userOrders));
+        } catch (e) { /* ignore */ }
+      }
+    });
+
+    return updated;
+  },
+
   // Get order by number
   getOrderByNumber: (orderNumber: string): any | null => {
     const allOrders = orderService.getAllOrders();
