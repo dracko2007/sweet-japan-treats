@@ -165,8 +165,10 @@ const OrderConfirmation: React.FC = () => {
       };
       
       // Mark coupon as used by this user
-      if (orderData.coupon && customerEmail) {
-        couponService.useCoupon(orderData.coupon.code, customerEmail);
+      if ((orderData.appliedCoupon || orderData.coupon) && customerEmail) {
+        const coupon = orderData.appliedCoupon || orderData.coupon;
+        console.log('🎟️ [COUPON] Marking coupon as used:', coupon.code, 'by', customerEmail);
+        couponService.useCoupon(coupon.code, customerEmail);
       }
       
       // Save to storage (works for logged in or guest users)
