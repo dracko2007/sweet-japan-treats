@@ -176,7 +176,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     } else if (lc.includes('sagawa') || lc.includes('佐川')) {
       newUrl = `https://k2k.sagawa-exp.co.jp/p/web/okurijosearch.do?okurijoNo=${trackingNumber}`;
     } else if (lc.includes('japan post') || lc.includes('ゆうパック') || lc.includes('post')) {
-      newUrl = `https://trackings.post.japanpost.jp/services/srv/search?requestNo1=${trackingNumber}&requestNo2=&requestNo3=&requestNo4=&requestNo5=&requestNo6=&requestNo7=&requestNo8=&requestNo9=&requestNo10=&locale=ja`;
+      newUrl = `https://trackings.post.japanpost.jp/services/srv/search/direct?reqCodeNo1=${trackingNumber}&locale=ja`;
     } else if (lc.includes('fukutsu') || lc.includes('福通')) {
       newUrl = `https://corp.fukutsu.co.jp/situation/tracking_no_hunt.html?tracking_no=${trackingNumber}`;
     }

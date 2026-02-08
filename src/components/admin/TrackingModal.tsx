@@ -36,7 +36,7 @@ const TrackingModal: React.FC<TrackingModalProps> = ({
     } else if (lowerCarrier.includes('sagawa') || lowerCarrier.includes('佐川')) {
       return `https://k2k.sagawa-exp.co.jp/p/web/okurijosearch.do?okurijoNo=${trackingNumber}`;
     } else if (lowerCarrier.includes('japan post') || lowerCarrier.includes('ゆうパック') || lowerCarrier.includes('post')) {
-      return `https://trackings.post.japanpost.jp/services/srv/search?requestNo1=${trackingNumber}&requestNo2=&requestNo3=&requestNo4=&requestNo5=&requestNo6=&requestNo7=&requestNo8=&requestNo9=&requestNo10=&locale=ja`;
+      return `https://trackings.post.japanpost.jp/services/srv/search/direct?reqCodeNo1=${trackingNumber}&locale=ja`;
     } else if (lowerCarrier.includes('fukutsu') || lowerCarrier.includes('福通')) {
       return `https://corp.fukutsu.co.jp/situation/tracking_no_hunt.html?tracking_no=${trackingNumber}`;
     }
