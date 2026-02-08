@@ -416,7 +416,23 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       console.log('🔥 [LOGIN] Attempting Firebase Auth login...');
       const firebaseUser = await firebaseSyncService.loginUser(normalizedEmail, password);
       
-      // Check email verification
+      // FIRST: Check if user actually registered (has profile in Firestore)
+      // This catches "ghost users" who exist in Auth but never completed registration
+      const userProfile = await firebaseSyncService.getUserFromFirestore(firebaseUser.uid);
+      const localUsers = getAllUsers();
+      const localUser = localUsers.find(u => normalizeEmail(u.email) === normalizedEmail);
+      
+      if (!userProfile && !localUser) {
+        // No profile in Firestore or localStorage - user never properly registered
+        console.log('⚠️ [LOGIN] Ghost user detected (Auth exists but no profile):', normalizedEmail);
+        await firebaseSyncService.logoutUser();
+        return { 
+          success: false, 
+          error: 'Usuário não cadastrado. Crie uma conta primeiro na página de cadastro.' 
+        };
+      }
+      
+      // THEN: Check email verification (only for users who actually registered)
       if (!firebaseUser.emailVerified) {
         console.log('⚠️ [LOGIN] Email not verified:', normalizedEmail);
         // Resend verification email before signing out
@@ -435,20 +451,15 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
         };
       }
       
-      // Get user data from Firestore
+      // Get user data - we already have userProfile from above
       console.log('🔥 [LOGIN] Fetching user data from Firestore...');
-      let userData = await firebaseSyncService.getUserFromFirestore(firebaseUser.uid);
+      let userData = userProfile;
       
       if (!userData) {
-        // Check localStorage as backup
-        const allUsers = getAllUsers();
-        const localUser = allUsers.find(u => normalizeEmail(u.email) === normalizedEmail);
+        // Use localStorage backup (localUser was already found above)
         if (localUser) {
           await firebaseSyncService.syncUserToFirestore(firebaseUser.uid, { ...localUser, id: firebaseUser.uid });
           userData = { ...localUser, id: firebaseUser.uid };
-        } else {
-          // No profile anywhere - user might have been deleted
-          return { success: false, error: 'Perfil não encontrado. Por favor, cadastre-se novamente.' };
         }
       }
       
