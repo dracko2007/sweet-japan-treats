@@ -502,7 +502,16 @@ const Profile: React.FC = () => {
                       {/* Tracking Info */}
                       {order.status === 'shipped' && (order as any).trackingNumber && (() => {
                         const trackingNumber = (order as any).trackingNumber;
-                        const carrierRaw = (order as any).carrier || (order as any).shipping?.carrier || '';
+                        const savedUrl = (order as any).trackingUrl || '';
+                        let carrierRaw = (order as any).carrier || (order as any).shipping?.carrier || '';
+                        
+                        // If carrier is empty, detect from saved URL
+                        if (!carrierRaw && savedUrl) {
+                          if (savedUrl.includes('kuronekoyamato')) carrierRaw = 'Yamato';
+                          else if (savedUrl.includes('sagawa')) carrierRaw = 'Sagawa';
+                          else if (savedUrl.includes('japanpost')) carrierRaw = 'Japan Post';
+                          else if (savedUrl.includes('fukutsu')) carrierRaw = 'Fukutsu';
+                        }
                         
                         // Derive carrier display name
                         const getCarrierName = (c: string) => {
@@ -514,7 +523,7 @@ const Profile: React.FC = () => {
                           return c;
                         };
                         
-                        // Derive tracking URL (use saved or reconstruct)
+                        // Always reconstruct the tracking URL with latest format
                         const getTrackingUrl = (c: string, tn: string) => {
                           const lc = c.toLowerCase();
                           if (lc.includes('yamato') || lc.includes('クロネコ')) return `https://toi.kuronekoyamato.co.jp/cgi-bin/tneko?number00=1&number01=${tn}`;
@@ -526,7 +535,7 @@ const Profile: React.FC = () => {
                         
                         const carrierName = getCarrierName(carrierRaw);
                         // Always reconstruct the URL to ensure latest format is used
-                        const trackingUrl = getTrackingUrl(carrierRaw, trackingNumber) || (order as any).trackingUrl;
+                        const trackingUrl = getTrackingUrl(carrierRaw, trackingNumber) || savedUrl;
                         
                         return (
                           <div className="mb-3 p-3 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800">
