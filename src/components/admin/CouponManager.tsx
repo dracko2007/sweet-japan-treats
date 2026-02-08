@@ -26,8 +26,10 @@ const CouponManager: React.FC = () => {
     loadCoupons();
   }, []);
 
-  const loadCoupons = () => {
-    setCoupons(couponService.getAll());
+  const loadCoupons = async () => {
+    // Load from Firestore to get the latest data
+    const allCoupons = await couponService.getAllAsync();
+    setCoupons(allCoupons);
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {

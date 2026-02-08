@@ -32,7 +32,8 @@ const CouponSelector: React.FC<CouponSelectorProps> = ({
   }, [user, appliedCoupon]);
 
   const loadAvailableCoupons = async () => {
-    const active = couponService.getActive();
+    // Load latest coupons from Firestore first (so client sees admin-created ones)
+    const active = await couponService.getActiveAsync();
     const userEmail = user?.email || '';
     
     // Filter coupons: check both localStorage AND Firestore

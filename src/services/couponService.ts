@@ -1,16 +1,91 @@
 import type { Coupon } from '@/types';
 
 const STORAGE_KEY = 'sweet-japan-coupons';
-const USAGE_FIRESTORE_KEY = 'coupon_usage';
+const FIRESTORE_COUPONS = 'coupons';
+const FIRESTORE_USAGE = 'coupon_usage';
 
-// Helper: sync coupon usage to Firestore
+// ==================== FIRESTORE HELPERS ====================
+
+// Sync a single coupon to Firestore
+const syncCouponToFirestore = async (coupon: Coupon) => {
+  try {
+    const { doc, setDoc } = await import('firebase/firestore');
+    const { db } = await import('@/config/firebase');
+    if (!db) return;
+    await setDoc(doc(db, FIRESTORE_COUPONS, coupon.code), {
+      ...coupon,
+      updatedAt: new Date().toISOString(),
+    });
+    console.log('✅ [COUPON] Synced to Firestore:', coupon.code);
+  } catch (err) {
+    console.warn('⚠️ [COUPON] Failed to sync coupon to Firestore:', err);
+  }
+};
+
+// Delete coupon from Firestore
+const deleteCouponFromFirestore = async (code: string) => {
+  try {
+    const { doc, deleteDoc } = await import('firebase/firestore');
+    const { db } = await import('@/config/firebase');
+    if (!db) return;
+    await deleteDoc(doc(db, FIRESTORE_COUPONS, code));
+    console.log('✅ [COUPON] Deleted from Firestore:', code);
+  } catch (err) {
+    console.warn('⚠️ [COUPON] Failed to delete coupon from Firestore:', err);
+  }
+};
+
+// Load all coupons from Firestore and merge with localStorage
+const loadCouponsFromFirestore = async (): Promise<Coupon[]> => {
+  try {
+    const { collection, getDocs } = await import('firebase/firestore');
+    const { db } = await import('@/config/firebase');
+    if (!db) return [];
+    
+    const snapshot = await getDocs(collection(db, FIRESTORE_COUPONS));
+    const firestoreCoupons: Coupon[] = [];
+    snapshot.forEach((doc) => {
+      const data = doc.data();
+      firestoreCoupons.push({
+        code: data.code || doc.id,
+        discount: data.discount || 0,
+        discountPercent: data.discountPercent,
+        type: data.type || 'percent',
+        expiryDate: data.expiryDate,
+        isActive: data.isActive !== false,
+        usageLimit: data.usageLimit,
+        usedCount: data.usedCount || 0,
+        description: data.description || '',
+        createdAt: data.createdAt || new Date().toISOString(),
+      });
+    });
+    
+    // Merge: Firestore takes priority, then add local-only ones
+    const localCoupons = couponService.getAll();
+    const map = new Map<string, Coupon>();
+    firestoreCoupons.forEach(c => map.set(c.code, c));
+    localCoupons.forEach(c => { if (!map.has(c.code)) map.set(c.code, c); });
+    
+    const merged = Array.from(map.values());
+    // Update localStorage with merged data
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+    
+    console.log('✅ [COUPON] Loaded from Firestore:', firestoreCoupons.length, 'coupons');
+    return merged;
+  } catch (err) {
+    console.warn('⚠️ [COUPON] Failed to load coupons from Firestore:', err);
+    return couponService.getAll();
+  }
+};
+
+// Sync coupon usage to Firestore
 const syncUsageToFirestore = async (couponCode: string, userEmail: string) => {
   try {
     const { doc, setDoc, getDoc } = await import('firebase/firestore');
     const { db } = await import('@/config/firebase');
     if (!db) return;
     
-    const usageRef = doc(db, USAGE_FIRESTORE_KEY, couponCode.toUpperCase());
+    const usageRef = doc(db, FIRESTORE_USAGE, couponCode.toUpperCase());
     const usageDoc = await getDoc(usageRef);
     const usedBy = usageDoc.exists() ? (usageDoc.data().usedBy || []) : [];
     
@@ -24,14 +99,14 @@ const syncUsageToFirestore = async (couponCode: string, userEmail: string) => {
   }
 };
 
-// Helper: check coupon usage from Firestore
+// Check coupon usage from Firestore
 const checkUsageFromFirestore = async (couponCode: string, userEmail: string): Promise<boolean> => {
   try {
     const { doc, getDoc } = await import('firebase/firestore');
     const { db } = await import('@/config/firebase');
     if (!db) return false;
     
-    const usageRef = doc(db, USAGE_FIRESTORE_KEY, couponCode.toUpperCase());
+    const usageRef = doc(db, FIRESTORE_USAGE, couponCode.toUpperCase());
     const usageDoc = await getDoc(usageRef);
     if (usageDoc.exists()) {
       const usedBy = usageDoc.data().usedBy || [];
@@ -45,15 +120,31 @@ const checkUsageFromFirestore = async (couponCode: string, userEmail: string): P
 };
 
 export const couponService = {
-  // Get all coupons
+  // Get all coupons from localStorage (sync/fast)
   getAll: (): Coupon[] => {
     const stored = localStorage.getItem(STORAGE_KEY);
     return stored ? JSON.parse(stored) : [];
   },
 
-  // Get active coupons
+  // Get all coupons from Firestore + merge with localStorage (async)
+  getAllAsync: async (): Promise<Coupon[]> => {
+    return await loadCouponsFromFirestore();
+  },
+
+  // Get active coupons (sync, from localStorage)
   getActive: (): Coupon[] => {
     const coupons = couponService.getAll();
+    const now = new Date();
+    return coupons.filter(c => 
+      c.isActive && 
+      new Date(c.expiryDate) > now &&
+      (!c.usageLimit || c.usedCount < c.usageLimit)
+    );
+  },
+
+  // Get active coupons from Firestore (async)
+  getActiveAsync: async (): Promise<Coupon[]> => {
+    const coupons = await loadCouponsFromFirestore();
     const now = new Date();
     return coupons.filter(c => 
       c.isActive && 
@@ -95,9 +186,12 @@ export const couponService = {
     return { valid: true, coupon };
   },
 
-  // Async validation that also checks Firestore (use this for checkout)
+  // Async validation: loads coupons from Firestore first, then checks usage
   validateCouponAsync: async (code: string, userEmail?: string): Promise<{ valid: boolean; coupon?: Coupon; error?: string }> => {
-    // First do local validation
+    // Load latest coupons from Firestore so client has admin-created ones
+    await loadCouponsFromFirestore();
+    
+    // Now do local validation (localStorage is up to date)
     const localResult = couponService.validateCoupon(code, userEmail);
     if (!localResult.valid) return localResult;
     
@@ -139,8 +233,10 @@ export const couponService = {
       
       localStorage.setItem(STORAGE_KEY, JSON.stringify(coupons));
       
-      // Also sync to Firestore (async, fire-and-forget)
+      // Sync usage to Firestore (fire-and-forget)
       syncUsageToFirestore(code, userEmail);
+      // Also update the coupon usedCount in Firestore
+      syncCouponToFirestore(coupons[index]);
     }
   },
 
@@ -150,7 +246,7 @@ export const couponService = {
     return JSON.parse(localStorage.getItem(usageKey) || '[]');
   },
 
-  // Create new coupon
+  // Create new coupon - saves to localStorage AND Firestore
   create: (coupon: Omit<Coupon, 'createdAt' | 'usedCount'>): Coupon => {
     const coupons = couponService.getAll();
     
@@ -163,10 +259,14 @@ export const couponService = {
 
     coupons.push(newCoupon);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(coupons));
+    
+    // Sync to Firestore (fire-and-forget)
+    syncCouponToFirestore(newCoupon);
+    
     return newCoupon;
   },
 
-  // Update coupon
+  // Update coupon - saves to localStorage AND Firestore
   update: (code: string, updates: Partial<Coupon>): boolean => {
     const coupons = couponService.getAll();
     const index = coupons.findIndex(c => c.code === code);
@@ -174,34 +274,58 @@ export const couponService = {
     if (index !== -1) {
       coupons[index] = { ...coupons[index], ...updates };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(coupons));
+      
+      // Sync to Firestore (fire-and-forget)
+      syncCouponToFirestore(coupons[index]);
+      
       return true;
     }
     return false;
   },
 
-  // Delete coupon
+  // Delete coupon - removes from localStorage AND Firestore
   delete: (code: string): boolean => {
     const coupons = couponService.getAll();
     const filtered = coupons.filter(c => c.code !== code);
     
     if (filtered.length < coupons.length) {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
+      
+      // Delete from Firestore (fire-and-forget)
+      deleteCouponFromFirestore(code);
+      
       return true;
     }
     return false;
   },
 
-  // Create default welcome coupon
-  createDefaultCoupons: (): void => {
+  // Sync all local coupons to Firestore (useful for initial migration)
+  syncAllToFirestore: async (): Promise<void> => {
     const coupons = couponService.getAll();
-    if (coupons.length === 0) {
-      // Cupom de boas-vindas
+    for (const coupon of coupons) {
+      await syncCouponToFirestore(coupon);
+    }
+    console.log('✅ [COUPON] All local coupons synced to Firestore');
+  },
+
+  // Load coupons from Firestore into localStorage (for clients)
+  loadFromFirestore: async (): Promise<Coupon[]> => {
+    return await loadCouponsFromFirestore();
+  },
+
+  // Create default welcome coupon (only if no coupons exist anywhere)
+  createDefaultCoupons: async (): Promise<void> => {
+    // First try loading from Firestore
+    const firestoreCoupons = await loadCouponsFromFirestore();
+    
+    if (firestoreCoupons.length === 0) {
+      // No coupons anywhere - create the welcome coupon
       couponService.create({
         code: 'BEMVINDO10',
         discount: 0,
         discountPercent: 10,
         type: 'percent',
-        expiryDate: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString(), // 90 days
+        expiryDate: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString(),
         isActive: true,
         description: 'Cupom de boas-vindas - 10% de desconto',
       });
@@ -209,7 +333,7 @@ export const couponService = {
   }
 };
 
-// Initialize default coupons
+// Initialize: load coupons from Firestore on startup
 if (typeof window !== 'undefined') {
   couponService.createDefaultCoupons();
 }
