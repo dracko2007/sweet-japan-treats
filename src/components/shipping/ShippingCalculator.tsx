@@ -27,6 +27,15 @@ const ShippingCalculator: React.FC<ShippingCalculatorProps> = ({
 
   const spaceInfo = getSpaceUsed();
   
+  // 🎂 Anniversary promotion: free shipping in October and November
+  const isAnniversaryPromo = useMemo(() => {
+    const currentMonth = new Date().getMonth() + 1; // 1-12
+    const isPromoMonth = currentMonth === 10 || currentMonth === 11;
+    const hasEnoughLargePots = spaceInfo.large >= 3;
+    const hasEnoughValue = totalPrice >= 5000;
+    return isPromoMonth && (hasEnoughLargePots || hasEnoughValue);
+  }, [spaceInfo.large, totalPrice]);
+
   // Calculate required boxes
   // Box 60cm: 8 small OR 1 large + 1 small (=4 small equivalent max)
   // Box 80cm: 3 large (=6 small eq) OR 2 large + 2 small (=6 small eq)
@@ -93,7 +102,8 @@ const ShippingCalculator: React.FC<ShippingCalculatorProps> = ({
         return {
           carrier,
           ...carrierNames[carrier],
-          cost: totalCost,
+          cost: isAnniversaryPromo ? 0 : totalCost,
+          originalCost: isAnniversaryPromo ? totalCost : undefined,
           estimatedDays: zone === 1 ? '1-2' : zone === 2 ? '2-3' : '3-4'
         };
       });
@@ -164,6 +174,19 @@ const ShippingCalculator: React.FC<ShippingCalculatorProps> = ({
           ))}
         </select>
       </div>
+
+      {/* Anniversary Promotion Banner */}
+      {isAnniversaryPromo && items.length > 0 && (
+        <div className="bg-gradient-to-r from-amber-100 to-orange-100 dark:from-amber-950 dark:to-orange-950 rounded-xl p-4 mb-6 border-2 border-amber-400 dark:border-amber-600">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-2xl">🎂</span>
+            <h3 className="font-bold text-amber-800 dark:text-amber-200">Promoção de Aniversário!</h3>
+          </div>
+          <p className="text-sm text-amber-700 dark:text-amber-300">
+            🎉 Frete GRÁTIS em outubro e novembro para pedidos com 3+ potes grandes ou acima de ¥5.000!
+          </p>
+        </div>
+      )}
 
       {/* Cart Summary */}
       {items.length > 0 && (
@@ -258,11 +281,20 @@ const ShippingCalculator: React.FC<ShippingCalculatorProps> = ({
                 <div className="text-right">
                   <p className={cn(
                     "font-display text-xl font-bold",
-                    option.carrier === 'pickup' ? "text-green-600" : "text-primary"
+                    option.carrier === 'pickup' ? "text-green-600" : 
+                    option.cost === 0 && option.originalCost ? "text-green-600" : "text-primary"
                   )}>
                     {option.cost === 0 ? 'GRÁTIS' : `¥${option.cost.toLocaleString()}`}
                   </p>
-                  {!onShippingSelect && index === 0 && option.carrier !== 'pickup' && (
+                  {option.originalCost && option.originalCost > 0 && (
+                    <p className="text-xs text-muted-foreground line-through">
+                      ¥{option.originalCost.toLocaleString()}
+                    </p>
+                  )}
+                  {option.cost === 0 && option.originalCost && (
+                    <span className="text-xs text-amber-600 font-medium">🎂 Aniversário</span>
+                  )}
+                  {!onShippingSelect && index === 0 && option.carrier !== 'pickup' && !isAnniversaryPromo && (
                     <span className="text-xs text-primary font-medium">Mais barato</span>
                   )}
                   {!onShippingSelect && option.carrier === 'pickup' && (
