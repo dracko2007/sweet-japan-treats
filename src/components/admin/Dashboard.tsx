@@ -10,9 +10,10 @@ const Dashboard: React.FC = () => {
     loadData();
   }, []);
 
-  const loadData = () => {
-    const statistics = orderService.getStatistics();
-    const monthly = orderService.getMonthlyData(6);
+  const loadData = async () => {
+    const orders = await orderService.getAllOrdersAsync();
+    const statistics = orderService.getStatistics(orders);
+    const monthly = orderService.getMonthlyData(6, orders);
     setStats(statistics);
     setMonthlyData(monthly);
   };

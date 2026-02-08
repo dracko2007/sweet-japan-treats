@@ -38,13 +38,13 @@ const Admin: React.FC = () => {
     loadOrders();
   }, [user, navigate]);
 
-  const loadOrders = () => {
-    const orders = orderService.getAllOrders();
+  const loadOrders = async () => {
+    const orders = await orderService.getAllOrdersAsync();
     setAllOrders(orders);
   };
 
-  const handleUpdateStatus = (orderNumber: string, newStatus: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled') => {
-    const success = orderService.updateOrderStatus(orderNumber, newStatus);
+  const handleUpdateStatus = async (orderNumber: string, newStatus: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled') => {
+    const success = await orderService.updateOrderStatus(orderNumber, newStatus);
     
     if (success) {
       toast({
@@ -61,12 +61,12 @@ const Admin: React.FC = () => {
     }
   };
 
-  const handleDeleteOrder = (orderNumber: string) => {
+  const handleDeleteOrder = async (orderNumber: string) => {
     if (!confirm(`Tem certeza que deseja excluir o pedido ${orderNumber}?`)) {
       return;
     }
 
-    const success = orderService.deleteOrder(orderNumber);
+    const success = await orderService.deleteOrder(orderNumber);
     
     if (success) {
       toast({

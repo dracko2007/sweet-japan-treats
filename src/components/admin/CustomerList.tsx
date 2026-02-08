@@ -12,9 +12,9 @@ const CustomerList: React.FC = () => {
     loadCustomers();
   }, []);
 
-  const loadCustomers = () => {
-    const allCustomers = customerService.getAllCustomers();
-    const stats = customerService.getCustomerOverview();
+  const loadCustomers = async () => {
+    const allCustomers = await customerService.getAllCustomersAsync();
+    const stats = await customerService.getCustomerOverviewAsync();
     setCustomers(allCustomers);
     setOverview(stats);
   };

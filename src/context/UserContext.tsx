@@ -700,7 +700,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     );
   };
 
-  const addOrder = (orderData: Omit<Order, 'id' | 'orderNumber' | 'date'>) => {
+  const addOrder = async (orderData: Omit<Order, 'id' | 'orderNumber' | 'date'>) => {
     const newOrder: Order = {
       ...orderData,
       id: `order-${Date.now()}`,
@@ -711,20 +711,36 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     // Atualiza os pedidos do usuário atual
     setOrders(prev => [newOrder, ...prev]);
     
-    // Também atualiza na base global de usuários
+    // Sync to Firestore
+    if (user) {
+      try {
+        await firebaseSyncService.syncOrderToFirestore(user.id, {
+          ...newOrder,
+          orderDate: newOrder.date,
+          totalPrice: newOrder.totalAmount,
+          customerEmail: user.email,
+          customerName: user.name,
+          customerPhone: user.phone,
+        });
+        console.log('✅ [ORDER] Synced to Firestore:', newOrder.orderNumber);
+      } catch (err) {
+        console.error('❌ [ORDER] Failed to sync to Firestore:', err);
+      }
+    }
+    
+    // Também atualiza na base global de usuários (localStorage backup)
     if (user) {
       const usersData = localStorage.getItem('sweet-japan-users');
       if (usersData) {
         const users = JSON.parse(usersData);
         if (users[user.email]) {
-          // Adiciona o pedido ao array de pedidos do usuário
           if (!users[user.email].orders) {
             users[user.email].orders = [];
           }
           users[user.email].orders.unshift({
             ...newOrder,
-            orderDate: newOrder.date, // Adiciona orderDate para compatibilidade
-            totalPrice: newOrder.totalAmount, // Adiciona totalPrice para compatibilidade
+            orderDate: newOrder.date,
+            totalPrice: newOrder.totalAmount,
           });
           localStorage.setItem('sweet-japan-users', JSON.stringify(users));
         }
