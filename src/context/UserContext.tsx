@@ -63,7 +63,7 @@ interface UserContextType {
   updateProfile: (userData: Partial<UserProfile>) => void;
   addCoupon: (coupon: Coupon) => void;
   useCoupon: (couponId: string) => void;
-  addOrder: (order: Omit<Order, 'id' | 'orderNumber' | 'date'>) => void;
+  addOrder: (order: Omit<Order, 'id' | 'orderNumber' | 'date'>) => Promise<void> | void;
   clearOrderHistory: () => void;
 }
 
@@ -126,6 +126,57 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     localStorage.setItem(`orders_${userId}`, JSON.stringify(orders));
   };
 
+  // Helper: sync local orders to Firestore for a user
+  const syncLocalOrdersToFirestore = async (userId: string, email: string, localOrders: Order[]) => {
+    if (localOrders.length === 0) return;
+    console.log(`🔄 [SYNC] Syncing ${localOrders.length} local orders to Firestore for ${email}...`);
+    for (const order of localOrders) {
+      try {
+        await firebaseSyncService.syncOrderToFirestore(userId, {
+          ...order,
+          orderDate: order.date,
+          totalPrice: order.totalAmount,
+          customerEmail: email,
+        });
+      } catch (err) {
+        console.warn('⚠️ [SYNC] Failed to sync order:', order.orderNumber, err);
+      }
+    }
+    console.log('✅ [SYNC] Local orders synced to Firestore');
+  };
+
+  // Helper: load orders from Firestore for a user
+  const loadOrdersFromFirestore = async (userId: string): Promise<Order[]> => {
+    try {
+      const firestoreOrders = await firebaseSyncService.getOrdersFromFirestore(userId);
+      return firestoreOrders.map((o: any) => ({
+        id: o.id || o.orderNumber,
+        orderNumber: o.orderNumber || o.id,
+        date: o.date || o.orderDate || o.syncedAt,
+        items: o.items || [],
+        totalAmount: o.totalAmount || o.totalPrice || 0,
+        paymentMethod: o.paymentMethod || '',
+        status: o.status || 'pending',
+        shippingAddress: o.shippingAddress || {},
+      })) as Order[];
+    } catch (err) {
+      console.warn('⚠️ [SYNC] Could not load orders from Firestore:', err);
+      return [];
+    }
+  };
+
+  // Merge local + Firestore orders (deduplicate by orderNumber)
+  const mergeOrders = (local: Order[], firestore: Order[]): Order[] => {
+    const map = new Map<string, Order>();
+    // Firestore orders first (source of truth)
+    firestore.forEach(o => map.set(o.orderNumber, o));
+    // Local orders (only if not already from Firestore)
+    local.forEach(o => { if (!map.has(o.orderNumber)) map.set(o.orderNumber, o); });
+    return Array.from(map.values()).sort((a, b) =>
+      new Date(b.date).getTime() - new Date(a.date).getTime()
+    );
+  };
+
   // Load user data from localStorage on mount AND listen to Firebase auth
   useEffect(() => {
     // Listener do Firebase Auth
@@ -140,14 +191,26 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
           setUser(firestoreUser as UserProfile);
           setIsAuthenticated(true);
           
-          // Load user-specific coupons and orders from localStorage (temporariamente)
+          // Load local orders
+          const localOrders = getUserOrders(firestoreUser.id);
           const userCoupons = getUserCoupons(firestoreUser.id);
-          const userOrders = getUserOrders(firestoreUser.id);
           
+          // Load Firestore orders
+          const firestoreOrders = await loadOrdersFromFirestore(firebaseUser.uid);
+          
+          // Merge and set
+          const allOrders = mergeOrders(localOrders, firestoreOrders);
           setCoupons(userCoupons);
-          setOrders(userOrders);
+          setOrders(allOrders);
           
-          // Também salva no localStorage para backup
+          // Sync any local-only orders UP to Firestore
+          const localOnlyOrders = localOrders.filter(
+            lo => !firestoreOrders.some(fo => fo.orderNumber === lo.orderNumber)
+          );
+          if (localOnlyOrders.length > 0) {
+            syncLocalOrdersToFirestore(firebaseUser.uid, (firestoreUser as any).email, localOnlyOrders);
+          }
+          
           localStorage.setItem('user', JSON.stringify(firestoreUser));
         }
       } else {
@@ -297,12 +360,22 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
         setUser(userData as UserProfile);
         setIsAuthenticated(true);
         
-        // Load user-specific coupons and orders
-        const userCoupons = getUserCoupons(userData.id);
-        const userOrders = getUserOrders(userData.id);
+        // Load local orders + Firestore orders and merge
+        const localOrders = getUserOrders(userData.id);
+        const firestoreOrders = await loadOrdersFromFirestore(firebaseUser.uid);
+        const allOrders = mergeOrders(localOrders, firestoreOrders);
         
+        const userCoupons = getUserCoupons(userData.id);
         setCoupons(userCoupons);
-        setOrders(userOrders);
+        setOrders(allOrders);
+        
+        // Sync local-only orders UP to Firestore
+        const localOnlyOrders = localOrders.filter(
+          lo => !firestoreOrders.some(fo => fo.orderNumber === lo.orderNumber)
+        );
+        if (localOnlyOrders.length > 0) {
+          syncLocalOrdersToFirestore(firebaseUser.uid, (userData as any).email, localOnlyOrders);
+        }
         
         // Also save to localStorage for backup
         localStorage.setItem('user', JSON.stringify(userData));
