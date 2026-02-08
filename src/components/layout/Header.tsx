@@ -221,6 +221,19 @@ const Header: React.FC = () => {
                 </Link>
               </Button>
             )}
+            {/* Admin Mobile - Only for Paula */}
+            {isAuthenticated && user?.email === 'dracko2007@gmail.com' && (
+              <Button 
+                asChild
+                variant="ghost" 
+                className="w-full justify-start text-base font-medium text-orange-600 hover:text-orange-700"
+              >
+                <Link to="/admin" onClick={() => setIsMenuOpen(false)}>
+                  <UserCircle className="w-5 h-5 mr-2" />
+                  🔐 Painel Admin
+                </Link>
+              </Button>
+            )}
           </nav>
         )}
       </div>
