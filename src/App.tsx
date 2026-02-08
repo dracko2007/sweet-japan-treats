@@ -25,6 +25,7 @@ import ProductDetail from "./pages/ProductDetail";
 import NotFound from "./pages/NotFound";
 import FirebaseSync from "./pages/FirebaseSync";
 import SyncData from "./pages/SyncData";
+import ScrollToTop from "./components/ScrollToTop";
 
 const queryClient = new QueryClient();
 
@@ -60,6 +61,7 @@ const App = () => (
           <Toaster />
           <Sonner />
           <BrowserRouter>
+            <ScrollToTop />
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/produtos" element={<Products />} />

@@ -161,7 +161,11 @@ const OrderConfirmation: React.FC = () => {
           address: orderData.formData.address,
           building: orderData.formData.building,
         },
-        shipping: orderData.shipping
+        shipping: orderData.shipping,
+        couponDiscount: couponDiscount > 0 ? couponDiscount : undefined,
+        couponCode: (orderData.appliedCoupon || orderData.coupon)?.code || undefined,
+        appliedCoupon: orderData.appliedCoupon || orderData.coupon || undefined,
+        subtotal: orderData.totalPrice,
       };
       
       // Mark coupon as used by this user

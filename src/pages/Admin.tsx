@@ -540,9 +540,38 @@ _This is an automated test message_
                               <span className="font-semibold">¥{(item.price * item.quantity).toLocaleString()}</span>
                             </div>
                           ))}
-                          <div className="pt-2 border-t border-border flex justify-between font-semibold">
-                            <span>Total</span>
-                            <span className="text-primary">¥{order.totalPrice.toLocaleString()}</span>
+                          <div className="pt-2 border-t border-border space-y-1">
+                            {/* Subtotal */}
+                            <div className="flex justify-between text-sm">
+                              <span>Subtotal</span>
+                              <span>¥{(order.subtotal || order.items.reduce((sum: number, item: any) => sum + item.price * item.quantity, 0)).toLocaleString()}</span>
+                            </div>
+                            
+                            {/* Coupon Discount */}
+                            {(order.couponDiscount && order.couponDiscount > 0) && (
+                              <div className="flex justify-between text-sm text-green-600">
+                                <span className="flex items-center gap-1">
+                                  <Tag className="w-3 h-3" />
+                                  Cupom {order.couponCode && <span className="font-mono bg-green-100 px-1 rounded text-xs">{order.couponCode}</span>}
+                                </span>
+                                <span>-¥{order.couponDiscount.toLocaleString()}</span>
+                              </div>
+                            )}
+                            
+                            {/* Shipping */}
+                            <div className="flex justify-between text-sm">
+                              <span className="flex items-center gap-1">
+                                <Truck className="w-3 h-3" />
+                                Frete {order.shipping?.carrier && <span className="text-muted-foreground text-xs">({order.shipping.carrier})</span>}
+                              </span>
+                              <span>{order.shipping?.cost != null ? (order.shipping.cost === 0 ? <span className="text-green-600">Grátis</span> : `¥${order.shipping.cost.toLocaleString()}`) : 'N/A'}</span>
+                            </div>
+                            
+                            {/* Total */}
+                            <div className="flex justify-between font-semibold pt-1 border-t border-border">
+                              <span>Total</span>
+                              <span className="text-primary">¥{order.totalPrice.toLocaleString()}</span>
+                            </div>
                           </div>
                         </div>
                       </div>

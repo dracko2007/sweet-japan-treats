@@ -42,6 +42,9 @@ export interface OrderData {
   shipping?: ShippingInfo;
   paymentMethod: 'bank' | 'paypay';
   deliveryTime?: string;
+  couponDiscount?: number;
+  appliedCoupon?: { code: string; discount: number; [key: string]: any };
+  coupon?: { code: string; discount: number; [key: string]: any };
 }
 
 export interface OrderItem {
