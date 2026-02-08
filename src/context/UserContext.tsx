@@ -570,15 +570,50 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
           return { success: false, error: 'API Key inválida. Verifique se a chave é do projeto correto.' };
         }
         if ((authError.code && authError.code.includes('email-already-in-use')) || (authError.message && authError.message.includes('email-already-in-use'))) {
-          return { success: false, error: 'Este email já está cadastrado. Faça login na página de login.' };
-        }
-        if (authError.code && authError.code.includes('weak-password')) {
+          // Ghost user check: exists in Auth but maybe not in Firestore
+          console.log('⚠️ [REGISTER] Email already in Auth. Checking for ghost user...');
+          try {
+            // Try to login with provided password to recover the ghost account
+            const ghostUser = await firebaseSyncService.loginUser(normalizedEmail, userData.password);
+            
+            // Check if profile exists in Firestore
+            const existingProfile = await firebaseSyncService.getUserFromFirestore(ghostUser.uid);
+            
+            if (existingProfile) {
+              // Real user with profile - truly already registered
+              await firebaseSyncService.logoutUser();
+              return { success: false, error: 'Este email já está cadastrado. Faça login na página de login.' };
+            }
+            
+            // Ghost user confirmed: Auth exists but NO Firestore profile
+            // Treat as new registration - create profile and send verification
+            console.log('👻 [REGISTER] Ghost user confirmed. Creating profile...');
+            firebaseUser = ghostUser;
+            
+            // Resend verification email since they never verified
+            if (!ghostUser.emailVerified) {
+              try {
+                await firebaseSyncService.resendVerificationEmail();
+                console.log('📧 [REGISTER] Verification email resent for ghost user');
+              } catch (e) {
+                console.warn('⚠️ [REGISTER] Could not resend verification:', e);
+              }
+            }
+            // Fall through to profile creation below
+          } catch (loginError: any) {
+            // Can't login - wrong password for existing Auth account
+            console.log('❌ [REGISTER] Ghost user exists but password mismatch');
+            await firebaseSyncService.logoutUser().catch(() => {});
+            return { success: false, error: 'Este email já existe com outra senha. Tente fazer login ou use "Esqueceu a senha?" para redefinir.' };
+          }
+        } else if (authError.code && authError.code.includes('weak-password')) {
           return { success: false, error: 'Senha muito fraca. Use pelo menos 6 caracteres.' };
+        } else {
+          const errorMessage = authError?.code
+            ? `Erro no cadastro: ${authError.code}`
+            : 'Erro ao criar conta. Tente novamente.';
+          return { success: false, error: errorMessage };
         }
-        const errorMessage = authError?.code
-          ? `Erro no cadastro: ${authError.code}`
-          : 'Erro ao criar conta. Tente novamente.';
-        return { success: false, error: errorMessage };
       }
       
       const newUser: UserProfile = {
