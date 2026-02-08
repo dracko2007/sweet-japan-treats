@@ -263,12 +263,26 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
         const firestoreUser = await firebaseSyncService.getUserFromFirestore(firebaseUser.uid);
         
         if (firestoreUser) {
-          setUser(firestoreUser as UserProfile);
+          // Merge Firestore data with local data (keep more complete profile)
+          const localUser = storedUser ? JSON.parse(localStorage.getItem('user') || '{}') : {};
+          const mergedUser: UserProfile = {
+            ...localUser,
+            ...firestoreUser,
+            // Keep the most complete address (Firestore if has data, else local)
+            address: (firestoreUser as any).address?.postalCode 
+              ? { ...localUser.address, ...(firestoreUser as any).address }
+              : localUser.address || (firestoreUser as any).address || {},
+            // Keep birthdate from whichever source has it
+            birthdate: (firestoreUser as any).birthdate || localUser.birthdate || undefined,
+            phone: (firestoreUser as any).phone || localUser.phone || '',
+          } as UserProfile;
+          
+          setUser(mergedUser);
           setIsAuthenticated(true);
           
           // Load local orders
-          const localOrders = getUserOrders(firestoreUser.id);
-          const userCoupons = getUserCoupons(firestoreUser.id);
+          const localOrders = getUserOrders(mergedUser.id);
+          const userCoupons = getUserCoupons(mergedUser.id);
           
           // Load Firestore orders
           const firestoreOrders = await loadOrdersFromFirestore(firebaseUser.uid);
@@ -286,7 +300,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
             syncLocalOrdersToFirestore(firebaseUser.uid, (firestoreUser as any).email, localOnlyOrders);
           }
           
-          localStorage.setItem('user', JSON.stringify(firestoreUser));
+          localStorage.setItem('user', JSON.stringify(mergedUser));
         }
       } else {
         console.log('🔥 [FIREBASE] Auth state changed - no Firebase user');
@@ -825,12 +839,25 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       
       setUser(updatedUser);
       
-      // Also update in users database
+      // Also update in users database (localStorage)
       const allUsers = getAllUsers();
       const updatedUsers = allUsers.map(u => 
         u.id === user.id ? updatedUser : u
       );
       saveAllUsers(updatedUsers);
+      
+      // Sync to Firestore (fire-and-forget)
+      firebaseSyncService.syncUserToFirestore(user.id, {
+        name: updatedUser.name,
+        email: updatedUser.email,
+        phone: updatedUser.phone,
+        birthdate: updatedUser.birthdate || null,
+        address: updatedUser.address || {},
+      }).then(() => {
+        console.log('✅ [SYNC] Profile synced to Firestore');
+      }).catch(err => {
+        console.warn('⚠️ [SYNC] Failed to sync profile to Firestore:', err);
+      });
       
       console.log('✅ User profile updated:', { 
         id: updatedUser.id, 
