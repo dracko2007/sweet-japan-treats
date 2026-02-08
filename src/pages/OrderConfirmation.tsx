@@ -177,7 +177,7 @@ const OrderConfirmation: React.FC = () => {
       // Also add to context if authenticated
       if (isAuthenticated) {
         console.log('🔍 [DEBUG] User is authenticated, also saving to context');
-        await addOrder({
+        addOrder({
           items: newOrder.items,
           totalAmount: finalTotal,
           paymentMethod: orderData.paymentMethod,
