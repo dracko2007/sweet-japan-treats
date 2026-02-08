@@ -339,14 +339,14 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
         return { success: false, error: friendlyMessage, code: authCode };
       }
 
-      if (firebaseConfigReady) {
-        const friendlyMessage = authCode
-          ? `Erro ao autenticar no Firebase: ${authCode}`
-          : 'Erro ao autenticar no Firebase. Verifique as credenciais e tente novamente.';
-        return { success: false, error: friendlyMessage, code: authCode };
-      }
-      
-      // Fallback to localStorage
+      // For invalid-credential or user-not-found, try localStorage fallback + auto-migration
+      const isCredentialError = [
+        'auth/invalid-credential',
+        'auth/user-not-found',
+        'auth/wrong-password'
+      ].some(code => authCode.includes(code));
+
+      // Fallback to localStorage (for users created before Firebase Auth was working)
       const allUsers = getAllUsers();
       console.log('🔍 Login attempt (localStorage):', { email });
       console.log('📦 Total users in database:', allUsers.length);
