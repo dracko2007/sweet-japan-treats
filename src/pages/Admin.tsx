@@ -36,6 +36,14 @@ const Admin: React.FC = () => {
     }
 
     loadOrders();
+
+    // Auto-refresh orders every 30 seconds
+    const interval = setInterval(() => {
+      console.log('🔄 [ADMIN] Auto-refreshing orders...');
+      loadOrders();
+    }, 30000);
+
+    return () => clearInterval(interval);
   }, [user, navigate]);
 
   const loadOrders = async () => {

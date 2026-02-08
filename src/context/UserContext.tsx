@@ -200,7 +200,24 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
 
   // Load user data from localStorage on mount AND listen to Firebase auth
   useEffect(() => {
-    // Listener do Firebase Auth
+    // IMMEDIATELY load from localStorage so user stays logged in on refresh
+    const storedUser = localStorage.getItem('user');
+    if (storedUser) {
+      try {
+        const userData = JSON.parse(storedUser);
+        console.log('⚡ [INIT] Restoring user from localStorage:', userData.email);
+        setUser(userData);
+        setIsAuthenticated(true);
+        const userCoupons = getUserCoupons(userData.id);
+        const userOrders = getUserOrders(userData.id);
+        setCoupons(userCoupons);
+        setOrders(userOrders);
+      } catch (e) {
+        console.error('❌ [INIT] Failed to parse stored user:', e);
+      }
+    }
+
+    // Listener do Firebase Auth (will update/enrich data when ready)
     const unsubscribe = firebaseSyncService.onAuthChange(async (firebaseUser) => {
       if (firebaseUser) {
         console.log('🔥 [FIREBASE] Auth state changed - user logged in:', firebaseUser.uid);
@@ -235,19 +252,23 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
           localStorage.setItem('user', JSON.stringify(firestoreUser));
         }
       } else {
-        console.log('🔥 [FIREBASE] Auth state changed - user logged out');
-        // Tenta carregar do localStorage como fallback
+        console.log('🔥 [FIREBASE] Auth state changed - no Firebase user');
+        // DON'T clear session - localStorage user may be valid (e.g. admin login)
+        // Only clear if there's no stored user either
         const storedUser = localStorage.getItem('user');
         if (storedUser) {
-          const userData = JSON.parse(storedUser);
-          setUser(userData);
-          setIsAuthenticated(true);
-          
-          const userCoupons = getUserCoupons(userData.id);
-          const userOrders = getUserOrders(userData.id);
-          
-          setCoupons(userCoupons);
-          setOrders(userOrders);
+          try {
+            const userData = JSON.parse(storedUser);
+            console.log('🔥 [FIREBASE] Keeping localStorage session for:', userData.email);
+            setUser(userData);
+            setIsAuthenticated(true);
+            const userCoupons = getUserCoupons(userData.id);
+            const userOrders = getUserOrders(userData.id);
+            setCoupons(userCoupons);
+            setOrders(userOrders);
+          } catch (e) {
+            console.error('❌ Failed to parse stored user');
+          }
         }
       }
     });
