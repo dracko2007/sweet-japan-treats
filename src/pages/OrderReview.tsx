@@ -313,7 +313,7 @@ const OrderReview: React.FC = () => {
       </section>
 
       {/* Print Styles */}
-      <style jsx>{`
+      <style dangerouslySetInnerHTML={{ __html: `
         @media print {
           @page {
             margin: 1cm;
@@ -323,7 +323,7 @@ const OrderReview: React.FC = () => {
             -webkit-print-color-adjust: exact;
           }
         }
-      `}</style>
+      ` }} />
     </Layout>
   );
 };

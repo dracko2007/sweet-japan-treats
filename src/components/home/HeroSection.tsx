@@ -1,9 +1,12 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Play, ArrowRight } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useLanguage } from '@/context/LanguageContext';
 
 const HeroSection: React.FC = () => {
+  const { t } = useLanguage();
+
   return (
     <section className="relative min-h-[90vh] gradient-hero overflow-hidden">
       {/* Decorative elements */}
@@ -18,31 +21,29 @@ const HeroSection: React.FC = () => {
           <div className="space-y-8 animate-fade-up">
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary text-sm font-medium">
               <span className="w-2 h-2 bg-primary rounded-full animate-pulse" />
-              Feito artesanalmente no Japão
+              {t('hero.badge')}
             </div>
             
             <h1 className="font-display text-5xl lg:text-7xl font-bold leading-tight text-foreground">
-              O verdadeiro sabor do{' '}
-              <span className="text-gradient">doce de leite</span>{' '}
-              brasileiro
+              {t('hero.title.1')}{' '}
+              <span className="text-gradient">{t('hero.title.highlight')}</span>{' '}
+              {t('hero.title.2')}
             </h1>
             
             <p className="text-lg text-muted-foreground max-w-lg leading-relaxed">
-              Produzido com ingredientes selecionados e técnicas tradicionais, 
-              nosso doce de leite traz toda a cremosidade e sabor que você 
-              conhece e ama, direto de Mie para todo o Japão.
+              {t('hero.description')}
             </p>
 
             <div className="flex flex-wrap items-center gap-4">
               <Button asChild size="lg" className="btn-primary rounded-full px-8 text-base">
                 <Link to="/produtos">
-                  Ver Produtos
+                  {t('hero.cta.products')}
                   <ArrowRight className="w-5 h-5 ml-2" />
                 </Link>
               </Button>
               <Button asChild variant="outline" size="lg" className="rounded-full px-8 text-base border-2">
                 <Link to="/sobre">
-                  Nossa História
+                  {t('hero.cta.story')}
                 </Link>
               </Button>
             </div>
@@ -51,17 +52,17 @@ const HeroSection: React.FC = () => {
             <div className="flex items-center gap-8 pt-4">
               <div>
                 <p className="font-display text-3xl font-bold text-foreground">100%</p>
-                <p className="text-sm text-muted-foreground">Artesanal</p>
+                <p className="text-sm text-muted-foreground">{t('hero.stat.artesanal')}</p>
               </div>
               <div className="w-px h-12 bg-border" />
               <div>
                 <p className="font-display text-3xl font-bold text-foreground">7+</p>
-                <p className="text-sm text-muted-foreground">Sabores</p>
+                <p className="text-sm text-muted-foreground">{t('hero.stat.flavors')}</p>
               </div>
               <div className="w-px h-12 bg-border" />
               <div>
                 <p className="font-display text-3xl font-bold text-foreground">47</p>
-                <p className="text-sm text-muted-foreground">Províncias</p>
+                <p className="text-sm text-muted-foreground">{t('hero.stat.provinces')}</p>
               </div>
             </div>
           </div>
@@ -77,7 +78,6 @@ const HeroSection: React.FC = () => {
                 preload="metadata"
               >
                 <source src="/video/preparo.mp4" type="video/mp4" />
-                Seu navegador não suporta vídeo HTML5.
               </video>
 
               {/* Decorative border */}
@@ -91,8 +91,8 @@ const HeroSection: React.FC = () => {
                   <span className="text-2xl">🇧🇷</span>
                 </div>
                 <div>
-                  <p className="font-display font-semibold text-sm">Receita Brasileira</p>
-                  <p className="text-xs text-muted-foreground">Tradição desde sempre</p>
+                  <p className="font-display font-semibold text-sm">{t('hero.badge.recipe')}</p>
+                  <p className="text-xs text-muted-foreground">{t('hero.badge.tradition')}</p>
                 </div>
               </div>
             </div>

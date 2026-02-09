@@ -3,8 +3,10 @@ import { Link } from 'react-router-dom';
 import { ArrowRight, Star } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { products } from '@/data/products';
+import { useLanguage } from '@/context/LanguageContext';
 
 const FeaturedProducts: React.FC = () => {
+  const { t } = useLanguage();
   const featuredProducts = products.slice(0, 4);
 
   return (
@@ -13,14 +15,13 @@ const FeaturedProducts: React.FC = () => {
         {/* Header */}
         <div className="text-center mb-16 animate-fade-up">
           <span className="inline-block px-4 py-1.5 rounded-full bg-primary/10 text-primary text-sm font-medium mb-4">
-            Nossos Produtos
+            {t('featured.badge')}
           </span>
           <h2 className="font-display text-4xl lg:text-5xl font-bold text-foreground mb-4">
-            Descubra nossos sabores
+            {t('featured.title')}
           </h2>
           <p className="text-muted-foreground max-w-2xl mx-auto">
-            Cada pote é preparado com carinho, seguindo receitas tradicionais 
-            brasileiras adaptadas com ingredientes locais japoneses de alta qualidade.
+            {t('featured.description')}
           </p>
         </div>
 
@@ -71,7 +72,7 @@ const FeaturedProducts: React.FC = () => {
                       : 'bg-primary/20 text-primary'
                     }
                   `}>
-                    {product.category === 'premium' ? '★ Premium' : 'Artesanal'}
+                    {product.category === 'premium' ? t('product.category.premium') : t('product.category.artesanal')}
                   </span>
                 </div>
 
@@ -90,7 +91,7 @@ const FeaturedProducts: React.FC = () => {
                 
                 <div className="flex items-center justify-between mt-4">
                   <div>
-                    <p className="text-xs text-muted-foreground">A partir de</p>
+                    <p className="text-xs text-muted-foreground">{t('featured.from')}</p>
                     <p className="font-display text-xl font-bold text-primary">
                       ¥{product.prices.small.toLocaleString()}
                     </p>
@@ -109,7 +110,7 @@ const FeaturedProducts: React.FC = () => {
         <div className="text-center">
           <Button asChild size="lg" className="btn-primary rounded-full px-8">
             <Link to="/produtos">
-              Ver todos os produtos
+              {t('featured.viewAll')}
               <ArrowRight className="w-5 h-5 ml-2" />
             </Link>
           </Button>

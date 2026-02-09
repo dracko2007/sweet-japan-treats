@@ -19,10 +19,3 @@ console.log('📧 EmailJS Config:', {
   source: import.meta.env.VITE_EMAILJS_SERVICE_ID ? 'env vars' : 'hardcoded fallback'
 });
 
-// Log para debug
-console.log('📧 EmailJS Config:', {
-  serviceId: emailJsConfig.serviceId,
-  templateId: emailJsConfig.templateId,
-  publicKey: emailJsConfig.publicKey ? emailJsConfig.publicKey.substring(0, 5) + '...' : 'MISSING',
-  source: import.meta.env.VITE_EMAILJS_SERVICE_ID ? 'env vars' : 'hardcoded fallback'
-});

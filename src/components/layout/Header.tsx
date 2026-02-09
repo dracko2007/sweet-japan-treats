@@ -3,28 +3,31 @@ import { Link, useLocation } from 'react-router-dom';
 import { ShoppingCart, Menu, X, ChevronDown, UserCircle, Heart } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
 import { useUser } from '@/context/UserContext';
+import { useLanguage } from '@/context/LanguageContext';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import LanguageSwitcher from '@/components/LanguageSwitcher';
 
 const Header: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isProductsOpen, setIsProductsOpen] = useState(false);
   const { totalItems } = useCart();
   const { isAuthenticated, user } = useUser();
+  const { t } = useLanguage();
   const location = useLocation();
 
   const navItems = [
     { 
-      label: 'Produtos', 
+      label: t('nav.products'), 
       href: '/produtos',
       submenu: [
-        { label: 'Artesanal', href: '/produtos/artesanal' },
-        { label: 'Premium', href: '/produtos/premium' }
+        { label: t('nav.products.artesanal'), href: '/produtos/artesanal' },
+        { label: t('nav.products.premium'), href: '/produtos/premium' }
       ]
     },
-    { label: 'Vlog', href: '/vlog' },
-    { label: 'Frete', href: '/frete' },
-    { label: 'Quem Somos', href: '/sobre' },
+    { label: t('nav.vlog'), href: '/vlog' },
+    { label: t('nav.shipping'), href: '/frete' },
+    { label: t('nav.about'), href: '/sobre' },
   ];
 
   const isActive = (path: string) => location.pathname === path || location.pathname.startsWith(path + '/');
@@ -88,7 +91,7 @@ const Header: React.FC = () => {
                         to={item.href}
                         className="block px-4 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors"
                       >
-                        Todos os Produtos
+                        {t('nav.products.all')}
                       </Link>
                       {item.submenu.map((sub) => (
                         <Link
@@ -106,8 +109,13 @@ const Header: React.FC = () => {
             ))}
           </nav>
 
-          {/* Cart & Mobile Menu */}
-          <div className="flex items-center gap-4">
+          {/* Cart, Language & Mobile Menu */}
+          <div className="flex items-center gap-3">
+            {/* Language Switcher */}
+            <div className="hidden sm:block">
+              <LanguageSwitcher />
+            </div>
+
             {/* Admin Link - Only for Paula */}
             {isAuthenticated && user?.email === 'dracko2007@gmail.com' && (
               <Button 
@@ -131,7 +139,7 @@ const Header: React.FC = () => {
             >
               <Link to={isAuthenticated ? "/perfil" : "/cadastro"}>
                 <UserCircle className="w-5 h-5" />
-                <span>{isAuthenticated ? (user?.name?.split(' ')[0] || 'Perfil') : 'Cadastro'}</span>
+                <span>{isAuthenticated ? (user?.name?.split(' ')[0] || t('nav.profile')) : t('nav.register')}</span>
               </Link>
             </Button>
 
@@ -140,7 +148,7 @@ const Header: React.FC = () => {
               <Link 
                 to="/favoritos" 
                 className="relative p-2 rounded-full hover:bg-secondary/50 transition-colors hidden lg:block"
-                title="Meus Favoritos"
+                title={t('nav.favorites')}
               >
                 <Heart className="w-6 h-6 text-foreground" />
               </Link>
@@ -170,6 +178,11 @@ const Header: React.FC = () => {
         {/* Mobile Navigation */}
         {isMenuOpen && (
           <nav className="lg:hidden py-4 border-t border-border animate-fade-up">
+            {/* Mobile Language Switcher */}
+            <div className="flex items-center justify-center gap-2 pb-4 mb-4 border-b border-border">
+              <LanguageSwitcher />
+            </div>
+
             {navItems.map((item) => (
               <div key={item.label}>
                 <Link
@@ -205,7 +218,7 @@ const Header: React.FC = () => {
             >
               <Link to={isAuthenticated ? "/perfil" : "/cadastro"} onClick={() => setIsMenuOpen(false)}>
                 <UserCircle className="w-5 h-5 mr-2" />
-                {isAuthenticated ? (user?.name?.split(' ')[0] || 'Perfil') : 'Cadastro'}
+                {isAuthenticated ? (user?.name?.split(' ')[0] || t('nav.profile')) : t('nav.register')}
               </Link>
             </Button>
             {/* Wishlist Mobile */}
@@ -217,7 +230,7 @@ const Header: React.FC = () => {
               >
                 <Link to="/favoritos" onClick={() => setIsMenuOpen(false)}>
                   <Heart className="w-5 h-5 mr-2" />
-                  Favoritos
+                  {t('nav.favorites')}
                 </Link>
               </Button>
             )}
@@ -230,7 +243,7 @@ const Header: React.FC = () => {
               >
                 <Link to="/admin" onClick={() => setIsMenuOpen(false)}>
                   <UserCircle className="w-5 h-5 mr-2" />
-                  🔐 Painel Admin
+                  {t('nav.admin')}
                 </Link>
               </Button>
             )}

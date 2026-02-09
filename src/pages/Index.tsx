@@ -2,13 +2,18 @@ import React from 'react';
 import Layout from '@/components/layout/Layout';
 import HeroSection from '@/components/home/HeroSection';
 import FeaturedProducts from '@/components/home/FeaturedProducts';
+import VideoGallery from '@/components/home/VideoGallery';
 import ShippingBanner from '@/components/home/ShippingBanner';
+import { useLanguage } from '@/context/LanguageContext';
 
 const Index: React.FC = () => {
+  const { t } = useLanguage();
+
   return (
     <Layout>
       <HeroSection />
       <FeaturedProducts />
+      <VideoGallery />
       <ShippingBanner />
       
       {/* About Preview */}
@@ -17,35 +22,31 @@ const Index: React.FC = () => {
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             <div className="order-2 lg:order-1">
               <span className="inline-block px-4 py-1.5 rounded-full bg-primary/10 text-primary text-sm font-medium mb-4">
-                Nossa História
+                {t('about.badge')}
               </span>
               <h2 className="font-display text-4xl lg:text-5xl font-bold text-foreground mb-6">
-                Do Brasil para o Japão, com amor
+                {t('about.title')}
               </h2>
               <p className="text-muted-foreground leading-relaxed mb-6">
-                Nascemos da saudade do sabor brasileiro. Em Mie, no coração do Japão, 
-                criamos um doce de leite que une o melhor das duas culturas: a tradição 
-                brasileira e a excelência japonesa.
+                {t('about.p1')}
               </p>
               <p className="text-muted-foreground leading-relaxed mb-8">
-                Cada pote é preparado artesanalmente, com ingredientes cuidadosamente 
-                selecionados e muito carinho. Nosso objetivo é levar esse pedacinho 
-                do Brasil para a sua mesa, onde quer que você esteja no Japão.
+                {t('about.p2')}
               </p>
               <div className="flex items-center gap-6">
                 <div className="text-center">
                   <p className="font-display text-3xl font-bold text-primary">2020</p>
-                  <p className="text-sm text-muted-foreground">Fundação</p>
+                  <p className="text-sm text-muted-foreground">{t('about.founded')}</p>
                 </div>
                 <div className="w-px h-12 bg-border" />
                 <div className="text-center">
                   <p className="font-display text-3xl font-bold text-primary">1000+</p>
-                  <p className="text-sm text-muted-foreground">Clientes</p>
+                  <p className="text-sm text-muted-foreground">{t('about.customers')}</p>
                 </div>
                 <div className="w-px h-12 bg-border" />
                 <div className="text-center">
                   <p className="font-display text-3xl font-bold text-primary">⭐ 5.0</p>
-                  <p className="text-sm text-muted-foreground">Avaliação</p>
+                  <p className="text-sm text-muted-foreground">{t('about.rating')}</p>
                 </div>
               </div>
             </div>

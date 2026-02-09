@@ -7,11 +7,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { useUser } from '@/context/UserContext';
+import { useLanguage } from '@/context/LanguageContext';
+import LanguageSwitcher from '@/components/LanguageSwitcher';
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { login, isAuthenticated, sendPasswordReset } = useUser();
+  const { t } = useLanguage();
   
   const [formData, setFormData] = useState({
     email: '',
@@ -23,7 +26,6 @@ const Login: React.FC = () => {
   const [isSendingReset, setIsSendingReset] = useState(false);
   const [needsVerification, setNeedsVerification] = useState(false);
 
-  // Redirect if already authenticated
   React.useEffect(() => {
     if (isAuthenticated) {
       navigate('/perfil');
@@ -32,10 +34,7 @@ const Login: React.FC = () => {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -51,13 +50,9 @@ const Login: React.FC = () => {
           title: "Login realizado!",
           description: "Bem-vindo(a) de volta!",
         });
-        setTimeout(() => {
-          navigate('/perfil');
-        }, 1000);
+        setTimeout(() => { navigate('/perfil'); }, 1000);
       } else {
-        if (result.needsVerification) {
-          setNeedsVerification(true);
-        }
+        if (result.needsVerification) setNeedsVerification(true);
         toast({
           title: "Erro ao fazer login",
           description: result.error || "Email ou senha incorretos.",
@@ -78,37 +73,21 @@ const Login: React.FC = () => {
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!forgotEmail.trim()) {
-      toast({
-        title: "Erro",
-        description: "Digite seu email.",
-        variant: "destructive",
-      });
+      toast({ title: "Erro", description: "Digite seu email.", variant: "destructive" });
       return;
     }
-
     setIsSendingReset(true);
     try {
       const result = await sendPasswordReset(forgotEmail);
       if (result.success) {
-        toast({
-          title: "Email enviado!",
-          description: "Verifique sua caixa de entrada para redefinir sua senha.",
-        });
+        toast({ title: "Email enviado!", description: "Verifique sua caixa de entrada para redefinir sua senha." });
         setShowForgotPassword(false);
         setForgotEmail('');
       } else {
-        toast({
-          title: "Erro",
-          description: result.error || "Não foi possível enviar o email.",
-          variant: "destructive",
-        });
+        toast({ title: "Erro", description: result.error || "Não foi possível enviar o email.", variant: "destructive" });
       }
     } catch (error) {
-      toast({
-        title: "Erro",
-        description: "Erro ao enviar email de recuperação.",
-        variant: "destructive",
-      });
+      toast({ title: "Erro", description: "Erro ao enviar email de recuperação.", variant: "destructive" });
     } finally {
       setIsSendingReset(false);
     }
@@ -120,10 +99,10 @@ const Login: React.FC = () => {
         <div className="container mx-auto px-4">
           <div className="text-center">
             <h1 className="font-display text-4xl lg:text-5xl font-bold text-foreground mb-4">
-              Fazer Login
+              {t('auth.login')}
             </h1>
             <p className="text-muted-foreground text-lg">
-              Entre na sua conta para acompanhar seus pedidos
+              {t('auth.login.subtitle')}
             </p>
           </div>
         </div>
@@ -134,7 +113,12 @@ const Login: React.FC = () => {
           <div className="max-w-md mx-auto">
             <div className="bg-card rounded-2xl border border-border p-6 lg:p-8">
               
-              {/* Forgot Password Form */}
+              {/* Language Switcher */}
+              <div className="flex items-center justify-center gap-2 mb-6 pb-4 border-b border-border">
+                <span className="text-sm text-muted-foreground mr-2">🌐</span>
+                <LanguageSwitcher />
+              </div>
+
               {showForgotPassword ? (
                 <>
                   <div className="flex items-center gap-3 mb-6">
@@ -146,15 +130,11 @@ const Login: React.FC = () => {
                     </h2>
                   </div>
 
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Digite seu email e enviaremos um link para redefinir sua senha.
-                  </p>
-
                   <form onSubmit={handleForgotPassword} className="space-y-4">
                     <div className="space-y-2">
                       <Label htmlFor="forgotEmail" className="flex items-center gap-2">
                         <Mail className="w-4 h-4" />
-                        Email *
+                        {t('auth.login.email')}
                       </Label>
                       <Input
                         id="forgotEmail"
@@ -168,19 +148,10 @@ const Login: React.FC = () => {
                     </div>
 
                     <div className="pt-4 space-y-3">
-                      <Button 
-                        type="submit" 
-                        className="w-full btn-primary rounded-xl py-6 text-lg font-semibold"
-                        disabled={isSendingReset}
-                      >
+                      <Button type="submit" className="w-full btn-primary rounded-xl py-6 text-lg font-semibold" disabled={isSendingReset}>
                         {isSendingReset ? 'Enviando...' : 'Enviar Link de Recuperação'}
                       </Button>
-                      <Button 
-                        type="button" 
-                        variant="outline"
-                        className="w-full"
-                        onClick={() => setShowForgotPassword(false)}
-                      >
+                      <Button type="button" variant="outline" className="w-full" onClick={() => setShowForgotPassword(false)}>
                         Voltar ao Login
                       </Button>
                     </div>
@@ -193,21 +164,18 @@ const Login: React.FC = () => {
                       <UserCircle className="w-5 h-5 text-primary" />
                     </div>
                     <h2 className="font-display text-2xl font-semibold text-foreground">
-                      Entrar na Conta
+                      {t('auth.login.title')}
                     </h2>
                   </div>
 
-                  {/* Email Verification Banner */}
                   {needsVerification && (
                     <div className="mb-4 p-4 bg-yellow-50 dark:bg-yellow-950 border border-yellow-200 dark:border-yellow-800 rounded-lg">
                       <div className="flex items-start gap-3">
                         <MailCheck className="w-5 h-5 text-yellow-600 mt-0.5 flex-shrink-0" />
                         <div>
-                          <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
-                            Email não verificado
-                          </p>
+                          <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">Email não verificado</p>
                           <p className="text-xs text-yellow-700 dark:text-yellow-300 mt-1">
-                            Verifique sua caixa de entrada (e pasta de spam) e clique no link de confirmação que enviamos quando você se cadastrou.
+                            Verifique sua caixa de entrada e clique no link de confirmação.
                           </p>
                         </div>
                       </div>
@@ -218,7 +186,7 @@ const Login: React.FC = () => {
                     <div className="space-y-2">
                       <Label htmlFor="email" className="flex items-center gap-2">
                         <Mail className="w-4 h-4" />
-                        Email *
+                        {t('auth.login.email')}
                       </Label>
                       <Input
                         id="email"
@@ -235,7 +203,7 @@ const Login: React.FC = () => {
                     <div className="space-y-2">
                       <Label htmlFor="password" className="flex items-center gap-2">
                         <Lock className="w-4 h-4" />
-                        Senha *
+                        {t('auth.login.password')}
                       </Label>
                       <Input
                         id="password"
@@ -251,31 +219,23 @@ const Login: React.FC = () => {
                     </div>
 
                     <div className="text-right">
-                      <button 
-                        type="button"
-                        onClick={() => setShowForgotPassword(true)}
-                        className="text-sm text-primary hover:underline"
-                      >
-                        Esqueceu a senha?
+                      <button type="button" onClick={() => setShowForgotPassword(true)} className="text-sm text-primary hover:underline">
+                        {t('auth.login.forgot')}
                       </button>
                     </div>
 
                     <div className="pt-2">
-                      <Button 
-                        type="submit" 
-                        className="w-full btn-primary rounded-xl py-6 text-lg font-semibold"
-                        disabled={isLoading}
-                      >
-                        {isLoading ? 'Entrando...' : 'Entrar'}
+                      <Button type="submit" className="w-full btn-primary rounded-xl py-6 text-lg font-semibold" disabled={isLoading}>
+                        {isLoading ? t('auth.login.loading') : t('auth.login.submit')}
                         {!isLoading && <ArrowRight className="w-5 h-5 ml-2" />}
                       </Button>
                     </div>
 
                     <div className="text-center pt-4">
                       <p className="text-sm text-muted-foreground">
-                        Não tem uma conta?{' '}
+                        {t('auth.login.noAccount')}{' '}
                         <Link to="/cadastro" className="text-primary hover:underline font-medium">
-                          Cadastre-se
+                          {t('auth.login.register')}
                         </Link>
                       </p>
                     </div>

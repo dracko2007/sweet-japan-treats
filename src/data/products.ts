@@ -9,6 +9,13 @@ export const products: Product[] = [
     category: 'artesanal',
     prices: { small: 1200, large: 2000 },
     image: '/products/cremoso.jpg',
+    gallery: [
+      '/products/cremoso.jpg',
+      '/products/gallery/cremoso-1.jpg',
+      '/products/gallery/cremoso-2.jpg',
+      '/products/gallery/cremoso-3.jpg',
+      '/products/gallery/cremoso-4.jpg',
+    ],
     video: '/video/tradicional.mp4',
     flavor: 'Tradicional'
   },
@@ -19,6 +26,12 @@ export const products: Product[] = [
     category: 'artesanal',
     prices: { small: 1200, large: 2000 },
     image: '/products/coco.jpg',
+    gallery: [
+      '/products/coco.jpg',
+      '/products/gallery/coco-1.jpg',
+      '/products/gallery/coco-2.jpg',
+      '/products/gallery/coco-3.jpg',
+    ],
     video: '/video/coco.mp4',
     flavor: 'Coco'
   },
@@ -29,6 +42,11 @@ export const products: Product[] = [
     category: 'artesanal',
     prices: { small: 1200, large: 2000 },
     image: '/products/amendoim.jpg',
+    gallery: [
+      '/products/amendoim.jpg',
+      '/products/gallery/amendoim-1.jpg',
+      '/products/gallery/amendoim-2.jpg',
+    ],
     video: '/video/amendoim.mp4',
     flavor: 'Amendoim'
   },
@@ -40,6 +58,11 @@ export const products: Product[] = [
     category: 'premium',
     prices: { small: 1400, large: 2400 },
     image: '/products/cafe.jpg',
+    gallery: [
+      '/products/cafe.jpg',
+      '/products/gallery/cafe-1.jpg',
+      '/products/gallery/cafe-2.jpg',
+    ],
     video: '/video/cafe.mp4',
     flavor: 'Café'
   },
@@ -50,6 +73,11 @@ export const products: Product[] = [
     category: 'premium',
     prices: { small: 1400, large: 2400 },
     image: '/products/amendoas.jpg',
+    gallery: [
+      '/products/amendoas.jpg',
+      '/products/gallery/amendoas-1.jpg',
+      '/products/gallery/amendoas-2.jpg',
+    ],
     video: '/video/amendoas.mp4',
     flavor: 'Amêndoas'
   },
@@ -60,6 +88,11 @@ export const products: Product[] = [
     category: 'premium',
     prices: { small: 1400, large: 2400 },
     image: '/products/matcha.jpg',
+    gallery: [
+      '/products/matcha.jpg',
+      '/products/gallery/matcha-1.jpg',
+      '/products/gallery/matcha-2.jpg',
+    ],
     video: '/video/cha.mp4',
     flavor: 'Matcha'
   },
@@ -70,6 +103,11 @@ export const products: Product[] = [
     category: 'premium',
     prices: { small: 1400, large: 2400 },
     image: '/products/chocolate.jpg',
+    gallery: [
+      '/products/chocolate.jpg',
+      '/products/gallery/chocolate-1.jpg',
+      '/products/gallery/chocolate-2.jpg',
+    ],
     video: '/video/cholate.mp4',
     flavor: 'Chocolate'
   }

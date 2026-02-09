@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { CartProvider } from "@/context/CartContext";
 import { UserProvider } from "@/context/UserContext";
+import { LanguageProvider } from "@/context/LanguageContext";
 import { firebaseConfigReady, firebaseConfigSource, firebaseConfig } from "@/config/firebase";
 import Index from "./pages/Index";
 import Products from "./pages/Products";
@@ -30,6 +31,7 @@ import ScrollToTop from "./components/ScrollToTop";
 const queryClient = new QueryClient();
 
 const App = () => (
+  <LanguageProvider>
   <QueryClientProvider client={queryClient}>
     <UserProvider>
       <CartProvider>
@@ -90,6 +92,7 @@ const App = () => (
       </CartProvider>
     </UserProvider>
   </QueryClientProvider>
+  </LanguageProvider>
 );
 
 export default App;
