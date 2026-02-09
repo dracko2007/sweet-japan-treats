@@ -342,17 +342,18 @@ export const firebaseSyncService = {
       let migratedCount = 0;
       
       for (const [email, userData] of Object.entries(users)) {
-        const userId = (userData as any).id || `user-${Date.now()}-${Math.random()}`;
+        const userObj = userData as Record<string, any>;
+        const userId = userObj.id || `user-${Date.now()}-${Math.random()}`;
         
         // Sincroniza usuário
         await this.syncUserToFirestore(userId, {
-          ...userData,
+          ...userObj,
           email
         });
         
         // Sincroniza pedidos do usuário
-        if ((userData as any).orders && Array.isArray((userData as any).orders)) {
-          for (const order of (userData as any).orders) {
+        if (userObj.orders && Array.isArray(userObj.orders)) {
+          for (const order of userObj.orders) {
             await this.syncOrderToFirestore(userId, order);
           }
         }

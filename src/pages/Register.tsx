@@ -7,11 +7,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { useUser } from '@/context/UserContext';
+import { useLanguage } from '@/context/LanguageContext';
+import LanguageSwitcher from '@/components/LanguageSwitcher';
 
 const Register: React.FC = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { register: registerUser, isAuthenticated } = useUser();
+  const { t } = useLanguage();
   
   const [formData, setFormData] = useState({
     name: '',
@@ -42,7 +45,6 @@ const Register: React.FC = () => {
     e.preventDefault();
     setIsLoading(true);
 
-    // Validate passwords match
     if (formData.password !== formData.confirmPassword) {
       toast({
         title: "Erro",
@@ -107,12 +109,12 @@ const Register: React.FC = () => {
         <div className="container mx-auto px-4">
           <div className="text-center">
             <h1 className="font-display text-4xl lg:text-5xl font-bold text-foreground mb-4">
-              {registrationComplete ? 'Cadastro Realizado!' : 'Criar Conta'}
+              {registrationComplete ? t('auth.register.complete.title') : t('auth.register')}
             </h1>
             <p className="text-muted-foreground text-lg">
               {registrationComplete 
-                ? 'Verifique seu email para confirmar sua conta' 
-                : 'Cadastre-se para acompanhar seus pedidos e receber ofertas exclusivas'}
+                ? t('auth.register.complete.subtitle')
+                : t('auth.register.subtitle')}
             </p>
           </div>
         </div>
@@ -123,6 +125,12 @@ const Register: React.FC = () => {
           <div className="max-w-md mx-auto">
             <div className="bg-card rounded-2xl border border-border p-6 lg:p-8">
 
+              {/* Language Switcher */}
+              <div className="flex items-center justify-center gap-2 mb-6 pb-4 border-b border-border">
+                <span className="text-sm text-muted-foreground mr-2">🌐</span>
+                <LanguageSwitcher />
+              </div>
+
               {/* Registration Complete - Email Verification Required */}
               {registrationComplete ? (
                 <div className="text-center py-8">
@@ -130,33 +138,19 @@ const Register: React.FC = () => {
                     <MailCheck className="w-10 h-10 text-green-600 dark:text-green-400" />
                   </div>
                   <h2 className="font-display text-2xl font-semibold text-foreground mb-3">
-                    Confirme seu Email
+                    {t('auth.register.complete.confirm')}
                   </h2>
                   <p className="text-muted-foreground mb-2">
-                    Enviamos um link de confirmação para:
+                    {t('auth.register.complete.sentTo')}
                   </p>
                   <p className="font-semibold text-primary text-lg mb-6">
                     {formData.email}
                   </p>
-                  <div className="bg-yellow-50 dark:bg-yellow-950 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 mb-6 text-left">
-                    <p className="text-sm text-yellow-800 dark:text-yellow-200 font-medium mb-2">
-                      📧 Próximos passos:
-                    </p>
-                    <ol className="text-sm text-yellow-700 dark:text-yellow-300 space-y-1 list-decimal list-inside">
-                      <li>Abra seu email ({formData.email})</li>
-                      <li>Procure o email de "noreply@localstorage-98492.firebaseapp.com"</li>
-                      <li>Clique no link de verificação</li>
-                      <li>Volte aqui e faça login!</li>
-                    </ol>
-                    <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-3">
-                      💡 Não encontrou? Verifique a pasta de <strong>spam</strong> ou <strong>lixo eletrônico</strong>.
-                    </p>
-                  </div>
                   <Button 
                     className="w-full btn-primary rounded-xl py-6 text-lg font-semibold"
                     onClick={() => navigate('/login')}
                   >
-                    Ir para Login
+                    {t('auth.register.complete.goLogin')}
                     <ArrowRight className="w-5 h-5 ml-2" />
                   </Button>
                 </div>
@@ -167,7 +161,7 @@ const Register: React.FC = () => {
                   <UserCircle className="w-5 h-5 text-primary" />
                 </div>
                 <h2 className="font-display text-2xl font-semibold text-foreground">
-                  Seus Dados
+                  {t('auth.register.title')}
                 </h2>
               </div>
 
@@ -175,7 +169,7 @@ const Register: React.FC = () => {
                 <div className="space-y-2">
                   <Label htmlFor="name" className="flex items-center gap-2">
                     <UserCircle className="w-4 h-4" />
-                    Nome Completo *
+                    {t('auth.register.name')}
                   </Label>
                   <Input
                     id="name"
@@ -191,7 +185,7 @@ const Register: React.FC = () => {
                 <div className="space-y-2">
                   <Label htmlFor="email" className="flex items-center gap-2">
                     <Mail className="w-4 h-4" />
-                    Email *
+                    {t('auth.login.email')}
                   </Label>
                   <Input
                     id="email"
@@ -207,7 +201,7 @@ const Register: React.FC = () => {
                 <div className="space-y-2">
                   <Label htmlFor="phone" className="flex items-center gap-2">
                     <Phone className="w-4 h-4" />
-                    Telefone *
+                    {t('auth.register.phone')}
                   </Label>
                   <Input
                     id="phone"
@@ -223,7 +217,7 @@ const Register: React.FC = () => {
                 <div className="space-y-2">
                   <Label htmlFor="password" className="flex items-center gap-2">
                     <Lock className="w-4 h-4" />
-                    Senha *
+                    {t('auth.register.password')}
                   </Label>
                   <Input
                     id="password"
@@ -240,7 +234,7 @@ const Register: React.FC = () => {
                 <div className="space-y-2">
                   <Label htmlFor="confirmPassword" className="flex items-center gap-2">
                     <Lock className="w-4 h-4" />
-                    Confirmar Senha *
+                    {t('auth.register.confirmPassword')}
                   </Label>
                   <Input
                     id="confirmPassword"
@@ -260,16 +254,16 @@ const Register: React.FC = () => {
                     disabled={isLoading}
                     className="w-full btn-primary rounded-xl py-6 text-lg font-semibold"
                   >
-                    {isLoading ? 'Criando conta...' : 'Criar Conta'}
+                    {isLoading ? t('auth.register.loading') : t('auth.register.submit')}
                     {!isLoading && <ArrowRight className="w-5 h-5 ml-2" />}
                   </Button>
                 </div>
 
                 <div className="text-center pt-4">
                   <p className="text-sm text-muted-foreground">
-                    Já tem uma conta?{' '}
+                    {t('auth.register.hasAccount')}{' '}
                     <Link to="/login" className="text-primary hover:underline font-medium">
-                      Fazer login
+                      {t('auth.register.loginLink')}
                     </Link>
                   </p>
                 </div>

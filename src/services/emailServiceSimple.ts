@@ -15,7 +15,7 @@
 import type { CartItem } from '@/types/order';
 import { emailJsConfig } from '@/config/emailjs';
 
-declare const emailjs: any;
+const getEmailJS = () => (window as any).emailjs;
 
 const EMAILJS_SERVICE_ID = emailJsConfig.serviceId;
 const EMAILJS_TEMPLATE_ID_CUSTOMER = emailJsConfig.templateIdCustomer;
@@ -25,7 +25,7 @@ const EMAILJS_PUBLIC_KEY = emailJsConfig.publicKey;
 // Load EmailJS library dynamically
 let emailjsLoaded = false;
 const loadEmailJS = (): Promise<void> => {
-  if (emailjsLoaded || typeof emailjs !== 'undefined') {
+  if (emailjsLoaded || getEmailJS()) {
     return Promise.resolve();
   }
   
@@ -35,7 +35,7 @@ const loadEmailJS = (): Promise<void> => {
     script.onload = () => {
       emailjsLoaded = true;
       if (EMAILJS_PUBLIC_KEY) {
-        emailjs.init(EMAILJS_PUBLIC_KEY);
+        (window as any).emailjs?.init(EMAILJS_PUBLIC_KEY);
       }
       resolve();
     };
@@ -230,7 +230,7 @@ Ingredientes selecionados e técnicas tradicionais.
       
       console.log('📤 Sending order confirmation email via EmailJS...');
       
-      const response = await emailjs.send(
+      const response = await getEmailJS().send(
         EMAILJS_SERVICE_ID,
         EMAILJS_TEMPLATE_ID_CUSTOMER,
         emailParams
@@ -303,7 +303,7 @@ Tel: ${orderData.formData.phone}
       console.log('📤 Store Params:', storeParams);
       console.log('📤 Using Template ID:', EMAILJS_TEMPLATE_ID_STORE);
       
-      const response = await emailjs.send(
+      const response = await getEmailJS().send(
         EMAILJS_SERVICE_ID,
         EMAILJS_TEMPLATE_ID_STORE,
         storeParams
@@ -358,7 +358,7 @@ Tel: ${orderData.formData.phone}
       console.log('📤 Carrier:', params.carrier_name);
       console.log('📤 Tracking URL:', params.tracking_url);
       
-      const response = await emailjs.send(
+      const response = await getEmailJS().send(
         EMAILJS_SERVICE_ID,
         EMAILJS_TEMPLATE_ID_CUSTOMER,
         emailParams

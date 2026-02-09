@@ -653,7 +653,7 @@ _Sabor do Campo - Doce de Leite Artesanal_
       </section>
 
       {/* Print Styles */}
-      <style jsx>{`
+      <style dangerouslySetInnerHTML={{ __html: `
         @media print {
           @page {
             margin: 1cm;
@@ -663,7 +663,7 @@ _Sabor do Campo - Doce de Leite Artesanal_
             -webkit-print-color-adjust: exact;
           }
         }
-      `}</style>
+      ` }} />
     </Layout>
   );
 };
