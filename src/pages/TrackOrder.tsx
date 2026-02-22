@@ -6,9 +6,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { firebaseSyncService } from '@/services/firebaseSyncService';
 
 interface OrderStatus {
-  status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
+  status: 'pending' | 'processing' | 'confirmed' | 'shipped' | 'delivered' | 'cancelled';
   label: string;
   icon: React.ReactNode;
   color: string;
@@ -18,17 +19,19 @@ interface OrderStatus {
 const TrackOrder: React.FC = () => {
   const [orderNumber, setOrderNumber] = useState('');
   const [searchedOrder, setSearchedOrder] = useState<any>(null);
+  const [isSearching, setIsSearching] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
 
   const statusFlow: OrderStatus[] = [
     { status: 'pending', label: 'Pendente', icon: <Package className="w-6 h-6" />, color: 'text-yellow-500' },
     { status: 'processing', label: 'Processando', icon: <Package className="w-6 h-6" />, color: 'text-blue-500' },
+    { status: 'confirmed', label: 'Confirmado', icon: <CheckCircle className="w-6 h-6" />, color: 'text-green-500' },
     { status: 'shipped', label: 'Enviado', icon: <Truck className="w-6 h-6" />, color: 'text-purple-500' },
     { status: 'delivered', label: 'Entregue', icon: <CheckCircle className="w-6 h-6" />, color: 'text-green-500' },
   ];
 
-  const handleSearch = () => {
+  const handleSearch = async () => {
     if (!orderNumber.trim()) {
       toast({
         title: 'Erro',
@@ -38,14 +41,45 @@ const TrackOrder: React.FC = () => {
       return;
     }
 
-    // Buscar em todos os usuários
-    const allUsers = Object.keys(localStorage)
-      .filter(key => key.startsWith('orders_'))
-      .map(key => localStorage.getItem(key))
-      .filter(Boolean)
-      .flatMap(data => JSON.parse(data as string));
+    setIsSearching(true);
 
-    const order = allUsers.find((o: any) => o.orderNumber === orderNumber.toUpperCase());
+    // 1. Buscar no localStorage (usuários locais)
+    const usersData = localStorage.getItem('sweet-japan-users');
+    let order = null;
+    
+    if (usersData) {
+      const users = JSON.parse(usersData);
+      for (const email of Object.keys(users)) {
+        const userOrders = users[email]?.orders || [];
+        const found = userOrders.find((o: any) => o.orderNumber === orderNumber.toUpperCase());
+        if (found) {
+          order = found;
+          break;
+        }
+      }
+    }
+
+    // Also check orders_ prefix keys (legacy format)
+    if (!order) {
+      const allLocalOrders = Object.keys(localStorage)
+        .filter(key => key.startsWith('orders_'))
+        .map(key => localStorage.getItem(key))
+        .filter(Boolean)
+        .flatMap(data => JSON.parse(data as string));
+      order = allLocalOrders.find((o: any) => o.orderNumber === orderNumber.toUpperCase());
+    }
+
+    // 2. Se não encontrou localmente, buscar no Firestore
+    if (!order) {
+      try {
+        const firestoreOrders = await firebaseSyncService.getAllOrdersFromFirestore();
+        order = firestoreOrders.find((o: any) => o.orderNumber === orderNumber.toUpperCase());
+      } catch (err) {
+        console.error('Error searching Firestore:', err);
+      }
+    }
+
+    setIsSearching(false);
 
     if (!order) {
       toast({
@@ -90,9 +124,9 @@ const TrackOrder: React.FC = () => {
                 onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
                 className="flex-1 text-lg"
               />
-              <Button onClick={handleSearch} size="lg">
+              <Button onClick={handleSearch} size="lg" disabled={isSearching}>
                 <Search className="w-5 h-5 mr-2" />
-                Rastrear
+                {isSearching ? 'Buscando...' : 'Rastrear'}
               </Button>
             </div>
           </div>

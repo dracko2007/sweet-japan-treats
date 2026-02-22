@@ -108,7 +108,7 @@ export const products: Product[] = [
       '/products/gallery/chocolate-1.jpg',
       '/products/gallery/chocolate-2.jpg',
     ],
-    video: '/video/cholate.mp4',
+    video: '/video/chocolate.mp4',
     flavor: 'Chocolate'
   }
 ];

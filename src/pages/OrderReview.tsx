@@ -278,11 +278,12 @@ const OrderReview: React.FC = () => {
                     <RadioGroupItem value="paypay" id="paypay" className="mt-1" />
                     <Label htmlFor="paypay" className="flex-1 cursor-pointer">
                       <div className="flex items-center gap-2 mb-2">
-                        <Smartphone className="w-5 h-5 text-primary" />
+                        <Smartphone className="w-5 h-5 text-red-500" />
                         <span className="font-semibold">PayPay</span>
+                        <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full">QR Code</span>
                       </div>
                       <p className="text-sm text-muted-foreground">
-                        Pagamento via aplicativo PayPay
+                        Escaneie o QR Code ou envie pelo app PayPay
                       </p>
                     </Label>
                   </div>

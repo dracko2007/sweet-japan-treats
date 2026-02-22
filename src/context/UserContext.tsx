@@ -719,11 +719,11 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     );
   };
 
-  const addOrder = async (orderData: Omit<Order, 'id' | 'orderNumber' | 'date'>) => {
+  const addOrder = async (orderData: Omit<Order, 'id' | 'date'> & { orderNumber?: string }) => {
     const newOrder: Order = {
       ...orderData,
       id: `order-${Date.now()}`,
-      orderNumber: `DL-${Date.now().toString().slice(-8)}`,
+      orderNumber: orderData.orderNumber || `DL-${Date.now().toString().slice(-8)}`,
       date: new Date().toISOString(),
     };
     

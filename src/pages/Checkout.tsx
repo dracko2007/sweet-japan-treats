@@ -597,7 +597,7 @@ const Checkout: React.FC = () => {
 
                   <div className="pt-4 mt-4 border-t border-border">
                     <p className="text-xs text-muted-foreground text-center">
-                      Pagamento seguro via PIX, cartão ou transferência
+                      Pagamento seguro via depósito bancário ou PayPay
                     </p>
                   </div>
                 </div>

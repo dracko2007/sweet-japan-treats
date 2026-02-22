@@ -67,7 +67,7 @@ export interface Order {
   items: OrderItem[];
   totalAmount: number;
   paymentMethod: 'bank' | 'paypay';
-  status: 'pending' | 'confirmed' | 'shipped' | 'delivered' | 'cancelled';
+  status: 'pending' | 'processing' | 'confirmed' | 'shipped' | 'delivered' | 'cancelled';
   shippingAddress: ShippingAddress;
 }
 

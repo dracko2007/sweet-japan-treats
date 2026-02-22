@@ -8,14 +8,10 @@ import { useUser } from '@/context/UserContext';
 import { useToast } from '@/hooks/use-toast';
 import { emailService } from '@/services/emailService';
 import { emailServiceSimple } from '@/services/emailServiceSimple';
-import { whatsappService } from '@/services/whatsappService';
-import { whatsappServiceSimple } from '@/services/whatsappServiceSimple';
-import { paypayService } from '@/services/paypayService';
 import { carrierService } from '@/services/carrierService';
 import { couponService } from '@/services/couponService';
+import { firebaseSyncService } from '@/services/firebaseSyncService';
 import type { OrderData, CartItem } from '@/types/order';
-
-const TWILIO_CONFIGURED = !!(import.meta.env.VITE_TWILIO_ACCOUNT_SID && import.meta.env.VITE_TWILIO_AUTH_TOKEN);
 
 const OrderConfirmation: React.FC = () => {
   const { clearCart } = useCart();
@@ -190,9 +186,23 @@ const OrderConfirmation: React.FC = () => {
           status: 'pending',
           shippingAddress: newOrder.shippingAddress,
           shipping: orderData.shipping,
+          orderNumber: generatedOrderNumber,
         });
       } else {
-        console.log('⚠️ [DEBUG] User is NOT authenticated, skipping context save');
+        // Guest user - sync directly to Firestore so ERP can see the order
+        console.log('⚠️ [DEBUG] User NOT authenticated, syncing directly to Firestore');
+        firebaseSyncService.syncOrderToFirestore('guest', {
+          ...newOrder,
+          orderDate: newOrder.date,
+          totalPrice: finalTotal,
+          customerEmail: customerEmail,
+          customerName: orderData.formData.name,
+          customerPhone: orderData.formData.phone,
+        }).then(() => {
+          console.log('✅ [DEBUG] Guest order synced to Firestore:', generatedOrderNumber);
+        }).catch((err: any) => {
+          console.error('❌ [DEBUG] Failed to sync guest order:', err);
+        });
       }
     } else {
       console.error('❌ [DEBUG] No customer email available to save order');
@@ -210,11 +220,11 @@ const OrderConfirmation: React.FC = () => {
     setIsLoading(false);
 
     // Send notifications and create shipping label
-    sendNotifications(orderData);
+    sendNotifications(orderData, generatedOrderNumber);
   }, [orderData, clearCart, navigate, toast, addOrder, isAuthenticated]);
 
-  const sendNotifications = async (data: OrderData) => {
-    const generatedOrderNumber = `DL-${Date.now().toString().slice(-8)}`;
+  const sendNotifications = async (data: OrderData, existingOrderNumber: string) => {
+    const generatedOrderNumber = existingOrderNumber;
     setOrderNumber(generatedOrderNumber);
     const shipping = data.shipping || { carrier: 'N/A', cost: 0, estimatedDays: 'N/A' };
     const couponDiscount = data.couponDiscount || 0;
@@ -291,129 +301,77 @@ const OrderConfirmation: React.FC = () => {
       console.error('❌ Error sending emails:', error);
     }
     
-    // 3. PayPay Integration (if PayPay payment selected)
-    if (data.paymentMethod === 'paypay') {
-      try {
-        const paymentResult = await paypayService.createPayment({
-          orderNumber: generatedOrderNumber,
-          amount: (finalTotal || 0) + (shipping.cost || 0),
-          description: `Pedido Doce de Leite ${generatedOrderNumber}`,
-          customerEmail: data.formData.email,
-          customerPhone: data.formData.phone
-        });
-        
-        if (paymentResult.success && paymentResult.paymentUrl) {
-          console.log('💳 PayPay payment URL:', paymentResult.paymentUrl);
-          console.log('📱 PayPay QR Code:', paymentResult.qrCodeUrl);
-        }
-      } catch (error) {
-        console.error('Error creating PayPay payment:', error);
-      }
-    }
-    
-    // 4. WhatsApp Messages (automatic via Twilio API or fallback to WhatsApp Web)
-    const whatsappMessageToStore = `
-🎉 *NOVO PEDIDO - Doce de Leite*
-
-📋 *Pedido:* ${generatedOrderNumber}
-📅 *Data:* ${new Date().toLocaleDateString('pt-BR')}
-${generatedTrackingNumber ? `🔢 *Rastreamento:* ${generatedTrackingNumber}\n` : ''}
-
-👤 *Cliente:*
-Nome: ${data.formData.name}
-Tel: ${data.formData.phone}
-Email: ${data.formData.email}
-
-📍 *Endereço de Entrega:*
-〒${data.formData.postalCode}
-${data.formData.prefecture} ${data.formData.city}
-${data.formData.address}
-${data.formData.building ? data.formData.building : ''}
-
-📦 *Produtos:*
-${data.items.map((item: CartItem) => 
-  `• ${item.product.name} (${item.size}) x${item.quantity} - ¥${(item.product.prices[item.size] * item.quantity).toLocaleString()}`
-).join('\n')}
-
-💰 *Valores:*
-Subtotal: ¥${data.totalPrice.toLocaleString()}${couponDiscount > 0 ? `\nDesconto: -¥${couponDiscount.toLocaleString()}` : ''}
-Frete (${shipping.carrier}): ¥${shipping.cost.toLocaleString()}
-*Total: ¥${(finalTotal + shipping.cost).toLocaleString()}*
-
-🚚 *Frete:*
-Transportadora: ${shipping.carrier}
-Previsão: ${shipping.estimatedDays} dias úteis
-
-💳 *Pagamento:*
-${data.paymentMethod === 'bank' ? 'Depósito Bancário' : 'PayPay'}
-    `.trim();
-
-    const whatsappMessageToCustomer = `
-🎉 *Pedido Confirmado!*
-
-Olá ${data.formData.name}!
-
-Seu pedido foi recebido com sucesso!
-
-📋 *Número do Pedido:* ${generatedOrderNumber}
-${generatedTrackingNumber ? `🔢 *Rastreamento:* ${generatedTrackingNumber}\n` : ''}
-
-📦 *Produtos:*
-${data.items.map((item: CartItem) => 
-  `• ${item.product.name} (${item.size}) x${item.quantity}`
-).join('\n')}
-
-💰 *Total:* ¥${(finalTotal + shipping.cost).toLocaleString()}
-
-🚚 *Previsão de Entrega:* ${shipping.estimatedDays} dias úteis
-
-Em breve você receberá um email com todos os detalhes.
-
-Obrigada pela preferência! 🍮
-
-_Sabor do Campo - Doce de Leite Artesanal_
-    `.trim();
-    
-    // Send WhatsApp messages (automatically if configured, or opens WhatsApp Web)
+    // 3. WhatsApp Messages via local WhatsApp service (automatic)
     try {
-      console.log('📱 Starting WhatsApp messages...');
+      console.log('📱 Sending WhatsApp via local service (port 3001)...');
       
-      // Try with Twilio first (if configured)
-      if (import.meta.env.VITE_TWILIO_ACCOUNT_SID && import.meta.env.VITE_TWILIO_AUTH_TOKEN) {
-        console.log('📱 Using Twilio service...');
-        
-        // Send to store owner (Paula)
-        console.log('📱 Sending to store owner...');
-        const storePhone = '8107013671679';
-        await whatsappService.sendMessage({
-          to: `+${storePhone}`,
-          message: whatsappMessageToStore
-        });
-        
-        console.log('📱 Sending to customer...');
-        // Send to customer
-        let customerPhone = data.formData.phone.replace(/[^0-9]/g, '');
-        if (!customerPhone.startsWith('81')) {
-          customerPhone = '81' + customerPhone;
-        }
-        
-        console.log('📱 Customer phone formatted:', customerPhone);
-        
-        await whatsappService.sendMessage({
-          to: `+${customerPhone}`,
-          message: whatsappMessageToCustomer
-        });
-        
-        console.log('✅ WhatsApp messages sent via Twilio');
+      const customerPhone = data.formData.phone;
+      const itemsList = data.items.map((item: CartItem) => ({
+        productName: item.product.name,
+        size: item.size,
+        quantity: item.quantity,
+        price: item.product.prices[item.size],
+      }));
+      
+      // Send confirmation to customer
+      const customerResult = await fetch('http://localhost:3001/api/send-order-notification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          phone: customerPhone,
+          orderNumber: generatedOrderNumber,
+          customerName: data.formData.name,
+          items: itemsList,
+          total: finalTotal + (shipping.cost || 0),
+          paymentMethod: data.paymentMethod,
+          type: 'new_order',
+          shipping: {
+            cost: shipping.cost || 0,
+            carrier: shipping.carrier || 'A definir',
+          },
+        }),
+      });
+      
+      if (customerResult.ok) {
+        console.log('✅ WhatsApp enviado ao cliente!');
       } else {
-        // No Twilio configured - just log it (DON'T open WhatsApp for customer!)
-        console.log('⚠️ Twilio não configurado - WhatsApp não será enviado automaticamente');
-        console.log('💡 Configure Twilio para enviar WhatsApp automaticamente');
-        console.log('📝 Você pode enviar manualmente pelo admin');
+        const err = await customerResult.json();
+        console.log('⚠️ WhatsApp cliente falhou:', err.error);
       }
+      
+      // Send notification to store owner (Paula)
+      const storeResult = await fetch('http://localhost:3001/api/send-order-notification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          phone: '07013671679',
+          orderNumber: generatedOrderNumber,
+          customerName: data.formData.name,
+          customerPhone: customerPhone,
+          customerEmail: data.formData.email,
+          items: itemsList,
+          total: finalTotal + (shipping.cost || 0),
+          paymentMethod: data.paymentMethod,
+          type: 'new_order_store',
+          shippingAddress: {
+            postalCode: data.formData.postalCode,
+            prefecture: data.formData.prefecture,
+            city: data.formData.city,
+            address: data.formData.address,
+            building: data.formData.building,
+          },
+        }),
+      });
+      
+      if (storeResult.ok) {
+        console.log('✅ WhatsApp enviado para a loja!');
+      } else {
+        console.log('⚠️ WhatsApp loja falhou');
+      }
+      
     } catch (error) {
-      console.error('❌ Error with WhatsApp service:', error);
-      console.error('❌ Error details:', error instanceof Error ? error.message : String(error));
+      // WhatsApp service not running - that's OK, emails were sent
+      console.log('⚠️ Serviço WhatsApp não disponível (mensagens não enviadas):', error instanceof Error ? error.message : String(error));
     }
   };
 
@@ -587,27 +545,52 @@ _Sabor do Campo - Doce de Leite Artesanal_
                       Por favor, realize o depósito bancário para:
                     </p>
                     <div className="text-sm space-y-1 font-mono">
-                      <p>Banco: [Nome do Banco]</p>
-                      <p>Agência: [Número da Agência]</p>
-                      <p>Conta: [Número da Conta]</p>
-                      <p>Nome: Paula Shiokawa</p>
+                      <p>🏦 ゆうちょ銀行 (Japan Post Bank)</p>
+                      <p>記号 (Kigou): <strong>12260</strong></p>
+                      <p>番号 (Bangou): <strong>33664351</strong></p>
+                      <p className="mt-2 pt-2 border-t border-border">📌 <strong>振込用 (Para transferência de outros bancos):</strong></p>
+                      <p>金融機関コード: <strong>9900</strong></p>
+                      <p>店名: <strong>二二八店 (228)</strong></p>
+                      <p>口座番号: <strong>3366435</strong> (普通)</p>
+                      <p>名義: <strong>ロドリゲス シオカワ ミリアン パウラ</strong></p>
                     </div>
                     <p className="text-xs text-muted-foreground mt-2">
-                      * Envie o comprovante via WhatsApp: 070-1367-1679
+                      * Envie o comprovante após o depósito via WhatsApp: 070-1367-1679
                     </p>
                   </div>
                 )}
 
                 {paymentMethod === 'paypay' && (
                   <div className="bg-secondary/50 p-4 rounded-lg print:break-inside-avoid">
-                    <h4 className="font-semibold mb-2">Instruções PayPay</h4>
-                    <p className="text-sm text-muted-foreground mb-2">
-                      Envie o pagamento via PayPay para:
-                    </p>
-                    <p className="text-lg font-semibold">070-1367-1679</p>
-                    <p className="text-xs text-muted-foreground mt-2">
-                      * Após o pagamento, envie a confirmação via WhatsApp
-                    </p>
+                    <h4 className="font-semibold mb-2 flex items-center gap-2">
+                      <span className="text-red-500 text-xl">●</span>
+                      Pagamento via PayPay
+                    </h4>
+                    <div className="flex flex-col items-center gap-3 my-4">
+                      <img 
+                        src="/products/paypay-qr.png" 
+                        alt="PayPay QR Code" 
+                        className="w-48 h-48 rounded-lg border-2 border-red-400 shadow-md"
+                      />
+                      <p className="text-sm text-muted-foreground text-center">
+                        Escaneie o QR Code com o app PayPay
+                      </p>
+                    </div>
+                    <div className="bg-background/70 p-3 rounded-lg space-y-2">
+                      <p className="text-sm font-medium">📱 Ou envie diretamente para:</p>
+                      <p className="text-xl font-bold text-center tracking-wider">070-1367-1679</p>
+                      <p className="text-xs text-center text-muted-foreground">Paula Shiokawa</p>
+                    </div>
+                    <div className="mt-3 space-y-1">
+                      <p className="text-sm font-medium">📝 Como pagar:</p>
+                      <ol className="text-xs text-muted-foreground space-y-1 list-decimal list-inside">
+                        <li>Abra o app <strong>PayPay</strong> no celular</li>
+                        <li>Escaneie o QR Code acima ou busque pelo número</li>
+                        <li>Insira o valor: <strong>¥{shipping ? (finalTotal + shipping.cost).toLocaleString() : finalTotal.toLocaleString()}</strong></li>
+                        <li>Confirme o pagamento</li>
+                        <li>Envie o comprovante via WhatsApp: 070-1367-1679</li>
+                      </ol>
+                    </div>
                   </div>
                 )}
 
@@ -616,10 +599,11 @@ _Sabor do Campo - Doce de Leite Artesanal_
                   <div className="print:block hidden print:break-inside-avoid">
                     <h4 className="font-semibold mb-2">Dados Bancários</h4>
                     <div className="text-sm space-y-1 font-mono">
-                      <p>Banco: [Nome do Banco]</p>
-                      <p>Agência: [Número da Agência]</p>
-                      <p>Conta: [Número da Conta]</p>
-                      <p>Nome: Paula Shiokawa</p>
+                      <p>ゆうちょ銀行 (Japan Post Bank)</p>
+                      <p>記号: 12260 / 番号: 33664351</p>
+                      <p>振込用: 店番228 / 口座3366435 (普通)</p>
+                      <p>ロドリゲス シオカワ ミリアン パウラ</p>
+                      <p>WhatsApp: 070-1367-1679</p>
                     </div>
                   </div>
                 )}

@@ -366,11 +366,16 @@ export const emailService = {
               <div class="info-box">
                 <p><strong>Por favor, realize o depósito para:</strong></p>
                 <p style="margin: 10px 0;">
-                  <!-- TODO: Replace with actual bank account details before production -->
-                  <strong>Banco:</strong> [Nome do Banco - Configure no .env]<br>
-                  <strong>Agência:</strong> [Número da Agência - Configure no .env]<br>
-                  <strong>Conta:</strong> [Número da Conta - Configure no .env]<br>
-                  <strong>Nome:</strong> Paula Shiokawa
+                  <strong>Banco:</strong> ゆうちょ銀行 (Japan Post Bank)<br>
+                  <strong>記号 (Kigou):</strong> 12260<br>
+                  <strong>番号 (Bangou):</strong> 33664351<br>
+                  <strong>名義:</strong> ロドリゲス シオカワ ミリアン パウラ
+                </p>
+                <p style="margin: 10px 0; padding: 10px; background: #f0f7ff; border-left: 3px solid #2196f3;">
+                  <strong>📌 振込用 (Transferência de outros bancos):</strong><br>
+                  金融機関コード: 9900<br>
+                  店名: 二二八店 (228)<br>
+                  口座番号: 3366435 (普通)
                 </p>
                 <p style="color: #856404; margin-top: 10px;">
                   ⚠️ <strong>Importante:</strong> Envie o comprovante via WhatsApp: 070-1367-1679
@@ -592,10 +597,16 @@ export const emailService = {
               <div class="info-box">
                 <p><strong>Por favor, realize o depósito para:</strong></p>
                 <p style="margin: 10px 0;">
-                  <strong>Banco:</strong> [Nome do Banco]<br>
-                  <strong>Agência:</strong> [Número da Agência]<br>
-                  <strong>Conta:</strong> [Número da Conta]<br>
-                  <strong>Nome:</strong> Paula Shiokawa
+                  <strong>Banco:</strong> ゆうちょ銀行 (Japan Post Bank)<br>
+                  <strong>記号 (Kigou):</strong> 12260<br>
+                  <strong>番号 (Bangou):</strong> 33664351<br>
+                  <strong>名義:</strong> ロドリゲス シオカワ ミリアン パウラ
+                </p>
+                <p style="margin: 10px 0; padding: 10px; background: #f0f7ff; border-left: 3px solid #2196f3;">
+                  <strong>📌 振込用 (Transferência de outros bancos):</strong><br>
+                  金融機関コード: 9900<br>
+                  店名: 二二八店 (228)<br>
+                  口座番号: 3366435 (普通)
                 </p>
                 <p style="color: #856404; margin-top: 10px;">
                   ⚠️ <strong>Importante:</strong> Envie o comprovante via WhatsApp: 070-1367-1679

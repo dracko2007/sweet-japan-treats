@@ -6,7 +6,7 @@
 import { firebaseSyncService } from '@/services/firebaseSyncService';
 
 export interface OrderStatus {
-  status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
+  status: 'pending' | 'processing' | 'confirmed' | 'shipped' | 'delivered' | 'cancelled';
   updatedAt: string;
   updatedBy?: string;
 }
