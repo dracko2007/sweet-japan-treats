@@ -4,46 +4,37 @@ import { Package, Truck, Clock, Shield, ArrowRight } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import ShippingCalculator from '@/components/shipping/ShippingCalculator';
 import { Button } from '@/components/ui/button';
+import { useLanguage } from '@/context/LanguageContext';
 
 const Shipping: React.FC = () => {
+  const { t } = useLanguage();
+
   const carriers = [
     {
-      name: 'Japan Post (ゆうパック)',
+      name: t('shippingPage.carrier1.name'),
       logo: '📮',
-      description: 'Serviço postal tradicional com cobertura nacional completa.',
-      features: ['Tracking online', 'Entrega nos correios', 'Horário flexível']
+      description: t('shippingPage.carrier1.desc'),
+      features: [t('shippingPage.carrier1.f1'), t('shippingPage.carrier1.f2'), t('shippingPage.carrier1.f3')]
     },
     {
-      name: 'Yamato (クロネコヤマト)',
+      name: t('shippingPage.carrier2.name'),
       logo: '🐱',
-      description: 'O gato preto mais famoso do Japão, conhecido pela qualidade.',
-      features: ['Entrega expressa', 'Serviço noturno', 'Reagendamento fácil']
+      description: t('shippingPage.carrier2.desc'),
+      features: [t('shippingPage.carrier2.f1'), t('shippingPage.carrier2.f2'), t('shippingPage.carrier2.f3')]
     },
     {
-      name: 'Sagawa (佐川急便)',
+      name: t('shippingPage.carrier3.name'),
       logo: '📦',
-      description: 'Confiabilidade e eficiência na entrega em todo o país.',
-      features: ['Preços competitivos', 'Entregas rápidas', 'Suporte em japonês']
+      description: t('shippingPage.carrier3.desc'),
+      features: [t('shippingPage.carrier3.f1'), t('shippingPage.carrier3.f2'), t('shippingPage.carrier3.f3')]
     }
   ];
 
   const faqItems = [
-    {
-      question: 'Quanto tempo demora a entrega?',
-      answer: 'O tempo varia de acordo com a sua localização. Para regiões próximas a Mie (Kansai e Chubu), a entrega leva de 1 a 2 dias úteis. Para regiões mais distantes como Hokkaido e Okinawa, pode levar de 3 a 4 dias úteis.'
-    },
-    {
-      question: 'Como são embalados os produtos?',
-      answer: 'Utilizamos caixas de 60cm para pedidos menores (até 8 potes pequenos) e caixas de 80cm para pedidos maiores. Cada pote é cuidadosamente protegido com material de enchimento para garantir que chegue em perfeitas condições.'
-    },
-    {
-      question: 'Posso escolher a transportadora?',
-      answer: 'Sim! Mostramos todas as opções disponíveis com seus respectivos preços para que você possa escolher a que melhor atende suas necessidades.'
-    },
-    {
-      question: 'O que acontece se o produto chegar danificado?',
-      answer: 'Garantimos a qualidade dos nossos produtos. Caso ocorra algum problema durante o transporte, entre em contato conosco imediatamente e providenciaremos a reposição ou reembolso.'
-    }
+    { question: t('shippingPage.faq1.q'), answer: t('shippingPage.faq1.a') },
+    { question: t('shippingPage.faq2.q'), answer: t('shippingPage.faq2.a') },
+    { question: t('shippingPage.faq3.q'), answer: t('shippingPage.faq3.a') },
+    { question: t('shippingPage.faq4.q'), answer: t('shippingPage.faq4.a') },
   ];
 
   return (
@@ -52,11 +43,10 @@ const Shipping: React.FC = () => {
         <div className="container mx-auto px-4">
           <div className="text-center max-w-2xl mx-auto">
             <h1 className="font-display text-4xl lg:text-5xl font-bold text-foreground mb-4">
-              Frete e Entrega
+              {t('shippingPage.title')}
             </h1>
             <p className="text-muted-foreground text-lg">
-              Enviamos para todas as 47 províncias do Japão. Calcule o frete para sua região 
-              e escolha a transportadora de sua preferência.
+              {t('shippingPage.description')}
             </p>
           </div>
         </div>
@@ -65,30 +55,26 @@ const Shipping: React.FC = () => {
       <section className="py-16 bg-background">
         <div className="container mx-auto px-4">
           <div className="grid lg:grid-cols-2 gap-12">
-            {/* Calculator */}
             <div>
               <ShippingCalculator />
               
               <div className="mt-6 p-4 bg-secondary/50 rounded-xl">
                 <p className="text-sm text-muted-foreground">
-                  <strong>💡 Dica:</strong> Adicione produtos ao carrinho para calcular o frete 
-                  com base no tamanho das caixas necessárias.
+                  <strong>💡 {t('shippingPage.tip').split('.')[0]}.</strong> {t('shippingPage.tip').includes('.') ? t('shippingPage.tip').split('.').slice(1).join('.') : ''}
                 </p>
                 <Button asChild variant="link" className="mt-2 p-0 h-auto text-primary">
                   <Link to="/produtos">
-                    Ver produtos
+                    {t('shippingPage.viewProducts')}
                     <ArrowRight className="w-4 h-4 ml-1" />
                   </Link>
                 </Button>
               </div>
             </div>
 
-            {/* Info */}
             <div className="space-y-8">
-              {/* Carriers */}
               <div>
                 <h2 className="font-display text-2xl font-bold text-foreground mb-6">
-                  Nossas Transportadoras
+                  {t('shippingPage.carriersTitle')}
                 </h2>
                 <div className="space-y-4">
                   {carriers.map((carrier) => (
@@ -112,37 +98,31 @@ const Shipping: React.FC = () => {
                 </div>
               </div>
 
-              {/* Box Info */}
               <div className="p-6 rounded-2xl bg-primary/5 border border-primary/20">
                 <h3 className="font-display text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
                   <Package className="w-5 h-5 text-primary" />
-                  Tamanhos de Caixa
+                  {t('shippingPage.boxTitle')}
                 </h3>
                 <div className="space-y-3 text-sm">
                   <div className="flex items-start gap-3">
                     <span className="font-medium text-foreground min-w-[60px]">60cm:</span>
-                    <span className="text-muted-foreground">
-                      Até 8 potes pequenos (280g) ou 1 grande + 1 pequeno
-                    </span>
+                    <span className="text-muted-foreground">{t('shippingPage.box60')}</span>
                   </div>
                   <div className="flex items-start gap-3">
                     <span className="font-medium text-foreground min-w-[60px]">80cm:</span>
-                    <span className="text-muted-foreground">
-                      Até 3 potes grandes (800g) ou 2 grandes + 2 pequenos
-                    </span>
+                    <span className="text-muted-foreground">{t('shippingPage.box80')}</span>
                   </div>
                   <p className="text-xs text-muted-foreground pt-2 border-t border-primary/10">
-                    * 1 pote grande equivale a 2 potes pequenos em espaço
+                    {t('shippingPage.boxNote')}
                   </p>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* FAQ */}
           <div className="mt-16">
             <h2 className="font-display text-2xl font-bold text-foreground mb-8 text-center">
-              Perguntas Frequentes
+              {t('shippingPage.faqTitle')}
             </h2>
             <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto">
               {faqItems.map((item) => (

@@ -1,62 +1,25 @@
 import React from 'react';
 import { Heart, Star, Users, Award } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
+import { useLanguage } from '@/context/LanguageContext';
 
 const About: React.FC = () => {
+  const { t } = useLanguage();
+
   const values = [
-    {
-      icon: Heart,
-      title: 'Feito com Amor',
-      description: 'Cada pote é preparado com dedicação e carinho, como se fosse para nossa própria família.'
-    },
-    {
-      icon: Star,
-      title: 'Qualidade Premium',
-      description: 'Utilizamos apenas ingredientes selecionados e de alta qualidade em todas as nossas receitas.'
-    },
-    {
-      icon: Users,
-      title: 'Tradição Familiar',
-      description: 'Nossas receitas passam de geração em geração, preservando o autêntico sabor brasileiro.'
-    },
-    {
-      icon: Award,
-      title: 'Excelência Japonesa',
-      description: 'Combinamos a tradição brasileira com os padrões de qualidade e higiene japoneses.'
-    }
+    { icon: Heart, titleKey: 'aboutPage.value1.title', descKey: 'aboutPage.value1.desc' },
+    { icon: Star, titleKey: 'aboutPage.value2.title', descKey: 'aboutPage.value2.desc' },
+    { icon: Users, titleKey: 'aboutPage.value3.title', descKey: 'aboutPage.value3.desc' },
+    { icon: Award, titleKey: 'aboutPage.value4.title', descKey: 'aboutPage.value4.desc' },
   ];
 
   const timeline = [
-    {
-      year: '2018',
-      title: 'O Sonho',
-      description: 'A saudade do doce de leite brasileiro nos inspirou a criar nossa própria receita no Japão.'
-    },
-    {
-      year: '2019',
-      title: 'Primeiros Testes',
-      description: 'Meses de experimentos para aperfeiçoar a receita com ingredientes locais.'
-    },
-    {
-      year: '2020',
-      title: 'Lançamento',
-      description: 'Início das vendas para amigos e família, com feedback extremamente positivo.'
-    },
-    {
-      year: '2021',
-      title: 'Expansão',
-      description: 'Começamos a enviar para todo o Japão, atendendo a demanda crescente.'
-    },
-    {
-      year: '2023',
-      title: 'Linha Premium',
-      description: 'Lançamento dos sabores premium com matcha, chocolate e amêndoas.'
-    },
-    {
-      year: '2024',
-      title: 'Hoje',
-      description: 'Continuamos crescendo, sempre mantendo a qualidade artesanal.'
-    }
+    { year: '2018', titleKey: 'aboutPage.timeline.2018.title', descKey: 'aboutPage.timeline.2018.desc' },
+    { year: '2019', titleKey: 'aboutPage.timeline.2019.title', descKey: 'aboutPage.timeline.2019.desc' },
+    { year: '2020', titleKey: 'aboutPage.timeline.2020.title', descKey: 'aboutPage.timeline.2020.desc' },
+    { year: '2021', titleKey: 'aboutPage.timeline.2021.title', descKey: 'aboutPage.timeline.2021.desc' },
+    { year: '2023', titleKey: 'aboutPage.timeline.2023.title', descKey: 'aboutPage.timeline.2023.desc' },
+    { year: '2024', titleKey: 'aboutPage.timeline.2024.title', descKey: 'aboutPage.timeline.2024.desc' },
   ];
 
   return (
@@ -67,15 +30,13 @@ const About: React.FC = () => {
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             <div>
               <span className="inline-block px-4 py-1.5 rounded-full bg-primary/10 text-primary text-sm font-medium mb-4">
-                Quem Somos
+                {t('aboutPage.badge')}
               </span>
               <h1 className="font-display text-4xl lg:text-5xl font-bold text-foreground mb-6">
-                Uma história de amor pelo doce de leite
+                {t('aboutPage.title')}
               </h1>
               <p className="text-lg text-muted-foreground leading-relaxed">
-                Somos brasileiros apaixonados pela culinária do nosso país, morando em Mie, 
-                no coração do Japão. Nossa missão é levar o verdadeiro sabor do doce de leite 
-                artesanal para todos os cantos deste país incrível.
+                {t('aboutPage.description')}
               </p>
             </div>
             
@@ -83,15 +44,15 @@ const About: React.FC = () => {
               <div className="aspect-square rounded-3xl bg-gradient-to-br from-caramel-light/40 to-primary/30 flex items-center justify-center shadow-elevated">
                 <div className="text-center">
                   <span className="text-8xl block mb-4">👨‍👩‍👧</span>
-                  <p className="font-display text-xl text-foreground">Família Doce de Leite</p>
+                  <p className="font-display text-xl text-foreground">{t('aboutPage.family')}</p>
                 </div>
               </div>
               <div className="absolute -bottom-6 -right-6 bg-card rounded-2xl shadow-card p-4">
                 <div className="flex items-center gap-3">
                   <span className="text-3xl">🏠</span>
                   <div>
-                    <p className="font-display font-semibold text-sm">Mie, Japão</p>
-                    <p className="text-xs text-muted-foreground">Nossa cozinha artesanal</p>
+                    <p className="font-display font-semibold text-sm">{t('aboutPage.location')}</p>
+                    <p className="text-xs text-muted-foreground">{t('aboutPage.kitchen')}</p>
                   </div>
                 </div>
               </div>
@@ -105,24 +66,24 @@ const About: React.FC = () => {
         <div className="container mx-auto px-4">
           <div className="text-center mb-12">
             <h2 className="font-display text-3xl lg:text-4xl font-bold text-foreground mb-4">
-              Nossos Valores
+              {t('aboutPage.valuesTitle')}
             </h2>
             <p className="text-muted-foreground max-w-2xl mx-auto">
-              O que nos move a cada dia para entregar o melhor doce de leite do Japão.
+              {t('aboutPage.valuesSubtitle')}
             </p>
           </div>
 
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {values.map((value) => (
-              <div key={value.title} className="p-6 rounded-2xl bg-background border border-border text-center">
+              <div key={value.titleKey} className="p-6 rounded-2xl bg-background border border-border text-center">
                 <div className="w-14 h-14 rounded-full gradient-caramel flex items-center justify-center mx-auto mb-4">
                   <value.icon className="w-7 h-7 text-primary-foreground" />
                 </div>
                 <h3 className="font-display text-lg font-semibold text-foreground mb-2">
-                  {value.title}
+                  {t(value.titleKey)}
                 </h3>
                 <p className="text-sm text-muted-foreground">
-                  {value.description}
+                  {t(value.descKey)}
                 </p>
               </div>
             ))}
@@ -135,34 +96,29 @@ const About: React.FC = () => {
         <div className="container mx-auto px-4">
           <div className="text-center mb-12">
             <h2 className="font-display text-3xl lg:text-4xl font-bold text-foreground mb-4">
-              Nossa Jornada
+              {t('aboutPage.journeyTitle')}
             </h2>
             <p className="text-muted-foreground max-w-2xl mx-auto">
-              Da saudade do Brasil ao sucesso no Japão.
+              {t('aboutPage.journeySubtitle')}
             </p>
           </div>
 
           <div className="max-w-3xl mx-auto">
             {timeline.map((item, index) => (
               <div key={item.year} className="relative pl-8 pb-8 last:pb-0">
-                {/* Line */}
                 {index !== timeline.length - 1 && (
                   <div className="absolute left-[11px] top-8 bottom-0 w-0.5 bg-border" />
                 )}
-                
-                {/* Dot */}
                 <div className="absolute left-0 top-1 w-6 h-6 rounded-full gradient-caramel flex items-center justify-center">
                   <div className="w-2 h-2 rounded-full bg-primary-foreground" />
                 </div>
-
-                {/* Content */}
                 <div className="bg-card rounded-xl p-5 border border-border ml-4">
                   <span className="text-sm font-semibold text-primary">{item.year}</span>
                   <h3 className="font-display text-lg font-semibold text-foreground mt-1">
-                    {item.title}
+                    {t(item.titleKey)}
                   </h3>
                   <p className="text-sm text-muted-foreground mt-1">
-                    {item.description}
+                    {t(item.descKey)}
                   </p>
                 </div>
               </div>
@@ -175,24 +131,23 @@ const About: React.FC = () => {
       <section className="py-20 gradient-caramel text-primary-foreground">
         <div className="container mx-auto px-4 text-center">
           <h2 className="font-display text-3xl lg:text-4xl font-bold mb-4">
-            Quer experimentar?
+            {t('aboutPage.ctaTitle')}
           </h2>
           <p className="text-primary-foreground/80 mb-8 max-w-lg mx-auto">
-            Prove o verdadeiro sabor do doce de leite brasileiro, 
-            feito com amor aqui no Japão.
+            {t('aboutPage.ctaDesc')}
           </p>
           <div className="flex flex-wrap justify-center gap-4">
             <a 
               href="/produtos" 
               className="px-8 py-3 bg-background text-foreground rounded-full font-semibold hover:bg-background/90 transition-colors"
             >
-              Ver Produtos
+              {t('aboutPage.ctaProducts')}
             </a>
             <a 
               href="mailto:contato@docedeleite.jp" 
               className="px-8 py-3 border-2 border-primary-foreground rounded-full font-semibold hover:bg-primary-foreground/10 transition-colors"
             >
-              Fale Conosco
+              {t('aboutPage.ctaContact')}
             </a>
           </div>
         </div>

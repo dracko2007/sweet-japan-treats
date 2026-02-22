@@ -12,6 +12,8 @@ import { wishlistService } from '@/services/wishlistService';
 import { reviewService } from '@/services/reviewService';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { useLanguage } from '@/context/LanguageContext';
+import { getTranslatedProductName, getTranslatedProductDesc, getTranslatedProductFlavor } from '@/data/translations';
 
 const ProductDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -19,6 +21,7 @@ const ProductDetail: React.FC = () => {
   const { addToCart } = useCart();
   const { user } = useUser();
   const { toast } = useToast();
+  const { t } = useLanguage();
 
   const product = products.find(p => p.id === id);
   const [selectedSize, setSelectedSize] = useState<'small' | 'large'>('small');
@@ -31,13 +34,16 @@ const ProductDetail: React.FC = () => {
     return (
       <Layout>
         <div className="container mx-auto px-4 py-20 text-center">
-          <h1 className="text-2xl font-bold mb-4">Produto não encontrado</h1>
-          <Button onClick={() => navigate('/produtos')}>Voltar aos Produtos</Button>
+          <h1 className="text-2xl font-bold mb-4">{t('productDetail.notFound')}</h1>
+          <Button onClick={() => navigate('/produtos')}>{t('productDetail.back')}</Button>
         </div>
       </Layout>
     );
   }
 
+  const translatedName = getTranslatedProductName(product.id, t);
+  const translatedDesc = getTranslatedProductDesc(product.id, t);
+  const translatedFlavor = getTranslatedProductFlavor(product.id, t);
   const currentPrice = selectedSize === 'small' ? product.prices.small : product.prices.large;
   const productRating = reviewService.getProductRating(product.id);
   const images = product.gallery && product.gallery.length > 0 ? product.gallery : [product.image];
@@ -45,16 +51,16 @@ const ProductDetail: React.FC = () => {
   const handleAddToCart = () => {
     addToCart(product, selectedSize, quantity);
     toast({
-      title: "Adicionado ao carrinho!",
-      description: `${product.name} (${selectedSize === 'small' ? '280g' : '800g'}) x${quantity}`,
+      title: t('productDetail.added'),
+      description: `${translatedName} (${selectedSize === 'small' ? '280g' : '800g'}) x${quantity}`,
     });
   };
 
   const handleToggleFavorite = () => {
     if (!user?.email) {
       toast({
-        title: "Login necessário",
-        description: "Faça login para adicionar aos favoritos",
+        title: t('productDetail.loginRequired'),
+        description: t('productDetail.loginFavorite'),
         variant: "destructive",
       });
       return;
@@ -64,8 +70,8 @@ const ProductDetail: React.FC = () => {
       wishlistService.removeFromWishlist(user.email, product.id);
       setIsFavorite(false);
       toast({
-        title: "Removido dos favoritos",
-        description: `${product.name} removido da lista de desejos`,
+        title: t('productDetail.removedFavorite'),
+        description: `${translatedName}`,
       });
     } else {
       wishlistService.addToWishlist(user.email, {
@@ -76,23 +82,23 @@ const ProductDetail: React.FC = () => {
       });
       setIsFavorite(true);
       toast({
-        title: "Adicionado aos favoritos! ❤️",
-        description: `${product.name} salvo na sua lista de desejos`,
+        title: t('productDetail.addedFavorite'),
+        description: translatedName,
       });
     }
   };
 
   const handleShare = () => {
     const url = window.location.href;
-    const text = `Confira ${product.name} - Doce de Leite Artesanal 🍯`;
+    const text = `${translatedName} 🍯`;
 
     if (navigator.share) {
-      navigator.share({ title: product.name, text, url }).catch(() => {});
+      navigator.share({ title: translatedName, text, url }).catch(() => {});
     } else {
       navigator.clipboard.writeText(url);
       toast({
-        title: "Link copiado!",
-        description: "O link foi copiado para sua área de transferência",
+        title: t('productDetail.linkCopied'),
+        description: t('productDetail.linkCopiedDesc'),
       });
     }
   };
@@ -107,7 +113,7 @@ const ProductDetail: React.FC = () => {
             className="mb-4 gap-2"
           >
             <ArrowLeft className="w-4 h-4" />
-            Voltar aos Produtos
+            {t('productDetail.back')}
           </Button>
         </div>
       </div>
@@ -116,16 +122,14 @@ const ProductDetail: React.FC = () => {
         <div className="container mx-auto px-4">
           <div className="max-w-6xl mx-auto">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-              {/* Gallery */}
               <div>
                 <ProductGallery 
                   images={images} 
-                  productName={product.name}
+                  productName={translatedName}
                   video={product.video}
                 />
               </div>
 
-              {/* Product Info */}
               <div>
                 <div className="mb-4">
                   <span className={cn(
@@ -134,13 +138,12 @@ const ProductDetail: React.FC = () => {
                       ? 'bg-gold/20 text-gold'
                       : 'bg-primary/20 text-primary'
                   )}>
-                    {product.category === 'premium' ? '★ Premium' : 'Artesanal'}
+                    {product.category === 'premium' ? t('product.category.premium') : t('product.category.artesanal')}
                   </span>
                 </div>
 
-                <h1 className="font-display text-4xl font-bold mb-4">{product.name}</h1>
+                <h1 className="font-display text-4xl font-bold mb-4">{translatedName}</h1>
                 
-                {/* Rating */}
                 {productRating.totalReviews > 0 && (
                   <div className="flex items-center gap-2 mb-4">
                     <div className="flex items-center">
@@ -157,21 +160,20 @@ const ProductDetail: React.FC = () => {
                       ))}
                     </div>
                     <span className="text-sm text-muted-foreground">
-                      {productRating.averageRating.toFixed(1)} ({productRating.totalReviews} avaliações)
+                      {productRating.averageRating.toFixed(1)} ({productRating.totalReviews} {t('productDetail.reviews')})
                     </span>
                   </div>
                 )}
 
-                <p className="text-lg text-muted-foreground mb-6">{product.description}</p>
+                <p className="text-lg text-muted-foreground mb-6">{translatedDesc}</p>
 
                 <div className="bg-secondary/30 rounded-xl p-4 mb-6">
-                  <p className="text-sm text-muted-foreground mb-1">Sabor</p>
-                  <p className="font-semibold">{product.flavor}</p>
+                  <p className="text-sm text-muted-foreground mb-1">{t('productDetail.flavor')}</p>
+                  <p className="font-semibold">{translatedFlavor}</p>
                 </div>
 
-                {/* Size Selection */}
                 <div className="mb-6">
-                  <label className="block text-sm font-medium mb-3">Tamanho</label>
+                  <label className="block text-sm font-medium mb-3">{t('productDetail.size')}</label>
                   <div className="grid grid-cols-2 gap-4">
                     <button
                       onClick={() => setSelectedSize('small')}
@@ -182,7 +184,7 @@ const ProductDetail: React.FC = () => {
                           : "border-border hover:border-primary/50"
                       )}
                     >
-                      <div className="font-semibold mb-1">280g - Pequeno</div>
+                      <div className="font-semibold mb-1">{t('productDetail.small')}</div>
                       <div className="text-2xl font-bold text-primary">
                         ¥{product.prices.small.toLocaleString()}
                       </div>
@@ -196,7 +198,7 @@ const ProductDetail: React.FC = () => {
                           : "border-border hover:border-primary/50"
                       )}
                     >
-                      <div className="font-semibold mb-1">800g - Grande</div>
+                      <div className="font-semibold mb-1">{t('productDetail.large')}</div>
                       <div className="text-2xl font-bold text-primary">
                         ¥{product.prices.large.toLocaleString()}
                       </div>
@@ -204,9 +206,8 @@ const ProductDetail: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Quantity */}
                 <div className="mb-6">
-                  <label className="block text-sm font-medium mb-3">Quantidade</label>
+                  <label className="block text-sm font-medium mb-3">{t('productDetail.quantity')}</label>
                   <div className="flex items-center gap-4">
                     <div className="flex items-center border-2 border-border rounded-xl">
                       <button
@@ -229,7 +230,6 @@ const ProductDetail: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Actions */}
                 <div className="flex gap-3 mb-6">
                   <Button
                     onClick={handleAddToCart}
@@ -237,7 +237,7 @@ const ProductDetail: React.FC = () => {
                     className="flex-1 gap-2"
                   >
                     <ShoppingCart className="w-5 h-5" />
-                    Adicionar ao Carrinho
+                    {t('productDetail.addToCart')}
                   </Button>
                   <Button
                     variant="outline"
@@ -256,18 +256,16 @@ const ProductDetail: React.FC = () => {
                   </Button>
                 </div>
 
-                {/* Info */}
                 <div className="border-t border-border pt-6 space-y-3 text-sm text-muted-foreground">
-                  <p>✓ Produto artesanal feito com ingredientes naturais</p>
-                  <p>✓ Entrega em todo o Japão via correios</p>
-                  <p>✓ Embalagem especial para presente</p>
+                  <p>{t('productDetail.info1')}</p>
+                  <p>{t('productDetail.info2')}</p>
+                  <p>{t('productDetail.info3')}</p>
                 </div>
               </div>
             </div>
 
-            {/* Reviews Section */}
             <div className="mt-16">
-              <ProductReviews productId={product.id} productName={product.name} />
+              <ProductReviews productId={product.id} productName={translatedName} />
             </div>
           </div>
         </div>
