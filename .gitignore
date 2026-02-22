@@ -34,3 +34,4 @@ erp/*.pyc
 erp/localstorage-*.json
 erp/whatsapp-service/.wwebjs_auth/
 erp/whatsapp-service/node_modules/
+erp/whatsapp-service/.wwebjs_cache/

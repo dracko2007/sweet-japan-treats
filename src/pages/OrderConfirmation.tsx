@@ -569,26 +569,26 @@ const OrderConfirmation: React.FC = () => {
                     <div className="flex flex-col items-center gap-3 my-4">
                       <img 
                         src="/products/paypay-qr.png" 
-                        alt="PayPay QR Code" 
-                        className="w-48 h-48 rounded-lg border-2 border-red-400 shadow-md"
+                        alt="PayPay QR Code - Sabor do Campo" 
+                        className="w-64 h-auto rounded-lg border-2 border-red-400 shadow-md"
                       />
                       <p className="text-sm text-muted-foreground text-center">
-                        Escaneie o QR Code com o app PayPay
+                        PayPayアプリでQRコードをスキャンしてください
                       </p>
                     </div>
                     <div className="bg-background/70 p-3 rounded-lg space-y-2">
-                      <p className="text-sm font-medium">📱 Ou envie diretamente para:</p>
-                      <p className="text-xl font-bold text-center tracking-wider">070-1367-1679</p>
-                      <p className="text-xs text-center text-muted-foreground">Paula Shiokawa</p>
+                      <p className="text-sm font-medium">📱 送金先 / Enviar para:</p>
+                      <p className="text-lg font-bold text-center">Sabor do Campo</p>
+                      <p className="text-xs text-center text-muted-foreground">電話番号: 070-1367-1679</p>
                     </div>
                     <div className="mt-3 space-y-1">
-                      <p className="text-sm font-medium">📝 Como pagar:</p>
+                      <p className="text-sm font-medium">📝 支払い方法 / Como pagar:</p>
                       <ol className="text-xs text-muted-foreground space-y-1 list-decimal list-inside">
-                        <li>Abra o app <strong>PayPay</strong> no celular</li>
-                        <li>Escaneie o QR Code acima ou busque pelo número</li>
-                        <li>Insira o valor: <strong>¥{shipping ? (finalTotal + shipping.cost).toLocaleString() : finalTotal.toLocaleString()}</strong></li>
-                        <li>Confirme o pagamento</li>
-                        <li>Envie o comprovante via WhatsApp: 070-1367-1679</li>
+                        <li>スマホで<strong>PayPay</strong>アプリを開く</li>
+                        <li>「スキャン」でQRコードを読み取る</li>
+                        <li>金額を入力: <strong>¥{shipping ? (finalTotal + shipping.cost).toLocaleString() : finalTotal.toLocaleString()}</strong></li>
+                        <li>送金を確認する</li>
+                        <li>スクリーンショットをWhatsAppで送信: 070-1367-1679</li>
                       </ol>
                     </div>
                   </div>
