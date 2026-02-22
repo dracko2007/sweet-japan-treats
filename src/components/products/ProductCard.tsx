@@ -8,6 +8,8 @@ import { useUser } from '@/context/UserContext';
 import { wishlistService } from '@/services/wishlistService';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { useLanguage } from '@/context/LanguageContext';
+import { getTranslatedProductName, getTranslatedProductDesc, getTranslatedProductFlavor } from '@/data/translations';
 
 interface ProductCardProps {
   product: Product;
@@ -23,6 +25,11 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
   const { addToCart } = useCart();
   const { user } = useUser();
   const { toast } = useToast();
+  const { t } = useLanguage();
+
+  const translatedName = getTranslatedProductName(product.id, t);
+  const translatedDesc = getTranslatedProductDesc(product.id, t);
+  const translatedFlavor = getTranslatedProductFlavor(product.id, t);
 
   useEffect(() => {
     if (user?.email) {
@@ -42,8 +49,8 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
   const handleToggleFavorite = () => {
     if (!user?.email) {
       toast({
-        title: "Login necessário",
-        description: "Faça login para adicionar aos favoritos",
+        title: t('productDetail.loginRequired'),
+        description: t('productDetail.loginFavorite'),
         variant: "destructive",
       });
       return;
@@ -53,8 +60,8 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
       wishlistService.removeFromWishlist(user.email, product.id);
       setIsFavorite(false);
       toast({
-        title: "Removido dos favoritos",
-        description: `${product.name} removido da lista de desejos`,
+        title: t('productDetail.removedFavorite'),
+        description: translatedName,
       });
     } else {
       const success = wishlistService.addToWishlist(user.email, {
@@ -67,8 +74,8 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
       if (success) {
         setIsFavorite(true);
         toast({
-          title: "Adicionado aos favoritos! ❤️",
-          description: `${product.name} salvo na sua lista de desejos`,
+          title: t('productDetail.addedFavorite'),
+          description: translatedName,
         });
       }
     }
@@ -76,22 +83,15 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
 
   const handleShare = () => {
     const url = `${window.location.origin}/produtos`;
-    const text = `Confira ${product.name} - Doce de Leite Artesanal 🍯`;
+    const text = `${translatedName} 🍯`;
 
     if (navigator.share) {
-      navigator.share({
-        title: product.name,
-        text: text,
-        url: url,
-      }).catch(() => {
-        // Fallback se cancelar
-      });
+      navigator.share({ title: translatedName, text, url }).catch(() => {});
     } else {
-      // Fallback: copiar link
       navigator.clipboard.writeText(url);
       toast({
-        title: "Link copiado!",
-        description: "O link foi copiado para sua área de transferência",
+        title: t('productDetail.linkCopied'),
+        description: t('productDetail.linkCopiedDesc'),
       });
     }
   };
@@ -106,33 +106,29 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
         onClick={() => navigate(`/produto/${product.id}`)}
       >
         {product.video ? (
-          <>
-            <video 
-              key={product.video}
-              src={product.video} 
-              autoPlay 
-              loop 
-              muted 
-              playsInline
-              poster={product.image}
-              className="absolute inset-0 w-full h-full object-cover"
-              onError={(e) => {
-                console.error('Erro ao carregar vídeo:', product.video, e);
-                const videoElement = e.target as HTMLVideoElement;
-                videoElement.style.display = 'none';
-                // Mostra a imagem se o vídeo falhar
-                const imgElement = document.createElement('img');
-                imgElement.src = product.image;
-                imgElement.alt = product.name;
-                imgElement.className = 'absolute inset-0 w-full h-full object-cover';
-                videoElement.parentElement?.appendChild(imgElement);
-              }}
-            />
-          </>
+          <video 
+            key={product.video}
+            src={product.video} 
+            autoPlay 
+            loop 
+            muted 
+            playsInline
+            poster={product.image}
+            className="absolute inset-0 w-full h-full object-cover"
+            onError={(e) => {
+              const videoElement = e.target as HTMLVideoElement;
+              videoElement.style.display = 'none';
+              const imgElement = document.createElement('img');
+              imgElement.src = product.image;
+              imgElement.alt = translatedName;
+              imgElement.className = 'absolute inset-0 w-full h-full object-cover';
+              videoElement.parentElement?.appendChild(imgElement);
+            }}
+          />
         ) : product.image ? (
           <img 
             src={product.image} 
-            alt={product.name}
+            alt={translatedName}
             className="absolute inset-0 w-full h-full object-cover"
           />
         ) : (
@@ -149,34 +145,26 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
               ? 'bg-gold/90 text-chocolate' 
               : 'bg-primary text-primary-foreground'
           )}>
-            {product.category === 'premium' ? '★ Premium' : 'Artesanal'}
+            {product.category === 'premium' ? t('product.category.premium') : t('product.category.artesanal')}
           </span>
         </div>
 
         {/* Favorite & Share Buttons */}
         <div className="absolute top-4 right-4 z-10 flex gap-2">
           <button
-            onClick={(e) => {
-              e.stopPropagation();
-              handleToggleFavorite();
-            }}
+            onClick={(e) => { e.stopPropagation(); handleToggleFavorite(); }}
             className={cn(
               "p-2 rounded-full backdrop-blur-sm transition-all",
               isFavorite 
                 ? "bg-red-500 text-white hover:bg-red-600" 
                 : "bg-white/90 dark:bg-gray-800/90 text-gray-700 dark:text-gray-200 hover:bg-white dark:hover:bg-gray-800"
             )}
-            title={isFavorite ? "Remover dos favoritos" : "Adicionar aos favoritos"}
           >
             <Heart className={cn("w-5 h-5", isFavorite && "fill-current")} />
           </button>
           <button
-            onClick={(e) => {
-              e.stopPropagation();
-              handleShare();
-            }}
+            onClick={(e) => { e.stopPropagation(); handleShare(); }}
             className="p-2 rounded-full bg-white/90 dark:bg-gray-800/90 text-gray-700 dark:text-gray-200 hover:bg-white dark:hover:bg-gray-800 backdrop-blur-sm transition-all"
-            title="Compartilhar produto"
           >
             <Share2 className="w-5 h-5" />
           </button>
@@ -186,14 +174,14 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/image:opacity-100 transition-opacity flex items-center justify-center">
           <div className="text-white text-center">
             <Eye className="w-8 h-8 mx-auto mb-2" />
-            <p className="text-sm font-medium">Ver Detalhes</p>
+            <p className="text-sm font-medium">{t('productDetail.viewDetails')}</p>
           </div>
         </div>
 
         {/* Flavor tag */}
         <div className="absolute bottom-4 right-4 z-10">
           <span className="px-3 py-1 rounded-full bg-card/90 text-sm font-medium text-foreground">
-            {product.flavor}
+            {translatedFlavor}
           </span>
         </div>
       </div>
@@ -201,10 +189,10 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
       {/* Content */}
       <div className="p-6">
         <h3 className="font-display text-xl font-bold text-foreground mb-2">
-          {product.name}
+          {translatedName}
         </h3>
         <p className="text-sm text-muted-foreground line-clamp-2 mb-4">
-          {product.description}
+          {translatedDesc}
         </p>
 
         {/* Size Selection */}
@@ -261,7 +249,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
             {added ? (
               <>
                 <Check className="w-5 h-5 mr-2" />
-                Adicionado!
+                {t('productDetail.added')}
               </>
             ) : (
               <>
