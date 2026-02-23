@@ -4,6 +4,7 @@ import { ArrowRight, Star } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { products } from '@/data/products';
 import { useLanguage } from '@/context/LanguageContext';
+import { getTranslatedProductName, getTranslatedProductDesc } from '@/data/translations';
 
 const FeaturedProducts: React.FC = () => {
   const { t } = useLanguage();
@@ -83,10 +84,10 @@ const FeaturedProducts: React.FC = () => {
               {/* Content */}
               <div className="p-5">
                 <h3 className="font-display text-lg font-semibold text-foreground group-hover:text-primary transition-colors">
-                  {product.name}
+                  {getTranslatedProductName(product.id, t)}
                 </h3>
                 <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
-                  {product.description}
+                  {getTranslatedProductDesc(product.id, t)}
                 </p>
                 
                 <div className="flex items-center justify-between mt-4">

@@ -69,6 +69,8 @@ export interface Order {
   paymentMethod: 'bank' | 'paypay';
   status: 'pending' | 'processing' | 'confirmed' | 'shipped' | 'delivered' | 'cancelled';
   shippingAddress: ShippingAddress;
+  orderNumber?: string;
+  shipping?: ShippingInfo;
 }
 
 export interface ShippingLabelData {
