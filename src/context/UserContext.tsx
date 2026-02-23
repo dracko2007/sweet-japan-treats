@@ -71,7 +71,7 @@ interface UserContextType {
   updateProfile: (userData: Partial<UserProfile>) => void;
   addCoupon: (coupon: Coupon) => void;
   useCoupon: (couponId: string) => void;
-  addOrder: (order: Omit<Order, 'id' | 'orderNumber' | 'date'>) => Promise<void> | void;
+  addOrder: (order: Omit<Order, 'id' | 'date'> & { orderNumber?: string }) => Promise<void> | void;
   clearOrderHistory: () => void;
   sendPasswordReset: (email: string) => Promise<{ success: boolean; error?: string }>;
   resendVerificationEmail: () => Promise<boolean>;
