@@ -31,6 +31,7 @@ export const products: Product[] = [
       '/products/gallery/coco-1.jpg',
       '/products/gallery/coco-2.jpg',
       '/products/gallery/coco-3.jpg',
+      '/products/gallery/coco-4.jpg',
     ],
     video: '/video/coco.mp4',
     flavor: 'Coco'
@@ -46,6 +47,8 @@ export const products: Product[] = [
       '/products/amendoim.jpg',
       '/products/gallery/amendoim-1.jpg',
       '/products/gallery/amendoim-2.jpg',
+      '/products/gallery/amendoim-3.jpg',
+      '/products/gallery/amendoim-4.jpg',
     ],
     video: '/video/amendoim.mp4',
     flavor: 'Amendoim'
@@ -62,6 +65,8 @@ export const products: Product[] = [
       '/products/cafe.jpg',
       '/products/gallery/cafe-1.jpg',
       '/products/gallery/cafe-2.jpg',
+      '/products/gallery/cafe-3.jpg',
+      '/products/gallery/cafe-4.jpg',
     ],
     video: '/video/cafe.mp4',
     flavor: 'Café'
@@ -77,6 +82,8 @@ export const products: Product[] = [
       '/products/amendoas.jpg',
       '/products/gallery/amendoas-1.jpg',
       '/products/gallery/amendoas-2.jpg',
+      '/products/gallery/amendoas-3.jpg',
+      '/products/gallery/amendoas-4.jpg',
     ],
     video: '/video/amendoas.mp4',
     flavor: 'Amêndoas'
@@ -92,6 +99,8 @@ export const products: Product[] = [
       '/products/matcha.jpg',
       '/products/gallery/matcha-1.jpg',
       '/products/gallery/matcha-2.jpg',
+      '/products/gallery/matcha-3.jpg',
+      '/products/gallery/matcha-4.jpg',
     ],
     video: '/video/cha.mp4',
     flavor: 'Matcha'
@@ -107,6 +116,8 @@ export const products: Product[] = [
       '/products/chocolate.jpg',
       '/products/gallery/chocolate-1.jpg',
       '/products/gallery/chocolate-2.jpg',
+      '/products/gallery/chocolate-3.jpg',
+      '/products/gallery/chocolate-4.jpg',
     ],
     video: '/video/chocolate.mp4',
     flavor: 'Chocolate'
