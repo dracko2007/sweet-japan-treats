@@ -30,6 +30,11 @@ export const translations: Record<Language, Record<string, string>> = {
     'hero.badge.recipe': 'Receita Brasileira',
     'hero.badge.tradition': 'Tradição desde sempre',
 
+    // Presentation Video
+    'presentation.badge': 'Conheça Nossa Produção',
+    'presentation.title': 'A Arte do Doce de Leite',
+    'presentation.description': 'Veja como produzimos nosso doce de leite artesanal com ingredientes selecionados e técnicas tradicionais brasileiras.',
+
     // Featured Products
     'featured.badge': 'Nossos Produtos',
     'featured.title': 'Descubra nossos sabores',
@@ -314,6 +319,11 @@ export const translations: Record<Language, Record<string, string>> = {
     'hero.badge.recipe': 'Brazilian Recipe',
     'hero.badge.tradition': 'Tradition since forever',
 
+    // Presentation Video
+    'presentation.badge': 'Discover Our Process',
+    'presentation.title': 'The Art of Dulce de Leche',
+    'presentation.description': 'Watch how we craft our artisan dulce de leche with selected ingredients and traditional Brazilian techniques.',
+
     // Featured Products
     'featured.badge': 'Our Products',
     'featured.title': 'Discover our flavors',
@@ -597,6 +607,11 @@ export const translations: Record<Language, Record<string, string>> = {
     'hero.stat.provinces': '都道府県',
     'hero.badge.recipe': 'ブラジルレシピ',
     'hero.badge.tradition': '伝統の味',
+
+    // Presentation Video
+    'presentation.badge': '製造工程をご覧ください',
+    'presentation.title': 'ドゥルセ・デ・レチェの芸術',
+    'presentation.description': '厳選された素材とブラジルの伝統技法で作る、職人手作りのドゥルセ・デ・レチェの製造工程をご覧ください。',
 
     // Featured Products
     'featured.badge': '当店の商品',
