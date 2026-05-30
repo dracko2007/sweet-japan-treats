@@ -161,7 +161,8 @@ const KimiClawAssistant: React.FC = () => {
       Object.entries(categoryAliases).forEach(([category, aliases]) => {
         if (product.category === category) {
           aliases.forEach(alias => {
-            if (normalized.includes(normalizeText(alias))) score += 5;
+            const normalizedAlias = normalizeText(alias);
+            if (normalized.includes(normalizedAlias) || normalizedAlias.includes(normalized)) score += 5;
           });
         }
       });
