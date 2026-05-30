@@ -2,9 +2,7 @@ import React from 'react';
 import Layout from '@/components/layout/Layout';
 import HeroSection from '@/components/home/HeroSection';
 import FeaturedProducts from '@/components/home/FeaturedProducts';
-import VideoGallery from '@/components/home/VideoGallery';
 import ShippingBanner from '@/components/home/ShippingBanner';
-import PresentationVideo from '@/components/home/PresentationVideo';
 import { WheelOfFortune } from '@/components/home/WheelOfFortune';
 import { useLanguage } from '@/context/LanguageContext';
 
@@ -15,9 +13,7 @@ const Index: React.FC = () => {
     <Layout>
       <WheelOfFortune />
       <HeroSection />
-      <PresentationVideo />
       <FeaturedProducts />
-      <VideoGallery />
       <ShippingBanner />
       
       {/* About Preview */}
