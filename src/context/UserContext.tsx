@@ -254,6 +254,15 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
         const userOrders = getUserOrders(userData.id).map(fixTrackingUrl);
         setCoupons(userCoupons);
         setOrders(userOrders);
+
+        // Se a sessão restaurada for do admin, reautentica no Firebase para liberar
+        // a escrita no painel (produtos) — necessário para sessões antigas.
+        const isAdminSession = userData.id === 'admin-001' || userData.email === 'dracko2007@gmail.com';
+        if (isAdminSession && auth && !auth.currentUser) {
+          signInWithEmailAndPassword(auth, 'dracko2007@gmail.com', 'admin123')
+            .then(() => console.log('✅ Admin reautenticado no Firebase (sessão restaurada)'))
+            .catch((err) => console.warn('⚠️ Falha ao reautenticar admin no Firebase:', err?.code));
+        }
       } catch (e) {
         console.error('❌ [INIT] Failed to parse stored user:', e);
       }
