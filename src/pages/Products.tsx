@@ -2,7 +2,7 @@ import React from 'react';
 import { useParams } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
 import ProductCard from '@/components/products/ProductCard';
-import { products, getProductsByCategory } from '@/data/products';
+import { useProducts } from '@/context/ProductsContext';
 import { cn } from '@/lib/utils';
 import { Link } from 'react-router-dom';
 import { useLanguage } from '@/context/LanguageContext';
@@ -10,9 +10,10 @@ import { useLanguage } from '@/context/LanguageContext';
 const Products: React.FC = () => {
   const { category } = useParams<{ category?: string }>();
   const { t, selectedCountry } = useLanguage();
-  
+  const { products } = useProducts();
+
   const displayProducts = category && category !== 'all'
-    ? getProductsByCategory(category)
+    ? products.filter(p => p.category === category)
     : products;
 
   // Só mostra categorias que realmente têm produtos cadastrados

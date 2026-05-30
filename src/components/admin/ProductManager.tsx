@@ -1,0 +1,360 @@
+import React, { useState, useRef } from 'react';
+import { Plus, Pencil, Trash2, X, Save, Image as ImageIcon, Loader2, PackageOpen } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Product } from '@/types';
+import { useProducts } from '@/context/ProductsContext';
+import { productService } from '@/services/productService';
+import { useToast } from '@/hooks/use-toast';
+
+const CATEGORIES = [
+  { id: 'cosmeticos', label: 'Cosméticos', icon: '🧴' },
+  { id: 'doces', label: 'Doces & Chás', icon: '🍵' },
+  { id: 'acessorios', label: 'Acessórios', icon: '🎮' },
+  { id: 'papelaria', label: 'Papelaria', icon: '✏️' },
+];
+
+const categoryLabel = (id: string) => CATEGORIES.find((c) => c.id === id)?.label || id;
+const categoryIcon = (id: string) => CATEGORIES.find((c) => c.id === id)?.icon || '🌸';
+
+const slugify = (s: string) =>
+  s
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '')
+    .slice(0, 40) || `produto-${Date.now()}`;
+
+// Redimensiona/comprime uma imagem para data URL JPEG (~600px) para caber no Firestore.
+function fileToCompressedDataURL(file: File, maxSize = 600, quality = 0.7): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > height && width > maxSize) {
+          height = Math.round((height * maxSize) / width);
+          width = maxSize;
+        } else if (height > maxSize) {
+          width = Math.round((width * maxSize) / height);
+          height = maxSize;
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return reject(new Error('canvas'));
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = reject;
+      img.src = e.target?.result as string;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+const emptyForm = (): Product => ({
+  id: '',
+  name: '',
+  description: '',
+  category: 'cosmeticos',
+  prices: { small: 0, large: 0 },
+  image: '',
+  gallery: [],
+  flavor: '',
+});
+
+const ProductManager: React.FC = () => {
+  const { products, refresh } = useProducts();
+  const { toast } = useToast();
+  const [editing, setEditing] = useState<Product | null>(null);
+  const [isNew, setIsNew] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const grouped = CATEGORIES.map((c) => ({
+    ...c,
+    items: products.filter((p) => p.category === c.id),
+  })).filter((g) => g.items.length > 0 || true);
+
+  const openNew = () => {
+    setEditing(emptyForm());
+    setIsNew(true);
+  };
+  const openEdit = (p: Product) => {
+    setEditing({ ...p, gallery: p.gallery ? [...p.gallery] : [p.image] });
+    setIsNew(false);
+  };
+  const close = () => {
+    setEditing(null);
+    setIsNew(false);
+  };
+
+  const handleFiles = async (files: FileList | null) => {
+    if (!files || !editing) return;
+    setUploading(true);
+    try {
+      const current = editing.gallery ? [...editing.gallery] : [];
+      for (const file of Array.from(files).slice(0, 5)) {
+        if (current.length >= 5) break;
+        const dataUrl = await fileToCompressedDataURL(file);
+        current.push(dataUrl);
+      }
+      setEditing({ ...editing, gallery: current, image: current[0] || editing.image });
+    } catch (e) {
+      toast({ title: 'Erro ao processar imagem', variant: 'destructive' });
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = '';
+    }
+  };
+
+  const removeImage = (idx: number) => {
+    if (!editing) return;
+    const gallery = (editing.gallery || []).filter((_, i) => i !== idx);
+    setEditing({ ...editing, gallery, image: gallery[0] || '' });
+  };
+
+  const save = async () => {
+    if (!editing) return;
+    if (!editing.name.trim()) {
+      toast({ title: 'Dê um nome ao produto', variant: 'destructive' });
+      return;
+    }
+    setSaving(true);
+    try {
+      const id = isNew ? slugify(editing.name) + '-' + Date.now().toString(36).slice(-4) : editing.id;
+      const gallery = editing.gallery && editing.gallery.length > 0 ? editing.gallery : [editing.image].filter(Boolean);
+      const product: Product = {
+        ...editing,
+        id,
+        image: gallery[0] || editing.image || '',
+        gallery,
+        prices: {
+          small: Number(editing.prices.small) || 0,
+          large: Number(editing.prices.large) || Number(editing.prices.small) || 0,
+        },
+      };
+      await productService.save(product);
+      await refresh();
+      toast({ title: isNew ? '✅ Produto adicionado!' : '✅ Produto atualizado!', description: product.name });
+      close();
+    } catch (e: any) {
+      toast({ title: 'Erro ao salvar', description: e?.message, variant: 'destructive' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const remove = async (p: Product) => {
+    if (!window.confirm(`Remover "${p.name}" da loja?`)) return;
+    try {
+      await productService.remove(p.id);
+      await refresh();
+      toast({ title: '🗑️ Produto removido', description: p.name });
+    } catch (e: any) {
+      toast({ title: 'Erro ao remover', description: e?.message, variant: 'destructive' });
+    }
+  };
+
+  return (
+    <div>
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h2 className="font-display text-2xl font-bold text-foreground">Produtos</h2>
+          <p className="text-sm text-muted-foreground">{products.length} produtos na loja</p>
+        </div>
+        <Button onClick={openNew} className="btn-primary rounded-xl gap-2">
+          <Plus className="w-5 h-5" /> Adicionar Produto
+        </Button>
+      </div>
+
+      {/* Categorias */}
+      <div className="space-y-8">
+        {grouped.map((group) => (
+          <div key={group.id}>
+            <h3 className="text-sm font-bold uppercase tracking-wide text-muted-foreground mb-3 flex items-center gap-2">
+              <span className="text-lg">{group.icon}</span> {group.label}
+              <span className="text-xs font-normal">({group.items.length})</span>
+            </h3>
+            {group.items.length === 0 ? (
+              <p className="text-sm text-muted-foreground/60 italic pl-7">Nenhum produto nesta categoria ainda.</p>
+            ) : (
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {group.items.map((p) => (
+                  <div key={p.id} className="bg-card border border-border rounded-xl overflow-hidden flex shadow-sm">
+                    <div className="w-24 h-24 bg-secondary/40 flex-shrink-0">
+                      {p.image ? (
+                        <img src={p.image} alt={p.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                          <ImageIcon className="w-6 h-6" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="p-3 flex-1 min-w-0 flex flex-col">
+                      <p className="font-semibold text-sm leading-tight line-clamp-2">{p.name}</p>
+                      <p className="text-xs text-primary font-bold mt-1">¥ {p.prices.small.toLocaleString()}</p>
+                      <div className="mt-auto flex gap-1 pt-2">
+                        <button onClick={() => openEdit(p)} className="flex-1 text-xs py-1.5 rounded-lg bg-secondary hover:bg-secondary/70 flex items-center justify-center gap-1">
+                          <Pencil className="w-3.5 h-3.5" /> Editar
+                        </button>
+                        <button onClick={() => remove(p)} className="px-2 py-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100">
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Modal de edição */}
+      {editing && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
+          <div className="bg-card rounded-2xl w-full max-w-2xl my-8 shadow-elevated border border-border">
+            <div className="flex items-center justify-between p-5 border-b border-border sticky top-0 bg-card rounded-t-2xl">
+              <h3 className="font-display text-xl font-bold flex items-center gap-2">
+                {isNew ? <Plus className="w-5 h-5" /> : <Pencil className="w-5 h-5" />}
+                {isNew ? 'Novo Produto' : 'Editar Produto'}
+              </h3>
+              <button onClick={close} className="p-2 rounded-full hover:bg-secondary"><X className="w-5 h-5" /></button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              {/* Nome */}
+              <div>
+                <label className="text-sm font-semibold block mb-1">Nome do produto</label>
+                <input
+                  value={editing.name}
+                  onChange={(e) => setEditing({ ...editing, name: e.target.value })}
+                  placeholder="Ex: Bioré UV Aqua Rich SPF50+"
+                  className="w-full px-3 py-2 rounded-lg border border-border bg-background"
+                />
+              </div>
+
+              {/* Categoria + Sabor/tag */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-sm font-semibold block mb-1">Categoria</label>
+                  <select
+                    value={editing.category}
+                    onChange={(e) => setEditing({ ...editing, category: e.target.value })}
+                    className="w-full px-3 py-2 rounded-lg border border-border bg-background"
+                  >
+                    {CATEGORIES.map((c) => (
+                      <option key={c.id} value={c.id}>{c.icon} {c.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-sm font-semibold block mb-1">Tag / Sabor</label>
+                  <input
+                    value={editing.flavor}
+                    onChange={(e) => setEditing({ ...editing, flavor: e.target.value })}
+                    placeholder="Ex: Matcha Kyoto"
+                    className="w-full px-3 py-2 rounded-lg border border-border bg-background"
+                  />
+                </div>
+              </div>
+
+              {/* Preços */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-sm font-semibold block mb-1">Preço pequeno (¥)</label>
+                  <input
+                    type="number"
+                    value={editing.prices.small || ''}
+                    onChange={(e) => setEditing({ ...editing, prices: { ...editing.prices, small: Number(e.target.value) } })}
+                    placeholder="980"
+                    className="w-full px-3 py-2 rounded-lg border border-border bg-background"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-semibold block mb-1">Preço grande (¥)</label>
+                  <input
+                    type="number"
+                    value={editing.prices.large || ''}
+                    onChange={(e) => setEditing({ ...editing, prices: { ...editing.prices, large: Number(e.target.value) } })}
+                    placeholder="2400"
+                    className="w-full px-3 py-2 rounded-lg border border-border bg-background"
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground -mt-2">Preços em ienes (¥). O site converte automático para R$/€ conforme o país.</p>
+
+              {/* Descrição */}
+              <div>
+                <label className="text-sm font-semibold block mb-1">Descrição</label>
+                <textarea
+                  value={editing.description}
+                  onChange={(e) => setEditing({ ...editing, description: e.target.value })}
+                  rows={4}
+                  placeholder="Descreva o produto..."
+                  className="w-full px-3 py-2 rounded-lg border border-border bg-background resize-y"
+                />
+              </div>
+
+              {/* Fotos */}
+              <div>
+                <label className="text-sm font-semibold block mb-1">Fotos (até 5)</label>
+                <div className="flex flex-wrap gap-3">
+                  {(editing.gallery || []).map((img, idx) => (
+                    <div key={idx} className="relative w-20 h-20 rounded-lg overflow-hidden border border-border group">
+                      <img src={img} alt="" className="w-full h-full object-cover" />
+                      {idx === 0 && (
+                        <span className="absolute top-0 left-0 bg-primary text-primary-foreground text-[9px] px-1 rounded-br">Capa</span>
+                      )}
+                      <button
+                        onClick={() => removeImage(idx)}
+                        className="absolute top-0.5 right-0.5 bg-black/60 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ))}
+                  {(editing.gallery?.length || 0) < 5 && (
+                    <button
+                      onClick={() => fileRef.current?.click()}
+                      disabled={uploading}
+                      className="w-20 h-20 rounded-lg border-2 border-dashed border-border flex items-center justify-center text-muted-foreground hover:border-primary hover:text-primary transition"
+                    >
+                      {uploading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Plus className="w-6 h-6" />}
+                    </button>
+                  )}
+                </div>
+                <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={(e) => handleFiles(e.target.files)} />
+                <p className="text-xs text-muted-foreground mt-1">A primeira foto é a capa. As imagens são reduzidas automaticamente.</p>
+              </div>
+            </div>
+
+            <div className="p-5 border-t border-border flex justify-end gap-3 sticky bottom-0 bg-card rounded-b-2xl">
+              <Button variant="outline" onClick={close} className="rounded-xl">Cancelar</Button>
+              <Button onClick={save} disabled={saving} className="btn-primary rounded-xl gap-2">
+                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                Salvar
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {products.length === 0 && (
+        <div className="text-center py-12 text-muted-foreground">
+          <PackageOpen className="w-12 h-12 mx-auto mb-3 opacity-50" />
+          Nenhum produto. Clique em "Adicionar Produto" para começar.
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default ProductManager;

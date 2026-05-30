@@ -5,7 +5,7 @@ import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import ProductGallery from '@/components/products/ProductGallery';
 import ProductReviews from '@/components/products/ProductReviews';
-import { products } from '@/data/products';
+import { useProducts } from '@/context/ProductsContext';
 import { useCart } from '@/context/CartContext';
 import { useUser } from '@/context/UserContext';
 import { wishlistService } from '@/services/wishlistService';
@@ -23,6 +23,7 @@ const ProductDetail: React.FC = () => {
   const { user } = useUser();
   const { toast } = useToast();
   const { t, selectedCountry } = useLanguage();
+  const { products } = useProducts();
 
   const product = products.find(p => p.id === id);
   const [selectedSize, setSelectedSize] = useState<'small' | 'large'>('small');

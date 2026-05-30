@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, Star, Flame, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { products } from '@/data/products';
+import { useProducts } from '@/context/ProductsContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { getTranslatedProductName, getTranslatedProductDesc } from '@/data/translations';
 import { formatPrice } from '@/utils/currency';
@@ -20,6 +20,7 @@ const FAKE_STOCK_PERCENT: Record<string, number> = {
 
 const FeaturedProducts: React.FC = () => {
   const { t, selectedCountry } = useLanguage();
+  const { products } = useProducts();
   const featuredProducts = products.slice(0, 4);
 
   // Countdown timer state

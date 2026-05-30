@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { CartProvider } from "@/context/CartContext";
 import { UserProvider } from "@/context/UserContext";
 import { LanguageProvider } from "@/context/LanguageContext";
+import { ProductsProvider } from "@/context/ProductsContext";
 import { firebaseConfigReady, firebaseConfigSource, firebaseConfig } from "@/config/firebase";
 import Index from "./pages/Index";
 import Products from "./pages/Products";
@@ -34,6 +35,7 @@ const App = () => (
   <LanguageProvider>
   <QueryClientProvider client={queryClient}>
     <UserProvider>
+      <ProductsProvider>
       <CartProvider>
         <TooltipProvider>
           {typeof window !== "undefined" && new URLSearchParams(window.location.search).get("debug") === "1" && (
@@ -90,6 +92,7 @@ const App = () => (
           </BrowserRouter>
         </TooltipProvider>
       </CartProvider>
+      </ProductsProvider>
     </UserProvider>
   </QueryClientProvider>
   </LanguageProvider>

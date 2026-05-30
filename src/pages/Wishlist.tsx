@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { useUser } from '@/context/UserContext';
 import { useCart } from '@/context/CartContext';
 import { wishlistService, WishlistItem } from '@/services/wishlistService';
-import { products } from '@/data/products';
+import { useProducts } from '@/context/ProductsContext';
 import { useToast } from '@/hooks/use-toast';
 import { useLanguage } from '@/context/LanguageContext';
 import { formatPrice } from '@/utils/currency';
@@ -14,6 +14,7 @@ import { formatPrice } from '@/utils/currency';
 const Wishlist: React.FC = () => {
   const navigate = useNavigate();
   const { user, isAuthenticated } = useUser();
+  const { products } = useProducts();
   const { addToCart } = useCart();
   const { selectedCountry } = useLanguage();
   const { toast } = useToast();

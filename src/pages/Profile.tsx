@@ -10,10 +10,11 @@ import { useCart } from '@/context/CartContext';
 import { useToast } from '@/hooks/use-toast';
 import { prefectures } from '@/data/prefectures';
 import { addAddressHints } from '@/utils/romanize';
-import { products } from '@/data/products';
+import { useProducts } from '@/context/ProductsContext';
 
 const Profile: React.FC = () => {
   const { user, isAuthenticated, coupons, orders, updateProfile, logout } = useUser();
+  const { products } = useProducts();
   const { addToCart, clearCart } = useCart();
   const navigate = useNavigate();
   const { toast } = useToast();

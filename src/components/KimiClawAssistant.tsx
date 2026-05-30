@@ -4,7 +4,8 @@ import { Send, X, Bot, Sparkles, Loader2, MessageSquare, Trash, CornerDownLeft, 
 import { useCart } from '@/context/CartContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { useUser } from '@/context/UserContext';
-import { products, Product } from '@/data/products';
+import { useProducts } from '@/context/ProductsContext';
+import { Product } from '@/types';
 import { safeStorage } from '@/utils/storage';
 import { formatPrice, getCurrencyByCountry } from '@/utils/currency';
 import { toast } from 'sonner';
@@ -44,6 +45,7 @@ const ClawIcon = ({ className }: { className?: string }) => (
 const KimiClawAssistant: React.FC = () => {
   const { addToCart, clearCart } = useCart();
   const { language, setLanguage, t, selectedCountry } = useLanguage();
+  const { products } = useProducts();
   const { user, updateProfile } = useUser();
   const navigate = useNavigate();
   const location = useLocation();
