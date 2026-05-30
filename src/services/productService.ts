@@ -4,7 +4,7 @@
 // e são mescladas por cima dos defaults. Fotos são guardadas como data URL (base64) dentro
 // do documento, pois o Firebase Storage não está provisionado neste projeto.
 
-import { db, auth } from '@/config/firebase';
+import { db } from '@/config/firebase';
 import {
   collection,
   getDocs,
@@ -12,24 +12,11 @@ import {
   setDoc,
   serverTimestamp,
 } from 'firebase/firestore';
-import { signInWithEmailAndPassword } from 'firebase/auth';
 import { Product } from '@/types';
 import { products as defaultProducts } from '@/data/products';
+import { ensureAdminAuth } from '@/utils/adminAuth';
 
 const COL = 'products';
-
-// Garante que o admin está autenticado no Firebase antes de escrever (as regras exigem).
-// Resolve o caso de a sessão Firebase ainda não ter carregado quando o admin clica em salvar.
-async function ensureAdminAuth(): Promise<void> {
-  if (!auth) return;
-  if (auth.currentUser) return;
-  try {
-    await signInWithEmailAndPassword(auth, 'dracko2007@gmail.com', 'admin123');
-  } catch (e) {
-    // Se falhar, o setDoc abaixo dará erro de permissão com mensagem clara.
-    console.warn('ensureAdminAuth falhou:', e);
-  }
-}
 
 interface Overrides {
   items: Product[];

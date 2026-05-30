@@ -5,6 +5,7 @@ import { safeStorage } from '@/utils/storage';
  */
 
 import { firebaseSyncService } from '@/services/firebaseSyncService';
+import { ensureAdminAuth } from '@/utils/adminAuth';
 
 export interface OrderStatus {
   status: 'pending' | 'processing' | 'confirmed' | 'shipped' | 'delivered' | 'cancelled';
@@ -80,6 +81,7 @@ export const orderService = {
 
     // Update in Firestore
     try {
+      await ensureAdminAuth();
       await firebaseSyncService.updateOrderStatus(orderNumber, status);
       updated = true;
     } catch (err) {
@@ -126,7 +128,9 @@ export const orderService = {
     }
 
     try {
+      await ensureAdminAuth();
       await firebaseSyncService.updateOrderStatus(orderNumber, 'cancelled');
+      deleted = true; // pedido existe só no Firestore (sincronizado do ERP)
     } catch (err) {
       console.error('❌ [ORDER] Firestore delete failed:', err);
     }
@@ -140,6 +144,7 @@ export const orderService = {
 
     // Update in Firestore
     try {
+      await ensureAdminAuth();
       const { doc, updateDoc } = await import('firebase/firestore');
       const { db } = await import('@/config/firebase');
       if (db) {
