@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Lato:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700;800&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -15,106 +15,106 @@
 
 @layer base {
   :root {
-    /* Warm caramel theme - Dulce de Leche inspired */
-    --background: 40 33% 98%;
-    --foreground: 25 30% 15%;
+    /* Temu Visual Theme - High conversion Orange & Red */
+    --background: 0 0% 100%;
+    --foreground: 20 20% 10%;
 
-    --card: 40 30% 96%;
-    --card-foreground: 25 30% 15%;
+    --card: 0 0% 98%;
+    --card-foreground: 20 20% 10%;
 
-    --popover: 40 33% 98%;
-    --popover-foreground: 25 30% 15%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 20 20% 10%;
 
-    /* Primary - Rich Caramel */
-    --primary: 30 70% 45%;
-    --primary-foreground: 40 33% 98%;
+    /* Primary - Temu Orange */
+    --primary: 14 100% 57%;
+    --primary-foreground: 0 0% 100%;
 
-    /* Secondary - Cream */
-    --secondary: 40 40% 92%;
-    --secondary-foreground: 25 30% 20%;
+    /* Secondary - Light Grey with hint of orange */
+    --secondary: 14 20% 96%;
+    --secondary-foreground: 14 80% 30%;
 
-    --muted: 35 25% 90%;
-    --muted-foreground: 25 15% 45%;
+    --muted: 0 0% 95%;
+    --muted-foreground: 0 0% 45%;
 
-    /* Accent - Deep Chocolate */
-    --accent: 20 45% 25%;
-    --accent-foreground: 40 33% 98%;
+    /* Accent - Pink/Red Discount Highlight */
+    --accent: 340 82% 52%;
+    --accent-foreground: 0 0% 100%;
 
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 35 30% 85%;
-    --input: 35 30% 85%;
-    --ring: 30 70% 45%;
+    --border: 0 0% 90%;
+    --input: 0 0% 90%;
+    --ring: 14 100% 57%;
 
-    --radius: 0.75rem;
+    --radius: 0.5rem;
 
-    /* Custom colors */
-    --caramel: 30 70% 45%;
-    --caramel-light: 35 60% 75%;
-    --caramel-dark: 25 65% 30%;
-    --cream: 40 40% 95%;
-    --chocolate: 20 45% 20%;
-    --coffee: 25 35% 30%;
-    --gold: 45 80% 55%;
+    /* Mapped custom colors from old theme to prevent styling breakage */
+    --caramel: 14 100% 57%;
+    --caramel-light: 14 100% 90%;
+    --caramel-dark: 14 100% 35%;
+    --cream: 0 0% 98%;
+    --chocolate: 340 82% 52%;
+    --coffee: 20 20% 20%;
+    --gold: 45 100% 50%;
 
     /* Gradients */
-    --gradient-caramel: linear-gradient(135deg, hsl(30 70% 50%) 0%, hsl(25 65% 35%) 100%);
-    --gradient-cream: linear-gradient(180deg, hsl(40 33% 98%) 0%, hsl(35 30% 92%) 100%);
-    --gradient-hero: linear-gradient(180deg, hsl(40 33% 98%) 0%, hsl(35 40% 94%) 50%, hsl(30 35% 90%) 100%);
+    --gradient-caramel: linear-gradient(135deg, hsl(14 100% 57%) 0%, hsl(340 82% 52%) 100%);
+    --gradient-cream: linear-gradient(180deg, hsl(0 0% 100%) 0%, hsl(0 0% 95%) 100%);
+    --gradient-hero: linear-gradient(180deg, hsl(14 100% 97%) 0%, hsl(0 0% 100%) 100%);
 
     /* Shadows */
-    --shadow-soft: 0 4px 20px -4px hsl(25 30% 15% / 0.1);
-    --shadow-card: 0 8px 30px -8px hsl(25 30% 15% / 0.15);
-    --shadow-elevated: 0 20px 50px -15px hsl(25 30% 15% / 0.2);
+    --shadow-soft: 0 2px 10px -2px hsl(20 20% 10% / 0.05);
+    --shadow-card: 0 4px 20px -6px hsl(20 20% 10% / 0.1);
+    --shadow-elevated: 0 15px 35px -10px hsl(20 20% 10% / 0.15);
 
     --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 240 5.9% 10%;
-    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-primary: 14 100% 57%;
+    --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 240 4.8% 95.9%;
     --sidebar-accent-foreground: 240 5.9% 10%;
     --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-ring: 14 100% 57%;
   }
 
   .dark {
-    --background: 25 25% 8%;
-    --foreground: 40 30% 95%;
+    --background: 20 20% 8%;
+    --foreground: 0 0% 95%;
 
-    --card: 25 20% 12%;
-    --card-foreground: 40 30% 95%;
+    --card: 20 15% 12%;
+    --card-foreground: 0 0% 95%;
 
-    --popover: 25 20% 10%;
-    --popover-foreground: 40 30% 95%;
+    --popover: 20 20% 10%;
+    --popover-foreground: 0 0% 95%;
 
-    --primary: 35 65% 55%;
-    --primary-foreground: 25 25% 8%;
+    --primary: 14 100% 57%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 25 20% 18%;
-    --secondary-foreground: 40 30% 90%;
+    --secondary: 20 15% 18%;
+    --secondary-foreground: 0 0% 90%;
 
-    --muted: 25 15% 20%;
-    --muted-foreground: 35 20% 60%;
+    --muted: 20 10% 20%;
+    --muted-foreground: 0 0% 60%;
 
-    --accent: 35 50% 65%;
-    --accent-foreground: 25 25% 8%;
+    --accent: 340 82% 52%;
+    --accent-foreground: 0 0% 100%;
 
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 25 15% 25%;
-    --input: 25 15% 25%;
-    --ring: 35 65% 55%;
+    --border: 20 10% 20%;
+    --input: 20 10% 20%;
+    --ring: 14 100% 57%;
 
     --sidebar-background: 240 5.9% 10%;
     --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary: 14 100% 57%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 240 3.7% 15.9%;
     --sidebar-accent-foreground: 240 4.8% 95.9%;
     --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-ring: 14 100% 57%;
   }
 }
 
@@ -125,29 +125,29 @@
 
   body {
     @apply bg-background text-foreground antialiased;
-    font-family: 'Lato', sans-serif;
+    font-family: 'Inter', sans-serif;
   }
 
   h1, h2, h3, h4, h5, h6 {
-    font-family: 'Playfair Display', serif;
+    font-family: 'Outfit', sans-serif;
   }
 }
 
 @layer components {
   .btn-primary {
-    @apply bg-primary text-primary-foreground hover:bg-primary/90 transition-all duration-300 shadow-soft hover:shadow-card;
+    @apply bg-primary text-primary-foreground hover:bg-primary/90 transition-all duration-300 shadow-soft hover:shadow-card font-semibold rounded;
   }
 
   .btn-secondary {
-    @apply bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-all duration-300;
+    @apply bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-all duration-300 font-semibold rounded;
   }
 
   .btn-accent {
-    @apply bg-accent text-accent-foreground hover:bg-accent/90 transition-all duration-300;
+    @apply bg-accent text-accent-foreground hover:bg-accent/90 transition-all duration-300 font-semibold rounded;
   }
 
   .card-product {
-    @apply bg-card rounded-2xl shadow-soft hover:shadow-card transition-all duration-500 overflow-hidden;
+    @apply bg-card rounded-lg border border-border shadow-soft hover:shadow-card transition-all duration-300 overflow-hidden hover:-translate-y-1;
   }
 
   .gradient-caramel {

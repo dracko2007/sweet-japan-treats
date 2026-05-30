@@ -1,3 +1,4 @@
+import { safeStorage } from '@/utils/storage';
 import React, { useState, useEffect } from 'react';
 import { Tag, X, Check, Gift, Truck, Star } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -46,7 +47,7 @@ const CouponSelector: React.FC<CouponSelectorProps> = ({
         continue;
       }
       
-      // Check localStorage first (fast)
+      // Check safeStorage first (fast)
       const usedBy = couponService.getCouponUsage(coupon.code);
       if (usedBy.includes(userEmail)) continue;
       

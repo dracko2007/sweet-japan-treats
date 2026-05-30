@@ -1,6 +1,7 @@
+import { safeStorage } from '@/utils/storage';
 /**
  * Firebase Sync Service
- * Sincroniza localStorage com Firestore para acesso multi-dispositivo
+ * Sincroniza safeStorage com Firestore para acesso multi-dispositivo
  */
 
 import { 
@@ -54,7 +55,7 @@ const sanitizeData = (data: any): any => {
 
 export const firebaseSyncService = {
   /**
-   * Sincroniza usuário do localStorage para Firestore
+   * Sincroniza usuário do safeStorage para Firestore
    */
   async syncUserToFirestore(userId: string, userData: any) {
     try {
@@ -326,15 +327,15 @@ export const firebaseSyncService = {
   },
 
   /**
-   * Migra dados do localStorage para Firestore
+   * Migra dados do safeStorage para Firestore
    */
   async migrateLocalStorageToFirestore() {
     try {
-      console.log('🔄 [FIREBASE] Starting migration from localStorage...');
+      console.log('🔄 [FIREBASE] Starting migration from safeStorage...');
       
-      const usersData = localStorage.getItem('sweet-japan-users');
+      const usersData = safeStorage.getItem('sweet-japan-users');
       if (!usersData) {
-        console.log('⚠️ [FIREBASE] No users in localStorage to migrate');
+        console.log('⚠️ [FIREBASE] No users in safeStorage to migrate');
         return { success: true, migrated: 0 };
       }
       

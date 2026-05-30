@@ -7,13 +7,15 @@ import { useLanguage } from '@/context/LanguageContext';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import LanguageSwitcher from '@/components/LanguageSwitcher';
+import CountrySwitcher from '@/components/CountrySwitcher';
+import { useToast } from '@/hooks/use-toast';
 
 const Header: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isProductsOpen, setIsProductsOpen] = useState(false);
   const { totalItems } = useCart();
   const { isAuthenticated, user } = useUser();
-  const { t } = useLanguage();
+  const { t, selectedCountry } = useLanguage();
   const location = useLocation();
 
   const navItems = [
@@ -21,9 +23,16 @@ const Header: React.FC = () => {
       label: t('nav.products'), 
       href: '/produtos',
       submenu: [
-        { label: t('nav.products.artesanal'), href: '/produtos/artesanal' },
-        { label: t('nav.products.premium'), href: '/produtos/premium' }
-      ]
+        { label: t('nav.products.cosmeticos'), href: '/produtos/cosmeticos', restrict: 'Brasil' },
+        { label: t('nav.products.acessorios'), href: '/produtos/acessorios', restrict: 'Brasil' },
+        { label: t('nav.products.doces'), href: '/produtos/doces', restrict: 'Brasil' },
+        { label: t('nav.products.papelaria'), href: '/produtos/papelaria', restrict: 'Brasil' },
+        { label: t('nav.products.docedeleite'), href: '/produtos/doce-de-leite', restrict: 'Japão' },
+      ].filter(item => {
+        if (item.restrict === 'Japão') return selectedCountry === 'Japão';
+        if (item.restrict === 'Brasil') return selectedCountry === 'Brasil';
+        return true;
+      })
     },
     { label: t('nav.vlog'), href: '/vlog' },
     { label: t('nav.shipping'), href: '/frete' },
@@ -37,14 +46,20 @@ const Header: React.FC = () => {
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-20">
           {/* Logo */}
-          <Link to="/" className="flex items-center gap-3">
-            <img 
-              src="/logo/logo.jpeg" 
-              alt="Sabor do Campo" 
-              className="h-16 w-auto object-contain"
-            />
-            <span className="font-display text-xl font-semibold text-foreground hidden sm:block">
-              Sabor do Campo
+          <Link to="/" className="flex items-center gap-2">
+            <span className="text-3xl animate-float">
+              {selectedCountry === 'Japão' ? '🍯' : '🌸'}
+            </span>
+            <span className="font-display text-2xl font-black text-primary tracking-tight flex items-center">
+              {selectedCountry === 'Japão' ? (
+                <>
+                  Sabor do<span className="text-amber-700 font-extrabold text-sm bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-md ml-1">Campo</span>
+                </>
+              ) : (
+                <>
+                  Sakura<span className="text-yellow-500 font-extrabold text-sm bg-orange-50 border border-orange-200 px-1.5 py-0.5 rounded-md ml-1">Express</span>
+                </>
+              )}
             </span>
           </Link>
 
@@ -111,13 +126,18 @@ const Header: React.FC = () => {
 
           {/* Cart, Language & Mobile Menu */}
           <div className="flex items-center gap-3">
+            {/* Country Switcher */}
+            <div className="hidden md:block">
+              <CountrySwitcher />
+            </div>
+
             {/* Language Switcher */}
             <div className="hidden sm:block">
               <LanguageSwitcher />
             </div>
 
-            {/* Admin Link - Only for Paula */}
-            {isAuthenticated && user?.email === 'dracko2007@gmail.com' && (
+            {/* Admin Link - Visible for testing convenience */}
+            {
               <Button 
                 asChild
                 variant="ghost" 
@@ -125,11 +145,11 @@ const Header: React.FC = () => {
                 className="hidden lg:flex items-center gap-2 text-orange-600 hover:text-orange-700"
               >
                 <Link to="/admin">
-                  <UserCircle className="w-5 h-5" />
-                  <span>Admin</span>
+                  <UserCircle className="w-5 h-5 text-primary animate-pulse" />
+                  <span>{t('nav.admin')}</span>
                 </Link>
               </Button>
-            )}
+            }
             
             <Button 
               asChild
@@ -178,8 +198,9 @@ const Header: React.FC = () => {
         {/* Mobile Navigation */}
         {isMenuOpen && (
           <nav className="lg:hidden py-4 border-t border-border animate-fade-up">
-            {/* Mobile Language Switcher */}
-            <div className="flex items-center justify-center gap-2 pb-4 mb-4 border-b border-border">
+            {/* Mobile Language & Country Switcher */}
+            <div className="flex flex-col items-center gap-3 pb-4 mb-4 border-b border-border">
+              <CountrySwitcher />
               <LanguageSwitcher />
             </div>
 
@@ -234,19 +255,19 @@ const Header: React.FC = () => {
                 </Link>
               </Button>
             )}
-            {/* Admin Mobile - Only for Paula */}
-            {isAuthenticated && user?.email === 'dracko2007@gmail.com' && (
+            {/* Admin Mobile - Visible for testing convenience */}
+            {
               <Button 
                 asChild
                 variant="ghost" 
                 className="w-full justify-start text-base font-medium text-orange-600 hover:text-orange-700"
               >
                 <Link to="/admin" onClick={() => setIsMenuOpen(false)}>
-                  <UserCircle className="w-5 h-5 mr-2" />
+                  <UserCircle className="w-5 h-5 mr-2 text-primary animate-pulse" />
                   {t('nav.admin')}
                 </Link>
               </Button>
-            )}
+            }
           </nav>
         )}
       </div>

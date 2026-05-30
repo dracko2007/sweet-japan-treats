@@ -14,6 +14,7 @@ import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { useLanguage } from '@/context/LanguageContext';
 import { getTranslatedProductName, getTranslatedProductDesc, getTranslatedProductFlavor } from '@/data/translations';
+import { formatPrice } from '@/utils/currency';
 
 const ProductDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -21,7 +22,7 @@ const ProductDetail: React.FC = () => {
   const { addToCart } = useCart();
   const { user } = useUser();
   const { toast } = useToast();
-  const { t } = useLanguage();
+  const { t, selectedCountry } = useLanguage();
 
   const product = products.find(p => p.id === id);
   const [selectedSize, setSelectedSize] = useState<'small' | 'large'>('small');
@@ -30,7 +31,7 @@ const ProductDetail: React.FC = () => {
     user?.email ? wishlistService.isInWishlist(user.email, id || '') : false
   );
 
-  if (!product) {
+  if (!product || (product.deliveryRestrict === 'Japão' && selectedCountry !== 'Japão')) {
     return (
       <Layout>
         <div className="container mx-auto px-4 py-20 text-center">
@@ -44,7 +45,17 @@ const ProductDetail: React.FC = () => {
   const translatedName = getTranslatedProductName(product.id, t);
   const translatedDesc = getTranslatedProductDesc(product.id, t);
   const translatedFlavor = getTranslatedProductFlavor(product.id, t);
-  const currentPrice = selectedSize === 'small' ? product.prices.small : product.prices.large;
+
+  const currency = product.deliveryRestrict === 'Japão' ? 'JPY' : (selectedCountry === 'Japão' ? 'JPY' : 'BRL');
+  
+  const getDisplayPrice = (size: 'small' | 'large') => {
+    const basePrice = size === 'small' ? product.prices.small : product.prices.large;
+    if (product.deliveryRestrict === 'Japão') return basePrice;
+    if (selectedCountry === 'Japão') return basePrice * 28;
+    return basePrice;
+  };
+
+  const currentPrice = getDisplayPrice(selectedSize);
   const productRating = reviewService.getProductRating(product.id);
   const images = product.gallery && product.gallery.length > 0 ? product.gallery : [product.image];
 
@@ -52,7 +63,7 @@ const ProductDetail: React.FC = () => {
     addToCart(product, selectedSize, quantity);
     toast({
       title: t('productDetail.added'),
-      description: `${translatedName} (${selectedSize === 'small' ? '280g' : '800g'}) x${quantity}`,
+      description: `${translatedName} (${selectedSize === 'small' ? 'Padrão' : 'Deluxe'}) x${quantity}`,
     });
   };
 
@@ -132,13 +143,12 @@ const ProductDetail: React.FC = () => {
 
               <div>
                 <div className="mb-4">
-                  <span className={cn(
-                    "inline-block px-3 py-1 rounded-full text-xs font-semibold uppercase",
-                    product.category === 'premium'
-                      ? 'bg-gold/20 text-gold'
-                      : 'bg-primary/20 text-primary'
-                  )}>
-                    {product.category === 'premium' ? t('product.category.premium') : t('product.category.artesanal')}
+                  <span className="inline-block px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wide bg-primary/20 text-primary">
+                    {product.category === 'doce-de-leite' ? 'Doce de Leite 🍯' : 
+                     product.category === 'cosmeticos' ? 'Cosméticos 🧴' : 
+                     product.category === 'acessorios' ? 'Acessórios & Geek 🎮' : 
+                     product.category === 'doces' ? 'Doces & Chás 🍵' : 
+                     product.category === 'papelaria' ? 'Papelaria ✏️' : 'Importado 🌸'}
                   </span>
                 </div>
 
@@ -184,9 +194,9 @@ const ProductDetail: React.FC = () => {
                           : "border-border hover:border-primary/50"
                       )}
                     >
-                      <div className="font-semibold mb-1">{t('productDetail.small')}</div>
+                      <div className="font-semibold mb-1">Padrão</div>
                       <div className="text-2xl font-bold text-primary">
-                        ¥{product.prices.small.toLocaleString()}
+                        {formatPrice(getDisplayPrice('small'), currency)}
                       </div>
                     </button>
                     <button
@@ -198,9 +208,9 @@ const ProductDetail: React.FC = () => {
                           : "border-border hover:border-primary/50"
                       )}
                     >
-                      <div className="font-semibold mb-1">{t('productDetail.large')}</div>
+                      <div className="font-semibold mb-1">Deluxe</div>
                       <div className="text-2xl font-bold text-primary">
-                        ¥{product.prices.large.toLocaleString()}
+                        {formatPrice(getDisplayPrice('large'), currency)}
                       </div>
                     </button>
                   </div>
@@ -225,7 +235,7 @@ const ProductDetail: React.FC = () => {
                       </button>
                     </div>
                     <div className="text-2xl font-bold text-primary">
-                      ¥{(currentPrice * quantity).toLocaleString()}
+                      {formatPrice(currentPrice * quantity, currency)}
                     </div>
                   </div>
                 </div>

@@ -1,3 +1,4 @@
+import { safeStorage } from '@/utils/storage';
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { db as firebaseDb, auth as firebaseAuth } from '@/config/firebase';
@@ -57,13 +58,13 @@ export default function FirebaseSync() {
       addLog('✅ Firestore conectado!', '#22c55e');
       addLog('✅ Authentication conectado!', '#22c55e');
 
-      const usersData = localStorage.getItem('sweet-japan-users');
+      const usersData = safeStorage.getItem('sweet-japan-users');
       if (usersData) {
         const users = JSON.parse(usersData);
         const userCount = Object.keys(users).length;
-        addLog(`📊 Encontrados ${userCount} usuários no localStorage`, '#06b6d4');
+        addLog(`📊 Encontrados ${userCount} usuários no safeStorage`, '#06b6d4');
       } else {
-        addLog('⚠️ Nenhum dado no localStorage', '#f59e0b');
+        addLog('⚠️ Nenhum dado no safeStorage', '#f59e0b');
       }
 
       showStatus('✅ Conexão com Firebase OK! Pronto para migrar dados.', 'success');
@@ -84,10 +85,10 @@ export default function FirebaseSync() {
       addLog('🔄 Iniciando migração de dados...', '#3b82f6');
       showStatus('🔄 Migrando dados...', 'info');
 
-      const usersData = localStorage.getItem('sweet-japan-users');
+      const usersData = safeStorage.getItem('sweet-japan-users');
       if (!usersData) {
         addLog('⚠️ Nenhum dado para migrar', '#f59e0b');
-        showStatus('⚠️ Nenhum dado encontrado no localStorage', 'warning');
+        showStatus('⚠️ Nenhum dado encontrado no safeStorage', 'warning');
         return;
       }
 
@@ -135,9 +136,9 @@ export default function FirebaseSync() {
   };
 
   const debugLocalStorage = () => {
-    addLog('🔍 Debugando localStorage...', '#3b82f6');
+    addLog('🔍 Debugando safeStorage...', '#3b82f6');
     
-    const usersData = localStorage.getItem('sweet-japan-users');
+    const usersData = safeStorage.getItem('sweet-japan-users');
     addLog(`📦 sweet-japan-users existe? ${!!usersData}`, '#06b6d4');
     
     if (usersData) {
@@ -158,10 +159,10 @@ export default function FirebaseSync() {
         }
       });
       
-      showStatus(`✅ ${userCount} usuários no localStorage`, 'success');
+      showStatus(`✅ ${userCount} usuários no safeStorage`, 'success');
     } else {
-      addLog('❌ localStorage vazio!', '#ef4444');
-      showStatus('❌ Nenhum dado no localStorage', 'error');
+      addLog('❌ safeStorage vazio!', '#ef4444');
+      showStatus('❌ Nenhum dado no safeStorage', 'error');
     }
   };
 
@@ -222,7 +223,7 @@ export default function FirebaseSync() {
             🔌 Testar Conexão
           </Button>
           <Button onClick={debugLocalStorage} variant="default">
-            🔍 Debug localStorage
+            🔍 Debug safeStorage
           </Button>
           <Button onClick={migrateData} variant="default">
             🔄 Migrar Dados

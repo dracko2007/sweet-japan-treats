@@ -1,6 +1,7 @@
+import { safeStorage } from '@/utils/storage';
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Package, ArrowRight, MapPin, User, Phone, Mail, Clock, Tag, X } from 'lucide-react';
+import { Package, ArrowRight, MapPin, User, Phone, Mail, Clock, Tag, CreditCard } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,10 +11,14 @@ import { useUser } from '@/context/UserContext';
 import ShippingCalculator from '@/components/shipping/ShippingCalculator';
 import CouponSelector from '@/components/checkout/CouponSelector';
 import { prefectures } from '@/data/prefectures';
-import { addAddressHints } from '@/utils/romanize';
+import { japanPrefectures } from '@/data/japanPrefectures';
 import { couponService } from '@/services/couponService';
 import type { Coupon } from '@/types';
 import { useToast } from '@/hooks/use-toast';
+import { usePostalCodeLookup } from '@/hooks/usePostalCodeLookup';
+import { useLanguage } from '@/context/LanguageContext';
+import { formatPrice } from '@/utils/currency';
+import { getTranslatedProductName } from '@/data/translations';
 
 const Checkout: React.FC = () => {
   const { items, totalPrice } = useCart();
@@ -21,17 +26,35 @@ const Checkout: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
+  const { lookupAddress: lookupJapaneseAddress } = usePostalCodeLookup();
+  const { selectedCountry, setSelectedCountry, t } = useLanguage();
   
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     phone: '',
+    cpf: '',
     postalCode: '',
-    prefecture: '',
+    prefecture: '', // UF or Province
     city: '',
     address: '',
     building: '',
+    country: selectedCountry,
   });
+
+  // Calculate base total price dynamically in correct currency
+  const baseTotalPrice = items.reduce((sum, item) => {
+    const price = item.size === 'small' ? item.product.prices.small : item.product.prices.large;
+    let unitPrice = price;
+    if (formData.country === 'Japão') {
+      if (item.product.deliveryRestrict !== 'Japão') {
+        unitPrice = price * 28; // Convert BRL to JPY
+      }
+    }
+    return sum + unitPrice * item.quantity;
+  }, 0);
+
+  const currency = formData.country === 'Japão' ? 'JPY' : 'BRL';
 
   const [selectedShipping, setSelectedShipping] = useState<{
     carrier: string;
@@ -45,9 +68,23 @@ const Checkout: React.FC = () => {
   const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
   const [couponDiscount, setCouponDiscount] = useState(0);
 
+  // Sync country in state with language context selectedCountry
+  useEffect(() => {
+    setFormData(prev => ({
+      ...prev,
+      country: selectedCountry
+    }));
+  }, [selectedCountry]);
+
+  // Sync back to selectedCountry context if form country select changes
+  useEffect(() => {
+    if (formData.country !== selectedCountry) {
+      setSelectedCountry(formData.country as 'Brasil' | 'Japão');
+    }
+  }, [formData.country, selectedCountry, setSelectedCountry]);
+
   // Handlers for coupon
   const handleCouponApply = async (coupon: Coupon, discount: number) => {
-    // Double-check if user hasn't already used this coupon (checks Firestore too)
     if (user?.email) {
       const validation = await couponService.validateCouponAsync(coupon.code, user.email);
       if (!validation.valid) {
@@ -63,12 +100,11 @@ const Checkout: React.FC = () => {
     setAppliedCoupon(coupon);
     setCouponDiscount(discount);
     
-    // If coupon gives free shipping, override shipping cost
     if (coupon.freeShipping && selectedShipping) {
       setSelectedShipping({
         ...selectedShipping,
         cost: 0,
-        carrier: selectedShipping.carrier + ' (Frete Grátis - Cupom)',
+        carrier: selectedShipping.carrier + ' (Frete Grátis)',
       });
     }
   };
@@ -78,54 +114,50 @@ const Checkout: React.FC = () => {
     setCouponDiscount(0);
   };
 
-  // Load form data from state if returning from review page
+  // Load from state if returning from order-review page
   useEffect(() => {
     if (location.state?.formData) {
       setFormData(location.state.formData);
     }
   }, [location.state]);
 
+  // Check for auto-applied coupon won on the Wheel of Fortune
+  useEffect(() => {
+    const savedCoupon = safeStorage.getItem('sakura_active_coupon');
+    if (savedCoupon === 'SAKURA90' && baseTotalPrice > 0) {
+      const discount = baseTotalPrice * 0.90;
+      setAppliedCoupon({
+        code: 'SAKURA90',
+        discount: 0,
+        discountPercent: 90,
+        type: 'percent',
+        expiryDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
+        isActive: true,
+        usedCount: 0,
+        description: 'Cupom de 90% OFF da Roda da Fortuna',
+        createdAt: new Date().toISOString()
+      });
+      setCouponDiscount(discount);
+    }
+  }, [baseTotalPrice]);
+
   // Auto-populate from user profile if authenticated
   useEffect(() => {
     if (isAuthenticated && user && !location.state?.formData) {
-      console.log('🔍 Checkout - Preenchendo dados do usuário:', user);
-      console.log('📍 Endereço do usuário:', user.address);
-      console.log('🏛️ Província do usuário:', user.address?.prefecture);
-      
-      // Normaliza a província se estiver no formato antigo "東京都 (Tóquio)"
-      let normalizedPrefecture = user.address?.prefecture || '';
-      if (normalizedPrefecture && normalizedPrefecture.includes('(')) {
-        // Extrai apenas o nome em português entre parênteses
-        const match = normalizedPrefecture.match(/\(([^)]+)\)/);
-        if (match) {
-          normalizedPrefecture = match[1];
-        }
-      }
-      
-      const formDataToSet = {
+      setFormData({
         name: user.name || '',
         email: user.email || '',
         phone: user.phone || '',
+        cpf: '', 
         postalCode: user.address?.postalCode || '',
-        prefecture: normalizedPrefecture,
+        prefecture: user.address?.prefecture || '',
         city: user.address?.city || '',
         address: user.address?.address || '',
         building: user.address?.building || '',
-      };
-      
-      console.log('📝 Dados que serão preenchidos no formulário:', formDataToSet);
-      
-      setFormData(formDataToSet);
-      
-      console.log('✅ Checkout - Formulário preenchido com dados do perfil');
-    } else if (!isAuthenticated) {
-      console.log('⚠️ Checkout - Usuário não autenticado');
-    } else if (!user) {
-      console.log('⚠️ Checkout - Dados do usuário não disponíveis');
-    } else if (location.state?.formData) {
-      console.log('🔄 Checkout - Usando dados do location.state (voltando da revisão)');
+        country: selectedCountry,
+      });
     }
-  }, [isAuthenticated, user, location.state]);
+  }, [isAuthenticated, user, location.state, selectedCountry]);
 
   // Redirect if cart is empty
   useEffect(() => {
@@ -142,70 +174,133 @@ const Checkout: React.FC = () => {
     }));
   };
 
-  // Busca automática de endereço por CEP
+  // Auto address lookup by CEP/Postal Code
   const handlePostalCodeChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value.replace(/\D/g, '');
+    const val = e.target.value;
     
-    // Formata CEP (XXX-XXXX)
-    let formatted = value;
-    if (value.length > 3) {
-      formatted = `${value.slice(0, 3)}-${value.slice(3, 7)}`;
-    }
-    
-    setFormData(prev => ({ ...prev, postalCode: formatted }));
+    if (formData.country === 'Japão') {
+      const cleanVal = val.replace(/[-\s]/g, '').slice(0, 7);
+      let formatted = cleanVal;
+      if (cleanVal.length > 3) {
+        formatted = `${cleanVal.slice(0, 3)}-${cleanVal.slice(3, 7)}`;
+      }
+      setFormData(prev => ({ ...prev, postalCode: formatted }));
 
-    // Busca endereço quando CEP está completo (7 dígitos)
-    if (value.length === 7) {
-      try {
-        const response = await fetch(`https://zipcloud.ibsnet.co.jp/api/search?zipcode=${value}`);
-        const data = await response.json();
-        
-        if (data.status === 200 && data.results && data.results.length > 0) {
-          const result = data.results[0];
-          const prefecture = prefectures.find(p => p.nameJa === result.address1);
-          
-          // Adiciona hints de leitura para cidade e bairro separadamente
-          const city = addAddressHints(result.address2);
-          const neighborhood = result.address3 ? addAddressHints(result.address3) : '';
-          const cityDisplay = neighborhood ? `${city} ${neighborhood}` : city;
-          
-          console.log('🔍 CEP encontrado:', {
-            address1: result.address1,
-            prefectureFound: prefecture,
-            prefectureName: prefecture?.name
-          });
-          
-          // Atualiza os dados do formulário com as informações do CEP
-          setFormData(prev => ({
-            ...prev,
-            prefecture: prefecture?.name || '', // Usa apenas o nome em português que corresponde ao value do select
-            city: cityDisplay,
-          }));
+      if (cleanVal.length === 7) {
+        try {
+          const result = await lookupJapaneseAddress(cleanVal);
+          if (result) {
+            // Map the Japanese province name (e.g. "三重県") to the Portuguese identifier (e.g. "Mie")
+            const matchedPref = japanPrefectures.find(p => p.nameJa === result.province);
+            setFormData(prev => ({
+              ...prev,
+              prefecture: matchedPref ? matchedPref.name : '',
+              city: result.city,
+              address: result.town,
+            }));
+            toast({
+              title: "Código Postal Encontrado!",
+              description: `${result.province} ${result.city} ${result.town}`,
+            });
+          } else {
+            toast({
+              title: "Erro no Código Postal",
+              description: "Não foi possível localizar este endereço japonês.",
+              variant: "destructive",
+            });
+          }
+        } catch (error) {
+          console.error('Erro ao buscar CEP japonês:', error);
         }
-      } catch (error) {
-        console.error('Erro ao buscar CEP:', error);
+      }
+    } else {
+      const cleanVal = val.replace(/\D/g, '').slice(0, 8);
+      let formatted = cleanVal;
+      if (cleanVal.length > 5) {
+        formatted = `${cleanVal.slice(0, 5)}-${cleanVal.slice(5, 8)}`;
+      }
+      setFormData(prev => ({ ...prev, postalCode: formatted }));
+
+      if (cleanVal.length === 8) {
+        try {
+          const response = await fetch(`https://viacep.com.br/ws/${cleanVal}/json/`);
+          const data = await response.json();
+          
+          if (response.ok && !data.erro) {
+            const stateCode = data.uf || '';
+            const addressString = data.logradouro ? `${data.logradouro}${data.bairro ? `, Bairro: ${data.bairro}` : ''}` : '';
+            
+            setFormData(prev => ({
+              ...prev,
+              prefecture: stateCode,
+              city: data.localidade || '',
+              address: addressString,
+            }));
+            
+            toast({
+              title: "CEP Encontrado!",
+              description: `${data.localidade} - ${stateCode}`,
+            });
+          } else {
+            toast({
+              title: "Erro no CEP",
+              description: "Não foi possível localizar este CEP.",
+              variant: "destructive",
+            });
+          }
+        } catch (error) {
+          console.error('Erro ao buscar CEP:', error);
+        }
       }
     }
   };
 
-  const handleRemoveCoupon = () => {
-    setAppliedCoupon(null);
-    setCouponDiscount(0);
-    toast({
-      title: "Cupom removido",
-      description: "O desconto foi removido",
-    });
+  // CPF Input formatting
+  const handleCpfChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value.replace(/\D/g, '').slice(0, 11);
+    let formatted = val;
+    if (val.length > 9) {
+      formatted = `${val.slice(0, 3)}.${val.slice(3, 6)}.${val.slice(6, 9)}-${val.slice(9, 11)}`;
+    } else if (val.length > 6) {
+      formatted = `${val.slice(0, 3)}.${val.slice(3, 6)}.${val.slice(6, 9)}`;
+    } else if (val.length > 3) {
+      formatted = `${val.slice(0, 3)}.${val.slice(3, 6)}`;
+    }
+    setFormData(prev => ({ ...prev, cpf: formatted }));
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validate shipping is selected
     if (!selectedShipping) {
-      return; // ShippingCalculator will handle the UI feedback
+      toast({
+        title: "Método de envio pendente",
+        description: "Por favor, selecione uma forma de entrega.",
+        variant: "destructive",
+      });
+      return;
     }
 
-    // Navigate to review page with form data and shipping info
+    const hasDoceDeLeite = items.some(item => item.product.deliveryRestrict === 'Japão');
+    if (formData.country !== 'Japão' && hasDoceDeLeite) {
+      toast({
+        title: "Restrição de Produto",
+        description: "O Doce de Leite está disponível apenas para entrega dentro do Japão! Por favor, remova-o do carrinho ou altere o país de destino para Japão.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (formData.country === 'Brasil' && formData.cpf.replace(/\D/g, '').length !== 11) {
+      toast({
+        title: "CPF inválido",
+        description: "Por favor, insira um CPF válido para liberação alfandegária.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Navigate to order review page
     navigate('/order-review', { 
       state: { 
         formData,
@@ -217,6 +312,23 @@ const Checkout: React.FC = () => {
     });
   };
 
+  // Apply free shipping override if coupon gives free shipping
+  const actualShippingCost = appliedCoupon?.freeShipping ? 0 : (selectedShipping?.cost || 0);
+
+  const subtotalWithCoupon = baseTotalPrice - couponDiscount;
+  const isBelow50USD = subtotalWithCoupon < 250;
+  
+  const federalTax = formData.country === 'Brasil'
+    ? (isBelow50USD ? subtotalWithCoupon * 0.20 : (subtotalWithCoupon * 0.60) - 62.50)
+    : 0;
+    
+  const icmsTax = formData.country === 'Brasil'
+    ? (subtotalWithCoupon + federalTax) * 0.17
+    : 0;
+    
+  const totalTax = federalTax + icmsTax;
+  const grandTotal = subtotalWithCoupon + actualShippingCost + totalTax;
+
   return (
     <Layout>
       <div className="gradient-hero py-16">
@@ -226,7 +338,7 @@ const Checkout: React.FC = () => {
               Finalizar Pedido
             </h1>
             <p className="text-muted-foreground text-lg">
-              Preencha seus dados para receber os produtos
+              Preencha seus dados para receber os produtos importados do Japão
             </p>
           </div>
         </div>
@@ -242,29 +354,29 @@ const Checkout: React.FC = () => {
                   <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
                     <MapPin className="w-5 h-5 text-primary" />
                   </div>
-                  <h2 className="font-display text-2xl font-semibold text-foreground">
-                    {selectedShipping?.carrier === 'Retirar no Local 🏠' ? 'Seus Dados' : 'Dados para Entrega'}
+                  <h2 className="font-sans text-xl font-bold text-foreground">
+                    Dados para Entrega
                   </h2>
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-6">
                   {/* Personal Information */}
                   <div className="space-y-4">
-                    <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                    <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wide">
                       Informações Pessoais
                     </h3>
                     
                     <div className="grid md:grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label htmlFor="name" className="flex items-center gap-2">
-                          <User className="w-4 h-4" />
+                        <Label htmlFor="name" className="flex items-center gap-2 font-semibold">
+                          <User className="w-4 h-4 text-gray-500" />
                           Nome Completo *
                         </Label>
                         <Input
                           id="name"
                           name="name"
                           type="text"
-                          placeholder="山田 太郎"
+                          placeholder="Ex: João Silva"
                           value={formData.name}
                           onChange={handleInputChange}
                           required
@@ -272,15 +384,15 @@ const Checkout: React.FC = () => {
                       </div>
 
                       <div className="space-y-2">
-                        <Label htmlFor="phone" className="flex items-center gap-2">
-                          <Phone className="w-4 h-4" />
-                          Telefone *
+                        <Label htmlFor="phone" className="flex items-center gap-2 font-semibold">
+                          <Phone className="w-4 h-4 text-gray-500" />
+                          Telefone Celular *
                         </Label>
                         <Input
                           id="phone"
                           name="phone"
                           type="tel"
-                          placeholder="090-1234-5678"
+                          placeholder="Ex: (11) 99999-9999"
                           value={formData.phone}
                           onChange={handleInputChange}
                           required
@@ -288,53 +400,113 @@ const Checkout: React.FC = () => {
                       </div>
                     </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="email" className="flex items-center gap-2">
-                        <Mail className="w-4 h-4" />
-                        Email *
-                      </Label>
-                      <Input
-                        id="email"
-                        name="email"
-                        type="email"
-                        placeholder="exemplo@email.com"
-                        value={formData.email}
-                        onChange={handleInputChange}
-                        required
-                      />
+                    <div className="grid md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="email" className="flex items-center gap-2 font-semibold">
+                          <Mail className="w-4 h-4 text-gray-500" />
+                          Email *
+                        </Label>
+                        <Input
+                          id="email"
+                          name="email"
+                          type="email"
+                          placeholder="exemplo@email.com"
+                          value={formData.email}
+                          onChange={handleInputChange}
+                          required
+                        />
+                      </div>
+
+                    {formData.country === 'Brasil' && (
+                      <div className="space-y-2">
+                        <Label htmlFor="cpf" className="flex items-center gap-2 font-semibold">
+                          <User className="w-4 h-4 text-gray-500" />
+                          CPF (Obrigatório Aduana) *
+                        </Label>
+                        <Input
+                          id="cpf"
+                          name="cpf"
+                          type="text"
+                          placeholder="000.000.000-00"
+                          value={formData.cpf}
+                          onChange={handleCpfChange}
+                          required
+                        />
+                        <p className="text-[10px] text-gray-400">
+                          Exigido pela Receita Federal para desembaraço de importação.
+                        </p>
+                      </div>
+                    )}
                     </div>
                   </div>
 
                   {/* Shipping Address */}
-                  {selectedShipping?.carrier !== 'Retirar no Local 🏠' && (
-                  <div className="space-y-4">
-                    <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                  <div className="space-y-4 pt-4 border-t border-gray-100">
+                    <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wide">
                       Endereço de Entrega
                     </h3>
                     
                     <div className="grid md:grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label htmlFor="postalCode">
-                          CEP (〒) *
+                        <Label htmlFor="country" className="font-semibold">
+                          País de Destino *
+                        </Label>
+                        <select
+                          id="country"
+                          name="country"
+                          value={formData.country}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (val === 'Brasil' && items.some(item => item.product.deliveryRestrict === 'Japão')) {
+                              toast({
+                                title: "Restrição de Destino",
+                                description: "Remova os produtos de Doce de Leite do carrinho para alterar o destino de envio para o Brasil.",
+                                variant: "destructive",
+                              });
+                              return;
+                            }
+                            setFormData(prev => ({
+                              ...prev,
+                              country: val as 'Japão' | 'Brasil',
+                              prefecture: '', // Reset
+                              postalCode: '',
+                              city: '',
+                              address: '',
+                              building: '',
+                            }));
+                          }}
+                          required
+                          className="w-full p-2.5 rounded-lg border border-border bg-background text-foreground focus:ring-2 focus:ring-primary focus:border-primary transition-all font-medium text-sm"
+                        >
+                          <option value="Brasil">Brasil 🇧🇷 (Envio Internacional)</option>
+                          <option value="Japão">Japão 🇯🇵 (Envio Local)</option>
+                        </select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="postalCode" className="font-semibold">
+                          {formData.country === 'Japão' ? 'Código Postal (ZIP) *' : 'CEP *'}
                         </Label>
                         <Input
                           id="postalCode"
                           name="postalCode"
                           type="text"
-                          placeholder="123-4567"
+                          placeholder={formData.country === 'Japão' ? '123-4567' : '00000-000'}
                           value={formData.postalCode}
                           onChange={handlePostalCodeChange}
-                          maxLength={8}
+                          maxLength={formData.country === 'Japão' ? 8 : 9}
                           required
                         />
-                        <p className="text-xs text-muted-foreground">
-                          Digite o CEP - Província e cidade preenchem automaticamente
+                        <p className="text-[10px] text-gray-400">
+                          {formData.country === 'Japão' ? 'Preenche o endereço japonês automaticamente (7 dígitos).' : 'Preenche o endereço brasileiro automaticamente (8 dígitos).'}
                         </p>
                       </div>
+                    </div>
 
+                    <div className="grid md:grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label htmlFor="prefecture">
-                          Província (都道府県) *
+                        <Label htmlFor="prefecture" className="font-semibold">
+                          {formData.country === 'Japão' ? 'Província *' : 'Estado (UF) *'}
                         </Label>
                         <select
                           id="prefecture"
@@ -342,42 +514,42 @@ const Checkout: React.FC = () => {
                           value={formData.prefecture}
                           onChange={handleInputChange}
                           required
-                          className="w-full p-3 rounded-lg border border-border bg-background text-foreground focus:ring-2 focus:ring-primary focus:border-primary transition-all"
+                          className="w-full p-2.5 rounded-lg border border-border bg-background text-foreground focus:ring-2 focus:ring-primary focus:border-primary transition-all font-medium text-sm"
                         >
-                          <option value="">Escolha uma província...</option>
-                          {prefectures.map((pref) => (
+                          <option value="">{formData.country === 'Japão' ? 'Escolha a Província...' : 'Escolha seu Estado...'}</option>
+                          {(formData.country === 'Japão' ? japanPrefectures : prefectures).map((pref) => (
                             <option key={pref.name} value={pref.name}>
                               {pref.nameJa} ({pref.name})
                             </option>
                           ))}
                         </select>
                       </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="city" className="font-semibold">
+                          Cidade *
+                        </Label>
+                        <Input
+                          id="city"
+                          name="city"
+                          type="text"
+                          placeholder="Ex: São Paulo"
+                          value={formData.city}
+                          onChange={handleInputChange}
+                          required
+                        />
+                      </div>
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="city">
-                        Cidade (市区町村) *
-                      </Label>
-                      <Input
-                        id="city"
-                        name="city"
-                        type="text"
-                        placeholder="津市"
-                        value={formData.city}
-                        onChange={handleInputChange}
-                        required
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="address">
-                        Endereço (町名番地) *
+                      <Label htmlFor="address" className="font-semibold">
+                        Rua e Número *
                       </Label>
                       <Input
                         id="address"
                         name="address"
                         type="text"
-                        placeholder="広明町123-45"
+                        placeholder="Ex: Avenida Paulista, 1000"
                         value={formData.address}
                         onChange={handleInputChange}
                         required
@@ -385,126 +557,61 @@ const Checkout: React.FC = () => {
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="building">
-                        Edifício / Apartamento (任意)
+                      <Label htmlFor="building" className="font-semibold">
+                        Complemento / Bloco / Apto (Opcional)
                       </Label>
                       <Input
                         id="building"
                         name="building"
                         type="text"
-                        placeholder="マンション名 101号室"
+                        placeholder="Ex: Bloco B, Apto 42"
                         value={formData.building}
                         onChange={handleInputChange}
                       />
                     </div>
                   </div>
-                  )}
 
                   {/* Shipping Calculator Section */}
                   <div className="pt-4 border-t border-border">
-                    <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-4">
-                      Forma de Entrega
+                    <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wide mb-4">
+                      Forma de Envio Internacional
                     </h3>
-                    {selectedShipping?.carrier === 'Retirar no Local 🏠' && (
-                      <div className="bg-green-50 dark:bg-green-950/20 border border-green-500 rounded-lg p-4 mb-4">
-                        <p className="text-sm font-medium text-green-700 dark:text-green-300 mb-2">🏪 Retirada no Local Selecionada</p>
-                        <p className="text-sm text-green-600 dark:text-green-400">
-                          📍 <strong>Endereço:</strong> Mie-ken, Iga-shi, Kirigaoka 5-292 (〒518-0225)<br/>
-                          📞 <strong>Contato:</strong> 070-1367-1679<br/>
-                          ⏰ Entre em contato para combinar o horário de retirada
-                        </p>
-                      </div>
-                    )}
                     <ShippingCalculator 
                       selectedPrefecture={formData.prefecture}
                       onShippingSelect={setSelectedShipping}
+                      destinationCountry={formData.country as 'Brasil' | 'Japão'}
+                      couponDiscount={couponDiscount}
                     />
                   </div>
 
                   {/* Delivery Time Selection */}
                   {selectedShipping && (
                     <div className="pt-4 border-t border-border">
-                      <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-4 flex items-center gap-2">
-                        <Clock className="w-4 h-4" />
-                        Horário de Entrega Preferido
+                      <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wide mb-4 flex items-center gap-2">
+                        <Clock className="w-4 h-4 text-orange-500" />
+                        Período de Entrega Preferido (Correios)
                       </h3>
                       <select
                         id="deliveryTime"
                         name="deliveryTime"
                         value={deliveryTime}
                         onChange={(e) => setDeliveryTime(e.target.value)}
-                        className="w-full p-3 rounded-lg border border-border bg-background text-foreground focus:ring-2 focus:ring-primary focus:border-primary transition-all"
+                        className="w-full p-2.5 rounded-lg border border-border bg-background text-foreground focus:ring-2 focus:ring-primary focus:border-primary transition-all font-medium text-sm"
                       >
-                        <option value="">Qualquer horário</option>
-                        <option value="morning">Manhã (9:00 - 12:00)</option>
-                        <option value="afternoon">Tarde (12:00 - 17:00)</option>
-                        <option value="evening">Noite (17:00 - 20:00)</option>
+                        <option value="">Qualquer horário (Recomendado)</option>
+                        <option value="morning">Horário Comercial (9h - 18h)</option>
+                        <option value="saturday">Finais de Semana</option>
                       </select>
-                      <p className="text-xs text-muted-foreground mt-2">
-                        Faremos o possível para entregar no horário preferido
-                      </p>
                     </div>
                   )}
-
-                  {/* Coupon Section - Mobile Only */}
-                  <div className="pt-4 border-t border-border lg:hidden">
-                    <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-4 flex items-center gap-2">
-                      <Tag className="w-4 h-4" />
-                      Cupom de Desconto
-                    </h3>
-                    <CouponSelector
-                      totalPrice={totalPrice}
-                      onCouponApply={handleCouponApply}
-                      onCouponRemove={handleCouponRemove}
-                      appliedCoupon={appliedCoupon}
-                    />
-                  </div>
-
-                  {/* Order Total - Mobile Only */}
-                  <div className="pt-4 border-t border-border lg:hidden">
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Subtotal</span>
-                        <span className="font-medium">¥{totalPrice.toLocaleString()}</span>
-                      </div>
-                      {appliedCoupon && couponDiscount > 0 && (
-                        <div className="flex justify-between text-sm text-green-600 dark:text-green-400">
-                          <span>Desconto ({appliedCoupon.code})</span>
-                          <span className="font-medium">-¥{couponDiscount.toLocaleString()}</span>
-                        </div>
-                      )}
-                      <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Frete</span>
-                        {selectedShipping ? (
-                          <span className="font-medium">¥{selectedShipping.cost.toLocaleString()}</span>
-                        ) : (
-                          <span className="text-muted-foreground text-xs">Selecione acima</span>
-                        )}
-                      </div>
-                      {selectedShipping && (
-                        <div className="text-xs text-muted-foreground text-right">
-                          {selectedShipping.carrier} - {selectedShipping.estimatedDays} dias
-                        </div>
-                      )}
-                      <div className="flex justify-between pt-2 border-t border-border">
-                        <span className="font-semibold text-lg">Total</span>
-                        <span className="font-bold text-2xl text-primary">
-                          ¥{selectedShipping 
-                            ? (totalPrice - couponDiscount + selectedShipping.cost).toLocaleString()
-                            : `${(totalPrice - couponDiscount).toLocaleString()}+`
-                          }
-                        </span>
-                      </div>
-                    </div>
-                  </div>
 
                   <div className="pt-4 border-t border-border">
                     <Button 
                       type="submit" 
-                      className="w-full btn-primary rounded-xl py-6 text-lg font-semibold"
+                      className="w-full btn-primary rounded-xl py-6 text-lg font-bold"
                       disabled={!selectedShipping}
                     >
-                      {selectedShipping?.carrier === 'Retirar no Local 🏠' ? 'Revisar Pedido de Retirada' : 'Revisar Pedido'}
+                      Ir para a Revisão do Pedido
                       <ArrowRight className="w-5 h-5 ml-2" />
                     </Button>
                     {!selectedShipping && (
@@ -517,88 +624,123 @@ const Checkout: React.FC = () => {
               </div>
             </div>
 
-            {/* Order Summary */}
+            {/* Order Summary Sidebar */}
             <div className="lg:col-span-1">
-              <div className="sticky top-24 bg-card rounded-2xl border border-border p-6">
-                <div className="flex items-center gap-3 mb-6">
+              <div className="sticky top-24 bg-card rounded-2xl border border-border p-6 space-y-6 shadow-sm">
+                <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
                     <Package className="w-5 h-5 text-primary" />
                   </div>
-                  <h2 className="font-display text-xl font-semibold text-foreground">
+                  <h2 className="font-sans text-lg font-bold text-foreground">
                     Resumo do Pedido
                   </h2>
                 </div>
 
                 <div className="space-y-4">
-                  {items.map((item) => (
-                    <div 
-                      key={`${item.product.id}-${item.size}`}
-                      className="flex items-center gap-3 pb-3 border-b border-border"
-                    >
-                      <img 
-                        src={item.product.image} 
-                        alt={item.product.name}
-                        className="w-16 h-16 rounded-lg object-cover"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-sm truncate">{item.product.name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {item.size} • {item.quantity}x
+                  {items.map((item) => {
+                    const price = item.size === 'small' ? item.product.prices.small : item.product.prices.large;
+                    let displayUnitPrice = price;
+                    if (formData.country === 'Japão') {
+                      if (item.product.deliveryRestrict !== 'Japão') {
+                        displayUnitPrice = price * 28; // BRL to JPY conversion
+                      }
+                    }
+                    const displayItemPrice = displayUnitPrice * item.quantity;
+                    const currency = formData.country === 'Japão' ? 'JPY' : 'BRL';
+                    const productName = getTranslatedProductName(item.product.id, t);
+                    return (
+                      <div 
+                        key={`${item.product.id}-${item.size}`}
+                        className="flex items-center gap-3 pb-3 border-b border-border"
+                      >
+                        <img 
+                          src={item.product.image} 
+                          alt={productName}
+                          className="w-12 h-12 rounded-lg object-cover border border-gray-200"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <p className="font-bold text-xs text-gray-800 truncate">{productName}</p>
+                          <p className="text-[10px] text-gray-400 font-semibold mt-0.5">
+                            {item.size === 'small' ? 'Padrão' : 'Deluxe'} • {item.quantity}x
+                          </p>
+                        </div>
+                        <p className="font-bold text-xs text-gray-800">
+                          {formatPrice(displayItemPrice, currency)}
                         </p>
                       </div>
-                      <p className="font-semibold text-sm">
-                        ¥{(item.product.prices[item.size] * item.quantity).toLocaleString()}
-                      </p>
-                    </div>
-                  ))}
+                    );
+                  })}
 
-                  {/* Coupon Section */}
+                  {/* Coupon Selector Widget */}
                   <CouponSelector
-                    totalPrice={totalPrice}
+                    totalPrice={baseTotalPrice}
                     onCouponApply={handleCouponApply}
                     onCouponRemove={handleCouponRemove}
                     appliedCoupon={appliedCoupon}
                   />
 
-                  <div className="space-y-2 pt-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Subtotal</span>
-                      <span className="font-medium">¥{totalPrice.toLocaleString()}</span>
+                  {/* Calculations breakdown */}
+                  <div className="space-y-2 pt-2 text-xs">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Subtotal dos itens</span>
+                      <span className="font-semibold text-gray-800">{formatPrice(baseTotalPrice, currency)}</span>
                     </div>
+                    
                     {appliedCoupon && couponDiscount > 0 && (
-                      <div className="flex justify-between text-sm text-green-600 dark:text-green-400">
+                      <div className="flex justify-between text-green-600 font-bold bg-green-50/50 p-1.5 rounded border border-dashed border-green-200">
                         <span>Desconto ({appliedCoupon.code})</span>
-                        <span className="font-medium">-¥{couponDiscount.toLocaleString()}</span>
+                        <span>-{formatPrice(couponDiscount, currency)}</span>
                       </div>
                     )}
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Frete</span>
+
+                    {formData.country === 'Brasil' && (
+                      <>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Imposto Federal ({isBelow50USD ? '20%' : '60%'})</span>
+                          <span className="font-semibold text-gray-800">
+                            {formatPrice(federalTax, 'BRL')}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">ICMS Estadual (17%)</span>
+                          <span className="font-semibold text-gray-800">
+                            {formatPrice(icmsTax, 'BRL')}
+                          </span>
+                        </div>
+                      </>
+                    )}
+
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">
+                        {formData.country === 'Japão' ? 'Frete Local' : 'Frete Internacional'}
+                      </span>
                       {selectedShipping ? (
-                        <span className="font-medium">¥{selectedShipping.cost.toLocaleString()}</span>
+                        <span className="font-semibold text-gray-800">
+                          {actualShippingCost === 0 ? 'Grátis' : formatPrice(actualShippingCost, currency)}
+                        </span>
                       ) : (
-                        <span className="text-muted-foreground text-xs">Selecione acima</span>
+                        <span className="text-muted-foreground text-[10px]">
+                          {formData.country === 'Japão' ? 'Aguardando Província' : 'Aguardando Estado'}
+                        </span>
                       )}
                     </div>
+
                     {selectedShipping && (
-                      <div className="text-xs text-muted-foreground text-right">
-                        {selectedShipping.carrier} - {selectedShipping.estimatedDays} dias
+                      <div className="text-[10px] text-gray-400 text-right">
+                        {selectedShipping.carrier} • {selectedShipping.estimatedDays} dias
                       </div>
                     )}
-                    <div className="flex justify-between pt-2 border-t border-border">
-                      <span className="font-semibold">Total</span>
-                      <span className="font-bold text-lg text-primary">
-                        ¥{selectedShipping 
-                          ? (totalPrice - couponDiscount + selectedShipping.cost).toLocaleString()
-                          : `${(totalPrice - couponDiscount).toLocaleString()}+`
-                        }
+
+                    <div className="flex justify-between pt-2 border-t border-border font-bold">
+                      <span className="text-sm">Total a pagar</span>
+                      <span className="text-base text-orange-600">
+                        {formatPrice(grandTotal, currency)}
                       </span>
                     </div>
                   </div>
 
-                  <div className="pt-4 mt-4 border-t border-border">
-                    <p className="text-xs text-muted-foreground text-center">
-                      Pagamento seguro via depósito bancário ou PayPay
-                    </p>
+                  <div className="pt-4 border-t border-border flex items-center justify-center gap-1.5 text-[10px] text-muted-foreground uppercase font-bold">
+                    <CreditCard className="w-4 h-4 text-green-600 animate-pulse" /> Pagamento 100% Protegido
                   </div>
                 </div>
               </div>

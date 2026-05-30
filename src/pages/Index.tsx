@@ -5,6 +5,7 @@ import FeaturedProducts from '@/components/home/FeaturedProducts';
 import VideoGallery from '@/components/home/VideoGallery';
 import ShippingBanner from '@/components/home/ShippingBanner';
 import PresentationVideo from '@/components/home/PresentationVideo';
+import { WheelOfFortune } from '@/components/home/WheelOfFortune';
 import { useLanguage } from '@/context/LanguageContext';
 
 const Index: React.FC = () => {
@@ -12,6 +13,7 @@ const Index: React.FC = () => {
 
   return (
     <Layout>
+      <WheelOfFortune />
       <HeroSection />
       <PresentationVideo />
       <FeaturedProducts />

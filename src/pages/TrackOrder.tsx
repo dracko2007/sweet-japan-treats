@@ -1,3 +1,4 @@
+import { safeStorage } from '@/utils/storage';
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, Package, Truck, CheckCircle, XCircle } from 'lucide-react';
@@ -43,8 +44,8 @@ const TrackOrder: React.FC = () => {
 
     setIsSearching(true);
 
-    // 1. Buscar no localStorage (usuários locais)
-    const usersData = localStorage.getItem('sweet-japan-users');
+    // 1. Buscar no safeStorage (usuários locais)
+    const usersData = safeStorage.getItem('sweet-japan-users');
     let order = null;
     
     if (usersData) {
@@ -61,9 +62,9 @@ const TrackOrder: React.FC = () => {
 
     // Also check orders_ prefix keys (legacy format)
     if (!order) {
-      const allLocalOrders = Object.keys(localStorage)
+      const allLocalOrders = Object.keys(safeStorage)
         .filter(key => key.startsWith('orders_'))
-        .map(key => localStorage.getItem(key))
+        .map(key => safeStorage.getItem(key))
         .filter(Boolean)
         .flatMap(data => JSON.parse(data as string));
       order = allLocalOrders.find((o: any) => o.orderNumber === orderNumber.toUpperCase());

@@ -341,3 +341,28 @@ def update_order_tracking(db, order_number: str, tracking_number: str, tracking_
     except Exception as e:
         st.error(f"Erro ao atualizar rastreio: {e}")
         return False
+
+
+def get_whatsapp_api_url(db):
+    """Obtém a URL da API do WhatsApp do Firestore ou retorna o padrão local."""
+    try:
+        doc = db.collection('erp_settings').document('whatsapp').get()
+        if doc.exists:
+            return doc.to_dict().get('api_url', 'http://localhost:3001')
+    except Exception as e:
+        pass
+    return 'http://localhost:3001'
+
+
+def save_whatsapp_api_url(db, api_url: str):
+    """Salva a URL da API do WhatsApp no Firestore."""
+    try:
+        db.collection('erp_settings').document('whatsapp').set({
+            'api_url': api_url,
+            'updatedAt': datetime.now().isoformat()
+        }, merge=True)
+        return True
+    except Exception as e:
+        st.error(f"Erro ao salvar URL do WhatsApp: {e}")
+        return False
+

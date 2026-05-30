@@ -1,3 +1,4 @@
+import { safeStorage } from '@/utils/storage';
 import React, { useState } from 'react';
 import { RefreshCw, Database, Cloud, AlertCircle, CheckCircle } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
@@ -12,7 +13,7 @@ const SyncData: React.FC = () => {
 
   React.useEffect(() => {
     // Count local users
-    const usersData = localStorage.getItem('sweet-japan-users');
+    const usersData = safeStorage.getItem('sweet-japan-users');
     if (usersData) {
       const users = JSON.parse(usersData);
       setLocalUsers(Object.keys(users).length);
@@ -43,7 +44,7 @@ const SyncData: React.FC = () => {
               Sincronização de Dados
             </CardTitle>
             <CardDescription>
-              Sincronize seus dados do localStorage para o Firebase Cloud
+              Sincronize seus dados do safeStorage para o Firebase Cloud
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -64,7 +65,7 @@ const SyncData: React.FC = () => {
             <div className="space-y-3">
               <h3 className="font-semibold">O que é sincronização?</h3>
               <p className="text-sm text-gray-600">
-                A sincronização envia seus dados do armazenamento local (localStorage) deste dispositivo
+                A sincronização envia seus dados do armazenamento local (safeStorage) deste dispositivo
                 para a nuvem do Firebase. Isso permite que você acesse seus dados de qualquer dispositivo.
               </p>
               <ul className="text-sm text-gray-600 space-y-2 list-disc list-inside">

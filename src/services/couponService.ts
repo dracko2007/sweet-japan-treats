@@ -1,3 +1,4 @@
+import { safeStorage } from '@/utils/storage';
 import type { Coupon } from '@/types';
 
 const STORAGE_KEY = 'sweet-japan-coupons';
@@ -35,7 +36,7 @@ const deleteCouponFromFirestore = async (code: string) => {
   }
 };
 
-// Load all coupons from Firestore and merge with localStorage
+// Load all coupons from Firestore and merge with safeStorage
 const loadCouponsFromFirestore = async (): Promise<Coupon[]> => {
   try {
     const { collection, getDocs } = await import('firebase/firestore');
@@ -71,8 +72,8 @@ const loadCouponsFromFirestore = async (): Promise<Coupon[]> => {
     localCoupons.forEach(c => { if (!map.has(c.code)) map.set(c.code, c); });
     
     const merged = Array.from(map.values());
-    // Update localStorage with merged data
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+    // Update safeStorage with merged data
+    safeStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
     
     console.log('✅ [COUPON] Loaded from Firestore:', firestoreCoupons.length, 'coupons');
     return merged;
@@ -153,18 +154,18 @@ export const couponService = {
     return true;
   },
 
-  // Get all coupons from localStorage (sync/fast)
+  // Get all coupons from safeStorage (sync/fast)
   getAll: (): Coupon[] => {
-    const stored = localStorage.getItem(STORAGE_KEY);
+    const stored = safeStorage.getItem(STORAGE_KEY);
     return stored ? JSON.parse(stored) : [];
   },
 
-  // Get all coupons from Firestore + merge with localStorage (async)
+  // Get all coupons from Firestore + merge with safeStorage (async)
   getAllAsync: async (): Promise<Coupon[]> => {
     return await loadCouponsFromFirestore();
   },
 
-  // Get active coupons (sync, from localStorage)
+  // Get active coupons (sync, from safeStorage)
   getActive: (): Coupon[] => {
     const coupons = couponService.getAll();
     const now = new Date();
@@ -224,7 +225,7 @@ export const couponService = {
     // Load latest coupons from Firestore so client has admin-created ones
     await loadCouponsFromFirestore();
     
-    // Now do local validation (localStorage is up to date)
+    // Now do local validation (safeStorage is up to date)
     const localResult = couponService.validateCoupon(code, userEmail);
     if (!localResult.valid) return localResult;
     
@@ -248,7 +249,7 @@ export const couponService = {
     }
   },
 
-  // Use coupon (increment usage and track user) - saves to localStorage AND Firestore
+  // Use coupon (increment usage and track user) - saves to safeStorage AND Firestore
   useCoupon: (code: string, userEmail: string): void => {
     const coupons = couponService.getAll();
     const index = coupons.findIndex(c => c.code.toUpperCase() === code.toUpperCase());
@@ -256,15 +257,15 @@ export const couponService = {
     if (index !== -1) {
       coupons[index].usedCount += 1;
       
-      // Track which users have used this coupon (localStorage)
+      // Track which users have used this coupon (safeStorage)
       const usageKey = `coupon_usage_${code.toUpperCase()}`;
-      const usedBy = JSON.parse(localStorage.getItem(usageKey) || '[]');
+      const usedBy = JSON.parse(safeStorage.getItem(usageKey) || '[]');
       if (!usedBy.includes(userEmail)) {
         usedBy.push(userEmail);
-        localStorage.setItem(usageKey, JSON.stringify(usedBy));
+        safeStorage.setItem(usageKey, JSON.stringify(usedBy));
       }
       
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(coupons));
+      safeStorage.setItem(STORAGE_KEY, JSON.stringify(coupons));
       
       // Sync usage to Firestore (fire-and-forget)
       syncUsageToFirestore(code, userEmail);
@@ -276,10 +277,10 @@ export const couponService = {
   // Get users who used a coupon
   getCouponUsage: (code: string): string[] => {
     const usageKey = `coupon_usage_${code.toUpperCase()}`;
-    return JSON.parse(localStorage.getItem(usageKey) || '[]');
+    return JSON.parse(safeStorage.getItem(usageKey) || '[]');
   },
 
-  // Create new coupon - saves to localStorage AND Firestore
+  // Create new coupon - saves to safeStorage AND Firestore
   create: (coupon: Omit<Coupon, 'createdAt' | 'usedCount'>): Coupon => {
     const coupons = couponService.getAll();
     
@@ -291,7 +292,7 @@ export const couponService = {
     };
 
     coupons.push(newCoupon);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(coupons));
+    safeStorage.setItem(STORAGE_KEY, JSON.stringify(coupons));
     
     // Sync to Firestore (fire-and-forget)
     syncCouponToFirestore(newCoupon);
@@ -299,14 +300,14 @@ export const couponService = {
     return newCoupon;
   },
 
-  // Update coupon - saves to localStorage AND Firestore
+  // Update coupon - saves to safeStorage AND Firestore
   update: (code: string, updates: Partial<Coupon>): boolean => {
     const coupons = couponService.getAll();
     const index = coupons.findIndex(c => c.code === code);
     
     if (index !== -1) {
       coupons[index] = { ...coupons[index], ...updates };
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(coupons));
+      safeStorage.setItem(STORAGE_KEY, JSON.stringify(coupons));
       
       // Sync to Firestore (fire-and-forget)
       syncCouponToFirestore(coupons[index]);
@@ -316,13 +317,13 @@ export const couponService = {
     return false;
   },
 
-  // Delete coupon - removes from localStorage AND Firestore
+  // Delete coupon - removes from safeStorage AND Firestore
   delete: (code: string): boolean => {
     const coupons = couponService.getAll();
     const filtered = coupons.filter(c => c.code !== code);
     
     if (filtered.length < coupons.length) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
+      safeStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
       
       // Delete from Firestore (fire-and-forget)
       deleteCouponFromFirestore(code);
@@ -341,7 +342,7 @@ export const couponService = {
     console.log('✅ [COUPON] All local coupons synced to Firestore');
   },
 
-  // Load coupons from Firestore into localStorage (for clients)
+  // Load coupons from Firestore into safeStorage (for clients)
   loadFromFirestore: async (): Promise<Coupon[]> => {
     return await loadCouponsFromFirestore();
   },

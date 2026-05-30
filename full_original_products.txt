@@ -1,0 +1,105 @@
+Created At: 2026-05-26T11:37:59Z
+Completed At: 2026-05-26T11:37:59Z
+File Path: `file:///c:/sk.kogyo/temu_shop/src/data/products.ts`
+Total Lines: 130
+Total Bytes: 4402
+Showing lines 1 to 130
+The following code has been modified to include a line number before every line, in the format: <line_number>: <original_line>. Please note that any changes targeting the original code should remove the line number, colon, and leading space.
+1: import { Product } from '@/types';
+2: 
+3: export const products: Product[] = [
+4:   // Artesanal - 280g: ¥1200, 800g: ¥2000
+5:   {
+6:     id: 'art-cremoso',
+7:     name: 'Doce de Leite Cremoso',
+8:     description: 'O clássico doce de leite brasileiro, cremoso e irresistível. Feito com leite fresco e açúcar, cozido lentamente até atingir a textura perfeita.',
+9:     category: 'artesanal',
+10:     prices: { small: 1200, large: 2000 },
+11:     image: '/products/cremoso.jpg',
+12:     gallery: [
+13:       '/products/cremoso.jpg',
+14:       '/products/gallery/cremoso-1.jpg',
+15:       '/products/gallery/cremoso-2.jpg',
+16:       '/products/gallery/cremoso-3.jpg',
+17:       '/products/gallery/cremoso-4.jpg',
+18:     ],
+19:     video: '/video/tradicional.mp4',
+20:     flavor: 'Tradicional'
+21:   },
+22:   {
+23:     id: 'art-coco',
+24:     name: 'Doce de Leite de Coco',
+25:     description: 'A doçura tropical do coco combinada com a cremosidade do doce de leite. Uma experiência única e refrescante.',
+26:     category: 'artesanal',
+27:     prices: { small: 1200, large: 2000 },
+28:     image: '/products/coco.jpg',
+29:     gallery: [
+30:       '/products/coco.jpg',
+31:       '/products/gallery/coco-1.jpg',
+32:       '/products/gallery/coco-2.jpg',
+33:       '/products/gallery/coco-3.jpg',
+34:       '/products/gallery/coco-4.jpg',
+35:     ],
+36:     video: '/video/coco.mp4',
+37:     flavor: 'Coco'
+38:   },
+39:   {
+40:     id: 'art-amendoim',
+41:     name: 'Doce de Leite de Amendoim',
+42:     description: 'O sabor irresistível do amendoim torrado misturado ao doce de leite cremoso. Perfeit
+<truncated 1363 bytes>
+a outro nível.',
+78:     category: 'premium',
+79:     prices: { small: 1400, large: 2400 },
+80:     image: '/products/amendoas.jpg',
+81:     gallery: [
+82:       '/products/amendoas.jpg',
+83:       '/products/gallery/amendoas-1.jpg',
+84:       '/products/gallery/amendoas-2.jpg',
+85:       '/products/gallery/amendoas-3.jpg',
+86:       '/products/gallery/amendoas-4.jpg',
+87:     ],
+88:     video: '/video/amendoas.mp4',
+89:     flavor: 'Amêndoas'
+90:   },
+91:   {
+92:     id: 'prem-matcha',
+93:     name: 'Doce de Leite de Matcha',
+94:     description: 'A fusão perfeita entre o Brasil e o Japão. Matcha de alta qualidade de Uji combinado com nosso doce de leite artesanal.',
+95:     category: 'premium',
+96:     prices: { small: 1400, large: 2400 },
+97:     image: '/products/matcha.jpg',
+98:     gallery: [
+99:       '/products/matcha.jpg',
+100:       '/products/gallery/matcha-1.jpg',
+101:       '/products/gallery/matcha-2.jpg',
+102:       '/products/gallery/matcha-3.jpg',
+103:       '/products/gallery/matcha-4.jpg',
+104:     ],
+105:     video: '/video/cha.mp4',
+106:     flavor: 'Matcha'
+107:   },
+108:   {
+109:     id: 'prem-chocolate',
+110:     name: 'Doce de Leite de Chocolate',
+111:     description: 'Chocolate belga premium encontra o doce de leite brasileiro. Uma indulgência irresistível para os chocólatras.',
+112:     category: 'premium',
+113:     prices: { small: 1400, large: 2400 },
+114:     image: '/products/chocolate.jpg',
+115:     gallery: [
+116:       '/products/chocolate.jpg',
+117:       '/products/gallery/chocolate-1.jpg',
+118:       '/products/gallery/chocolate-2.jpg',
+119:       '/products/gallery/chocolate-3.jpg',
+120:       '/products/gallery/chocolate-4.jpg',
+121:     ],
+122:     video: '/video/chocolate.mp4',
+123:     flavor: 'Chocolate'
+124:   }
+125: ];
+126: 
+127: export const getProductsByCategory = (category: 'artesanal' | 'premium') => {
+128:   return products.filter(p => p.category === category);
+129: };
+130: 
+The above content shows the entire, complete file contents of the requested file.

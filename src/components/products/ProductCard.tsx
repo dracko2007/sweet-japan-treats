@@ -10,6 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { useLanguage } from '@/context/LanguageContext';
 import { getTranslatedProductName, getTranslatedProductDesc, getTranslatedProductFlavor } from '@/data/translations';
+import { formatPrice } from '@/utils/currency';
 
 interface ProductCardProps {
   product: Product;
@@ -25,7 +26,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
   const { addToCart } = useCart();
   const { user } = useUser();
   const { toast } = useToast();
-  const { t } = useLanguage();
+  const { t, selectedCountry } = useLanguage();
 
   const translatedName = getTranslatedProductName(product.id, t);
   const translatedDesc = getTranslatedProductDesc(product.id, t);
@@ -37,7 +38,16 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
     }
   }, [user, product.id]);
 
-  const currentPrice = selectedSize === 'small' ? product.prices.small : product.prices.large;
+  const currency = product.deliveryRestrict === 'Japão' ? 'JPY' : (selectedCountry === 'Japão' ? 'JPY' : 'BRL');
+
+  const getDisplayPrice = (size: 'small' | 'large') => {
+    const basePrice = size === 'small' ? product.prices.small : product.prices.large;
+    if (product.deliveryRestrict === 'Japão') return basePrice;
+    if (selectedCountry === 'Japão') return basePrice * 28;
+    return basePrice;
+  };
+
+  const currentPrice = getDisplayPrice(selectedSize);
 
   const handleAddToCart = () => {
     addToCart(product, selectedSize, quantity);
@@ -139,13 +149,12 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
         
         {/* Category Badge */}
         <div className="absolute top-4 left-4 z-10">
-          <span className={cn(
-            "px-3 py-1.5 rounded-full text-xs font-semibold uppercase tracking-wide",
-            product.category === 'premium' 
-              ? 'bg-gold/90 text-chocolate' 
-              : 'bg-primary text-primary-foreground'
-          )}>
-            {product.category === 'premium' ? t('product.category.premium') : t('product.category.artesanal')}
+          <span className="px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wide bg-primary text-primary-foreground shadow-sm">
+            {product.category === 'doce-de-leite' ? 'Doce de Leite 🍯' : 
+             product.category === 'cosmeticos' ? 'Cosméticos 🧴' : 
+             product.category === 'acessorios' ? 'Acessórios 🎮' : 
+             product.category === 'doces' ? 'Doces & Chás 🍵' : 
+             product.category === 'papelaria' ? 'Papelaria ✏️' : 'Importado 🌸'}
           </span>
         </div>
 
@@ -206,7 +215,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
                 : "border-border hover:border-primary/50"
             )}
           >
-            280g - ¥{product.prices.small.toLocaleString()}
+            Padrão - {formatPrice(getDisplayPrice('small'), currency)}
           </button>
           <button
             onClick={() => setSelectedSize('large')}
@@ -217,7 +226,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
                 : "border-border hover:border-primary/50"
             )}
           >
-            800g - ¥{product.prices.large.toLocaleString()}
+            Deluxe - {formatPrice(getDisplayPrice('large'), currency)}
           </button>
         </div>
 
@@ -254,7 +263,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
             ) : (
               <>
                 <ShoppingCart className="w-5 h-5 mr-2" />
-                ¥{(currentPrice * quantity).toLocaleString()}
+                {formatPrice(currentPrice * quantity, currency)}
               </>
             )}
           </Button>

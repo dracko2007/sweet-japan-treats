@@ -1,37 +1,36 @@
-import React, { useState } from 'react';
+import { safeStorage } from '@/utils/storage';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Package, ArrowRight, Printer, CreditCard, Building2, Smartphone, MapPin, User, Phone, Mail, CheckCircle } from 'lucide-react';
+import { Package, ArrowRight, Printer, CreditCard, Landmark, Smartphone, FileText, MapPin, User, Phone, Mail, CheckCircle } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { useCart } from '@/context/CartContext';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-
-interface OrderReviewProps {
-  formData?: {
-    name: string;
-    email: string;
-    phone: string;
-    postalCode: string;
-    prefecture: string;
-    city: string;
-    address: string;
-    building: string;
-  };
-}
+import { useToast } from '@/hooks/use-toast';
+import { useLanguage } from '@/context/LanguageContext';
+import { formatPrice } from '@/utils/currency';
+import { getTranslatedProductName } from '@/data/translations';
+import { cn } from '@/lib/utils';
 
 const OrderReview: React.FC = () => {
-  const { items, totalPrice } = useCart();
+  const { items, clearCart } = useCart();
   const navigate = useNavigate();
   const location = useLocation();
+  const { toast } = useToast();
+  const { t } = useLanguage();
+
   const formData = location.state?.formData;
   const shipping = location.state?.shipping;
   const couponDiscount = location.state?.couponDiscount || 0;
   const appliedCoupon = location.state?.coupon;
-  const [paymentMethod, setPaymentMethod] = useState('bank');
+
+  const [paymentMethod, setPaymentMethod] = useState(() => {
+    return formData?.country === 'Japão' ? 'paypay' : 'pix';
+  });
 
   // Redirect if no form data or shipping
-  React.useEffect(() => {
+  useEffect(() => {
     if (!formData || !shipping) {
       navigate('/checkout');
     }
@@ -45,28 +44,119 @@ const OrderReview: React.FC = () => {
     window.print();
   };
 
+  const isJapan = formData.country === 'Japão';
+  const currency = isJapan ? 'JPY' : 'BRL';
+
+  // Base Total Price (subtotal before discounts/taxes) in target currency
+  const baseTotalPrice = items.reduce((sum, item) => {
+    const price = item.size === 'small' ? item.product.prices.small : item.product.prices.large;
+    let unitPrice = price;
+    if (isJapan) {
+      if (item.product.deliveryRestrict !== 'Japão') {
+        unitPrice = price * 28; // BRL to JPY conversion
+      }
+    }
+    return sum + unitPrice * item.quantity;
+  }, 0);
+
+  // PIX gets 5% additional discount (Temu high conversion strategy) - ONLY for Brazil
+  const isPix = paymentMethod === 'pix';
+  const subtotalWithCoupon = baseTotalPrice - couponDiscount;
+  const pixDiscount = (!isJapan && isPix) ? subtotalWithCoupon * 0.05 : 0;
+  const priceAfterPix = subtotalWithCoupon - pixDiscount;
+  
+  // Brazil Taxes (ICMS and Import Tax)
+  let federalTax = 0;
+  let icmsTax = 0;
+  
+  if (!isJapan) {
+    const isBelow50USD = priceAfterPix < 250;
+    federalTax = isBelow50USD
+      ? priceAfterPix * 0.20
+      : (priceAfterPix * 0.60) - 62.50;
+      
+    icmsTax = (priceAfterPix + federalTax) * 0.17;
+  }
+  
+  const taxAmount = federalTax + icmsTax;
+  const finalShippingCost = appliedCoupon?.freeShipping ? 0 : shipping.cost;
+  const grandTotal = priceAfterPix + taxAmount + finalShippingCost;
+
   const handleConfirmOrder = () => {
+    toast({
+      title: "Processando Pedido...",
+      description: isJapan ? "Preparando seu pedido com o centro de Mie." : "Preparando seus dados com a aduana do Brasil.",
+    });
+
+    const orderId = isJapan 
+      ? `SC-JP-${Math.floor(100000 + Math.random() * 900000)}`
+      : `SE-BR-${Math.floor(100000 + Math.random() * 900000)}`;
+
+    const trackingPrefix = isJapan ? 'JP' : 'NX';
+    const trackingSuffix = isJapan ? 'JP' : 'JP';
+    const trackingCode = isJapan 
+      ? `LP${Math.floor(100000000 + Math.random() * 900000000)}JP`
+      : `NX${Math.floor(100000000 + Math.random() * 900000000)}JP`;
+
+    // Save mock order to simulated db (local storage for the admin panel)
+    const mockOrder = {
+      id: orderId,
+      name: formData.name,
+      email: formData.email,
+      phone: formData.phone,
+      cpf: formData.cpf || '',
+      postalCode: formData.postalCode,
+      prefecture: formData.prefecture,
+      city: formData.city,
+      address: formData.address,
+      building: formData.building,
+      shippingCarrier: shipping.carrier,
+      shippingCost: finalShippingCost,
+      subtotal: baseTotalPrice,
+      couponCode: appliedCoupon?.code || '',
+      couponDiscount: couponDiscount,
+      pixDiscount: pixDiscount,
+      federalTax: federalTax,
+      icmsTax: icmsTax,
+      taxAmount: taxAmount,
+      total: grandTotal,
+      currency: currency,
+      paymentMethod: paymentMethod,
+      status: 'Pendente',
+      trackingCode: trackingCode,
+      date: new Date().toLocaleDateString('pt-BR'),
+      items: items.map(item => {
+        const p = item.size === 'small' ? item.product.prices.small : item.product.prices.large;
+        let finalUnitPrice = p;
+        if (isJapan) {
+          if (item.product.deliveryRestrict !== 'Japão') {
+            finalUnitPrice = p * 28; // BRL to JPY
+          }
+        }
+        return {
+          id: item.product.id,
+          name: getTranslatedProductName(item.product.id, t),
+          image: item.product.image,
+          quantity: item.quantity,
+          size: item.size === 'small' ? 'Padrão' : 'Deluxe',
+          price: finalUnitPrice
+        };
+      })
+    };
+
+    // Save to list of orders in safeStorage so Admin panel has access to it
+    const existingOrders = JSON.parse(safeStorage.getItem('sakura_orders') || '[]');
+    safeStorage.setItem('sakura_orders', JSON.stringify([mockOrder, ...existingOrders]));
+
+    // Clear cart upon final purchase order creation
+    clearCart();
+
+    // Navigate to confirmation page
     navigate('/order-confirmation', { 
       state: { 
-        formData, 
-        paymentMethod,
-        shipping,
-        items,
-        totalPrice,
-        couponDiscount,
-        appliedCoupon
+        order: mockOrder
       } 
     });
-  };
-
-  // Fixed sender address
-  const senderAddress = {
-    name: 'Paula Shiokawa',
-    postalCode: '518-0225',
-    prefecture: '三重県',
-    city: '伊賀市',
-    address: '桐ヶ丘 5-292',
-    phone: '070-1367-1679'
   };
 
   return (
@@ -78,7 +168,10 @@ const OrderReview: React.FC = () => {
               Revisar Pedido
             </h1>
             <p className="text-muted-foreground text-lg">
-              Verifique todos os dados antes de finalizar
+              {isJapan 
+                ? 'Verifique os dados de entrega doméstica antes de confirmar'
+                : 'Verifique todos os dados da importação aérea antes de finalizar'
+              }
             </p>
           </div>
         </div>
@@ -90,161 +183,187 @@ const OrderReview: React.FC = () => {
             
             {/* Print Button */}
             <div className="flex justify-end print:hidden">
-              <Button onClick={handlePrint} variant="outline" className="gap-2">
+              <Button onClick={handlePrint} variant="outline" className="gap-2 font-semibold">
                 <Printer className="w-4 h-4" />
                 Imprimir Recibo
               </Button>
             </div>
 
-            {/* Order Summary */}
+            {/* Order Items Summary */}
             <div className="bg-card rounded-2xl border border-border p-6 lg:p-8">
               <div className="flex items-center gap-3 mb-6">
                 <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
                   <Package className="w-5 h-5 text-primary" />
                 </div>
-                <h2 className="font-display text-2xl font-semibold text-foreground">
-                  Produtos do Pedido
+                <h2 className="font-sans text-xl font-bold text-foreground">
+                  {isJapan ? 'Produtos Selecionados (Entrega no Japão)' : 'Produtos Selecionados (Tóquio Hub)'}
                 </h2>
               </div>
 
               <div className="space-y-4">
-                {items.map((item) => (
-                  <div 
-                    key={`${item.product.id}-${item.size}`}
-                    className="flex items-center gap-4 pb-4 border-b border-border last:border-0"
-                  >
-                    <img 
-                      src={item.product.image} 
-                      alt={item.product.name}
-                      className="w-20 h-20 rounded-lg object-cover"
-                    />
-                    <div className="flex-1">
-                      <p className="font-semibold text-foreground">{item.product.name}</p>
-                      <p className="text-sm text-muted-foreground">
-                        Tamanho: {item.size} • Quantidade: {item.quantity}x
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        Preço unitário: ¥{item.product.prices[item.size].toLocaleString()}
-                      </p>
+                {items.map((item) => {
+                  const price = item.size === 'small' ? item.product.prices.small : item.product.prices.large;
+                  let displayUnitPrice = price;
+                  if (isJapan) {
+                    if (item.product.deliveryRestrict !== 'Japão') {
+                      displayUnitPrice = price * 28; // Convert BRL to JPY
+                    }
+                  }
+                  const displayItemPrice = displayUnitPrice * item.quantity;
+                  const productName = getTranslatedProductName(item.product.id, t);
+                  return (
+                    <div 
+                      key={`${item.product.id}-${item.size}`}
+                      className="flex items-center gap-4 pb-4 border-b border-border last:border-0"
+                    >
+                      <img 
+                        src={item.product.image} 
+                        alt={productName}
+                        className="w-16 h-16 rounded-lg object-cover border border-gray-200"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="font-bold text-sm text-foreground truncate">{productName}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          Opção: {item.size === 'small' ? 'Padrão' : 'Deluxe'} • Quantidade: {item.quantity}x
+                        </p>
+                        <p className="text-xs text-gray-400">
+                          Preço unitário: {formatPrice(displayUnitPrice, currency)}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-bold text-base text-foreground">
+                          {formatPrice(displayItemPrice, currency)}
+                        </p>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <p className="font-bold text-lg text-foreground">
-                        ¥{(item.product.prices[item.size] * item.quantity).toLocaleString()}
-                      </p>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
 
-                <div className="pt-4 space-y-2">
-                  <div className="flex justify-between text-base">
-                    <span className="text-muted-foreground">Subtotal</span>
-                    <span className="font-semibold">¥{totalPrice.toLocaleString()}</span>
+                {/* Calculation breakdown */}
+                <div className="pt-4 space-y-2.5 text-sm border-t border-border">
+                  <div className="flex justify-between text-muted-foreground">
+                    <span>Subtotal</span>
+                    <span>{formatPrice(baseTotalPrice, currency)}</span>
                   </div>
+                  
                   {couponDiscount > 0 && (
-                    <div className="flex justify-between text-base text-green-600">
-                      <span>Desconto {appliedCoupon ? `(${appliedCoupon.code})` : ''}</span>
-                      <span className="font-semibold">-¥{couponDiscount.toLocaleString()}</span>
+                    <div className="flex justify-between text-green-600 font-bold bg-green-50/50 p-2 rounded border border-dashed border-green-200">
+                      <span>Desconto do Cupom {appliedCoupon ? `(${appliedCoupon.code})` : ''}</span>
+                      <span>-{formatPrice(couponDiscount, currency)}</span>
                     </div>
                   )}
-                  <div className="flex justify-between text-base">
-                    <span className="text-muted-foreground">Frete ({shipping.carrier})</span>
-                    <span className="font-semibold">¥{shipping.cost.toLocaleString()}</span>
+
+                  {pixDiscount > 0 && (
+                    <div className="flex justify-between text-orange-600 font-bold bg-orange-50 p-2 rounded border border-dashed border-orange-200">
+                      <span>Desconto Extra de 5% (Pagamento via PIX)</span>
+                      <span>-{formatPrice(pixDiscount, 'BRL')}</span>
+                    </div>
+                  )}
+
+                  {formData.country === 'Brasil' && (
+                    <>
+                      <div className="flex justify-between text-muted-foreground">
+                        <span>Imposto de Importação Federal ({subtotalWithCoupon < 250 ? '20%' : '60%'})</span>
+                        <span>{formatPrice(federalTax, 'BRL')}</span>
+                      </div>
+                      <div className="flex justify-between text-muted-foreground">
+                        <span>ICMS Estadual (17%)</span>
+                        <span>{formatPrice(icmsTax, 'BRL')}</span>
+                      </div>
+                    </>
+                  )}
+
+                  <div className="flex justify-between text-muted-foreground">
+                    <span>{isJapan ? 'Frete Local' : 'Frete Aéreo'} ({shipping.carrier})</span>
+                    <span>{finalShippingCost === 0 ? 'Grátis' : formatPrice(finalShippingCost, currency)}</span>
                   </div>
-                  <div className="text-xs text-muted-foreground text-right">
-                    Entrega em {shipping.estimatedDays} dias úteis
+
+                  <div className="text-[10px] text-gray-400 text-right">
+                    {isJapan ? 'Envio doméstico seguro de Mie Prefecture.' : 'Voo internacional Tóquio para Brasil.'} Entrega estimada: {shipping.estimatedDays} dias úteis
                   </div>
-                  <div className="flex justify-between pt-3 border-t border-border">
-                    <span className="font-bold text-xl">Total</span>
-                    <span className="font-bold text-2xl text-primary">
-                      ¥{(totalPrice - couponDiscount + shipping.cost).toLocaleString()}
+
+                  <div className="flex justify-between pt-3 border-t border-border font-black text-lg">
+                    <span>Total Geral</span>
+                    <span className="text-2xl text-orange-600">
+                      {formatPrice(grandTotal, currency)}
                     </span>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Customer Information */}
+            {/* Customer & Customs Info */}
             <div className="bg-card rounded-2xl border border-border p-6 lg:p-8">
               <div className="flex items-center gap-3 mb-6">
                 <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
                   <User className="w-5 h-5 text-primary" />
                 </div>
-                <h2 className="font-display text-2xl font-semibold text-foreground">
-                  Dados do Cliente
+                <h2 className="font-sans text-xl font-bold text-foreground">
+                  {isJapan ? 'Informações do Cliente' : 'Informações de Faturamento e Aduana'}
                 </h2>
               </div>
 
-              <div className="grid md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <Label className="text-muted-foreground flex items-center gap-2">
-                    <User className="w-4 h-4" />
-                    Nome
-                  </Label>
-                  <p className="font-medium text-foreground">{formData.name}</p>
+              <div className="grid md:grid-cols-2 gap-4 text-sm">
+                <div>
+                  <Label className="text-muted-foreground font-semibold">Nome Completo</Label>
+                  <p className="font-bold text-gray-800 text-base">{formData.name}</p>
                 </div>
 
-                <div className="space-y-2">
-                  <Label className="text-muted-foreground flex items-center gap-2">
-                    <Phone className="w-4 h-4" />
-                    Telefone
-                  </Label>
-                  <p className="font-medium text-foreground">{formData.phone}</p>
+                 {!isJapan && (
+                   <div>
+                     <Label className="text-muted-foreground font-semibold">CPF (Desembaraço Aduaneiro)</Label>
+                     <p className="font-bold text-orange-600 text-base">{formData.cpf}</p>
+                   </div>
+                 )}
+
+                <div>
+                  <Label className="text-muted-foreground font-semibold">Telefone</Label>
+                  <p className="font-medium text-gray-800">{formData.phone}</p>
                 </div>
 
-                <div className="space-y-2 md:col-span-2">
-                  <Label className="text-muted-foreground flex items-center gap-2">
-                    <Mail className="w-4 h-4" />
-                    Email
-                  </Label>
-                  <p className="font-medium text-foreground">{formData.email}</p>
+                <div>
+                  <Label className="text-muted-foreground font-semibold">Email de Contato</Label>
+                  <p className="font-medium text-gray-800">{formData.email}</p>
                 </div>
               </div>
             </div>
 
-            {/* Shipping Address - Destinatário APENAS */}
+            {/* Shipping Address */}
             <div className="bg-card rounded-2xl border border-border p-6 lg:p-8">
               <div className="flex items-center gap-3 mb-6">
                 <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
                   <MapPin className="w-5 h-5 text-primary" />
                 </div>
-                <h2 className="font-display text-2xl font-semibold text-foreground">
-                  Endereço de Entrega (Destinatário)
-                </h2>
+                 <h2 className="font-sans text-xl font-bold text-foreground">
+                   Endereço de Entrega ({isJapan ? 'Japão 🇯🇵' : 'Brasil 🇧🇷'})
+                 </h2>
               </div>
               
-              <div className="space-y-4">
-                <div>
-                  <Label className="text-muted-foreground text-sm">Nome Completo</Label>
-                  <p className="font-semibold text-lg text-foreground">{formData.name}</p>
-                </div>
-                <div className="grid md:grid-cols-2 gap-4">
+              <div className="space-y-3 text-sm">
+                <div className="grid md:grid-cols-3 gap-4">
                   <div>
-                    <Label className="text-muted-foreground text-sm">CEP</Label>
-                    <p className="font-medium text-foreground">〒{formData.postalCode}</p>
+                    <Label className="text-muted-foreground">Código Postal / CEP</Label>
+                    <p className="font-bold text-gray-800">〒 {formData.postalCode}</p>
                   </div>
                   <div>
-                    <Label className="text-muted-foreground text-sm">Província</Label>
-                    <p className="font-medium text-foreground">{formData.prefecture}</p>
+                    <Label className="text-muted-foreground">{isJapan ? 'Província' : 'Estado / UF'}</Label>
+                    <p className="font-medium text-gray-800">{formData.prefecture}</p>
+                  </div>
+                  <div>
+                    <Label className="text-muted-foreground">Cidade</Label>
+                    <p className="font-medium text-gray-800">{formData.city}</p>
                   </div>
                 </div>
                 <div>
-                  <Label className="text-muted-foreground text-sm">Cidade</Label>
-                  <p className="font-medium text-foreground">{formData.city}</p>
-                </div>
-                <div>
-                  <Label className="text-muted-foreground text-sm">Endereço</Label>
-                  <p className="font-medium text-foreground">{formData.address}</p>
+                  <Label className="text-muted-foreground">Rua e Número</Label>
+                  <p className="font-medium text-gray-800">{formData.address}</p>
                 </div>
                 {formData.building && (
                   <div>
-                    <Label className="text-muted-foreground text-sm">Edifício/Apartamento</Label>
-                    <p className="font-medium text-foreground">{formData.building}</p>
+                    <Label className="text-muted-foreground">Complemento / Edifício</Label>
+                    <p className="font-medium text-gray-800">{formData.building}</p>
                   </div>
                 )}
-                <div>
-                  <Label className="text-muted-foreground text-sm">Telefone</Label>
-                  <p className="font-medium text-foreground">{formData.phone}</p>
-                </div>
               </div>
             </div>
 
@@ -254,39 +373,104 @@ const OrderReview: React.FC = () => {
                 <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
                   <CreditCard className="w-5 h-5 text-primary" />
                 </div>
-                <h2 className="font-display text-2xl font-semibold text-foreground">
-                  Forma de Pagamento
+                <h2 className="font-sans text-xl font-bold text-foreground">
+                  Selecione o Método de Pagamento
                 </h2>
               </div>
 
               <RadioGroup value={paymentMethod} onValueChange={setPaymentMethod}>
                 <div className="space-y-4">
-                  <div className="flex items-start space-x-3 p-4 rounded-lg border border-border hover:bg-secondary/50 cursor-pointer">
-                    <RadioGroupItem value="bank" id="bank" className="mt-1" />
-                    <Label htmlFor="bank" className="flex-1 cursor-pointer">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Building2 className="w-5 h-5 text-primary" />
-                        <span className="font-semibold">Depósito Bancário</span>
+                  {isJapan ? (
+                    <>
+                      {/* PayPay Option for Japan */}
+                      <div className={cn(
+                        "flex items-start space-x-3 p-4 rounded-xl border-2 transition-all cursor-pointer",
+                        paymentMethod === 'paypay' ? "border-orange-500 bg-orange-50/50" : "border-border hover:border-gray-300"
+                      )}>
+                        <RadioGroupItem value="paypay" id="paypay" className="mt-1" />
+                        <Label htmlFor="paypay" className="flex-1 cursor-pointer">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-xl">📱</span>
+                            <span className="font-bold text-base text-gray-800">PayPay</span>
+                          </div>
+                          <p className="text-xs text-muted-foreground leading-relaxed">
+                            Pague de forma rápida e instantânea usando o aplicativo PayPay via QR Code na próxima tela.
+                          </p>
+                        </Label>
                       </div>
-                      <p className="text-sm text-muted-foreground">
-                        Transferência direta para conta bancária
-                      </p>
-                    </Label>
-                  </div>
 
-                  <div className="flex items-start space-x-3 p-4 rounded-lg border border-border hover:bg-secondary/50 cursor-pointer">
-                    <RadioGroupItem value="paypay" id="paypay" className="mt-1" />
-                    <Label htmlFor="paypay" className="flex-1 cursor-pointer">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Smartphone className="w-5 h-5 text-red-500" />
-                        <span className="font-semibold">PayPay</span>
-                        <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full">QR Code</span>
+                      {/* Bank Transfer Option for Japan */}
+                      <div className={cn(
+                        "flex items-start space-x-3 p-4 rounded-xl border-2 transition-all cursor-pointer",
+                        paymentMethod === 'yucho' ? "border-orange-500 bg-orange-50/50" : "border-border hover:border-gray-300"
+                      )}>
+                        <RadioGroupItem value="yucho" id="yucho" className="mt-1" />
+                        <Label htmlFor="yucho" className="flex-1 cursor-pointer">
+                          <div className="flex items-center gap-2 mb-1">
+                            <Landmark className="w-5 h-5 text-emerald-600" />
+                            <span className="font-bold text-base text-gray-800">Depósito Bancário (Yucho Bank / ゆうちょ銀行)</span>
+                          </div>
+                          <p className="text-xs text-muted-foreground leading-relaxed">
+                            Faça a transferência para nossa conta no Yucho Bank (Paula Shiokawa). As instruções estarão na próxima tela.
+                          </p>
+                        </Label>
                       </div>
-                      <p className="text-sm text-muted-foreground">
-                        Escaneie o QR Code ou envie pelo app PayPay
-                      </p>
-                    </Label>
-                  </div>
+                    </>
+                  ) : (
+                    <>
+                      {/* PIX Option */}
+                      <div className={cn(
+                        "flex items-start space-x-3 p-4 rounded-xl border-2 transition-all cursor-pointer",
+                        isPix ? "border-orange-500 bg-orange-50/50" : "border-border hover:border-gray-300"
+                      )}>
+                        <RadioGroupItem value="pix" id="pix" className="mt-1" />
+                        <Label htmlFor="pix" className="flex-1 cursor-pointer">
+                          <div className="flex items-center gap-2 mb-1">
+                            <Smartphone className="w-5 h-5 text-orange-500" />
+                            <span className="font-bold text-base text-gray-800">PIX de Alta Velocidade</span>
+                            <span className="text-[10px] bg-orange-600 text-white font-extrabold px-2 py-0.5 rounded-full uppercase">5% OFF EXTRA</span>
+                          </div>
+                          <p className="text-xs text-muted-foreground leading-relaxed">
+                            Aprovação em 3 segundos. Mostraremos o QR Code e a chave Copia e Cola na próxima página.
+                          </p>
+                        </Label>
+                      </div>
+
+                      {/* Credit Card Option */}
+                      <div className={cn(
+                        "flex items-start space-x-3 p-4 rounded-xl border-2 transition-all cursor-pointer",
+                        paymentMethod === 'card' ? "border-orange-500 bg-orange-50/50" : "border-border hover:border-gray-300"
+                      )}>
+                        <RadioGroupItem value="card" id="card" className="mt-1" />
+                        <Label htmlFor="card" className="flex-1 cursor-pointer">
+                          <div className="flex items-center gap-2 mb-1">
+                            <CreditCard className="w-5 h-5 text-blue-500" />
+                            <span className="font-bold text-base text-gray-800">Cartão de Crédito Nacional / Internacional</span>
+                          </div>
+                          <p className="text-xs text-muted-foreground leading-relaxed">
+                            Parcele em até 12x no cartão (Visa, MasterCard, Elo, Amex).
+                          </p>
+                        </Label>
+                      </div>
+
+                      {/* Boleto Option */}
+                      <div className={cn(
+                        "flex items-start space-x-3 p-4 rounded-xl border-2 transition-all cursor-pointer",
+                        paymentMethod === 'boleto' ? "border-orange-500 bg-orange-50/50" : "border-border hover:border-gray-300"
+                      )}>
+                        <RadioGroupItem value="boleto" id="boleto" className="mt-1" />
+                        <Label htmlFor="boleto" className="flex-1 cursor-pointer">
+                          <div className="flex items-center gap-2 mb-1">
+                            <FileText className="w-5 h-5 text-gray-500" />
+                            <span className="font-bold text-base text-gray-800">Boleto Bancário</span>
+                          </div>
+                          <p className="text-xs text-muted-foreground leading-relaxed">
+                            Compensa em 1 a 2 dias úteis. Imprima o boleto ou copie o código de barras para pagamento.
+                          </p>
+                        </Label>
+                      </div>
+                    </>
+                  )}
                 </div>
               </RadioGroup>
             </div>
@@ -296,35 +480,22 @@ const OrderReview: React.FC = () => {
               <Button 
                 variant="outline" 
                 onClick={() => navigate('/checkout', { state: { formData } })}
-                className="flex-1 rounded-xl py-6 text-lg"
+                className="flex-1 rounded-xl py-6 text-lg border-2"
               >
-                Voltar e Editar
+                Voltar e Editar Dados
               </Button>
               <Button 
                 onClick={handleConfirmOrder}
-                className="flex-1 btn-primary rounded-xl py-6 text-lg font-semibold"
+                className="flex-1 btn-primary rounded-xl py-6 text-lg font-bold"
               >
                 <CheckCircle className="w-5 h-5 mr-2" />
-                Confirmar e Finalizar
+                Confirmar e Pagar {formatPrice(grandTotal, currency)}
                 <ArrowRight className="w-5 h-5 ml-2" />
               </Button>
             </div>
           </div>
         </div>
       </section>
-
-      {/* Print Styles */}
-      <style dangerouslySetInnerHTML={{ __html: `
-        @media print {
-          @page {
-            margin: 1cm;
-          }
-          body {
-            print-color-adjust: exact;
-            -webkit-print-color-adjust: exact;
-          }
-        }
-      ` }} />
     </Layout>
   );
 };

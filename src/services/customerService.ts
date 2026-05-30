@@ -1,3 +1,4 @@
+import { safeStorage } from '@/utils/storage';
 // Serviço para gerenciar dados de clientes e estatísticas
 import { firebaseSyncService } from '@/services/firebaseSyncService';
 import { collection, getDocs } from 'firebase/firestore';
@@ -27,7 +28,7 @@ export interface CustomerStats {
 export const customerService = {
   // Obtém todos os clientes com suas estatísticas
   getAllCustomers(): CustomerStats[] {
-    const usersData = localStorage.getItem('sweet-japan-users');
+    const usersData = safeStorage.getItem('sweet-japan-users');
     if (!usersData) return [];
 
     const users = JSON.parse(usersData);
@@ -143,7 +144,7 @@ export const customerService = {
     return customers.find(c => c.email === email) || null;
   },
 
-  // Async version: fetches all users from Firestore + merges with localStorage
+  // Async version: fetches all users from Firestore + merges with safeStorage
   async getAllCustomersAsync(): Promise<CustomerStats[]> {
     try {
       if (!db) throw new Error('Firestore not available');
@@ -237,7 +238,7 @@ export const customerService = {
 
       return Array.from(customerMap.values()).sort((a, b) => b.totalSpent - a.totalSpent);
     } catch (error) {
-      console.error('❌ [CUSTOMER SERVICE] Firestore fetch failed, using localStorage:', error);
+      console.error('❌ [CUSTOMER SERVICE] Firestore fetch failed, using safeStorage:', error);
       return this.getAllCustomers();
     }
   },

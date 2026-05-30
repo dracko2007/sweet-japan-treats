@@ -108,6 +108,11 @@ client.on('message', (msg) => {
 // API ROUTES
 // =====================================================
 
+// Root route (friendly confirmation check)
+app.get('/', (req, res) => {
+    res.send('🏮 Sweet Japan Treats - Servidor WhatsApp está online e rodando! 🚀');
+});
+
 // Status
 app.get('/api/status', (req, res) => {
     res.json({

@@ -1,399 +1,128 @@
+import { safeStorage } from '@/utils/storage';
 import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { CheckCircle, Home, Mail, Printer } from 'lucide-react';
+import { CheckCircle, Home, Mail, Printer, Copy, AlertCircle, Smartphone, CreditCard, FileText, Landmark } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
-import { useCart } from '@/context/CartContext';
-import { useUser } from '@/context/UserContext';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { emailService } from '@/services/emailService';
-import { emailServiceSimple } from '@/services/emailServiceSimple';
-import { carrierService } from '@/services/carrierService';
-import { couponService } from '@/services/couponService';
-import { firebaseSyncService } from '@/services/firebaseSyncService';
-import type { OrderData, CartItem } from '@/types/order';
+import { QRCodeSVG } from 'qrcode.react';
+import { formatPrice } from '@/utils/currency';
 
 const OrderConfirmation: React.FC = () => {
-  const { clearCart } = useCart();
-  const { addOrder, isAuthenticated, user } = useUser();
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
-  const orderData = location.state;
+  const order = location.state?.order;
   
-  const [trackingNumber, setTrackingNumber] = useState<string>('');
-  const [emailSent, setEmailSent] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const [orderNumber, setOrderNumber] = useState<string>('');
-  
-  // Use ref to prevent processing the order multiple times
-  const processedRef = useRef(false);
+  const [pixTimeLeft, setPixTimeLeft] = useState(600); // 10 minutes for PIX
+  const [pixStatus, setPixStatus] = useState<'pending' | 'loading' | 'success'>('pending');
+  const [copied, setCopied] = useState(false);
+  const [cardData, setCardData] = useState({ number: '', name: '', expiry: '', cvv: '' });
+  const [cardStatus, setCardStatus] = useState<'idle' | 'processing' | 'success'>('idle');
 
-  // Helper function to save order directly to localStorage (even if not logged in)
-  const saveOrderToStorage = (email: string, orderData: any) => {
-    console.log('🔍 [DEBUG] saveOrderToStorage called with email:', email);
-    
-    const usersData = localStorage.getItem('sweet-japan-users');
-    console.log('🔍 [DEBUG] sweet-japan-users exists:', !!usersData);
-    
-    if (!usersData) {
-      console.error('❌ [DEBUG] No users data in localStorage!');
-      return;
-    }
-    
-    const users = JSON.parse(usersData);
-    console.log('🔍 [DEBUG] Total users in storage:', Object.keys(users).length);
-    console.log('🔍 [DEBUG] User emails in storage:', Object.keys(users));
-    
-    // Find or create user entry
-    if (!users[email]) {
-      console.error('❌ [DEBUG] User not found with email:', email);
-      console.log('🔍 [DEBUG] Available users:', Object.keys(users));
-      return;
-    }
-    
-    console.log('✅ [DEBUG] User found:', email);
-    console.log('🔍 [DEBUG] User data:', users[email]);
-    
-    // Ensure orders array exists
-    if (!users[email].orders) {
-      console.log('🔍 [DEBUG] Initializing orders array for user');
-      users[email].orders = [];
-    }
-    
-    console.log('🔍 [DEBUG] Current orders count:', users[email].orders.length);
-    
-    // Add the order
-    users[email].orders.unshift(orderData);
-    console.log('🔍 [DEBUG] Order added, new count:', users[email].orders.length);
-    console.log('🔍 [DEBUG] Order data:', orderData);
-    
-    localStorage.setItem('sweet-japan-users', JSON.stringify(users));
-    console.log('✅ [DEBUG] Order saved to localStorage successfully!');
-    
-    // Verify save
-    const verifyData = localStorage.getItem('sweet-japan-users');
-    const verifyUsers = JSON.parse(verifyData!);
-    console.log('✅ [DEBUG] Verification - orders count:', verifyUsers[email]?.orders?.length);
-  };
-
+  // Redirect if no order data is received
   useEffect(() => {
-    console.log('🔍 OrderConfirmation mounted');
-    console.log('📦 location.state:', location.state);
-    console.log('📦 orderData:', orderData);
-    
-    if (!orderData) {
-      console.error('⚠️ No order data found in location.state');
-      console.log('🔙 Redirecting to home...');
+    if (!order) {
       navigate('/', { replace: true });
-      return;
     }
+  }, [order, navigate]);
 
-    // Validate orderData structure
-    if (!orderData.formData || !orderData.items || !orderData.totalPrice) {
-      console.error('⚠️ Invalid order data structure:', {
-        hasFormData: !!orderData.formData,
-        hasItems: !!orderData.items,
-        hasTotalPrice: !!orderData.totalPrice
+  // PIX Countdown Timer
+  useEffect(() => {
+    if (order?.paymentMethod !== 'pix' || pixStatus === 'success') return;
+
+    const interval = setInterval(() => {
+      setPixTimeLeft(prev => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          return 0;
+        }
+        return prev - 1;
       });
-      navigate('/', { replace: true });
-      return;
-    }
+    }, 1000);
 
-    console.log('✅ Valid order data received:', {
-      customerName: orderData.formData.name,
-      itemsCount: orderData.items.length,
-      total: orderData.totalPrice,
-      paymentMethod: orderData.paymentMethod
-    });
+    return () => clearInterval(interval);
+  }, [order, pixStatus]);
 
-    // Prevent processing order multiple times
-    if (processedRef.current) {
-      console.log('✅ Order already processed, skipping');
-      return;
-    }
-    processedRef.current = true;
+  // Simulate PIX Automatic Payment Detection (after 8 seconds)
+  useEffect(() => {
+    if (order?.paymentMethod !== 'pix' || pixStatus !== 'pending') return;
 
-    // Clear cart
-    clearCart();
-
-    // Save order to user's history
-    const couponDiscount = orderData.couponDiscount || 0;
-    const finalTotal = orderData.totalPrice - couponDiscount;
-    const generatedOrderNumber = `DL-${Date.now().toString().slice(-8)}`;
-    
-    console.log('🔍 [DEBUG] ===== ORDER SAVE START =====');
-    console.log('🔍 [DEBUG] Order number:', generatedOrderNumber);
-    console.log('🔍 [DEBUG] Is authenticated:', isAuthenticated);
-    console.log('🔍 [DEBUG] Current user:', user);
-    console.log('🔍 [DEBUG] Form email:', orderData.formData.email);
-    
-    // Get customer email from form data or from logged in user
-    const customerEmail = orderData.formData.email || user?.email;
-    console.log('🔍 [DEBUG] Customer email to use:', customerEmail);
-    
-    if (customerEmail) {
-      // Create order object
-      const newOrder = {
-        id: `order-${Date.now()}`,
-        orderNumber: generatedOrderNumber,
-        orderDate: new Date().toISOString(),
-        date: new Date().toISOString(),
-        items: orderData.items.map((item: CartItem) => ({
-          productName: item.product.name,
-          size: item.size,
-          quantity: item.quantity,
-          price: item.product.prices[item.size],
-        })),
-        totalAmount: finalTotal,
-        totalPrice: finalTotal,
-        paymentMethod: orderData.paymentMethod,
-        status: 'pending' as const,
-        shippingAddress: {
-          name: orderData.formData.name,
-          postalCode: orderData.formData.postalCode,
-          prefecture: orderData.formData.prefecture,
-          city: orderData.formData.city,
-          address: orderData.formData.address,
-          building: orderData.formData.building,
-        },
-        shipping: orderData.shipping,
-        couponDiscount: couponDiscount > 0 ? couponDiscount : undefined,
-        couponCode: (orderData.appliedCoupon || orderData.coupon)?.code || undefined,
-        appliedCoupon: orderData.appliedCoupon || orderData.coupon || undefined,
-        subtotal: orderData.totalPrice,
-      };
-      
-      // Mark coupon as used by this user
-      if ((orderData.appliedCoupon || orderData.coupon) && customerEmail) {
-        const coupon = orderData.appliedCoupon || orderData.coupon;
-        console.log('🎟️ [COUPON] Marking coupon as used:', coupon.code, 'by', customerEmail);
-        couponService.useCoupon(coupon.code, customerEmail);
-      }
-      
-      // Save to storage (works for logged in or guest users)
-      saveOrderToStorage(customerEmail, newOrder);
-      
-      console.log('🔍 [DEBUG] ===== ORDER SAVE COMPLETE =====');
-      
-      // Also add to context if authenticated
-      if (isAuthenticated) {
-        console.log('🔍 [DEBUG] User is authenticated, also saving to context');
-        addOrder({
-          items: newOrder.items,
-          totalAmount: finalTotal,
-          paymentMethod: orderData.paymentMethod,
-          status: 'pending',
-          shippingAddress: newOrder.shippingAddress,
-          shipping: orderData.shipping,
-          orderNumber: generatedOrderNumber,
+    const timer = setTimeout(() => {
+      setPixStatus('loading');
+      setTimeout(() => {
+        setPixStatus('success');
+        
+        // Update order status in safeStorage to 'Pago'
+        const existingOrders = JSON.parse(safeStorage.getItem('sakura_orders') || '[]');
+        const updatedOrders = existingOrders.map((o: any) => {
+          if (o.id === order.id) {
+            return { ...o, status: 'Pago' };
+          }
+          return o;
         });
-      } else {
-        // Guest user - sync directly to Firestore so ERP can see the order
-        console.log('⚠️ [DEBUG] User NOT authenticated, syncing directly to Firestore');
-        firebaseSyncService.syncOrderToFirestore('guest', {
-          ...newOrder,
-          orderDate: newOrder.date,
-          totalPrice: finalTotal,
-          customerEmail: customerEmail,
-          customerName: orderData.formData.name,
-          customerPhone: orderData.formData.phone,
-        }).then(() => {
-          console.log('✅ [DEBUG] Guest order synced to Firestore:', generatedOrderNumber);
-        }).catch((err: any) => {
-          console.error('❌ [DEBUG] Failed to sync guest order:', err);
-        });
-      }
-    } else {
-      console.error('❌ [DEBUG] No customer email available to save order');
-      console.error('❌ [DEBUG] orderData.formData:', orderData.formData);
-      console.error('❌ [DEBUG] user:', user);
-    }
+        safeStorage.setItem('sakura_orders', JSON.stringify(updatedOrders));
 
-    // Show success notification
+        toast({
+          title: "Pagamento Aprovado! 🎉",
+          description: "Seu PIX foi identificado e o pedido foi enviado para o centro logístico de Tóquio.",
+        });
+      }, 2000);
+    }, 8000);
+
+    return () => clearTimeout(timer);
+  }, [order, pixStatus, toast]);
+
+  if (!order) return null;
+
+  // Format PIX Payload Code
+  const pixPayload = `00020101021226870014br.gov.bcb.pix25800263600020000000000000000000000000000000000000000000000000000000000000000000000053039865405${order.total.toFixed(2)}5802BR5914SakuraExpress6009Sao Paulo62070503***6304`;
+
+  const copyToClipboard = () => {
+    navigator.clipboard.writeText(pixPayload);
+    setCopied(true);
     toast({
-      title: "🎉 Pedido Confirmado!",
-      description: "Seu pedido foi realizado com sucesso. Você receberá uma confirmação por email.",
+      title: "Chave PIX Copiada!",
+      description: "Código copiado para a área de transferência.",
     });
-
-    // Mark as loaded
-    setIsLoading(false);
-
-    // Send notifications and create shipping label
-    sendNotifications(orderData, generatedOrderNumber);
-  }, [orderData, clearCart, navigate, toast, addOrder, isAuthenticated]);
-
-  const sendNotifications = async (data: OrderData, existingOrderNumber: string) => {
-    const generatedOrderNumber = existingOrderNumber;
-    setOrderNumber(generatedOrderNumber);
-    const shipping = data.shipping || { carrier: 'N/A', cost: 0, estimatedDays: 'N/A' };
-    const couponDiscount = data.couponDiscount || 0;
-    const finalTotal = data.totalPrice - couponDiscount;
-    let generatedTrackingNumber = '';
-    
-    // 1. Create Shipping Label via Carrier API (FIRST - to get tracking number)
-    try {
-      const labelData = {
-        orderNumber: generatedOrderNumber,
-        sender: {
-          name: 'Paula Shiokawa',
-          postalCode: '518-0225',
-          address: 'Mie-ken Iga-shi Kirigaoka 5-292',
-          phone: '070-1367-1679'
-        },
-        recipient: {
-          name: data.formData.name,
-          postalCode: data.formData.postalCode,
-          prefecture: data.formData.prefecture,
-          city: data.formData.city,
-          address: data.formData.address,
-          building: data.formData.building,
-          phone: data.formData.phone
-        },
-        items: data.items.map((item: CartItem) => ({
-          name: item.product.name,
-          quantity: item.quantity,
-          weight: item.size === '800g' ? 800 : 280
-        })),
-        deliveryTime: data.deliveryTime
-      };
-      
-      const tracking = await carrierService.createLabel(shipping.carrier, labelData);
-      generatedTrackingNumber = tracking.trackingNumber;
-      setTrackingNumber(generatedTrackingNumber);
-      
-      console.log('📦 Shipping label created');
-      console.log('🔢 Tracking number:', generatedTrackingNumber);
-    } catch (error) {
-      console.error('Error creating shipping label:', error);
-    }
-    
-    // 2. Send Emails using EmailJS
-    try {
-      console.log('📧 Sending emails via EmailJS...');
-      
-      // Send to customer
-      const emailResultCustomer = await emailServiceSimple.sendOrderConfirmation({
-        formData: data.formData,
-        items: data.items,
-        totalPrice: data.totalPrice,
-        orderNumber: generatedOrderNumber,
-        paymentMethod: data.paymentMethod,
-        shipping: data.shipping
-      });
-      
-      console.log('📧 Email sent to customer:', data.formData.email, emailResultCustomer ? '✅' : '❌');
-      
-      // Send to store owner (you) - using different template
-      const emailResultStore = await emailServiceSimple.sendStoreNotification({
-        formData: data.formData,
-        items: data.items,
-        totalPrice: data.totalPrice,
-        orderNumber: generatedOrderNumber,
-        paymentMethod: data.paymentMethod,
-        shipping: data.shipping
-      });
-      
-      console.log('📧 Store notification sent:', emailResultStore ? '✅' : '❌');
-      setEmailSent(emailResultCustomer || emailResultStore);
-      
-    } catch (error) {
-      console.error('❌ Error sending emails:', error);
-    }
-    
-    // 3. WhatsApp Messages via local WhatsApp service (automatic)
-    try {
-      console.log('📱 Sending WhatsApp via local service (port 3001)...');
-      
-      const customerPhone = data.formData.phone;
-      const itemsList = data.items.map((item: CartItem) => ({
-        productName: item.product.name,
-        size: item.size,
-        quantity: item.quantity,
-        price: item.product.prices[item.size],
-      }));
-      
-      // Send confirmation to customer
-      const customerResult = await fetch('http://localhost:3001/api/send-order-notification', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          phone: customerPhone,
-          orderNumber: generatedOrderNumber,
-          customerName: data.formData.name,
-          items: itemsList,
-          total: finalTotal + (shipping.cost || 0),
-          paymentMethod: data.paymentMethod,
-          type: 'new_order',
-          shipping: {
-            cost: shipping.cost || 0,
-            carrier: shipping.carrier || 'A definir',
-          },
-        }),
-      });
-      
-      if (customerResult.ok) {
-        console.log('✅ WhatsApp enviado ao cliente!');
-      } else {
-        const err = await customerResult.json();
-        console.log('⚠️ WhatsApp cliente falhou:', err.error);
-      }
-      
-      // Send notification to store owner (Paula)
-      const storeResult = await fetch('http://localhost:3001/api/send-order-notification', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          phone: '07013671679',
-          orderNumber: generatedOrderNumber,
-          customerName: data.formData.name,
-          customerPhone: customerPhone,
-          customerEmail: data.formData.email,
-          items: itemsList,
-          total: finalTotal + (shipping.cost || 0),
-          paymentMethod: data.paymentMethod,
-          type: 'new_order_store',
-          shippingAddress: {
-            postalCode: data.formData.postalCode,
-            prefecture: data.formData.prefecture,
-            city: data.formData.city,
-            address: data.formData.address,
-            building: data.formData.building,
-          },
-        }),
-      });
-      
-      if (storeResult.ok) {
-        console.log('✅ WhatsApp enviado para a loja!');
-      } else {
-        console.log('⚠️ WhatsApp loja falhou');
-      }
-      
-    } catch (error) {
-      // WhatsApp service not running - that's OK, emails were sent
-      console.log('⚠️ Serviço WhatsApp não disponível (mensagens não enviadas):', error instanceof Error ? error.message : String(error));
-    }
+    setTimeout(() => setCopied(false), 3000);
   };
 
-  if (!orderData || isLoading) {
-    return (
-      <Layout>
-        <div className="min-h-screen flex items-center justify-center">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-            <p className="text-muted-foreground">Processando pedido...</p>
-          </div>
-        </div>
-      </Layout>
-    );
-  }
+  const handleCardPay = (e: React.FormEvent) => {
+    e.preventDefault();
+    setCardStatus('processing');
+    
+    setTimeout(() => {
+      setCardStatus('success');
+      
+      // Update order status in safeStorage to 'Pago'
+      const existingOrders = JSON.parse(safeStorage.getItem('sakura_orders') || '[]');
+      const updatedOrders = existingOrders.map((o: any) => {
+        if (o.id === order.id) {
+          return { ...o, status: 'Pago' };
+        }
+        return o;
+      });
+      safeStorage.setItem('sakura_orders', JSON.stringify(updatedOrders));
 
-  const { formData, paymentMethod, items, totalPrice, shipping } = orderData;
-  const couponDiscount = orderData.couponDiscount || 0;
-  const appliedCoupon = orderData.appliedCoupon;
-  const finalTotal = totalPrice - couponDiscount;
+      toast({
+        title: "Transação Aprovada! 💳",
+        description: "Seu pagamento foi confirmado pela operadora e enviado para Tóquio.",
+      });
+    }, 2500);
+  };
+
   const handlePrint = () => {
     window.print();
+  };
+
+  // Timer Formatting
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
   return (
@@ -402,252 +131,558 @@ const OrderConfirmation: React.FC = () => {
         <div className="container mx-auto px-4">
           <div className="max-w-3xl mx-auto">
             
-            {/* Success Message */}
+            {/* Header Success Message */}
             <div className="text-center mb-8 print:hidden">
-              <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4 animate-bounce">
                 <CheckCircle className="w-12 h-12 text-green-600" />
               </div>
-              <h1 className="font-display text-4xl font-bold text-foreground mb-2">
-                Pedido Confirmado!
+              <h1 className="font-display text-4xl font-extrabold text-gray-900 mb-2">
+                {order.currency === 'JPY' ? 'Pedido Confirmado! 🎉' : 'Pedido Gerado!'}
               </h1>
               <p className="text-lg text-muted-foreground mb-2">
-                Número do pedido: <span className="font-mono font-semibold text-foreground">{orderNumber}</span>
+                ID do pedido: <span className="font-mono font-semibold text-gray-900">{order.orderNumber || order.id}</span>
               </p>
-              <p className="text-muted-foreground">
-                Obrigado por sua compra! Seu pedido está sendo processado.
+              <p className="text-muted-foreground text-sm">
+                {order.currency === 'JPY'
+                  ? 'Obrigado por comprar na Sabor do Campo. Realize o pagamento para iniciar o preparo em Mie.'
+                  : 'Obrigado por comprar na SakuraExpress. Pague para iniciar o envio de Tóquio.'
+                }
               </p>
             </div>
 
-            {/* Notification Status */}
-            <div className="bg-card rounded-2xl border border-border p-6 mb-6 print:hidden">
-              <h2 className="font-display text-xl font-semibold text-foreground mb-4">
-                Notificação Enviada
-              </h2>
-              <div className="flex items-center gap-3 text-sm">
-                <Mail className="w-5 h-5 text-green-600" />
-                <div className="flex-1">
-                  <p className="font-medium">Email de confirmação</p>
-                  <p className="text-muted-foreground">{formData.email}</p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {emailSent ? '✅ Enviado com sucesso' : '⏳ O email será enviado automaticamente'}
+            {/* PAYMENT SCREENS */}
+
+            {/* PAYPAY SCREEN */}
+            {order.paymentMethod === 'paypay' && (
+              <div className="bg-white rounded-3xl border-2 border-orange-500 p-6 mb-8 shadow-md print:hidden text-center space-y-4 animate-fade-in">
+                <div className="flex items-center justify-center gap-2 text-orange-600 font-extrabold text-lg">
+                  <Smartphone className="w-6 h-6 animate-pulse" />
+                  <span>ÁREA DE PAGAMENTO PAYPAY</span>
+                </div>
+
+                <div className="bg-red-50 text-red-700 text-xs font-semibold px-4 py-3 rounded-xl inline-flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>Abra o app PayPay, escaneie o QR Code e realize o pagamento no valor exato.</span>
+                </div>
+
+                <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 inline-block shadow-sm">
+                  <img 
+                    src="/products/paypay-qr.png" 
+                    alt="PayPay QR Code - Sabor do Campo" 
+                    className="w-60 h-auto rounded-xl border border-gray-200 mx-auto shadow-md"
+                    onError={(e) => {
+                      e.currentTarget.src = "https://placehold.co/240x240/red/white?text=PayPay+QR";
+                    }}
+                  />
+                  <p className="text-[10px] text-gray-400 mt-2 font-mono">
+                    Escaneie com o app do PayPay
                   </p>
                 </div>
-              </div>
-            </div>
 
-            {/* Order Summary for Print */}
+                <div className="bg-gray-100 p-4 rounded-xl max-w-sm mx-auto text-xs space-y-2 font-mono text-left">
+                  <p><strong className="text-gray-800">Enviar para:</strong> Sabor do Campo</p>
+                  <p><strong className="text-gray-800">Telefone:</strong> 070-1367-1679</p>
+                  <p><strong className="text-gray-800">Valor do Pedido:</strong> {formatPrice(order.total, 'JPY')}</p>
+                </div>
+
+                <div className="pt-2 text-xs text-muted-foreground leading-relaxed max-w-md mx-auto">
+                  Após concluir a transferência, por favor envie o comprovante (print de tela) para o WhatsApp: <strong className="text-gray-800">070-1367-1679</strong>. Seu pedido será liberado no mesmo dia!
+                </div>
+              </div>
+            )}
+
+            {/* YUCHO SCREEN */}
+            {order.paymentMethod === 'yucho' && (
+              <div className="bg-white rounded-3xl border-2 border-orange-500 p-6 mb-8 shadow-md print:hidden space-y-4 animate-fade-in">
+                <div className="flex items-center justify-center gap-2 text-orange-600 font-extrabold text-lg">
+                  <Landmark className="w-6 h-6" />
+                  <span>DEPÓSITO BANCÁRIO (Yucho Bank / ゆうちょ銀行)</span>
+                </div>
+
+                <div className="bg-yellow-50 text-yellow-700 text-xs font-semibold px-4 py-3 rounded-xl inline-flex items-center gap-2 border border-yellow-200">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>Por favor, realize a transferência e nos envie o comprovante pelo WhatsApp (070-1367-1679).</span>
+                </div>
+
+                <div className="bg-gray-50 border border-gray-200 rounded-2xl p-6 max-w-md mx-auto space-y-3 font-mono text-xs md:text-sm text-left">
+                  <div className="flex justify-between border-b pb-2">
+                    <span className="text-gray-500">Banco:</span>
+                    <span className="font-bold text-gray-800">ゆうちょ銀行 (Japan Post Bank)</span>
+                  </div>
+                  <div className="flex justify-between border-b pb-2">
+                    <span className="text-gray-500">記号 (Kigou):</span>
+                    <span className="font-bold text-gray-800">12260</span>
+                  </div>
+                  <div className="flex justify-between border-b pb-2">
+                    <span className="text-gray-500">番号 (Bangou):</span>
+                    <span className="font-bold text-gray-800">33664351</span>
+                  </div>
+                  <div className="flex justify-between border-b pb-2">
+                    <span className="text-gray-500">Nome:</span>
+                    <span className="font-bold text-gray-800">ロドリゲス シオカワ ミリアン パウラ</span>
+                  </div>
+                  
+                  <div className="pt-3 border-t border-dashed text-[10px] text-gray-500 space-y-1">
+                    <p className="font-bold">Para transferência de outros bancos (振込用):</p>
+                    <p>金融機関コード (Cód. Banco): <strong className="text-gray-700">9900</strong></p>
+                    <p>店名 (Agência): <strong className="text-gray-700">二二八店 (228)</strong></p>
+                    <p>口座番号 (Nº Conta): <strong className="text-gray-700">3366435</strong> (普通)</p>
+                  </div>
+                </div>
+
+                <div className="pt-2 text-xs text-muted-foreground leading-relaxed max-w-md mx-auto text-center">
+                  Após o depósito, envie uma foto do comprovante para o WhatsApp: <strong className="text-gray-800">070-1367-1679</strong>.
+                </div>
+              </div>
+            )}
+
+            {/* PIX SCREEN */}
+            {order.paymentMethod === 'pix' && (
+              <div className="bg-white rounded-3xl border-2 border-orange-500 p-6 mb-8 shadow-md print:hidden text-center space-y-4">
+                <div className="flex items-center justify-center gap-2 text-orange-600 font-extrabold text-lg">
+                  <Smartphone className="w-6 h-6 animate-pulse" />
+                  <span>ÁREA DE PAGAMENTO PIX</span>
+                </div>
+
+                {pixStatus === 'pending' && (
+                  <div className="space-y-4">
+                    <div className="bg-red-50 text-red-700 text-xs font-semibold px-4 py-3 rounded-xl inline-flex items-center gap-2">
+                      <AlertCircle className="w-4 h-4 shrink-0" />
+                      <span>Seu pedido será cancelado se o PIX não for pago em {formatTime(pixTimeLeft)}</span>
+                    </div>
+
+                    <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 inline-block shadow-sm">
+                      <QRCodeSVG value={pixPayload} size={200} includeMargin={true} />
+                    </div>
+
+                    <div className="max-w-md mx-auto space-y-2">
+                      <p className="text-xs text-gray-500 font-bold uppercase">Chave Copia e Cola:</p>
+                      <div className="flex border border-gray-300 rounded-xl overflow-hidden shadow-sm bg-gray-50">
+                        <input
+                          type="text"
+                          readOnly
+                          value={pixPayload}
+                          className="flex-1 px-3 py-2 text-xs font-mono text-gray-500 bg-transparent select-all outline-none"
+                        />
+                        <button
+                          onClick={copyToClipboard}
+                          className="bg-orange-500 hover:bg-orange-600 text-white px-4 flex items-center justify-center gap-1.5 transition-all text-xs font-bold"
+                        >
+                          <Copy className="w-4 h-4" />
+                          {copied ? 'Copiado!' : 'Copiar'}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="pt-2 flex flex-col items-center justify-center">
+                      <div className="animate-spin rounded-full h-5 h-5 border-2 border-orange-500 border-t-transparent mb-2"></div>
+                      <p className="text-xs text-orange-600 font-bold animate-pulse">
+                        Aguardando pagamento... (Simulador ativo)
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {pixStatus === 'loading' && (
+                  <div className="py-8 space-y-3">
+                    <div className="animate-spin rounded-full h-12 w-12 border-4 border-orange-500 border-t-transparent mx-auto"></div>
+                    <p className="text-sm font-bold text-orange-600">Verificando recebimento do PIX...</p>
+                  </div>
+                )}
+
+                {pixStatus === 'success' && (
+                  <div className="bg-green-50 border border-green-200 rounded-2xl p-6 text-center space-y-3 animate-fade-in">
+                    <div className="w-12 h-12 rounded-full bg-green-500 flex items-center justify-center text-white mx-auto">
+                      ✓
+                    </div>
+                    <h3 className="font-sans font-bold text-lg text-green-800">Pagamento PIX Confirmado!</h3>
+                    <p className="text-xs text-green-700 max-w-sm mx-auto leading-relaxed">
+                      Seu pagamento foi aprovado instantaneamente. Seu pacote já está em processo de separação e rotulagem no porto de Tóquio. Rastreio: <strong>{order.trackingCode}</strong>.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* CREDIT CARD SCREEN */}
+            {order.paymentMethod === 'card' && (
+              <div className="bg-white rounded-3xl border-2 border-orange-500 p-6 mb-8 shadow-md print:hidden space-y-4">
+                <div className="flex items-center gap-2 text-orange-600 font-extrabold text-lg justify-center">
+                  <CreditCard className="w-6 h-6" />
+                  <span>PAGAMENTO VIA CARTÃO DE CRÉDITO</span>
+                </div>
+
+                {cardStatus === 'idle' && (
+                  <form onSubmit={handleCardPay} className="space-y-4 max-w-md mx-auto pt-2">
+                    <div className="space-y-1">
+                      <Label htmlFor="cardNumber" className="text-xs font-bold text-gray-500">Número do Cartão *</Label>
+                      <Input
+                        id="cardNumber"
+                        type="text"
+                        placeholder="4512 3456 7890 1234"
+                        required
+                        value={cardData.number}
+                        onChange={(e) => {
+                          const val = e.target.value.replace(/\D/g, '').slice(0, 16);
+                          const formatted = val.replace(/(.{4})/g, '$1 ').trim();
+                          setCardData(prev => ({ ...prev, number: formatted }));
+                        }}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="cardName" className="text-xs font-bold text-gray-500">Nome do Titular *</Label>
+                      <Input
+                        id="cardName"
+                        type="text"
+                        placeholder="Nome como impresso no cartão"
+                        required
+                        value={cardData.name}
+                        onChange={(e) => setCardData(prev => ({ ...prev, name: e.target.value.toUpperCase() }))}
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <Label htmlFor="cardExpiry" className="text-xs font-bold text-gray-500">Validade *</Label>
+                        <Input
+                          id="cardExpiry"
+                          type="text"
+                          placeholder="MM/AA"
+                          required
+                          value={cardData.expiry}
+                          onChange={(e) => {
+                            const val = e.target.value.replace(/\D/g, '').slice(0, 4);
+                            const formatted = val.length > 2 ? `${val.slice(0, 2)}/${val.slice(2, 4)}` : val;
+                            setCardData(prev => ({ ...prev, expiry: formatted }));
+                          }}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label htmlFor="cardCvv" className="text-xs font-bold text-gray-500">CVV *</Label>
+                        <Input
+                          id="cardCvv"
+                          type="password"
+                          placeholder="123"
+                          maxLength={3}
+                          required
+                          value={cardData.cvv}
+                          onChange={(e) => setCardData(prev => ({ ...prev, cvv: e.target.value.replace(/\D/g, '') }))}
+                        />
+                      </div>
+                    </div>
+                    
+                    <button
+                      type="submit"
+                      className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 px-6 rounded-xl transition-all shadow-md active:scale-95"
+                    >
+                      Pagar R$ {order.total.toFixed(2)}
+                    </button>
+                  </form>
+                )}
+
+                {cardStatus === 'processing' && (
+                  <div className="py-8 text-center space-y-3">
+                    <div className="animate-spin rounded-full h-12 w-12 border-4 border-orange-500 border-t-transparent mx-auto"></div>
+                    <p className="text-sm font-bold text-orange-600">Aprovando transação com a operadora do cartão...</p>
+                  </div>
+                )}
+
+                {cardStatus === 'success' && (
+                  <div className="bg-green-50 border border-green-200 rounded-2xl p-6 text-center space-y-3 animate-fade-in">
+                    <div className="w-12 h-12 rounded-full bg-green-500 flex items-center justify-center text-white mx-auto">
+                      ✓
+                    </div>
+                    <h3 className="font-sans font-bold text-lg text-green-800">Transação de Cartão Aprovada!</h3>
+                    <p className="text-xs text-green-700 max-w-sm mx-auto leading-relaxed">
+                      Seu pagamento foi confirmado com sucesso. O pedido foi enviado para separação no porto logístico de Tóquio. Rastreamento dos Correios: <strong>{order.trackingCode}</strong>.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* BOLETO SCREEN */}
+            {order.paymentMethod === 'boleto' && (
+              <div className="bg-white rounded-3xl border-2 border-orange-500 p-6 mb-8 shadow-md print:hidden text-center space-y-4">
+                <div className="flex items-center justify-center gap-2 text-orange-600 font-extrabold text-lg">
+                  <FileText className="w-6 h-6" />
+                  <span>EMISSÃO DE BOLETO BANCÁRIO</span>
+                </div>
+
+                <div className="bg-yellow-50 text-yellow-700 text-xs font-semibold px-4 py-3 rounded-xl inline-flex items-center gap-2 border border-yellow-200">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>Boleto vence em 3 dias úteis. Compensação em até 48 horas após o pagamento.</span>
+                </div>
+
+                <div className="bg-gray-100 p-6 rounded-2xl max-w-md mx-auto border border-gray-300 font-mono text-xs flex flex-col items-center gap-3">
+                  {/* Mock Barcode display */}
+                  <div className="w-full h-12 bg-black flex items-center justify-center text-white text-[8px] tracking-[3px] select-none font-sans">
+                    ||||| | ||||| | || ||||| | ||||| | || ||||| | ||||| | || ||||| | ||||| 
+                  </div>
+                  <p className="font-bold text-gray-800 text-[10px]">
+                    34191.79001 01043.513184 91020.150008 7 926500000{(order.total * 100).toFixed(0).padStart(6, '0')}
+                  </p>
+                </div>
+
+                <div className="flex justify-center gap-4">
+                  <Button 
+                    onClick={() => {
+                      navigator.clipboard.writeText(`34191.79001 01043.513184 91020.150008 7 926500000${(order.total * 100).toFixed(0).padStart(6, '0')}`);
+                      toast({ title: "Código copiado!", description: "Linha digitável copiada." });
+                    }}
+                    variant="outline"
+                    className="border-2"
+                  >
+                    Copiar Código de Barras
+                  </Button>
+                  <Button 
+                    onClick={handlePrint}
+                    variant="secondary"
+                  >
+                    Imprimir Boleto
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* ORDER CONFIRMATION INVOICE / RECIBO */}
             <div className="bg-card rounded-2xl border border-border p-8 mb-6">
               <div className="text-center mb-6 print:block hidden">
-                <h1 className="font-display text-3xl font-bold mb-2">Doce de Leite</h1>
-                <p className="text-muted-foreground">Recibo de Pedido</p>
-                <p className="font-mono text-sm">Pedido: {orderNumber}</p>
-                <p className="text-sm text-muted-foreground">{new Date().toLocaleDateString('pt-BR')}</p>
+                <h1 className="font-display text-3xl font-bold mb-2">
+                  {order.currency === 'JPY' ? 'Sabor do Campo' : 'SakuraExpress'}
+                </h1>
+                <p className="text-muted-foreground">
+                  {order.currency === 'JPY' ? 'Recibo de Pedido Doméstico' : 'Recibo de Pedido Internacional'}
+                </p>
+                <p className="font-mono text-sm">Pedido: {order.orderNumber || order.id}</p>
+                <p className="text-sm text-muted-foreground">{order.date}</p>
               </div>
 
               <div className="space-y-6">
-                {/* Customer Info */}
-                <div>
-                  <h3 className="font-semibold text-lg mb-3">Dados do Cliente</h3>
-                  <div className="grid grid-cols-2 gap-3 text-sm">
-                    <div>
-                      <p className="text-muted-foreground">Nome:</p>
-                      <p className="font-medium">{formData.name}</p>
-                    </div>
-                    <div>
-                      <p className="text-muted-foreground">Telefone:</p>
-                      <p className="font-medium">{formData.phone}</p>
-                    </div>
-                    <div className="col-span-2">
-                      <p className="text-muted-foreground">Email:</p>
-                      <p className="font-medium">{formData.email}</p>
-                    </div>
+                
+                {/* Print Title Header */}
+                <div className="flex items-center justify-between border-b pb-4">
+                  <h3 className="font-sans font-bold text-lg text-foreground">
+                    {order.currency === 'JPY' ? 'Comprovante de Compra Local' : 'Comprovante de Importação'}
+                  </h3>
+                  <Button onClick={handlePrint} variant="ghost" size="sm" className="print:hidden font-semibold">
+                    <Printer className="w-4 h-4 mr-2" />
+                    Imprimir Comprovante
+                  </Button>
+                </div>
+
+                {/* Tracking Details */}
+                <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 flex flex-col md:flex-row justify-between gap-3 text-xs md:text-sm">
+                  <div>
+                    <span className="text-muted-foreground block">
+                      {order.currency === 'JPY' ? 'Código de Rastreamento (Transportadora):' : 'Código de Rastreamento Aéreo (Correios):'}
+                    </span>
+                    <span className="font-mono font-bold text-gray-800 text-base">{order.trackingCode}</span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-muted-foreground block">Status Logístico:</span>
+                    <span className="bg-orange-600 text-white font-extrabold px-2 py-0.5 rounded text-xs uppercase inline-block mt-1">
+                      {order.status === 'Pago' || pixStatus === 'success' || cardStatus === 'success'
+                        ? (order.currency === 'JPY' ? 'Preparando Envio Doméstico' : 'Aguardando Despacho Aéreo')
+                        : 'Aguardando Pagamento'
+                      }
+                    </span>
                   </div>
                 </div>
 
-                {/* Shipping Address */}
-                <div>
-                  <h3 className="font-semibold text-lg mb-3">Endereço de Entrega</h3>
-                  <div className="text-sm">
-                    <p>〒{formData.postalCode}</p>
-                    <p>{formData.prefecture} {formData.city}</p>
-                    <p>{formData.address}</p>
-                    {formData.building && <p>{formData.building}</p>}
+                {/* Customer Details */}
+                <div className="grid md:grid-cols-2 gap-4 text-xs md:text-sm border-b pb-4">
+                  <div>
+                    <h4 className="font-semibold text-gray-500 uppercase tracking-wider mb-1">Destinatário</h4>
+                    <p className="font-bold text-gray-800">{order.name}</p>
+                    {order.currency !== 'JPY' && order.cpf && (
+                      <p className="text-muted-foreground font-mono mt-0.5">CPF: {order.cpf}</p>
+                    )}
+                    <p className="text-muted-foreground">Tel: {order.phone}</p>
+                    <p className="text-muted-foreground">{order.email}</p>
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-gray-500 uppercase tracking-wider mb-1">Endereço de Entrega</h4>
+                    <p className="text-gray-800">〒 {order.postalCode}</p>
+                    <p className="text-gray-800">
+                      {order.prefecture}, {order.city}
+                    </p>
+                    <p className="text-gray-800">{order.address}</p>
+                    {order.building && <p className="text-gray-500 text-xs">Complemento: {order.building}</p>}
                   </div>
                 </div>
 
-                {/* Items */}
+                {/* Items list */}
                 <div>
-                  <h3 className="font-semibold text-lg mb-3">Produtos</h3>
-                  <div className="space-y-2">
-                    {items.map((item: CartItem) => (
-                      <div key={`${item.product.id}-${item.size}`} className="flex justify-between text-sm border-b pb-2">
-                        <div className="flex-1">
-                          <p className="font-medium">{item.product.name}</p>
-                          <p className="text-muted-foreground">{item.size} × {item.quantity}</p>
+                  <h4 className="font-semibold text-xs text-gray-500 uppercase tracking-wider mb-2">
+                    {order.currency === 'JPY' ? 'Doce de Leite Artesanal' : 'Produtos Importados'}
+                  </h4>
+                  <div className="space-y-3">
+                    {order.items.map((item: any, idx: number) => (
+                      <div key={idx} className="flex justify-between items-center text-xs md:text-sm border-b border-gray-100 pb-2 last:border-0">
+                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                          {item.image && (
+                            <img src={item.image} alt={item.name} className="w-8 h-8 rounded object-cover border border-gray-100" />
+                          )}
+                          <div className="truncate">
+                            <p className="font-bold text-gray-800 truncate">{item.name}</p>
+                            <p className="text-muted-foreground text-[10px]">{item.size} × {item.quantity}</p>
+                          </div>
                         </div>
-                        <p className="font-medium">¥{(item.product.prices[item.size] * item.quantity).toLocaleString()}</p>
+                        <p className="font-bold text-gray-800 shrink-0">
+                          {formatPrice(item.price * item.quantity, order.currency || 'BRL')}
+                        </p>
                       </div>
                     ))}
                   </div>
                 </div>
 
-                {/* Payment Info */}
-                <div>
-                  <h3 className="font-semibold text-lg mb-3">Pagamento e Frete</h3>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Método de Pagamento:</span>
-                      <span className="font-medium">
-                        {paymentMethod === 'bank' ? 'Depósito Bancário' : 'PayPay'}
-                      </span>
+                {/* Invoice Totals */}
+                <div className="border-t pt-4 space-y-2 text-xs md:text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Subtotal dos Produtos</span>
+                    <span className="font-semibold text-gray-800">
+                      {formatPrice(order.subtotal, order.currency || 'BRL')}
+                    </span>
+                  </div>
+                  
+                  {order.couponDiscount > 0 && (
+                    <div className="flex justify-between text-green-600 font-bold">
+                      <span>Desconto do Cupom ({order.couponCode})</span>
+                      <span>-{formatPrice(order.couponDiscount, order.currency || 'BRL')}</span>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Subtotal:</span>
-                      <span className="font-medium">¥{totalPrice.toLocaleString()}</span>
+                  )}
+
+                  {order.currency !== 'JPY' && order.pixDiscount > 0 && (
+                    <div className="flex justify-between text-orange-600 font-bold">
+                      <span>Desconto Adicional de PIX (5%)</span>
+                      <span>-{formatPrice(order.pixDiscount, 'BRL')}</span>
                     </div>
-                    {couponDiscount > 0 && (
-                      <div className="flex justify-between text-green-600">
-                        <span>Desconto {appliedCoupon ? `(${appliedCoupon.code})` : ''}:</span>
-                        <span className="font-medium">-¥{couponDiscount.toLocaleString()}</span>
-                      </div>
-                    )}
-                    {shipping && (
-                      <>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Frete ({shipping.carrier}):</span>
-                          <span className="font-medium">¥{shipping.cost.toLocaleString()}</span>
-                        </div>
-                        <div className="text-xs text-muted-foreground text-right">
-                          Previsão: {shipping.estimatedDays} dias úteis
-                        </div>
-                      </>
-                    )}
-                    {!shipping && (
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Frete:</span>
-                        <span className="font-medium">A calcular</span>
-                      </div>
-                    )}
-                    <div className="flex justify-between pt-2 border-t font-bold text-lg">
-                      <span>Total:</span>
-                      <span className="text-primary">
-                        ¥{shipping ? (finalTotal + shipping.cost).toLocaleString() : `${finalTotal.toLocaleString()}+`}
-                      </span>
-                    </div>
+                  )}
+
+                  {order.currency !== 'JPY' && (
+                    <>
+                      {order.federalTax !== undefined ? (
+                        <>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Imposto de Importação Federal</span>
+                            <span className="font-semibold text-gray-800">{formatPrice(order.federalTax, 'BRL')}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">ICMS Estadual (17%)</span>
+                            <span className="font-semibold text-gray-800">{formatPrice(order.icmsTax, 'BRL')}</span>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          {order.taxAmount > 0 && (
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Impostos Aduaneiros (Total)</span>
+                              <span className="font-semibold text-gray-800">{formatPrice(order.taxAmount, 'BRL')}</span>
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </>
+                  )}
+
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">
+                      {order.currency === 'JPY' ? 'Frete Local' : 'Frete Internacional (Tóquio Hub)'}
+                    </span>
+                    <span className="font-semibold text-gray-800">
+                      {order.shippingCost === 0 ? 'Grátis' : formatPrice(order.shippingCost, order.currency || 'BRL')}
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between pt-3 border-t font-black text-base md:text-lg">
+                    <span>Total Pago / A Pagar</span>
+                    <span className="text-xl text-orange-600">
+                      {formatPrice(order.total, order.currency || 'BRL')}
+                    </span>
                   </div>
                 </div>
 
-                {/* Payment Instructions */}
-                {paymentMethod === 'bank' && (
-                  <div className="bg-secondary/50 p-4 rounded-lg print:break-inside-avoid">
-                    <h4 className="font-semibold mb-2">Instruções de Pagamento</h4>
-                    <p className="text-sm text-muted-foreground mb-2">
-                      Por favor, realize o depósito bancário para:
-                    </p>
-                    <div className="text-sm space-y-1 font-mono">
-                      <p>🏦 ゆうちょ銀行 (Japan Post Bank)</p>
-                      <p>記号 (Kigou): <strong>12260</strong></p>
-                      <p>番号 (Bangou): <strong>33664351</strong></p>
-                      <p className="mt-2 pt-2 border-t border-border">📌 <strong>振込用 (Para transferência de outros bancos):</strong></p>
-                      <p>金融機関コード: <strong>9900</strong></p>
-                      <p>店名: <strong>二二八店 (228)</strong></p>
-                      <p>口座番号: <strong>3366435</strong> (普通)</p>
-                      <p>名義: <strong>ロドリゲス シオカワ ミリアン パウラ</strong></p>
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-2">
-                      * Envie o comprovante após o depósito via WhatsApp: 070-1367-1679
-                    </p>
-                  </div>
-                )}
-
-                {paymentMethod === 'paypay' && (
-                  <div className="bg-secondary/50 p-4 rounded-lg print:break-inside-avoid">
-                    <h4 className="font-semibold mb-2 flex items-center gap-2">
-                      <span className="text-red-500 text-xl">●</span>
-                      Pagamento via PayPay
-                    </h4>
-                    <div className="flex flex-col items-center gap-3 my-4">
-                      <img 
-                        src="/products/paypay-qr.png" 
-                        alt="PayPay QR Code - Sabor do Campo" 
-                        className="w-64 h-auto rounded-lg border-2 border-red-400 shadow-md"
-                      />
-                      <p className="text-sm text-muted-foreground text-center">
-                        PayPayアプリでQRコードをスキャンしてください
-                      </p>
-                    </div>
-                    <div className="bg-background/70 p-3 rounded-lg space-y-2">
-                      <p className="text-sm font-medium">📱 送金先 / Enviar para:</p>
-                      <p className="text-lg font-bold text-center">Sabor do Campo</p>
-                      <p className="text-xs text-center text-muted-foreground">電話番号: 070-1367-1679</p>
-                    </div>
-                    <div className="mt-3 space-y-1">
-                      <p className="text-sm font-medium">📝 支払い方法 / Como pagar:</p>
-                      <ol className="text-xs text-muted-foreground space-y-1 list-decimal list-inside">
-                        <li>スマホで<strong>PayPay</strong>アプリを開く</li>
-                        <li>「スキャン」でQRコードを読み取る</li>
-                        <li>金額を入力: <strong>¥{shipping ? (finalTotal + shipping.cost).toLocaleString() : finalTotal.toLocaleString()}</strong></li>
-                        <li>送金を確認する</li>
-                        <li>スクリーンショットをWhatsAppで送信: 070-1367-1679</li>
-                      </ol>
-                    </div>
-                  </div>
-                )}
-
-                {/* Payment Info - Only visible when printed */}
-                {paymentMethod === 'bank' && (
-                  <div className="print:block hidden print:break-inside-avoid">
-                    <h4 className="font-semibold mb-2">Dados Bancários</h4>
-                    <div className="text-sm space-y-1 font-mono">
-                      <p>ゆうちょ銀行 (Japan Post Bank)</p>
-                      <p>記号: 12260 / 番号: 33664351</p>
-                      <p>振込用: 店番228 / 口座3366435 (普通)</p>
-                      <p>ロドリゲス シオカワ ミリアン パウラ</p>
-                      <p>WhatsApp: 070-1367-1679</p>
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
 
-            {/* Action Buttons */}
-            <div className="flex flex-col sm:flex-row gap-4 print:hidden">
+            {/* Back Button */}
+            <div className="flex gap-4 print:hidden justify-center">
               <Button 
                 onClick={() => navigate('/')}
-                className="flex-1 btn-primary rounded-xl py-6 text-lg font-semibold gap-2"
+                className="btn-primary rounded-xl py-6 text-base font-bold gap-2 px-8 shadow-md"
               >
                 <Home className="w-5 h-5" />
-                Voltar ao Início
+                Voltar à Página Inicial
               </Button>
             </div>
 
-            {/* Next Steps */}
-            <div className="mt-8 bg-secondary/30 rounded-xl p-6 print:hidden">
-              <h3 className="font-semibold text-lg mb-3">Próximos Passos</h3>
-              <ol className="space-y-2 text-sm text-muted-foreground list-decimal list-inside">
-                <li>Realize o pagamento conforme as instruções acima</li>
-                <li>Envie o comprovante via WhatsApp (070-1367-1679)</li>
-                <li>Aguarde a confirmação do pagamento</li>
-                <li>Seu pedido será enviado em até 2 dias úteis</li>
-                <li>Você receberá o código de rastreamento por email</li>
-              </ol>
+            {/* Simulated Logistics Milestones - Urgency & Trust */}
+            <div className="mt-8 bg-gray-50 border border-gray-100 rounded-2xl p-6 print:hidden space-y-4">
+              <h3 className="font-bold text-sm text-gray-800 uppercase tracking-wider">
+                {order.currency === 'JPY' ? 'Como Acompanhar Sua Entrega Doméstica' : 'Como Acompanhar Sua Importação'}
+              </h3>
+              <div className="relative pl-6 border-l border-orange-300 space-y-4 text-xs text-muted-foreground">
+                
+                {order.currency === 'JPY' ? (
+                  <>
+                    <div className="relative">
+                      <div className="absolute -left-[30px] top-0 w-4 h-4 bg-orange-500 rounded-full border-2 border-white flex items-center justify-center text-white text-[8px]">✓</div>
+                      <h4 className="font-bold text-gray-800">Etapa 1: Embalagem em Mie (Cozinha Artesanal Sabor do Campo)</h4>
+                      <p className="mt-0.5">Seu Doce de Leite fresco é verificado, embalado com proteção térmica e preparado para envio no centro de Mie.</p>
+                    </div>
+
+                    <div className="relative">
+                      <div className="absolute -left-[30px] top-0 w-4 h-4 bg-gray-300 rounded-full border-2 border-white flex items-center justify-center text-white text-[8px]">2</div>
+                      <h4 className="font-bold text-gray-700">Etapa 2: Coleta e Despacho Doméstico (Yamato / Sagawa / JP Post)</h4>
+                      <p className="mt-0.5">A transportadora local selecionada coleta os produtos diretamente em nossa sede em Mie Prefecture.</p>
+                    </div>
+
+                    <div className="relative">
+                      <div className="absolute -left-[30px] top-0 w-4 h-4 bg-gray-300 rounded-full border-2 border-white flex items-center justify-center text-white text-[8px]">3</div>
+                      <h4 className="font-bold text-gray-700">Etapa 3: Trânsito Expresso entre Províncias</h4>
+                      <p className="mt-0.5">Sua encomenda segue via rede expressa rodoviária japonesa para trânsito rápido e seguro até sua província.</p>
+                    </div>
+
+                    <div className="relative">
+                      <div className="absolute -left-[30px] top-0 w-4 h-4 bg-gray-300 rounded-full border-2 border-white flex items-center justify-center text-white text-[8px]">4</div>
+                      <h4 className="font-bold text-gray-700">Etapa 4: Entrega Direta na Residência</h4>
+                      <p className="mt-0.5">A transportadora realiza a entrega em mãos no seu endereço no Japão. Use o código para rastrear no site oficial.</p>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="relative">
+                      <div className="absolute -left-[30px] top-0 w-4 h-4 bg-orange-500 rounded-full border-2 border-white flex items-center justify-center text-white text-[8px]">✓</div>
+                      <h4 className="font-bold text-gray-800">Etapa 1: Embalagem em Tóquio (Hub Logístico)</h4>
+                      <p className="mt-0.5">Após a aprovação do pagamento, seu pedido é inspecionado, embalado com plástico bolha e preparado para despacho aéreo.</p>
+                    </div>
+
+                    <div className="relative">
+                      <div className="absolute -left-[30px] top-0 w-4 h-4 bg-gray-300 rounded-full border-2 border-white flex items-center justify-center text-white text-[8px]">2</div>
+                      <h4 className="font-bold text-gray-700">Etapa 2: Voo Tóquio para São Paulo (GRU)</h4>
+                      <p className="mt-0.5">Despacho no aeroporto de Narita (Tóquio) com destino a São Paulo Guarulhos via priority mail express.</p>
+                    </div>
+
+                    <div className="relative">
+                      <div className="absolute -left-[30px] top-0 w-4 h-4 bg-gray-300 rounded-full border-2 border-white flex items-center justify-center text-white text-[8px]">3</div>
+                      <h4 className="font-bold text-gray-700">Etapa 3: Desembaraço Aduaneiro Rápido</h4>
+                      <p className="mt-0.5">O pacote passa pela alfândega dos Correios. Por estar no programa Remessa Conforme, o desembaraço ocorre em poucas horas sem taxas adicionais.</p>
+                    </div>
+
+                    <div className="relative">
+                      <div className="absolute -left-[30px] top-0 w-4 h-4 bg-gray-300 rounded-full border-2 border-white flex items-center justify-center text-white text-[8px]">4</div>
+                      <h4 className="font-bold text-gray-700">Etapa 4: Entrega no Seu Endereço</h4>
+                      <p className="mt-0.5">Os Correios realizam a entrega direta na sua residência. Rastreie pelo site dos Correios com o código de rastreamento.</p>
+                    </div>
+                  </>
+                )}
+
+              </div>
             </div>
+
           </div>
         </div>
       </section>
-
-      {/* Print Styles */}
-      <style dangerouslySetInnerHTML={{ __html: `
-        @media print {
-          @page {
-            margin: 1cm;
-          }
-          body {
-            print-color-adjust: exact;
-            -webkit-print-color-adjust: exact;
-          }
-        }
-      ` }} />
     </Layout>
   );
 };

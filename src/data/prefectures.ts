@@ -1,93 +1,63 @@
 import { Prefecture } from '@/types';
 
-// Zones based on distance from Mie Prefecture
-// Zone 1: Same region (Mie)
-// Zone 2: Nearby regions
-// Zone 3: Further regions
-// Zone 4: Distant regions (Hokkaido, Okinawa)
+// Zones for Brazil based on shipping ports/airports (e.g. GRU/VCP airports in Sao Paulo)
+// Zone 1: Sudeste (SP, RJ, MG, ES) - Fast and economical
+// Zone 2: Sul & Centro-Oeste (PR, SC, RS, DF, GO, MS, MT)
+// Zone 3: Nordeste (BA, CE, PE, AL, PB, RN, SE, PI, MA)
+// Zone 4: Norte (AM, PA, AC, AP, RO, RR, TO) - Remote region, takes longer
 
 export const prefectures: Prefecture[] = [
-  // Chubu Region (Zone 1-2)
-  { name: 'Mie', nameJa: '三重県', zone: 1 },
-  { name: 'Aichi', nameJa: '愛知県', zone: 1 },
-  { name: 'Gifu', nameJa: '岐阜県', zone: 1 },
-  { name: 'Shizuoka', nameJa: '静岡県', zone: 2 },
-  { name: 'Nagano', nameJa: '長野県', zone: 2 },
-  { name: 'Niigata', nameJa: '新潟県', zone: 2 },
-  { name: 'Toyama', nameJa: '富山県', zone: 2 },
-  { name: 'Ishikawa', nameJa: '石川県', zone: 2 },
-  { name: 'Fukui', nameJa: '福井県', zone: 2 },
-  { name: 'Yamanashi', nameJa: '山梨県', zone: 2 },
+  // Zone 1 - Sudeste
+  { name: 'SP', nameJa: 'São Paulo', zone: 1 },
+  { name: 'RJ', nameJa: 'Rio de Janeiro', zone: 1 },
+  { name: 'MG', nameJa: 'Minas Gerais', zone: 1 },
+  { name: 'ES', nameJa: 'Espírito Santo', zone: 1 },
   
-  // Kansai Region (Zone 1-2)
-  { name: 'Osaka', nameJa: '大阪府', zone: 1 },
-  { name: 'Kyoto', nameJa: '京都府', zone: 1 },
-  { name: 'Hyogo', nameJa: '兵庫県', zone: 1 },
-  { name: 'Nara', nameJa: '奈良県', zone: 1 },
-  { name: 'Shiga', nameJa: '滋賀県', zone: 1 },
-  { name: 'Wakayama', nameJa: '和歌山県', zone: 2 },
+  // Zone 2 - Sul & Centro-Oeste
+  { name: 'PR', nameJa: 'Paraná', zone: 2 },
+  { name: 'SC', nameJa: 'Santa Catarina', zone: 2 },
+  { name: 'RS', nameJa: 'Rio Grande do Sul', zone: 2 },
+  { name: 'DF', nameJa: 'Distrito Federal', zone: 2 },
+  { name: 'GO', nameJa: 'Goiás', zone: 2 },
+  { name: 'MS', nameJa: 'Mato Grosso do Sul', zone: 2 },
+  { name: 'MT', nameJa: 'Mato Grosso', zone: 2 },
   
-  // Kanto Region (Zone 2-3)
-  { name: 'Tokyo', nameJa: '東京都', zone: 2 },
-  { name: 'Kanagawa', nameJa: '神奈川県', zone: 2 },
-  { name: 'Saitama', nameJa: '埼玉県', zone: 2 },
-  { name: 'Chiba', nameJa: '千葉県', zone: 2 },
-  { name: 'Ibaraki', nameJa: '茨城県', zone: 2 },
-  { name: 'Tochigi', nameJa: '栃木県', zone: 2 },
-  { name: 'Gunma', nameJa: '群馬県', zone: 2 },
-  
-  // Chugoku Region (Zone 2)
-  { name: 'Okayama', nameJa: '岡山県', zone: 2 },
-  { name: 'Hiroshima', nameJa: '広島県', zone: 2 },
-  { name: 'Yamaguchi', nameJa: '山口県', zone: 2 },
-  { name: 'Tottori', nameJa: '鳥取県', zone: 2 },
-  { name: 'Shimane', nameJa: '島根県', zone: 2 },
-  
-  // Shikoku Region (Zone 2)
-  { name: 'Tokushima', nameJa: '徳島県', zone: 2 },
-  { name: 'Kagawa', nameJa: '香川県', zone: 2 },
-  { name: 'Ehime', nameJa: '愛媛県', zone: 2 },
-  { name: 'Kochi', nameJa: '高知県', zone: 2 },
-  
-  // Kyushu Region (Zone 3)
-  { name: 'Fukuoka', nameJa: '福岡県', zone: 3 },
-  { name: 'Saga', nameJa: '佐賀県', zone: 3 },
-  { name: 'Nagasaki', nameJa: '長崎県', zone: 3 },
-  { name: 'Kumamoto', nameJa: '熊本県', zone: 3 },
-  { name: 'Oita', nameJa: '大分県', zone: 3 },
-  { name: 'Miyazaki', nameJa: '宮崎県', zone: 3 },
-  { name: 'Kagoshima', nameJa: '鹿児島県', zone: 3 },
-  
-  // Tohoku Region (Zone 3)
-  { name: 'Miyagi', nameJa: '宮城県', zone: 3 },
-  { name: 'Fukushima', nameJa: '福島県', zone: 3 },
-  { name: 'Yamagata', nameJa: '山形県', zone: 3 },
-  { name: 'Iwate', nameJa: '岩手県', zone: 3 },
-  { name: 'Akita', nameJa: '秋田県', zone: 3 },
-  { name: 'Aomori', nameJa: '青森県', zone: 3 },
-  
-  // Distant (Zone 4)
-  { name: 'Hokkaido', nameJa: '北海道', zone: 4 },
-  { name: 'Okinawa', nameJa: '沖縄県', zone: 4 },
+  // Zone 3 - Nordeste
+  { name: 'BA', nameJa: 'Bahia', zone: 3 },
+  { name: 'CE', nameJa: 'Ceará', zone: 3 },
+  { name: 'PE', nameJa: 'Pernambuco', zone: 3 },
+  { name: 'MA', nameJa: 'Maranhão', zone: 3 },
+  { name: 'PB', nameJa: 'Paraíba', zone: 3 },
+  { name: 'PE-2', nameJa: 'Piauí', zone: 3 }, // Map PI to PE-2 or keep it simple
+  { name: 'PI', nameJa: 'Piauí', zone: 3 },
+  { name: 'RN', nameJa: 'Rio Grande do Norte', zone: 3 },
+  { name: 'AL', nameJa: 'Alagoas', zone: 3 },
+  { name: 'SE', nameJa: 'Sergipe', zone: 3 },
+
+  // Zone 4 - Norte
+  { name: 'AM', nameJa: 'Amazonas', zone: 4 },
+  { name: 'PA', nameJa: 'Pará', zone: 4 },
+  { name: 'AC', nameJa: 'Acre', zone: 4 },
+  { name: 'AP', nameJa: 'Amapá', zone: 4 },
+  { name: 'RO', nameJa: 'Rondônia', zone: 4 },
+  { name: 'RR', nameJa: 'Roraima', zone: 4 },
+  { name: 'TO', nameJa: 'Tocantins', zone: 4 }
 ];
 
-// Shipping rates by carrier, box size, and zone (in yen)
-// Box 60cm: fits 8 small (280g) OR 1 large + 1 small
-// Box 80cm: fits 3 large OR 2 large + 2 small
-// 1 large = 2 small in space
-
+// Shipping rates by carrier, box size, and zone (in R$)
+// Mapped to carriers: yuubin -> Correios Padrão, yamato -> EMS Aéreo, sagawa -> Priority Courier
 export const shippingRates = {
   yuubin: {
-    '60': { 1: 870, 2: 970, 3: 1100, 4: 1350 },
-    '80': { 1: 1100, 2: 1200, 3: 1400, 4: 1700 }
+    '60': { 1: 139.90, 2: 149.90, 3: 159.90, 4: 169.90 },
+    '80': { 1: 329.90, 2: 339.90, 3: 349.90, 4: 369.90 }
   },
   yamato: {
-    '60': { 1: 930, 2: 1040, 3: 1150, 4: 1480 },
-    '80': { 1: 1150, 2: 1260, 3: 1370, 4: 1810 }
+    '60': { 1: 279.90, 2: 289.90, 3: 299.90, 4: 319.90 },
+    '80': { 1: 559.90, 2: 579.90, 3: 599.90, 4: 629.90 }
   },
   sagawa: {
-    '60': { 1: 880, 2: 990, 3: 1100, 4: 1430 },
-    '80': { 1: 1100, 2: 1210, 3: 1430, 4: 1760 }
+    '60': { 1: 419.90, 2: 439.90, 3: 459.90, 4: 479.90 },
+    '80': { 1: 769.90, 2: 789.90, 3: 819.90, 4: 859.90 }
   }
 };
 

@@ -8,11 +8,14 @@ import { useCart } from '@/context/CartContext';
 import { wishlistService, WishlistItem } from '@/services/wishlistService';
 import { products } from '@/data/products';
 import { useToast } from '@/hooks/use-toast';
+import { useLanguage } from '@/context/LanguageContext';
+import { formatPrice } from '@/utils/currency';
 
 const Wishlist: React.FC = () => {
   const navigate = useNavigate();
   const { user, isAuthenticated } = useUser();
   const { addToCart } = useCart();
+  const { selectedCountry } = useLanguage();
   const { toast } = useToast();
   const [wishlistItems, setWishlistItems] = useState<WishlistItem[]>([]);
 
@@ -146,7 +149,12 @@ const Wishlist: React.FC = () => {
                               {item.productName}
                             </h3>
                             <p className="text-primary font-bold text-xl mb-2">
-                              ¥{item.productPrice.toLocaleString()}
+                              {(() => {
+                                const p = products.find(prod => prod.id === item.productId);
+                                const cur = p?.deliveryRestrict === 'Japão' ? 'JPY' : (selectedCountry === 'Japão' ? 'JPY' : 'BRL');
+                                const price = (p?.deliveryRestrict !== 'Japão' && selectedCountry === 'Japão') ? item.productPrice * 28 : item.productPrice;
+                                return formatPrice(price, cur);
+                              })()}
                             </p>
                             <p className="text-xs text-muted-foreground">
                               Adicionado em {new Date(item.addedAt).toLocaleDateString('pt-BR')}

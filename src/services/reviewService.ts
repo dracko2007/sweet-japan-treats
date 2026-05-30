@@ -1,3 +1,4 @@
+import { safeStorage } from '@/utils/storage';
 import { Review, ProductRating } from '@/types/review';
 
 const REVIEWS_KEY = 'sweet-japan-reviews';
@@ -5,13 +6,13 @@ const REVIEWS_KEY = 'sweet-japan-reviews';
 export const reviewService = {
   // Obter todas as avaliações
   getAllReviews(): Review[] {
-    const data = localStorage.getItem(REVIEWS_KEY);
+    const data = safeStorage.getItem(REVIEWS_KEY);
     return data ? JSON.parse(data) : [];
   },
 
   // Salvar avaliações
   saveReviews(reviews: Review[]): void {
-    localStorage.setItem(REVIEWS_KEY, JSON.stringify(reviews));
+    safeStorage.setItem(REVIEWS_KEY, JSON.stringify(reviews));
   },
 
   // Adicionar nova avaliação
@@ -65,7 +66,7 @@ export const reviewService = {
   canUserReview(userId: string, productId: string): boolean {
     // Verificar se tem pedido entregue com este produto
     const ordersKey = `orders_${userId}`;
-    const ordersData = localStorage.getItem(ordersKey);
+    const ordersData = safeStorage.getItem(ordersKey);
     
     if (!ordersData) return false;
     

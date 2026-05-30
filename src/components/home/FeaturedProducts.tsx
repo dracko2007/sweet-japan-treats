@@ -1,115 +1,196 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, Star } from 'lucide-react';
+import { ArrowRight, Star, Flame, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { products } from '@/data/products';
 import { useLanguage } from '@/context/LanguageContext';
 import { getTranslatedProductName, getTranslatedProductDesc } from '@/data/translations';
+import { formatPrice } from '@/utils/currency';
+
+// Generate static fake remaining stock percentages for high-conversion design
+const FAKE_STOCK_PERCENT: Record<string, number> = {
+  'biore-uv': 84,
+  'kitkat-matcha': 92,
+  'luffy-figure': 67,
+  'kawaii-lamp': 75,
+  'sakura-pens': 88,
+  'muji-organizer': 59,
+  'sencha-tea': 63,
+};
 
 const FeaturedProducts: React.FC = () => {
-  const { t } = useLanguage();
-  const featuredProducts = products.slice(0, 4);
+  const { t, selectedCountry } = useLanguage();
+  const filteredProducts = products.filter(p => {
+    if (selectedCountry === 'Japão') {
+      return p.deliveryRestrict === 'Japão';
+    } else {
+      return p.deliveryRestrict !== 'Japão';
+    }
+  });
+  const featuredProducts = filteredProducts.slice(0, 4);
+
+  // Countdown timer state
+  const [timeLeft, setTimeLeft] = useState({ hours: 1, minutes: 48, seconds: 26 });
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setTimeLeft(prev => {
+        if (prev.seconds > 0) {
+          return { ...prev, seconds: prev.seconds - 1 };
+        } else if (prev.minutes > 0) {
+          return { ...prev, minutes: prev.minutes - 1, seconds: 59 };
+        } else if (prev.hours > 0) {
+          return { hours: prev.hours - 1, minutes: 59, seconds: 59 };
+        } else {
+          return { hours: 2, minutes: 0, seconds: 0 }; // Reset
+        }
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   return (
-    <section className="py-20 bg-card">
+    <section className="py-16 bg-white">
       <div className="container mx-auto px-4">
-        {/* Header */}
-        <div className="text-center mb-16 animate-fade-up">
-          <span className="inline-block px-4 py-1.5 rounded-full bg-primary/10 text-primary text-sm font-medium mb-4">
-            {t('featured.badge')}
-          </span>
-          <h2 className="font-display text-4xl lg:text-5xl font-bold text-foreground mb-4">
-            {t('featured.title')}
-          </h2>
-          <p className="text-muted-foreground max-w-2xl mx-auto">
-            {t('featured.description')}
-          </p>
+        {/* Temu-Style Lightning Deals Header Banner */}
+        <div className="bg-orange-50 border border-orange-200 rounded-2xl p-6 mb-12 flex flex-col md:flex-row items-center justify-between gap-6 shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-full bg-orange-500 flex items-center justify-center text-white animate-pulse">
+              <Flame className="w-6 h-6 fill-current" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="bg-orange-600 text-white font-extrabold text-xs px-2.5 py-0.5 rounded-full uppercase">Ofertas Relâmpago</span>
+                <span className="text-orange-500 font-extrabold text-sm">-90% OFF EXTRA</span>
+              </div>
+              <h2 className="font-display text-2xl md:text-3xl font-extrabold text-gray-900 mt-1">
+                Leva tudo direto do Japão
+              </h2>
+            </div>
+          </div>
+
+          {/* Countdown Clock */}
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-bold text-gray-600 uppercase flex items-center gap-1.5">
+              <Clock className="w-4 h-4 text-orange-500" /> Termina em:
+            </span>
+            <div className="flex items-center gap-1">
+              <span className="bg-gray-900 text-white font-mono font-extrabold text-lg px-2.5 py-1.5 rounded-lg shadow-sm">
+                {timeLeft.hours.toString().padStart(2, '0')}
+              </span>
+              <span className="font-bold text-gray-800 text-xl">:</span>
+              <span className="bg-gray-900 text-white font-mono font-extrabold text-lg px-2.5 py-1.5 rounded-lg shadow-sm">
+                {timeLeft.minutes.toString().padStart(2, '0')}
+              </span>
+              <span className="font-bold text-gray-800 text-xl">:</span>
+              <span className="bg-orange-600 text-white font-mono font-extrabold text-lg px-2.5 py-1.5 rounded-lg shadow-sm animate-pulse">
+                {timeLeft.seconds.toString().padStart(2, '0')}
+              </span>
+            </div>
+          </div>
         </div>
 
         {/* Products Grid */}
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-          {featuredProducts.map((product, index) => (
-            <Link
-              key={product.id}
-              to={`/produtos/${product.category}`}
-              className="group card-product"
-              style={{ animationDelay: `${index * 100}ms` }}
-            >
-              {/* Image */}
-              <div className="aspect-square bg-secondary/50 relative overflow-hidden">
-                {product.video ? (
-                  <video 
-                    src={product.video} 
-                    autoPlay 
-                    loop 
-                    muted 
-                    playsInline
-                    poster={product.image}
-                    className="absolute inset-0 w-full h-full object-cover"
-                    onError={(e) => {
-                      console.error('Erro ao carregar vídeo:', product.video);
-                      const videoElement = e.target as HTMLVideoElement;
-                      videoElement.style.display = 'none';
-                    }}
-                  />
-                ) : product.image ? (
-                  <img 
-                    src={product.image} 
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 mb-12">
+          {featuredProducts.map((product, index) => {
+            const currency = product.deliveryRestrict === 'Japão' ? 'JPY' : (selectedCountry === 'Japão' ? 'JPY' : 'BRL');
+            const getDisplayPrice = (val: number) => {
+              if (product.deliveryRestrict === 'Japão') return val;
+              if (selectedCountry === 'Japão') return val * 28;
+              return val;
+            };
+            const smallPrice = getDisplayPrice(product.prices.small);
+            const originalPrice = smallPrice * 2.5;
+            const stockPercent = FAKE_STOCK_PERCENT[product.id] || 75;
+
+            return (
+              <Link
+                key={product.id}
+                to={`/produto/${product.id}`}
+                className="group bg-gray-50 border border-gray-100 rounded-xl overflow-hidden shadow-soft hover:shadow-card hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between"
+                style={{ animationDelay: `${index * 100}ms` }}
+              >
+                {/* Image Section */}
+                <div className="aspect-square bg-white relative overflow-hidden">
+                  <img
+                    src={product.image}
                     alt={product.name}
-                    className="absolute inset-0 w-full h-full object-cover"
+                    className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                   />
-                ) : (
-                  <div className="absolute inset-0 bg-gradient-to-br from-caramel-light/40 to-primary/30 flex items-center justify-center">
-                    <span className="text-6xl opacity-80">🍯</span>
+                  
+                  {/* Free Shipping / Origin Tag */}
+                  <div className="absolute top-2 left-2 flex flex-col gap-1.5">
+                    {product.id === 'doce-de-leite' ? (
+                      <span className="bg-green-600 text-white font-black text-[9px] px-2 py-0.5 rounded shadow-sm tracking-wider uppercase">
+                        Frete Grátis (No Japão 🇯🇵)
+                      </span>
+                    ) : (
+                      <span className="bg-orange-600 text-white font-black text-[9px] px-2 py-0.5 rounded shadow-sm tracking-wider uppercase">
+                        Importado Aéreo
+                      </span>
+                    )}
+                    <span className="bg-yellow-400 text-gray-900 font-extrabold text-[9px] px-2 py-0.5 rounded shadow-sm tracking-wider uppercase">
+                      -{Math.floor((1 - (product.prices.small / (product.prices.small * 2.5))) * 100)}%
+                    </span>
                   </div>
-                )}
-                
-                {/* Category Badge */}
-                <div className="absolute top-3 left-3">
-                  <span className={`
-                    px-3 py-1 rounded-full text-xs font-medium
-                    ${product.category === 'premium' 
-                      ? 'bg-gold/20 text-caramel-dark' 
-                      : 'bg-primary/20 text-primary'
-                    }
-                  `}>
-                    {product.category === 'premium' ? t('product.category.premium') : t('product.category.artesanal')}
-                  </span>
+
+                  {/* Rating Overlay */}
+                  <div className="absolute bottom-2 right-2 bg-white/90 backdrop-blur-sm text-gray-800 text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center gap-0.5 shadow-sm border border-gray-200">
+                    <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
+                    <span>5.0 ({120 + index * 14})</span>
+                  </div>
                 </div>
 
-                {/* Hover overlay */}
-                <div className="absolute inset-0 bg-foreground/0 group-hover:bg-foreground/5 transition-colors duration-300" />
-              </div>
-
-              {/* Content */}
-              <div className="p-5">
-                <h3 className="font-display text-lg font-semibold text-foreground group-hover:text-primary transition-colors">
-                  {getTranslatedProductName(product.id, t)}
-                </h3>
-                <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
-                  {getTranslatedProductDesc(product.id, t)}
-                </p>
-                
-                <div className="flex items-center justify-between mt-4">
+                {/* Content Section */}
+                <div className="p-3 md:p-4 flex-1 flex flex-col justify-between">
                   <div>
-                    <p className="text-xs text-muted-foreground">{t('featured.from')}</p>
-                    <p className="font-display text-xl font-bold text-primary">
-                      ¥{product.prices.small.toLocaleString()}
+                    <h3 className="font-sans font-bold text-sm text-gray-800 line-clamp-1 group-hover:text-primary transition-colors">
+                      {getTranslatedProductName(product.id, t)}
+                    </h3>
+                    <p className="text-xs text-muted-foreground mt-1 line-clamp-2 leading-relaxed">
+                      {getTranslatedProductDesc(product.id, t)}
                     </p>
                   </div>
-                  <div className="flex items-center gap-1 text-gold">
-                    <Star className="w-4 h-4 fill-current" />
-                    <span className="text-sm font-medium">5.0</span>
+                  
+                  <div className="mt-4">
+                    {/* Stock Progress Bar */}
+                    <div className="mb-3">
+                      <div className="flex justify-between items-center text-[10px] text-gray-500 mb-1">
+                        <span>Restam poucos!</span>
+                        <span className="font-bold text-orange-600">{100 - stockPercent}% Restantes</span>
+                      </div>
+                      <div className="w-full h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                        <div 
+                          className="h-full bg-gradient-to-r from-orange-500 to-red-500 rounded-full" 
+                          style={{ width: `${stockPercent}%` }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Price display */}
+                    <div className="flex items-baseline justify-between gap-1.5">
+                      <div className="flex items-baseline gap-1">
+                        <span className="text-lg md:text-xl font-black text-orange-600">
+                          {formatPrice(smallPrice, currency)}
+                        </span>
+                        <span className="text-xs text-gray-400 line-through">
+                          {formatPrice(originalPrice, currency)}
+                        </span>
+                      </div>
+                      <span className="text-[10px] font-bold text-green-600 bg-green-50 px-1.5 py-0.5 rounded">
+                        Original
+                      </span>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </Link>
-          ))}
+              </Link>
+            );
+          })}
         </div>
 
-        {/* CTA */}
+        {/* View All CTA */}
         <div className="text-center">
-          <Button asChild size="lg" className="btn-primary rounded-full px-8">
+          <Button asChild size="lg" className="bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-full px-8 shadow-md">
             <Link to="/produtos">
               {t('featured.viewAll')}
               <ArrowRight className="w-5 h-5 ml-2" />

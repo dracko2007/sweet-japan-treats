@@ -1,10 +1,13 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
 import { translations, Language } from '@/data/translations';
+import { safeStorage } from '@/utils/storage';
 
 interface LanguageContextType {
   language: Language;
   setLanguage: (lang: Language) => void;
   t: (key: string) => string;
+  selectedCountry: 'Brasil' | 'Japão';
+  setSelectedCountry: (country: 'Brasil' | 'Japão') => void;
 }
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
@@ -23,22 +26,38 @@ interface LanguageProviderProps {
 
 export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) => {
   const [language, setLanguageState] = useState<Language>(() => {
-    const stored = localStorage.getItem('preferred-language');
+    const stored = safeStorage.getItem('preferred-language');
     return (stored as Language) || 'pt';
+  });
+
+  const [selectedCountry, setSelectedCountryState] = useState<'Brasil' | 'Japão'>(() => {
+    const stored = safeStorage.getItem('sakura_selected_country');
+    return (stored as 'Brasil' | 'Japão') || 'Brasil';
   });
 
   const setLanguage = useCallback((lang: Language) => {
     setLanguageState(lang);
-    localStorage.setItem('preferred-language', lang);
+    safeStorage.setItem('preferred-language', lang);
+  }, []);
+
+  const setSelectedCountry = useCallback((country: 'Brasil' | 'Japão') => {
+    setSelectedCountryState(country);
+    safeStorage.setItem('sakura_selected_country', country);
   }, []);
 
   const t = useCallback((key: string): string => {
-    return translations[language][key] || translations['pt'][key] || key;
-  }, [language]);
+    const suffix = selectedCountry === 'Japão' ? 'japan' : 'brazil';
+    const dict = translations[language] || translations['pt'];
+    const suffixedKey = `${key}.${suffix}`;
+    
+    // Look up suffixed key first, then fall back to normal key, then same for 'pt' default
+    return dict[suffixedKey] || dict[key] || translations['pt'][suffixedKey] || translations['pt'][key] || key;
+  }, [language, selectedCountry]);
 
   return (
-    <LanguageContext.Provider value={{ language, setLanguage, t }}>
+    <LanguageContext.Provider value={{ language, setLanguage, t, selectedCountry, setSelectedCountry }}>
       {children}
     </LanguageContext.Provider>
   );
 };
+

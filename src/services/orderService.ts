@@ -1,6 +1,7 @@
+import { safeStorage } from '@/utils/storage';
 /**
  * Order Management Service
- * Gerencia pedidos - lê do Firestore com fallback para localStorage
+ * Gerencia pedidos - lê do Firestore com fallback para safeStorage
  */
 
 import { firebaseSyncService } from '@/services/firebaseSyncService';
@@ -12,7 +13,7 @@ export interface OrderStatus {
 }
 
 const getLocalOrders = (): any[] => {
-  const users = JSON.parse(localStorage.getItem('sweet-japan-users') || '{}');
+  const users = JSON.parse(safeStorage.getItem('sweet-japan-users') || '{}');
   const allOrders: any[] = [];
 
   Object.keys(users).forEach((email) => {
@@ -34,12 +35,12 @@ const getLocalOrders = (): any[] => {
 };
 
 export const orderService = {
-  // Get all orders from localStorage (sync, for backward compat)
+  // Get all orders from safeStorage (sync, for backward compat)
   getAllOrders: (): any[] => {
     return getLocalOrders();
   },
 
-  // Async version that fetches from Firestore + merges with localStorage
+  // Async version that fetches from Firestore + merges with safeStorage
   getAllOrdersAsync: async (): Promise<any[]> => {
     try {
       const firestoreOrders = await firebaseSyncService.getAllOrdersFromFirestore();
@@ -68,12 +69,12 @@ export const orderService = {
         new Date(b.orderDate || b.date).getTime() - new Date(a.orderDate || a.date).getTime()
       );
     } catch (error) {
-      console.error('❌ [ORDER SERVICE] Firestore fetch failed, using localStorage:', error);
+      console.error('❌ [ORDER SERVICE] Firestore fetch failed, using safeStorage:', error);
       return getLocalOrders();
     }
   },
 
-  // Update order status (both Firestore and localStorage)
+  // Update order status (both Firestore and safeStorage)
   updateOrderStatus: async (orderNumber: string, status: OrderStatus['status']): Promise<boolean> => {
     let updated = false;
 
@@ -85,8 +86,8 @@ export const orderService = {
       console.error('❌ [ORDER] Firestore status update failed:', err);
     }
 
-    // Also update in localStorage
-    const users = JSON.parse(localStorage.getItem('sweet-japan-users') || '{}');
+    // Also update in safeStorage
+    const users = JSON.parse(safeStorage.getItem('sweet-japan-users') || '{}');
     Object.keys(users).forEach((email) => {
       const user = users[email];
       if (user.orders && user.orders.length > 0) {
@@ -99,7 +100,7 @@ export const orderService = {
         });
       }
     });
-    localStorage.setItem('sweet-japan-users', JSON.stringify(users));
+    safeStorage.setItem('sweet-japan-users', JSON.stringify(users));
     return updated;
   },
 
@@ -107,7 +108,7 @@ export const orderService = {
   deleteOrder: async (orderNumber: string): Promise<boolean> => {
     let deleted = false;
 
-    const users = JSON.parse(localStorage.getItem('sweet-japan-users') || '{}');
+    const users = JSON.parse(safeStorage.getItem('sweet-japan-users') || '{}');
     Object.keys(users).forEach((email) => {
       const user = users[email];
       if (user.orders && user.orders.length > 0) {
@@ -121,7 +122,7 @@ export const orderService = {
       }
     });
     if (deleted) {
-      localStorage.setItem('sweet-japan-users', JSON.stringify(users));
+      safeStorage.setItem('sweet-japan-users', JSON.stringify(users));
     }
 
     try {
@@ -133,7 +134,7 @@ export const orderService = {
     return deleted;
   },
 
-  // Update order tracking info (both Firestore and localStorage)
+  // Update order tracking info (both Firestore and safeStorage)
   updateOrderTracking: async (orderNumber: string, trackingNumber: string, trackingUrl: string, carrier: string): Promise<boolean> => {
     let updated = false;
 
@@ -157,8 +158,8 @@ export const orderService = {
       console.error('❌ [ORDER] Firestore tracking update failed:', err);
     }
 
-    // Also update in localStorage
-    const users = JSON.parse(localStorage.getItem('sweet-japan-users') || '{}');
+    // Also update in safeStorage
+    const users = JSON.parse(safeStorage.getItem('sweet-japan-users') || '{}');
     Object.keys(users).forEach((email) => {
       const user = users[email];
       if (user.orders && user.orders.length > 0) {
@@ -174,14 +175,14 @@ export const orderService = {
         });
       }
     });
-    localStorage.setItem('sweet-japan-users', JSON.stringify(users));
+    safeStorage.setItem('sweet-japan-users', JSON.stringify(users));
 
     // Also update per-user orders storage
-    const allKeys = Object.keys(localStorage);
+    const allKeys = Object.keys(safeStorage);
     allKeys.forEach(key => {
       if (key.startsWith('orders_')) {
         try {
-          const userOrders = JSON.parse(localStorage.getItem(key) || '[]');
+          const userOrders = JSON.parse(safeStorage.getItem(key) || '[]');
           let changed = false;
           userOrders.forEach((order: any, idx: number) => {
             if (order.orderNumber === orderNumber) {
@@ -192,7 +193,7 @@ export const orderService = {
               changed = true;
             }
           });
-          if (changed) localStorage.setItem(key, JSON.stringify(userOrders));
+          if (changed) safeStorage.setItem(key, JSON.stringify(userOrders));
         } catch (e) { /* ignore */ }
       }
     });

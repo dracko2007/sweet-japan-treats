@@ -1,3 +1,4 @@
+import { safeStorage } from '@/utils/storage';
 /**
  * Mobile Debug Logger
  * Shows console.log messages directly on screen for mobile debugging
@@ -7,10 +8,10 @@ let debugOverlay: HTMLDivElement | null = null;
 let isEnabled = false;
 
 export const initMobileDebug = () => {
-  // Check if debug mode is enabled (via URL parameter or localStorage)
+  // Check if debug mode is enabled (via URL parameter or safeStorage)
   const urlParams = new URLSearchParams(window.location.search);
   const debugParam = urlParams.get('debug');
-  const debugStorage = localStorage.getItem('mobile-debug');
+  const debugStorage = safeStorage.getItem('mobile-debug');
   
   isEnabled = debugParam === 'true' || debugStorage === 'true';
   
@@ -82,7 +83,7 @@ export const initMobileDebug = () => {
     margin-left: 5px;
   `;
   closeBtn.onclick = () => {
-    localStorage.setItem('mobile-debug', 'false');
+    safeStorage.setItem('mobile-debug', 'false');
     debugOverlay?.remove();
     debugOverlay = null;
     isEnabled = false;
@@ -164,13 +165,13 @@ const interceptConsole = () => {
 
 // Enable debug mode
 export const enableDebug = () => {
-  localStorage.setItem('mobile-debug', 'true');
+  safeStorage.setItem('mobile-debug', 'true');
   window.location.reload();
 };
 
 // Disable debug mode
 export const disableDebug = () => {
-  localStorage.setItem('mobile-debug', 'false');
+  safeStorage.setItem('mobile-debug', 'false');
   if (debugOverlay) {
     debugOverlay.remove();
     debugOverlay = null;

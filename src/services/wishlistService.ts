@@ -1,6 +1,7 @@
+import { safeStorage } from '@/utils/storage';
 /**
  * Wishlist Service
- * Gerencia lista de desejos do usuário no localStorage
+ * Gerencia lista de desejos do usuário no safeStorage
  */
 
 export interface WishlistItem {
@@ -17,7 +18,7 @@ export const wishlistService = {
   // Get user's wishlist
   getWishlist: (userEmail: string): WishlistItem[] => {
     try {
-      const wishlistData = localStorage.getItem(`${STORAGE_KEY}_${userEmail}`);
+      const wishlistData = safeStorage.getItem(`${STORAGE_KEY}_${userEmail}`);
       return wishlistData ? JSON.parse(wishlistData) : [];
     } catch (error) {
       console.error('Error loading wishlist:', error);
@@ -41,7 +42,7 @@ export const wishlistService = {
       };
 
       wishlist.push(newItem);
-      localStorage.setItem(`${STORAGE_KEY}_${userEmail}`, JSON.stringify(wishlist));
+      safeStorage.setItem(`${STORAGE_KEY}_${userEmail}`, JSON.stringify(wishlist));
       return true;
     } catch (error) {
       console.error('Error adding to wishlist:', error);
@@ -55,7 +56,7 @@ export const wishlistService = {
       const wishlist = wishlistService.getWishlist(userEmail);
       const filtered = wishlist.filter(item => item.productId !== productId);
       
-      localStorage.setItem(`${STORAGE_KEY}_${userEmail}`, JSON.stringify(filtered));
+      safeStorage.setItem(`${STORAGE_KEY}_${userEmail}`, JSON.stringify(filtered));
       return true;
     } catch (error) {
       console.error('Error removing from wishlist:', error);
@@ -72,7 +73,7 @@ export const wishlistService = {
   // Clear entire wishlist
   clearWishlist: (userEmail: string): boolean => {
     try {
-      localStorage.removeItem(`${STORAGE_KEY}_${userEmail}`);
+      safeStorage.removeItem(`${STORAGE_KEY}_${userEmail}`);
       return true;
     } catch (error) {
       console.error('Error clearing wishlist:', error);

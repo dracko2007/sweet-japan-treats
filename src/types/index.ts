@@ -2,7 +2,7 @@ export interface Product {
   id: string;
   name: string;
   description: string;
-  category: 'artesanal' | 'premium';
+  category: string;
   prices: {
     small: number; // 280g
     large: number; // 800g
@@ -11,6 +11,7 @@ export interface Product {
   gallery?: string[]; // Múltiplas imagens do produto
   video?: string; // Vídeo do produto (opcional)
   flavor: string;
+  deliveryRestrict?: 'Japão';
 }
 
 export interface CartItem {

@@ -28,6 +28,7 @@ from firebase_service import (
     save_stock_entry, get_all_stock, update_stock_item, delete_stock_item,
     create_coupon, get_all_coupons, delete_coupon, toggle_coupon_active,
     update_order_status_erp, update_order_tracking,
+    get_whatsapp_api_url, save_whatsapp_api_url,
 )
 
 # =====================================================
@@ -1941,7 +1942,8 @@ elif menu == "📦 Gestão de Pedidos":
                             wa_payload['trackingUrl'] = selected_order.get('trackingUrl', '')
                             wa_payload['carrier'] = selected_order.get('carrier', '')
                         
-                        wa_response = http_requests.post('http://localhost:3001/api/send-order-notification', json=wa_payload, timeout=10)
+                        whatsapp_api_url = get_whatsapp_api_url(db)
+                        wa_response = http_requests.post(f'{whatsapp_api_url}/api/send-order-notification', json=wa_payload, timeout=10)
                         if wa_response.status_code == 200:
                             status_labels = {
                                 'processing': '🔄 Processando',
@@ -1990,7 +1992,8 @@ elif menu == "📦 Gestão de Pedidos":
                     customer_phone = selected_order.get('customerPhone', '')
                     if customer_phone:
                         try:
-                            wa_response = http_requests.post('http://localhost:3001/api/send-order-notification', json={
+                            whatsapp_api_url = get_whatsapp_api_url(db)
+                            wa_response = http_requests.post(f'{whatsapp_api_url}/api/send-order-notification', json={
                                 'phone': customer_phone,
                                 'orderNumber': selected_order.get('orderNumber', ''),
                                 'customerName': selected_order.get('customerName', ''),
@@ -2525,7 +2528,20 @@ elif menu == "📱 WhatsApp":
     if db is None:
         st.stop()
     
-    WHATSAPP_API = "http://localhost:3001"
+    whatsapp_api_url = get_whatsapp_api_url(db)
+    
+    # Configuration container
+    with st.expander("⚙️ Configurar URL do Servidor WhatsApp (Túnel ngrok)", expanded=True):
+        st.markdown("""
+        Se o ERP está rodando na nuvem (Streamlit Cloud), ele precisa do endereço público do ngrok para se conectar ao seu WhatsApp local.
+        """)
+        new_url = st.text_input("URL da API WhatsApp", value=whatsapp_api_url, help="Ex: https://xxxx.ngrok-free.app ou http://localhost:3001").strip()
+        if st.button("💾 Salvar URL da API", use_container_width=True):
+            if save_whatsapp_api_url(db, new_url):
+                st.success("✅ URL da API atualizada com sucesso no Firebase!")
+                st.rerun()
+                
+    WHATSAPP_API = new_url
     
     # Helper function to check WhatsApp service
     def get_wa_status():
@@ -2538,21 +2554,28 @@ elif menu == "📱 WhatsApp":
     wa_status = get_wa_status()
     
     if wa_status is None:
-        st.error("⚠️ Serviço WhatsApp não está rodando!")
-        st.markdown("""
-        ### 🚀 Como iniciar o serviço WhatsApp
+        st.error("⚠️ Serviço WhatsApp não está rodando no endereço configurado!")
+        st.markdown(f"""
+        **Endereço configurado:** `{WHATSAPP_API}`
         
-        Abra um terminal e execute:
+        ### 🚀 Como iniciar o serviço WhatsApp e o Túnel ngrok
+        
+        1. **Abra um terminal** e inicie o serviço WhatsApp localmente:
         ```bash
         cd erp/whatsapp-service
         npm install
         node server.js
         ```
         
-        O serviço iniciará na porta **3001** e gerará o QR Code automaticamente.
+        2. **Abra outro terminal** e inicie o túnel ngrok para a porta 3001:
+        ```bash
+        C:\\Users\\VAIO\\AppData\\Local\\ngrok\\ngrok.exe http 3001
+        ```
+        
+        3. **Copie a URL do ngrok** (ex: `https://xxxx-xx-xx.ngrok-free.app`) gerada e salve no campo "URL da API WhatsApp" acima.
         """)
         
-        st.info("💡 O serviço precisa estar rodando para o WhatsApp funcionar. Após iniciar, clique em **Recarregar** acima.")
+        st.info("💡 O serviço e o túnel ngrok precisam estar rodando para o WhatsApp funcionar na nuvem.")
         st.stop()
     
     # Connection status

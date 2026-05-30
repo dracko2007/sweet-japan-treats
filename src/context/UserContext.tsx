@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { safeStorage } from '@/utils/storage';
 import { firebaseSyncService } from '@/services/firebaseSyncService';
 import { firebaseConfigReady, allowLocalOnly } from '@/config/firebase';
 
@@ -101,7 +102,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
 
   // Helper functions for users database
   const getAllUsers = (): UserProfile[] => {
-    const usersData = localStorage.getItem('sweet-japan-users');
+    const usersData = safeStorage.getItem('sweet-japan-users');
     if (!usersData) return [];
     
     const usersObj = JSON.parse(usersData);
@@ -115,25 +116,25 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     users.forEach(user => {
       usersObj[user.email] = user;
     });
-    localStorage.setItem('sweet-japan-users', JSON.stringify(usersObj));
+    safeStorage.setItem('sweet-japan-users', JSON.stringify(usersObj));
   };
 
   const getUserCoupons = (userId: string): Coupon[] => {
-    const couponsData = localStorage.getItem(`coupons_${userId}`);
+    const couponsData = safeStorage.getItem(`coupons_${userId}`);
     return couponsData ? JSON.parse(couponsData) : [];
   };
 
   const saveUserCoupons = (userId: string, coupons: Coupon[]) => {
-    localStorage.setItem(`coupons_${userId}`, JSON.stringify(coupons));
+    safeStorage.setItem(`coupons_${userId}`, JSON.stringify(coupons));
   };
 
   const getUserOrders = (userId: string): Order[] => {
-    const ordersData = localStorage.getItem(`orders_${userId}`);
+    const ordersData = safeStorage.getItem(`orders_${userId}`);
     return ordersData ? JSON.parse(ordersData) : [];
   };
 
   const saveUserOrders = (userId: string, orders: Order[]) => {
-    localStorage.setItem(`orders_${userId}`, JSON.stringify(orders));
+    safeStorage.setItem(`orders_${userId}`, JSON.stringify(orders));
   };
 
   // Helper: sync local orders to Firestore for a user
@@ -237,14 +238,14 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     );
   };
 
-  // Load user data from localStorage on mount AND listen to Firebase auth
+  // Load user data from safeStorage on mount AND listen to Firebase auth
   useEffect(() => {
-    // IMMEDIATELY load from localStorage so user stays logged in on refresh
-    const storedUser = localStorage.getItem('user');
+    // IMMEDIATELY load from safeStorage so user stays logged in on refresh
+    const storedUser = safeStorage.getItem('user');
     if (storedUser) {
       try {
         const userData = JSON.parse(storedUser);
-        console.log('⚡ [INIT] Restoring user from localStorage:', userData.email);
+        console.log('⚡ [INIT] Restoring user from safeStorage:', userData.email);
         setUser(userData);
         setIsAuthenticated(true);
         const userCoupons = getUserCoupons(userData.id);
@@ -273,7 +274,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
         
         if (firestoreUser) {
           // Merge Firestore data with local data (keep more complete profile)
-          const localUser = storedUser ? JSON.parse(localStorage.getItem('user') || '{}') : {};
+          const localUser = storedUser ? JSON.parse(safeStorage.getItem('user') || '{}') : {};
           const mergedUser: UserProfile = {
             ...localUser,
             ...firestoreUser,
@@ -309,17 +310,17 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
             syncLocalOrdersToFirestore(firebaseUser.uid, (firestoreUser as any).email, localOnlyOrders);
           }
           
-          localStorage.setItem('user', JSON.stringify(mergedUser));
+          safeStorage.setItem('user', JSON.stringify(mergedUser));
         }
       } else {
         console.log('🔥 [FIREBASE] Auth state changed - no Firebase user');
-        // DON'T clear session - localStorage user may be valid (e.g. admin login)
+        // DON'T clear session - safeStorage user may be valid (e.g. admin login)
         // Only clear if there's no stored user either
-        const storedUser = localStorage.getItem('user');
+        const storedUser = safeStorage.getItem('user');
         if (storedUser) {
           try {
             const userData = JSON.parse(storedUser);
-            console.log('🔥 [FIREBASE] Keeping localStorage session for:', userData.email);
+            console.log('🔥 [FIREBASE] Keeping safeStorage session for:', userData.email);
             setUser(userData);
             setIsAuthenticated(true);
             const userCoupons = getUserCoupons(userData.id);
@@ -336,23 +337,23 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     return () => unsubscribe();
   }, []);
 
-  // Save current user session to localStorage
+  // Save current user session to safeStorage
   useEffect(() => {
     if (user) {
-      localStorage.setItem('user', JSON.stringify(user));
+      safeStorage.setItem('user', JSON.stringify(user));
     } else {
-      localStorage.removeItem('user');
+      safeStorage.removeItem('user');
     }
   }, [user]);
 
-  // Save user-specific coupons to localStorage
+  // Save user-specific coupons to safeStorage
   useEffect(() => {
     if (user && coupons.length >= 0) {
       saveUserCoupons(user.id, coupons);
     }
   }, [coupons, user]);
 
-  // Save user-specific orders to localStorage
+  // Save user-specific orders to safeStorage
   useEffect(() => {
     if (user && orders.length >= 0) {
       saveUserOrders(user.id, orders);
@@ -405,7 +406,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
         const userOrders = getUserOrders(foundUser.id);
         setCoupons(userCoupons);
         setOrders(userOrders);
-        localStorage.setItem('user', JSON.stringify(foundUser));
+        safeStorage.setItem('user', JSON.stringify(foundUser));
         return { success: true };
       }
       return { success: false, error: 'Email ou senha incorretos. Cadastre-se primeiro caso não tenha uma conta.' };
@@ -423,7 +424,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       const localUser = localUsers.find(u => normalizeEmail(u.email) === normalizedEmail);
       
       if (!userProfile && !localUser) {
-        // No profile in Firestore or localStorage - user never properly registered
+        // No profile in Firestore or safeStorage - user never properly registered
         console.log('⚠️ [LOGIN] Ghost user detected (Auth exists but no profile):', normalizedEmail);
         await firebaseSyncService.logoutUser();
         return { 
@@ -456,7 +457,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       let userData = userProfile;
       
       if (!userData) {
-        // Use localStorage backup (localUser was already found above)
+        // Use safeStorage backup (localUser was already found above)
         if (localUser) {
           await firebaseSyncService.syncUserToFirestore(firebaseUser.uid, { ...localUser, id: firebaseUser.uid });
           userData = { ...localUser, id: firebaseUser.uid };
@@ -484,7 +485,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
           syncLocalOrdersToFirestore(firebaseUser.uid, (userData as any).email, localOnlyOrders);
         }
         
-        localStorage.setItem('user', JSON.stringify(userData));
+        safeStorage.setItem('user', JSON.stringify(userData));
         
         console.log('✅ User logged in successfully via Firebase:', { email: userData.email, id: userData.id });
         return { success: true };
@@ -632,7 +633,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
         return { success: false, error: 'Falha ao salvar na nuvem. Verifique a configuração do Firebase.' };
       }
       
-      // Also save to localStorage as backup
+      // Also save to safeStorage as backup
       const allUsers = getAllUsers();
       const updatedUsers = [...allUsers, newUser];
       saveAllUsers(updatedUsers);
@@ -661,7 +662,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     setOrders([]);
     
     // Remove only current session, keep users database intact
-    localStorage.removeItem('user');
+    safeStorage.removeItem('user');
     console.log('User logged out successfully');
   };
 
@@ -679,7 +680,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       
       setUser(updatedUser);
       
-      // Also update in users database (localStorage)
+      // Also update in users database (safeStorage)
       const allUsers = getAllUsers();
       const updatedUsers = allUsers.map(u => 
         u.id === user.id ? updatedUser : u
@@ -747,9 +748,9 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       }
     }
     
-    // Também atualiza na base global de usuários (localStorage backup)
+    // Também atualiza na base global de usuários (safeStorage backup)
     if (user) {
-      const usersData = localStorage.getItem('sweet-japan-users');
+      const usersData = safeStorage.getItem('sweet-japan-users');
       if (usersData) {
         const users = JSON.parse(usersData);
         if (users[user.email]) {
@@ -761,7 +762,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
             orderDate: newOrder.date,
             totalPrice: newOrder.totalAmount,
           });
-          localStorage.setItem('sweet-japan-users', JSON.stringify(users));
+          safeStorage.setItem('sweet-japan-users', JSON.stringify(users));
         }
       }
     }
