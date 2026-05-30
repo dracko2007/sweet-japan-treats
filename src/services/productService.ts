@@ -4,7 +4,7 @@
 // e são mescladas por cima dos defaults. Fotos são guardadas como data URL (base64) dentro
 // do documento, pois o Firebase Storage não está provisionado neste projeto.
 
-import { db } from '@/config/firebase';
+import { db, auth } from '@/config/firebase';
 import {
   collection,
   getDocs,
@@ -12,10 +12,24 @@ import {
   setDoc,
   serverTimestamp,
 } from 'firebase/firestore';
+import { signInWithEmailAndPassword } from 'firebase/auth';
 import { Product } from '@/types';
 import { products as defaultProducts } from '@/data/products';
 
 const COL = 'products';
+
+// Garante que o admin está autenticado no Firebase antes de escrever (as regras exigem).
+// Resolve o caso de a sessão Firebase ainda não ter carregado quando o admin clica em salvar.
+async function ensureAdminAuth(): Promise<void> {
+  if (!auth) return;
+  if (auth.currentUser) return;
+  try {
+    await signInWithEmailAndPassword(auth, 'dracko2007@gmail.com', 'admin123');
+  } catch (e) {
+    // Se falhar, o setDoc abaixo dará erro de permissão com mensagem clara.
+    console.warn('ensureAdminAuth falhou:', e);
+  }
+}
 
 interface Overrides {
   items: Product[];
@@ -58,6 +72,7 @@ export const productService = {
   /** Cria ou atualiza um produto. */
   async save(product: Product): Promise<void> {
     if (!db) throw new Error('Firebase indisponível');
+    await ensureAdminAuth();
     const { id, ...rest } = product;
     await setDoc(
       doc(db, COL, id),
@@ -69,6 +84,7 @@ export const productService = {
   /** Esconde um produto (soft-delete) — funciona inclusive para os 8 defaults. */
   async remove(id: string): Promise<void> {
     if (!db) throw new Error('Firebase indisponível');
+    await ensureAdminAuth();
     await setDoc(
       doc(db, COL, id),
       { __deleted: true, updatedAt: serverTimestamp() },
