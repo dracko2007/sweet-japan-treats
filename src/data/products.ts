@@ -657,3 +657,8 @@ export const products: Product[] = [
     flavor: 'Signo 0.38 Set'
   }
 ];
+
+export const getProductsByCategory = (category: string): Product[] => {
+  if (category === 'doce-de-leite') return [];
+  return products.filter(product => product.category === category);
+};
