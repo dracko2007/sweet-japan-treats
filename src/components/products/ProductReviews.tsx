@@ -1,12 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { Star, ThumbsUp, Camera, X } from 'lucide-react';
+import { Star, ThumbsUp, Camera, X, Video, Gift, PlayCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { useUser } from '@/context/UserContext';
 import { reviewService } from '@/services/reviewService';
-import { Review, ProductRating } from '@/types/review';
+import { Review, ProductRating, calculateReviewPoints, REVIEW_POINTS } from '@/types/review';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+
+// Converte um link de vídeo (YouTube) em URL embutível; senão devolve null.
+function getYouTubeEmbed(url: string): string | null {
+  const m = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([\w-]{11})/);
+  return m ? `https://www.youtube.com/embed/${m[1]}` : null;
+}
 
 interface ProductReviewsProps {
   productId: string;
@@ -14,7 +20,7 @@ interface ProductReviewsProps {
 }
 
 const ProductReviews: React.FC<ProductReviewsProps> = ({ productId, productName }) => {
-  const { user } = useUser();
+  const { user, addPoints } = useUser();
   const { toast } = useToast();
   const [reviews, setReviews] = useState<Review[]>([]);
   const [rating, setRating] = useState<ProductRating | null>(null);
@@ -26,6 +32,7 @@ const ProductReviews: React.FC<ProductReviewsProps> = ({ productId, productName 
   const [hoverRating, setHoverRating] = useState(0);
   const [comment, setComment] = useState('');
   const [images, setImages] = useState<string[]>([]);
+  const [videoUrl, setVideoUrl] = useState('');
 
   useEffect(() => {
     loadReviews();
@@ -85,6 +92,13 @@ const ProductReviews: React.FC<ProductReviewsProps> = ({ productId, productName 
       return;
     }
 
+    const trimmedVideo = videoUrl.trim();
+    const points = calculateReviewPoints({
+      hasComment: comment.trim().length >= 10,
+      hasPhoto: images.length > 0,
+      hasVideo: trimmedVideo.length > 0,
+    });
+
     reviewService.addReview({
       productId,
       userId: user.id,
@@ -92,12 +106,17 @@ const ProductReviews: React.FC<ProductReviewsProps> = ({ productId, productName 
       rating: selectedRating,
       comment: comment.trim(),
       images: images.length > 0 ? images : undefined,
-      verified: true
+      videoUrl: trimmedVideo || undefined,
+      pointsAwarded: points,
+      verified: reviewService.hasPurchased(user.id, productName)
     });
 
+    // Concede os pontos ao usuário
+    if (points > 0) addPoints(points);
+
     toast({
-      title: 'Avaliação enviada!',
-      description: 'Obrigado pelo seu feedback!'
+      title: `🎉 Avaliação enviada! +${points} pontos`,
+      description: `Você agora tem ${(user.points || 0) + points} pontos de fidelidade.`,
     });
 
     // Reset form
@@ -105,6 +124,7 @@ const ProductReviews: React.FC<ProductReviewsProps> = ({ productId, productName 
     setSelectedRating(0);
     setComment('');
     setImages([]);
+    setVideoUrl('');
     loadReviews();
   };
 
@@ -166,7 +186,16 @@ const ProductReviews: React.FC<ProductReviewsProps> = ({ productId, productName 
       {showForm && (
         <div className="bg-card rounded-xl border border-border p-6 space-y-4">
           <h3 className="font-semibold text-lg">Avaliar {productName}</h3>
-          
+
+          {/* Banner de pontos */}
+          <div className="flex items-start gap-3 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-xl p-3">
+            <Gift className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+            <div className="text-xs text-amber-900 leading-relaxed">
+              <p className="font-bold mb-0.5">Ganhe pontos de fidelidade!</p>
+              Avaliação + foto = <b>{REVIEW_POINTS.withPhoto} pts</b> · só avaliação ou só foto = <b>{REVIEW_POINTS.textOrPhotoOnly} pts</b> · vídeo de unboxing = <b>+{REVIEW_POINTS.unboxingVideo} pts</b>
+            </div>
+          </div>
+
           {/* Star Rating */}
           <div>
             <label className="block text-sm font-medium mb-2">Sua Avaliação</label>
@@ -235,6 +264,21 @@ const ProductReviews: React.FC<ProductReviewsProps> = ({ productId, productName 
             </div>
           </div>
 
+          {/* Video de unboxing (link) */}
+          <div>
+            <label className="block text-sm font-medium mb-2 flex items-center gap-1.5">
+              <Video className="w-4 h-4" /> Vídeo de unboxing <span className="text-amber-600 font-bold">(+{REVIEW_POINTS.unboxingVideo} pts)</span>
+            </label>
+            <input
+              type="url"
+              value={videoUrl}
+              onChange={(e) => setVideoUrl(e.target.value)}
+              placeholder="Cole o link do seu vídeo (YouTube, Instagram, TikTok)"
+              className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm"
+            />
+            <p className="text-xs text-muted-foreground mt-1">Grave seu unboxing/review, publique no YouTube/Insta e cole o link aqui.</p>
+          </div>
+
           {/* Actions */}
           <div className="flex gap-3">
             <Button onClick={handleSubmit} className="flex-1">Enviar Avaliação</Button>
@@ -272,7 +316,7 @@ const ProductReviews: React.FC<ProductReviewsProps> = ({ productId, productName 
               <p className="text-foreground mb-3">{review.comment}</p>
               
               {review.images && review.images.length > 0 && (
-                <div className="flex gap-2 mb-3">
+                <div className="flex gap-2 mb-3 flex-wrap">
                   {review.images.map((img, index) => (
                     <img
                       key={index}
@@ -283,6 +327,37 @@ const ProductReviews: React.FC<ProductReviewsProps> = ({ productId, productName 
                     />
                   ))}
                 </div>
+              )}
+
+              {review.videoUrl && (
+                <div className="mb-3">
+                  {getYouTubeEmbed(review.videoUrl) ? (
+                    <div className="relative w-full max-w-md aspect-video rounded-lg overflow-hidden border border-border">
+                      <iframe
+                        src={getYouTubeEmbed(review.videoUrl)!}
+                        title="Vídeo de unboxing"
+                        className="absolute inset-0 w-full h-full"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                      />
+                    </div>
+                  ) : (
+                    <a
+                      href={review.videoUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline"
+                    >
+                      <PlayCircle className="w-5 h-5" /> Ver vídeo de unboxing
+                    </a>
+                  )}
+                </div>
+              )}
+
+              {review.videoUrl && (
+                <span className="inline-flex items-center gap-1 text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">
+                  <Video className="w-3 h-3" /> Vídeo de unboxing
+                </span>
               )}
             </div>
           ))

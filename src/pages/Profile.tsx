@@ -191,7 +191,17 @@ const Profile: React.FC = () => {
       <section className="py-12 bg-background">
         <div className="container mx-auto px-4">
           <div className="max-w-6xl mx-auto space-y-6">
-            
+
+            {/* Pontos de Fidelidade */}
+            <div className="bg-gradient-to-r from-amber-400 to-orange-500 rounded-2xl p-6 lg:p-8 text-white shadow-elevated flex items-center justify-between">
+              <div>
+                <p className="text-sm font-semibold uppercase tracking-wide text-white/90">Pontos de Fidelidade</p>
+                <p className="font-display text-5xl font-extrabold mt-1">{user?.points || 0} <span className="text-2xl font-bold">pts</span></p>
+                <p className="text-sm text-white/90 mt-1">Avalie produtos e envie vídeos de unboxing para ganhar pontos!</p>
+              </div>
+              <div className="text-7xl opacity-80">🎁</div>
+            </div>
+
             {/* Personal Information */}
             <div className="bg-card rounded-2xl border border-border p-6 lg:p-8">
               <div className="flex items-center justify-between mb-6">

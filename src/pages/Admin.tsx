@@ -1,7 +1,7 @@
 import { safeStorage } from '@/utils/storage';
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Package, Printer, ShoppingBag, User, MapPin, Phone, Mail, Calendar, TestTube, Tag, Truck, CheckCircle, XCircle, Trash2, BarChart3, Users, PackagePlus } from 'lucide-react';
+import { Package, Printer, ShoppingBag, User, MapPin, Phone, Mail, Calendar, TestTube, Tag, Truck, CheckCircle, XCircle, Trash2, BarChart3, Users, PackagePlus, Video } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { useUser } from '@/context/UserContext';
@@ -14,6 +14,7 @@ import CouponManager from '@/components/admin/CouponManager';
 import Dashboard from '@/components/admin/Dashboard';
 import CustomerList from '@/components/admin/CustomerList';
 import ProductManager from '@/components/admin/ProductManager';
+import HomeContentManager from '@/components/admin/HomeContentManager';
 import TrackingModal from '@/components/admin/TrackingModal';
 import { orderService } from '@/services/orderService';
 
@@ -23,7 +24,7 @@ const Admin: React.FC = () => {
   const { toast } = useToast();
   const [allOrders, setAllOrders] = useState<any[]>([]);
   const [isTesting, setIsTesting] = useState(false);
-  const [activeTab, setActiveTab] = useState<'orders' | 'coupons' | 'dashboard' | 'customers' | 'products'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'orders' | 'coupons' | 'dashboard' | 'customers' | 'products' | 'home'>('dashboard');
   const [trackingModalOpen, setTrackingModalOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
 
@@ -388,6 +389,17 @@ _This is an automated test message_
                     <span>Produtos</span>
                   </button>
                   <button
+                    onClick={() => setActiveTab('home')}
+                    className={`py-3 sm:py-4 px-3 sm:px-1 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap flex items-center gap-1.5 ${
+                      activeTab === 'home'
+                        ? 'border-primary text-primary'
+                        : 'border-transparent text-muted-foreground hover:text-foreground hover:border-gray-300'
+                    }`}
+                  >
+                    <Video className="w-4 h-4 flex-shrink-0" />
+                    <span>Início</span>
+                  </button>
+                  <button
                     onClick={() => setActiveTab('customers')}
                     className={`py-3 sm:py-4 px-3 sm:px-1 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap flex items-center gap-1.5 ${
                       activeTab === 'customers'
@@ -671,6 +683,8 @@ _This is an automated test message_
               <Dashboard />
             ) : activeTab === 'products' ? (
               <ProductManager />
+            ) : activeTab === 'home' ? (
+              <HomeContentManager />
             ) : (
               <CustomerList />
             )}

@@ -12,6 +12,7 @@ export interface UserProfile {
   password?: string; // Stored for demo purposes - in production, use backend authentication
   birthdate?: string;
   whatsappMarketing?: boolean;
+  points?: number; // Pontos de fidelidade (reviews, vídeos)
   address: {
     postalCode: string;
     prefecture: string;
@@ -72,6 +73,7 @@ interface UserContextType {
   register: (userData: Omit<UserProfile, 'id' | 'createdAt' | 'password'> & { password: string }) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
   updateProfile: (userData: Partial<UserProfile>) => void;
+  addPoints: (amount: number) => void;
   addCoupon: (coupon: Coupon) => void;
   useCoupon: (couponId: string) => void;
   addOrder: (order: Omit<Order, 'id' | 'date'> & { orderNumber?: string }) => Promise<void> | void;
@@ -729,6 +731,23 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     }
   };
 
+  const addPoints = (amount: number) => {
+    if (!user || amount <= 0) return;
+    const newTotal = (user.points || 0) + amount;
+    const updatedUser: UserProfile = { ...user, points: newTotal };
+    setUser(updatedUser);
+
+    // Persiste no banco local de usuários
+    const allUsers = getAllUsers();
+    const updatedUsers = allUsers.map(u => (u.id === user.id ? updatedUser : u));
+    saveAllUsers(updatedUsers);
+
+    // Sincroniza com Firestore (fire-and-forget)
+    firebaseSyncService.syncUserToFirestore(user.id, { points: newTotal }).catch(() => {});
+
+    console.log(`✅ +${amount} pontos (total: ${newTotal})`);
+  };
+
   const addCoupon = (coupon: Coupon) => {
     setCoupons(prev => [...prev, coupon]);
   };
@@ -822,6 +841,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     register,
     logout,
     updateProfile,
+    addPoints,
     addCoupon,
     useCoupon,
     addOrder,

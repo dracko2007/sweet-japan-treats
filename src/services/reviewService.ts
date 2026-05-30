@@ -62,26 +62,27 @@ export const reviewService = {
     };
   },
 
-  // Verificar se usuário pode avaliar (comprou o produto)
+  // Verificar se usuário pode avaliar (logado e ainda não avaliou este produto)
   canUserReview(userId: string, productId: string): boolean {
-    // Verificar se tem pedido entregue com este produto
-    const ordersKey = `orders_${userId}`;
-    const ordersData = safeStorage.getItem(ordersKey);
-    
-    if (!ordersData) return false;
-    
-    const orders = JSON.parse(ordersData);
-    const hasDeliveredOrder = orders.some((order: any) => 
-      order.status === 'delivered' && 
-      order.items.some((item: any) => item.productName.includes(productId))
-    );
-
-    // Verificar se já avaliou
+    if (!userId) return false;
     const hasReviewed = this.getAllReviews().some(
       r => r.userId === userId && r.productId === productId
     );
+    return !hasReviewed;
+  },
 
-    return hasDeliveredOrder && !hasReviewed;
+  // Verifica se o usuário tem pedido com este produto (para o selo "Compra Verificada")
+  hasPurchased(userId: string, productName: string): boolean {
+    const ordersData = safeStorage.getItem(`orders_${userId}`);
+    if (!ordersData) return false;
+    try {
+      const orders = JSON.parse(ordersData);
+      return orders.some((order: any) =>
+        (order.items || []).some((item: any) => item.productName === productName)
+      );
+    } catch {
+      return false;
+    }
   },
 
   // Deletar avaliação
