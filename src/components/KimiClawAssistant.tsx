@@ -550,7 +550,12 @@ ${itemsText}
     if (query.includes('oi') || query.includes('ola') || query.includes('hello')) {
       responseText = 'Olá! Sou o KimiClaw AI. Posso adicionar itens ao seu carrinho, mudar o idioma, calcular o frete ou enviar novidades e descontos via WhatsApp! O que deseja?';
     } else {
-      responseText = `Desculpe, ainda estou aprendendo sobre esse assunto. Deseja que eu envie as novidades e o cupom de **90% de desconto** direto para o seu WhatsApp? Peça para "enviar whatsapp"!`;
+      const suggestions = language === 'pt'
+        ? 'Minhas habilidades: 🔍 **buscar** produtos | 📦 **calcular** frete | 🎟️ **cupom SAKURA90** | 📱 **whatsapp** | 🗑️ **limpar carrinho**'
+        : language === 'ja'
+          ? '機能: 🔍 商品検索 | 📦 送料計算 | 🎟️ SAKURA90クーポン | 📱 WhatsApp | 🗑️ カート削除'
+          : 'My skills: 🔍 **search** products | 📦 **calculate** shipping | 🎟️ **coupon** | 📱 **whatsapp** | 🗑️ **clear cart**';
+      responseText = suggestions;
     }
     await addKimiMessageWithTyping(responseText);
   };
