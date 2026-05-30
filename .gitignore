@@ -41,3 +41,23 @@ erp/whatsapp-service/.wwebjs_cache/
 # Firebase credentials (NUNCA commitar)
 serviceAccountKey.json
 image-urls.json
+
+# Scripts auxiliares de setup (dev)
+get-rules.cjs
+publish-rules.cjs
+setup-admin-auth.cjs
+list-firebase.cjs
+check-buckets.cjs
+check-firestore.cjs
+fetch-real-images.cjs
+fetch-pass2.cjs
+gen-placeholders.cjs
+replace-urls.js
+update-local-images.ts
+fix-images.ts
+fix_images_correct.py
+update.py
+fix_urls.py
+replace_all.sh
+auto-setup-images.ts
+upload-images.ts

@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { safeStorage } from '@/utils/storage';
 import { firebaseSyncService } from '@/services/firebaseSyncService';
-import { firebaseConfigReady, allowLocalOnly } from '@/config/firebase';
+import { firebaseConfigReady, allowLocalOnly, auth } from '@/config/firebase';
+import { signInWithEmailAndPassword } from 'firebase/auth';
 
 export interface UserProfile {
   id: string;
@@ -385,13 +386,23 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       
       setUser(adminUser);
       setIsAuthenticated(true);
-      
+
       const userCoupons = getUserCoupons(adminUser.id);
       const userOrders = getUserOrders(adminUser.id);
-      
+
       setCoupons(userCoupons);
       setOrders(userOrders);
-      
+
+      // Também autentica no Firebase para liberar escrita no painel (produtos, etc.)
+      if (auth) {
+        try {
+          await signInWithEmailAndPassword(auth, ADMIN_EMAIL, ADMIN_PASSWORD);
+          console.log('✅ Admin autenticado no Firebase (permissões de escrita ativas)');
+        } catch (err) {
+          console.warn('⚠️ Admin local OK, mas Firebase Auth falhou:', err);
+        }
+      }
+
       console.log('✅ Admin logged in successfully');
       return { success: true };
     }
