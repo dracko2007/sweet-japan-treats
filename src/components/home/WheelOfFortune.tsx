@@ -9,7 +9,7 @@ interface WheelOfFortuneProps {
 
 const SECTORS = [
   { label: '90% OFF', color: '#FF5722', text: '#FFFFFF', value: 90, type: 'percent', code: 'SAKURA90' },
-  { label: 'R$ 15 OFF', color: '#FF9800', text: '#FFFFFF', value: 15, type: 'fixed', code: 'SAKURA15' },
+  { label: '15% OFF', color: '#FF9800', text: '#FFFFFF', value: 15, type: 'percent', code: 'SAKURA15' },
   { label: 'Frete Grátis', color: '#4CAF50', text: '#FFFFFF', value: 0, type: 'free', code: 'FRETEGRATIS' },
   { label: 'Tente De Novo', color: '#9E9E9E', text: '#FFFFFF', value: 0, type: 'retry', code: '' },
   { label: 'R$ 50 OFF', color: '#E91E63', text: '#FFFFFF', value: 50, type: 'fixed', code: 'SAKURA50' },
@@ -29,14 +29,22 @@ export const WheelOfFortune: React.FC<WheelOfFortuneProps> = ({ onClose }) => {
     // Check if user already spun in the last 24h
     const spunTime = safeStorage.getItem('sakura_wheel_spun_time');
     const now = Date.now();
-    
-    if (!spunTime || now - parseInt(spunTime) > 24 * 60 * 60 * 1000) {
-      // Show modal after 1.5 seconds
-      const timer = setTimeout(() => {
+    const recentlySpun = spunTime && now - parseInt(spunTime) <= 24 * 60 * 60 * 1000;
+    if (recentlySpun) return;
+
+    // Exit-intent: show the wheel only when the user moves to leave the page
+    // (mouse exits through the top of the viewport, e.g. toward the tab bar / close button).
+    let triggered = false;
+    const handleMouseOut = (e: MouseEvent) => {
+      if (triggered) return;
+      if (e.clientY <= 0 && !e.relatedTarget) {
+        triggered = true;
         setIsOpen(true);
-      }, 1500);
-      return () => clearTimeout(timer);
-    }
+        document.removeEventListener('mouseout', handleMouseOut);
+      }
+    };
+    document.addEventListener('mouseout', handleMouseOut);
+    return () => document.removeEventListener('mouseout', handleMouseOut);
   }, []);
 
   const spinWheel = () => {
@@ -44,18 +52,16 @@ export const WheelOfFortune: React.FC<WheelOfFortuneProps> = ({ onClose }) => {
 
     setIsSpinning(true);
     
-    // Rig the wheel to land on '90% OFF' (index 0)
-    // Slices are counter-clockwise, Slice 0 (index 0) starts at 0 to 60 deg.
-    // To align it under the pointer (pointing down at 12 o'clock, 90 deg), we need specific degrees.
+    // Rig the wheel to land on '15% OFF' (index 1)
     // Slices (clockwise from top):
     // 0: 90% OFF (0 to 60 deg)
-    // 1: R$ 15 OFF (60 to 120 deg)
+    // 1: 15% OFF (60 to 120 deg)
     // 2: Frete Grátis (120 to 180 deg)
     // 3: Tente De Novo (180 to 240 deg)
     // 4: R$ 50 OFF (240 to 300 deg)
     // 5: R$ 100 OFF (300 to 360 deg)
-    
-    const targetSectorIndex = 0; // 90% OFF
+
+    const targetSectorIndex = 1; // 15% OFF
     const sectorAngle = 360 / SECTORS.length;
     // Calculate degree to center the 90% OFF slice under the pointer
     const targetAngle = 360 - (targetSectorIndex * sectorAngle) - (sectorAngle / 2);
@@ -172,7 +178,7 @@ export const WheelOfFortune: React.FC<WheelOfFortuneProps> = ({ onClose }) => {
             RODA DA FORTUNA!
           </h2>
           <p className="text-sm font-semibold text-white/90 mb-6 px-4">
-            Gire e ganhe descontos imperdíveis de até 90% em cosméticos, figures de anime e doces japoneses!
+            Gire e ganhe 15% de desconto em cosméticos, figures de anime e doces japoneses!
           </p>
 
           {/* The Spinning Wheel Visual */}
