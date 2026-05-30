@@ -35,3 +35,9 @@ erp/localstorage-*.json
 erp/whatsapp-service/.wwebjs_auth/
 erp/whatsapp-service/node_modules/
 erp/whatsapp-service/.wwebjs_cache/
+
+.vercel
+
+# Firebase credentials (NUNCA commitar)
+serviceAccountKey.json
+image-urls.json

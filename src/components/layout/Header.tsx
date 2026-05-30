@@ -23,16 +23,9 @@ const Header: React.FC = () => {
       label: t('nav.products'), 
       href: '/produtos',
       submenu: [
-        { label: t('nav.products.cosmeticos'), href: '/produtos/cosmeticos', restrict: 'Brasil' },
-        { label: t('nav.products.acessorios'), href: '/produtos/acessorios', restrict: 'Brasil' },
-        { label: t('nav.products.doces'), href: '/produtos/doces', restrict: 'Brasil' },
-        { label: t('nav.products.papelaria'), href: '/produtos/papelaria', restrict: 'Brasil' },
-        { label: t('nav.products.docedeleite'), href: '/produtos/doce-de-leite', restrict: 'Japão' },
-      ].filter(item => {
-        if (item.restrict === 'Japão') return selectedCountry === 'Japão';
-        if (item.restrict === 'Brasil') return selectedCountry === 'Brasil';
-        return true;
-      })
+        { label: t('nav.products.cosmeticos'), href: '/produtos/cosmeticos' },
+        { label: t('nav.products.doces'), href: '/produtos/doces' },
+      ]
     },
     { label: t('nav.vlog'), href: '/vlog' },
     { label: t('nav.shipping'), href: '/frete' },
@@ -47,19 +40,9 @@ const Header: React.FC = () => {
         <div className="flex items-center justify-between h-20">
           {/* Logo */}
           <Link to="/" className="flex items-center gap-2">
-            <span className="text-3xl animate-float">
-              {selectedCountry === 'Japão' ? '🍯' : '🌸'}
-            </span>
+            <span className="text-3xl animate-float">🌸</span>
             <span className="font-display text-2xl font-black text-primary tracking-tight flex items-center">
-              {selectedCountry === 'Japão' ? (
-                <>
-                  Sabor do<span className="text-amber-700 font-extrabold text-sm bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-md ml-1">Campo</span>
-                </>
-              ) : (
-                <>
-                  Sakura<span className="text-yellow-500 font-extrabold text-sm bg-orange-50 border border-orange-200 px-1.5 py-0.5 rounded-md ml-1">Express</span>
-                </>
-              )}
+              Sakura<span className="text-yellow-500 font-extrabold text-xs bg-orange-50 border border-orange-200 px-1.5 py-0.5 rounded-md ml-1">Express</span>
             </span>
           </Link>
 

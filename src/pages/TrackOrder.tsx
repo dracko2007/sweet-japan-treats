@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { firebaseSyncService } from '@/services/firebaseSyncService';
+import { formatPrice } from '@/utils/currency';
 
 interface OrderStatus {
   status: 'pending' | 'processing' | 'confirmed' | 'shipped' | 'delivered' | 'cancelled';
@@ -148,9 +149,9 @@ const TrackOrder: React.FC = () => {
                   </div>
                   <div className="text-right">
                     <p className="text-3xl font-bold text-primary">
-                      ¥{searchedOrder.totalAmount.toLocaleString()}
+                      {formatPrice(searchedOrder.totalAmount, searchedOrder.currency || 'BRL')}
                     </p>
-                    <p className="text-sm text-muted-foreground">{searchedOrder.paymentMethod === 'bank' ? 'Depósito' : 'PayPay'}</p>
+                    <p className="text-sm text-muted-foreground">{searchedOrder.paymentMethod === 'bank' ? 'Depósito' : searchedOrder.paymentMethod === 'paypay' ? 'PayPay' : 'Cartão/Pix'}</p>
                   </div>
                 </div>
 
@@ -218,7 +219,7 @@ const TrackOrder: React.FC = () => {
                         <p className="font-medium">{item.productName}</p>
                         <p className="text-sm text-muted-foreground">{item.size} × {item.quantity}</p>
                       </div>
-                      <p className="font-semibold">¥{(item.price * item.quantity).toLocaleString()}</p>
+                      <p className="font-semibold">{formatPrice(item.price * item.quantity, searchedOrder.currency || 'BRL')}</p>
                     </div>
                   ))}
                 </div>

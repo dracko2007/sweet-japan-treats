@@ -95,9 +95,9 @@ export const emailServiceSimple = {
 <table width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.1);">
 
 <!-- Header -->
-<tr><td style="background:linear-gradient(135deg,#8B4513 0%,#A0522D 100%);padding:40px 30px;text-align:center;">
-<h1 style="margin:0;color:#ffffff;font-size:28px;font-weight:600;">🍮 Sabor do Campo</h1>
-<p style="margin:10px 0 0 0;color:#f5e6d3;font-size:14px;letter-spacing:1px;">DOCE DE LEITE ARTESANAL</p>
+<tr><td style="background:linear-gradient(135deg,#FF69B4 0%,#FFB6C1 100%);padding:40px 30px;text-align:center;">
+<h1 style="margin:0;color:#ffffff;font-size:28px;font-weight:600;">🌸 Sakura Express</h1>
+<p style="margin:10px 0 0 0;color:#f5e6d3;font-size:14px;letter-spacing:1px;">PRODUTOS IMPORTADOS DO JAPÃO</p>
 </td></tr>
 
 <!-- Success -->
@@ -115,7 +115,7 @@ export const emailServiceSimple = {
 <tr>
 <td style="color:#666666;font-size:14px;padding:15px;">
 <strong style="color:#1a1a1a;">📋 Número do Pedido:</strong><br>
-<span style="font-family:monospace;font-size:16px;color:#8B4513;">${orderData.orderNumber}</span>
+<span style="font-family:monospace;font-size:16px;color:#FF69B4;">${orderData.orderNumber}</span>
 </td>
 <td style="color:#666666;font-size:14px;padding:15px;text-align:right;">
 <strong style="color:#1a1a1a;">📅 Data:</strong><br>
@@ -127,7 +127,7 @@ export const emailServiceSimple = {
 
 <!-- Products -->
 <tr><td style="padding:30px;">
-<h3 style="margin:0 0 15px 0;color:#1a1a1a;font-size:18px;font-weight:600;border-bottom:2px solid #8B4513;padding-bottom:10px;">📦 Produtos</h3>
+<h3 style="margin:0 0 15px 0;color:#1a1a1a;font-size:18px;font-weight:600;border-bottom:2px solid #FF69B4;padding-bottom:10px;">📦 Produtos</h3>
 <div style="background-color:#ffffff;padding:15px;border:1px solid #e5e7eb;border-radius:8px;">
 ${itemsList.map((item: string) => `<p style="margin:5px 0;font-size:14px;color:#1a1a1a;">${item}</p>`).join('')}
 </div>
@@ -149,17 +149,17 @@ ${couponDiscount > 0 ? `
 <td style="color:#666666;font-size:15px;padding:8px 0;">🚚 Frete (${shipping.carrier}):</td>
 <td style="text-align:right;color:#1a1a1a;font-size:15px;font-weight:600;padding:8px 0;">¥${shipping.cost.toLocaleString()}</td>
 </tr>
-<tr style="border-top:2px solid #8B4513;">
+<tr style="border-top:2px solid #FF69B4;">
 <td style="color:#1a1a1a;font-size:18px;font-weight:700;padding:15px 0 8px 0;">💰 Total:</td>
-<td style="text-align:right;color:#8B4513;font-size:22px;font-weight:700;padding:15px 0 8px 0;">¥${(finalTotal + shipping.cost).toLocaleString()}</td>
+<td style="text-align:right;color:#FF69B4;font-size:22px;font-weight:700;padding:15px 0 8px 0;">¥${(finalTotal + shipping.cost).toLocaleString()}</td>
 </tr>
 </table>
 </td></tr>
 
 <!-- Address -->
 <tr><td style="padding:0 30px 30px 30px;">
-<h3 style="margin:0 0 15px 0;color:#1a1a1a;font-size:18px;font-weight:600;border-bottom:2px solid #8B4513;padding-bottom:10px;">📍 Endereço de Entrega</h3>
-<div style="background-color:#f8f9fa;padding:20px;border-radius:8px;border-left:4px solid #8B4513;">
+<h3 style="margin:0 0 15px 0;color:#1a1a1a;font-size:18px;font-weight:600;border-bottom:2px solid #FF69B4;padding-bottom:10px;">📍 Endereço de Entrega</h3>
+<div style="background-color:#f8f9fa;padding:20px;border-radius:8px;border-left:4px solid #FF69B4;">
 <p style="margin:5px 0;font-size:14px;color:#1a1a1a;"><strong>${orderData.formData.name}</strong></p>
 <p style="margin:5px 0;font-size:14px;color:#1a1a1a;">〒${orderData.formData.postalCode}</p>
 <p style="margin:5px 0;font-size:14px;color:#1a1a1a;">${orderData.formData.prefecture} ${orderData.formData.city}</p>
@@ -203,16 +203,16 @@ ${orderData.formData.building ? `<p style="margin:5px 0;font-size:14px;color:#1a
 
 <!-- Footer -->
 <tr><td style="background-color:#f8f9fa;padding:30px;text-align:center;border-top:1px solid #e5e7eb;">
-<p style="margin:0 0 10px 0;color:#1a1a1a;font-size:16px;font-weight:600;">Sabor do Campo - Doce de Leite Artesanal</p>
+<p style="margin:0 0 10px 0;color:#1a1a1a;font-size:16px;font-weight:600;">Sakura Express - Importados do Japão</p>
 <p style="margin:0 0 15px 0;color:#666666;font-size:14px;line-height:1.6;">
-Doce de leite artesanal brasileiro feito com amor no Japão.<br>
-Ingredientes selecionados e técnicas tradicionais.
+Sua conexão direta com os melhores cosméticos, papelaria, acessórios e doces exclusivos direto do Japão.<br>
+Enviado com carinho e rapidez.
 </p>
 <div style="margin:20px 0;">
-<a href="tel:070-1367-1679" style="display:inline-block;margin:0 10px;color:#8B4513;text-decoration:none;font-size:14px;">📞 070-1367-1679</a>
-<a href="mailto:dracko2007@gmail.com" style="display:inline-block;margin:0 10px;color:#8B4513;text-decoration:none;font-size:14px;">📧 dracko2007@gmail.com</a>
+<a href="tel:070-1367-1679" style="display:inline-block;margin:0 10px;color:#FF69B4;text-decoration:none;font-size:14px;">📞 070-1367-1679</a>
+<a href="mailto:contato@sakuraexpress.jp" style="display:inline-block;margin:0 10px;color:#FF69B4;text-decoration:none;font-size:14px;">📧 contato@sakuraexpress.jp</a>
 </div>
-<p style="margin:15px 0 0 0;color:#999999;font-size:12px;">© 2026 Sabor do Campo. Todos os direitos reservados.</p>
+<p style="margin:15px 0 0 0;color:#999999;font-size:12px;">© 2026 Sakura Express. Todos os direitos reservados.</p>
 </td></tr>
 
 </table>

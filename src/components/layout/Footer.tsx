@@ -4,7 +4,8 @@ import { Instagram, Facebook, Mail, MapPin } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 
 const Footer: React.FC = () => {
-  const { t } = useLanguage();
+  const { t, selectedCountry } = useLanguage();
+  const isJapan = selectedCountry === 'Japão';
 
   return (
     <footer className="bg-accent text-accent-foreground">
@@ -13,10 +14,10 @@ const Footer: React.FC = () => {
           {/* Brand */}
           <div className="md:col-span-2">
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center">
-                <span className="text-primary-foreground font-display font-bold text-lg">DL</span>
-              </div>
-              <span className="font-display text-xl font-semibold">Doce de Leite</span>
+              <span className="text-2xl animate-float">🌸</span>
+              <span className="font-display text-xl font-bold tracking-tight flex items-center">
+                Sakura<span className="text-yellow-500 font-extrabold text-xs bg-orange-50 border border-orange-200 px-1.5 py-0.5 rounded-md ml-1">Express</span>
+              </span>
             </div>
             <p className="text-accent-foreground/80 text-sm leading-relaxed max-w-md">
               {t('footer.description')}
@@ -28,7 +29,10 @@ const Footer: React.FC = () => {
               <a href="#" className="p-2 rounded-full bg-primary/20 hover:bg-primary/30 transition-colors">
                 <Facebook className="w-5 h-5" />
               </a>
-              <a href="mailto:contato@docedeleite.jp" className="p-2 rounded-full bg-primary/20 hover:bg-primary/30 transition-colors">
+              <a 
+                href="mailto:contato@sakuraexpress.jp" 
+                className="p-2 rounded-full bg-primary/20 hover:bg-primary/30 transition-colors"
+              >
                 <Mail className="w-5 h-5" />
               </a>
             </div>
@@ -74,7 +78,7 @@ const Footer: React.FC = () => {
               <div className="flex items-start gap-2">
                 <Mail className="w-4 h-4 mt-0.5 text-primary" />
                 <span className="text-sm text-accent-foreground/80">
-                  contato@docedeleite.jp
+                  contato@sakuraexpress.jp
                 </span>
               </div>
             </div>
@@ -83,7 +87,7 @@ const Footer: React.FC = () => {
 
         <div className="border-t border-accent-foreground/10 mt-10 pt-6 text-center">
           <p className="text-sm text-accent-foreground/60">
-            © {new Date().getFullYear()} Doce de Leite. {t('footer.rights')}
+            © {new Date().getFullYear()} Sakura Express. {t('footer.rights')}
           </p>
         </div>
       </div>

@@ -1,65 +1,72 @@
-import React from 'react';
-import { Play, Calendar, Clock, Eye } from 'lucide-react';
+import React, { useState } from 'react';
+import { Play, Calendar, Clock, Eye, X } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import { useLanguage } from '@/context/LanguageContext';
 
 const Vlog: React.FC = () => {
   const { t, language } = useLanguage();
+  const [playingVideo, setPlayingVideo] = useState<string | null>(null);
 
   const videos = [
     {
       id: 1,
       titleKey: 'vlog.video1.title',
       descKey: 'vlog.video1.desc',
-      thumbnail: '🍯',
-      duration: '12:34',
-      date: '2024-01-15',
-      views: '2.5K'
+      thumbnail: '/video/thumb_simples_recebendo.png',
+      videoUrl: 'tYcA1j-fcKg',
+      duration: '14:02',
+      date: '2026-05-15',
+      views: '12.5K'
     },
     {
       id: 2,
       titleKey: 'vlog.video2.title',
       descKey: 'vlog.video2.desc',
-      thumbnail: '🍵',
-      duration: '8:45',
-      date: '2024-01-08',
-      views: '1.8K'
+      thumbnail: '/video/thumb_simples_abrindo.png',
+      videoUrl: '1xN5_p-lU0Y',
+      duration: '12:45',
+      date: '2026-05-08',
+      views: '8.2K'
     },
     {
       id: 3,
       titleKey: 'vlog.video3.title',
       descKey: 'vlog.video3.desc',
-      thumbnail: '🏠',
-      duration: '6:20',
-      date: '2024-01-01',
-      views: '3.2K'
+      thumbnail: '/video/thumb_simples_provando.png',
+      videoUrl: 'S7R97sV1w8k',
+      duration: '13:28',
+      date: '2026-05-01',
+      views: '9.8K'
     },
     {
       id: 4,
       titleKey: 'vlog.video4.title',
       descKey: 'vlog.video4.desc',
-      thumbnail: '🍰',
-      duration: '15:10',
-      date: '2023-12-20',
-      views: '4.1K'
+      thumbnail: '/video/thumb_simples_cosmetico.png',
+      videoUrl: '1xN5_p-lU0Y',
+      duration: '12:45',
+      date: '2026-04-20',
+      views: '14.1K'
     },
     {
       id: 5,
       titleKey: 'vlog.video5.title',
       descKey: 'vlog.video5.desc',
-      thumbnail: '🇧🇷',
-      duration: '10:55',
-      date: '2023-12-10',
-      views: '2.9K'
+      thumbnail: '📦',
+      videoUrl: 'tYcA1j-fcKg',
+      duration: '14:02',
+      date: '2026-04-10',
+      views: '4.9K'
     },
     {
       id: 6,
       titleKey: 'vlog.video6.title',
       descKey: 'vlog.video6.desc',
-      thumbnail: '📦',
-      duration: '7:30',
-      date: '2023-12-01',
-      views: '1.5K'
+      thumbnail: '📮',
+      videoUrl: 'S7R97sV1w8k',
+      duration: '13:28',
+      date: '2026-04-01',
+      views: '3.5K'
     }
   ];
 
@@ -84,29 +91,36 @@ const Vlog: React.FC = () => {
         <div className="container mx-auto px-4">
           {/* Featured Video */}
           <div className="mb-12">
-            <div className="relative aspect-video rounded-3xl overflow-hidden bg-gradient-to-br from-caramel-light/40 to-primary/30 shadow-elevated">
+            <div 
+              className="relative aspect-video rounded-3xl overflow-hidden bg-cover bg-center shadow-elevated group cursor-pointer border border-border/40"
+              style={{ backgroundImage: `url(${videos[0].thumbnail})` }}
+              onClick={() => setPlayingVideo(videos[0].videoUrl)}
+            >
+              {/* Dark shading overlay */}
+              <div className="absolute inset-0 bg-black/45 group-hover:bg-black/35 transition-colors duration-300" />
+              
               <div className="absolute inset-0 flex items-center justify-center">
-                <div className="text-center">
-                  <button className="group w-24 h-24 rounded-full gradient-caramel shadow-elevated flex items-center justify-center transition-transform hover:scale-110 mb-6">
-                    <Play className="w-10 h-10 text-primary-foreground ml-1" fill="currentColor" />
+                <div className="text-center text-white px-4">
+                  <button className="group w-20 h-20 rounded-full bg-white/95 text-primary shadow-elevated flex items-center justify-center transition-transform hover:scale-110 mb-5 mx-auto">
+                    <Play className="w-8 h-8 text-primary fill-primary ml-1" />
                   </button>
-                  <h2 className="font-display text-2xl font-bold text-foreground">
+                  <h2 className="font-display text-2xl lg:text-3xl font-bold mb-2 drop-shadow-md">
                     {t(videos[0].titleKey)}
                   </h2>
-                  <p className="text-muted-foreground mt-2 max-w-lg mx-auto">
+                  <p className="text-white/90 text-sm max-w-lg mx-auto leading-relaxed drop-shadow-sm">
                     {t(videos[0].descKey)}
                   </p>
                 </div>
               </div>
               
-              <div className="absolute bottom-6 left-6 right-6 flex items-center justify-between">
-                <div className="flex items-center gap-4 text-sm text-foreground/80">
-                  <span className="flex items-center gap-1">
-                    <Clock className="w-4 h-4" />
+              <div className="absolute bottom-6 left-6 right-6 flex items-center justify-between text-white/95">
+                <div className="flex items-center gap-4 text-xs font-bold">
+                  <span className="flex items-center gap-1 bg-black/40 backdrop-blur-sm px-3 py-1.5 rounded-full">
+                    <Clock className="w-3.5 h-3.5" />
                     {videos[0].duration}
                   </span>
-                  <span className="flex items-center gap-1">
-                    <Eye className="w-4 h-4" />
+                  <span className="flex items-center gap-1 bg-black/40 backdrop-blur-sm px-3 py-1.5 rounded-full">
+                    <Eye className="w-3.5 h-3.5" />
                     {videos[0].views} {t('vlog.views')}
                   </span>
                 </div>
@@ -117,43 +131,57 @@ const Vlog: React.FC = () => {
           {/* Video Grid */}
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {videos.slice(1).map((video) => (
-              <div key={video.id} className="group card-product cursor-pointer">
+              <div 
+                key={video.id} 
+                className="group bg-card rounded-2xl overflow-hidden border border-border shadow-sm hover:shadow-md hover:-translate-y-1 transition-all duration-300 cursor-pointer flex flex-col justify-between"
+                onClick={() => setPlayingVideo(video.videoUrl)}
+              >
                 <div className="aspect-video bg-secondary/50 relative overflow-hidden">
-                  <div className="absolute inset-0 bg-gradient-to-br from-caramel-light/30 to-primary/20 flex items-center justify-center">
-                    <span className="text-6xl group-hover:scale-110 transition-transform duration-300">
-                      {video.thumbnail}
-                    </span>
-                  </div>
+                  {video.thumbnail.startsWith('/') ? (
+                    <img 
+                      src={video.thumbnail} 
+                      alt={t(video.titleKey)} 
+                      className="w-full h-full object-cover group-hover:scale-103 transition-transform duration-500"
+                    />
+                  ) : (
+                    <div className="absolute inset-0 bg-gradient-to-br from-caramel-light/30 to-primary/20 flex items-center justify-center">
+                      <span className="text-6xl group-hover:scale-110 transition-transform duration-300">
+                        {video.thumbnail}
+                      </span>
+                    </div>
+                  )}
                   
-                  <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-foreground/20">
-                    <div className="w-16 h-16 rounded-full gradient-caramel flex items-center justify-center">
-                      <Play className="w-8 h-8 text-primary-foreground ml-1" fill="currentColor" />
+                  <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/40">
+                    <div className="w-14 h-14 rounded-full bg-white text-primary flex items-center justify-center shadow-lg">
+                      <Play className="w-6 h-6 text-primary fill-primary ml-1" />
                     </div>
                   </div>
 
                   <div className="absolute bottom-3 right-3">
-                    <span className="px-2 py-1 rounded bg-foreground/80 text-background text-xs font-medium">
+                    <span className="px-2.5 py-1 rounded-lg bg-black/75 text-white text-[10px] font-bold">
                       {video.duration}
                     </span>
                   </div>
                 </div>
 
-                <div className="p-5">
-                  <h3 className="font-display text-lg font-semibold text-foreground group-hover:text-primary transition-colors line-clamp-2">
-                    {t(video.titleKey)}
-                  </h3>
-                  <p className="text-sm text-muted-foreground mt-2 line-clamp-2">
-                    {t(video.descKey)}
-                  </p>
+                <div className="p-5 flex-1 flex flex-col justify-between">
+                  <div>
+                    <h3 className="font-display text-base font-bold text-foreground group-hover:text-primary transition-colors line-clamp-2">
+                      {t(video.titleKey)}
+                    </h3>
+                    <p className="text-xs text-muted-foreground mt-2 line-clamp-2 leading-relaxed">
+                      {t(video.descKey)}
+                    </p>
+                  </div>
                   
-                  <div className="flex items-center gap-4 mt-4 text-xs text-muted-foreground">
+                  <div className="flex items-center gap-4 mt-4 text-[10px] text-muted-foreground border-t border-border/60 pt-3">
                     <span className="flex items-center gap-1">
-                      <Calendar className="w-3 h-3" />
+                      <Calendar className="w-3.5 h-3.5" />
                       {new Date(video.date).toLocaleDateString(dateLocale)}
                     </span>
                     <span className="flex items-center gap-1">
-                      <Eye className="w-3 h-3" />
-                      {video.views}
+                      <Eye className="w-3.5 h-3.5" />
+                      {video.views} {t('vlog.views')}
                     </span>
                   </div>
                 </div>
@@ -171,16 +199,53 @@ const Vlog: React.FC = () => {
               {t('vlog.subscribeDesc')}
             </p>
             <div className="flex justify-center gap-4">
-              <a href="#" className="px-6 py-2.5 rounded-full bg-destructive text-destructive-foreground font-medium hover:bg-destructive/90 transition-colors">
+              <a href="#" className="px-6 py-2.5 rounded-full bg-destructive text-destructive-foreground font-medium hover:bg-destructive/90 transition-colors text-sm">
                 YouTube
               </a>
-              <a href="#" className="px-6 py-2.5 rounded-full gradient-caramel text-primary-foreground font-medium hover:opacity-90 transition-opacity">
+              <a href="#" className="px-6 py-2.5 rounded-full gradient-caramel text-primary-foreground font-medium hover:opacity-90 transition-opacity text-sm">
                 Instagram
               </a>
             </div>
           </div>
         </div>
       </section>
+
+      {/* Video Modal Player */}
+      {playingVideo && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm animate-fade-in p-4">
+          <div className="relative w-full max-w-4xl bg-black rounded-2xl overflow-hidden shadow-2xl border border-white/10">
+            <button 
+              onClick={() => setPlayingVideo(null)}
+              className="absolute top-4 right-4 z-10 p-2 rounded-full bg-black/60 text-white hover:bg-black/80 hover:text-primary transition-all"
+              aria-label="Close video"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <div className="aspect-video w-full bg-black">
+              {(!playingVideo.startsWith('http') && !playingVideo.startsWith('/')) || playingVideo.includes('youtube.com') || playingVideo.includes('youtu.be') ? (
+                <iframe
+                  src={playingVideo.includes('youtube.com') || playingVideo.includes('youtu.be') 
+                    ? playingVideo.replace('watch?v=', 'embed/') 
+                    : `https://www.youtube.com/embed/${playingVideo}?autoplay=1&rel=0`
+                  }
+                  title="Video Player"
+                  frameBorder="0"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                  allowFullScreen
+                  className="w-full h-full"
+                ></iframe>
+              ) : (
+                <video 
+                  src={playingVideo} 
+                  controls 
+                  autoPlay 
+                  className="w-full h-full object-contain"
+                />
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </Layout>
   );
 };

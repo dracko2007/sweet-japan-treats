@@ -11,29 +11,22 @@ const Products: React.FC = () => {
   const { category } = useParams<{ category?: string }>();
   const { t, selectedCountry } = useLanguage();
   
-  const displayProducts = (category && category !== 'all'
+  const displayProducts = category && category !== 'all'
     ? getProductsByCategory(category)
-    : products
-  ).filter(p => {
-    if (selectedCountry === 'Japão') {
-      return p.deliveryRestrict === 'Japão';
-    } else {
-      return p.deliveryRestrict !== 'Japão';
-    }
-  });
+    : products;
 
+  // Só mostra categorias que realmente têm produtos cadastrados
+  const availableCategories = Array.from(new Set(products.map(p => p.category)));
+  const allCategories = [
+    { id: 'cosmeticos', label: t('nav.products.cosmeticos'), href: '/produtos/cosmeticos' },
+    { id: 'acessorios', label: t('nav.products.acessorios'), href: '/produtos/acessorios' },
+    { id: 'doces', label: t('nav.products.doces'), href: '/produtos/doces' },
+    { id: 'papelaria', label: t('nav.products.papelaria'), href: '/produtos/papelaria' },
+  ];
   const categories = [
     { id: 'all', label: t('productsPage.all') || 'Todos', href: '/produtos' },
-    { id: 'cosmeticos', label: t('nav.products.cosmeticos'), href: '/produtos/cosmeticos', restrict: 'Brasil' },
-    { id: 'acessorios', label: t('nav.products.acessorios'), href: '/produtos/acessorios', restrict: 'Brasil' },
-    { id: 'doces', label: t('nav.products.doces'), href: '/produtos/doces', restrict: 'Brasil' },
-    { id: 'papelaria', label: t('nav.products.papelaria'), href: '/produtos/papelaria', restrict: 'Brasil' },
-    { id: 'doce-de-leite', label: t('nav.products.docedeleite'), href: '/produtos/doce-de-leite', restrict: 'Japão' },
-  ].filter(cat => {
-    if (cat.restrict === 'Japão') return selectedCountry === 'Japão';
-    if (cat.restrict === 'Brasil') return selectedCountry === 'Brasil';
-    return true;
-  });
+    ...allCategories.filter(c => availableCategories.includes(c.id)),
+  ];
 
   const currentCategory = category || 'all';
 
@@ -80,20 +73,17 @@ const Products: React.FC = () => {
                   {category === 'cosmeticos' ? '🧴' : 
                    category === 'acessorios' ? '🎮' : 
                    category === 'doces' ? '🍵' : 
-                   category === 'papelaria' ? '✏️' : 
-                   category === 'doce-de-leite' ? '🍯' : '🌸'}
+                   category === 'papelaria' ? '✏️' : '🌸'}
                 </div>
                 <div>
                   <h2 className="font-display text-2xl font-bold text-foreground">
-                    {category === 'doce-de-leite' ? t('nav.products.docedeleite') : 
-                     category === 'cosmeticos' ? t('nav.products.cosmeticos') : 
+                    {category === 'cosmeticos' ? t('nav.products.cosmeticos') : 
                      category === 'acessorios' ? t('nav.products.acessorios') : 
                      category === 'doces' ? t('nav.products.doces') : 
                      category === 'papelaria' ? t('nav.products.papelaria') : category}
                   </h2>
                   <p className="text-muted-foreground">
-                    {category === 'doce-de-leite' ? 'O legítimo doce de leite cremoso brasileiro, disponível apenas para envio rápido no Japão com frete grátis!' : 
-                     category === 'cosmeticos' ? 'Os cosméticos, protetores solares e produtos de skin care mais famosos e tecnológicos do Japão.' : 
+                    {category === 'cosmeticos' ? 'Os cosméticos, protetores solares e produtos de skin care mais famosos e tecnológicos do Japão.' : 
                      category === 'acessorios' ? 'Action figures originais de anime, luminárias kawaii e organizadores de design minimalista.' : 
                      category === 'doces' ? 'Doces finos de matcha, chás verdes tradicionais orgânicos e guloseimas exclusivas de Tóquio.' : 
                      category === 'papelaria' ? 'Canetas gel Sakura de fluxo suave e papelaria japonesa de alta durabilidade e estilo.' : 

@@ -10,6 +10,7 @@ export interface UserProfile {
   phone: string;
   password?: string; // Stored for demo purposes - in production, use backend authentication
   birthdate?: string;
+  whatsappMarketing?: boolean;
   address: {
     postalCode: string;
     prefecture: string;

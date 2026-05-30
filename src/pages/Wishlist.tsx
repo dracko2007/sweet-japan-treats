@@ -150,9 +150,16 @@ const Wishlist: React.FC = () => {
                             </h3>
                             <p className="text-primary font-bold text-xl mb-2">
                               {(() => {
-                                const p = products.find(prod => prod.id === item.productId);
-                                const cur = p?.deliveryRestrict === 'Japão' ? 'JPY' : (selectedCountry === 'Japão' ? 'JPY' : 'BRL');
-                                const price = (p?.deliveryRestrict !== 'Japão' && selectedCountry === 'Japão') ? item.productPrice * 28 : item.productPrice;
+                                const isEuro = ['Portugal', 'França', 'Itália', 'Espanha'].includes(selectedCountry);
+                                const cur = selectedCountry === 'Japão' ? 'JPY' : (isEuro ? 'EUR' : 'BRL');
+                                let price = item.productPrice; // base is JPY
+                                if (selectedCountry === 'Japão') {
+                                  price = item.productPrice;
+                                } else if (isEuro) {
+                                  price = (item.productPrice / 28) * 0.16;
+                                } else {
+                                  price = item.productPrice / 28;
+                                }
                                 return formatPrice(price, cur);
                               })()}
                             </p>

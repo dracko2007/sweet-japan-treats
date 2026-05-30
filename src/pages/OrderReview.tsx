@@ -44,17 +44,19 @@ const OrderReview: React.FC = () => {
     window.print();
   };
 
-  const isJapan = formData.country === 'Japão';
-  const currency = isJapan ? 'JPY' : 'BRL';
+  const isEurope = ['Portugal', 'França', 'Itália', 'Espanha'].includes(formData.country);
+  const currency = isJapan ? 'JPY' : (isEurope ? 'EUR' : 'BRL');
 
   // Base Total Price (subtotal before discounts/taxes) in target currency
   const baseTotalPrice = items.reduce((sum, item) => {
-    const price = item.size === 'small' ? item.product.prices.small : item.product.prices.large;
-    let unitPrice = price;
+    const basePrice = item.size === 'small' ? item.product.prices.small : item.product.prices.large;
+    let unitPrice = basePrice;
     if (isJapan) {
-      if (item.product.deliveryRestrict !== 'Japão') {
-        unitPrice = price * 28; // BRL to JPY conversion
-      }
+      unitPrice = basePrice;
+    } else if (isEurope) {
+      unitPrice = (basePrice / 28) * 0.16;
+    } else {
+      unitPrice = basePrice / 28; // BRL
     }
     return sum + unitPrice * item.quantity;
   }, 0);
@@ -62,41 +64,51 @@ const OrderReview: React.FC = () => {
   // PIX gets 5% additional discount (Temu high conversion strategy) - ONLY for Brazil
   const isPix = paymentMethod === 'pix';
   const subtotalWithCoupon = baseTotalPrice - couponDiscount;
-  const pixDiscount = (!isJapan && isPix) ? subtotalWithCoupon * 0.05 : 0;
+  const pixDiscount = (formData.country === 'Brasil' && isPix) ? subtotalWithCoupon * 0.05 : 0;
   const priceAfterPix = subtotalWithCoupon - pixDiscount;
   
-  // Brazil Taxes (ICMS and Import Tax)
+  // Taxes (Estimated only, NOT added to grand total)
   let federalTax = 0;
   let icmsTax = 0;
+  let estimatedTax = 0;
+  let taxLabel = '';
   
-  if (!isJapan) {
+  if (formData.country === 'Brasil') {
     const isBelow50USD = priceAfterPix < 250;
     federalTax = isBelow50USD
       ? priceAfterPix * 0.20
       : (priceAfterPix * 0.60) - 62.50;
       
     icmsTax = (priceAfterPix + federalTax) * 0.17;
+    estimatedTax = federalTax + icmsTax;
+    taxLabel = 'Impostos Estimados (Brasil)';
+  } else if (isEurope) {
+    const rates: Record<string, number> = { Portugal: 0.23, França: 0.20, Itália: 0.22, Espanha: 0.21 };
+    const rate = rates[formData.country] || 0.20;
+    estimatedTax = priceAfterPix * rate;
+    taxLabel = `IVA / VAT Estimado (${Math.round(rate * 100)}%)`;
   }
   
-  const taxAmount = federalTax + icmsTax;
+  const taxAmount = estimatedTax; // Saved in mockOrder for administrative visibility
+  
   const finalShippingCost = appliedCoupon?.freeShipping ? 0 : shipping.cost;
-  const grandTotal = priceAfterPix + taxAmount + finalShippingCost;
+  // Grand Total only includes products + shipping (NO TAXES ADDED!)
+  const grandTotal = priceAfterPix + finalShippingCost;
 
   const handleConfirmOrder = () => {
     toast({
       title: "Processando Pedido...",
-      description: isJapan ? "Preparando seu pedido com o centro de Mie." : "Preparando seus dados com a aduana do Brasil.",
+      description: isJapan ? "Preparando seu pedido com o centro de Mie." : `Preparando seus dados com a aduana ${formData.country === 'Brasil' ? 'do Brasil' : 'de destino'}.`,
     });
+
+    const countryPrefix = isJapan ? 'JP' : formData.country === 'Brasil' ? 'BR' : formData.country === 'Portugal' ? 'PT' : formData.country === 'França' ? 'FR' : formData.country === 'Itália' ? 'IT' : 'ES';
 
     const orderId = isJapan 
       ? `SC-JP-${Math.floor(100000 + Math.random() * 900000)}`
-      : `SE-BR-${Math.floor(100000 + Math.random() * 900000)}`;
+      : `SE-${countryPrefix}-${Math.floor(100000 + Math.random() * 900000)}`;
 
-    const trackingPrefix = isJapan ? 'JP' : 'NX';
-    const trackingSuffix = isJapan ? 'JP' : 'JP';
-    const trackingCode = isJapan 
-      ? `LP${Math.floor(100000000 + Math.random() * 900000000)}JP`
-      : `NX${Math.floor(100000000 + Math.random() * 900000000)}JP`;
+    const trackingPrefix = isJapan ? 'JP' : countryPrefix === 'BR' ? 'NX' : 'EX';
+    const trackingCode = `${trackingPrefix}${Math.floor(100000000 + Math.random() * 900000000)}JP`;
 
     // Save mock order to simulated db (local storage for the admin panel)
     const mockOrder = {
@@ -110,6 +122,7 @@ const OrderReview: React.FC = () => {
       city: formData.city,
       address: formData.address,
       building: formData.building,
+      country: formData.country,
       shippingCarrier: shipping.carrier,
       shippingCost: finalShippingCost,
       subtotal: baseTotalPrice,
@@ -126,12 +139,14 @@ const OrderReview: React.FC = () => {
       trackingCode: trackingCode,
       date: new Date().toLocaleDateString('pt-BR'),
       items: items.map(item => {
-        const p = item.size === 'small' ? item.product.prices.small : item.product.prices.large;
-        let finalUnitPrice = p;
+        const basePrice = item.size === 'small' ? item.product.prices.small : item.product.prices.large;
+        let finalUnitPrice = basePrice;
         if (isJapan) {
-          if (item.product.deliveryRestrict !== 'Japão') {
-            finalUnitPrice = p * 28; // BRL to JPY
-          }
+          finalUnitPrice = basePrice;
+        } else if (isEurope) {
+          finalUnitPrice = (basePrice / 28) * 0.16;
+        } else {
+          finalUnitPrice = basePrice / 28; // BRL
         }
         return {
           id: item.product.id,
@@ -202,12 +217,14 @@ const OrderReview: React.FC = () => {
 
               <div className="space-y-4">
                 {items.map((item) => {
-                  const price = item.size === 'small' ? item.product.prices.small : item.product.prices.large;
-                  let displayUnitPrice = price;
+                  const basePrice = item.size === 'small' ? item.product.prices.small : item.product.prices.large;
+                  let displayUnitPrice = basePrice;
                   if (isJapan) {
-                    if (item.product.deliveryRestrict !== 'Japão') {
-                      displayUnitPrice = price * 28; // Convert BRL to JPY
-                    }
+                    displayUnitPrice = basePrice;
+                  } else if (isEurope) {
+                    displayUnitPrice = (basePrice / 28) * 0.16;
+                  } else {
+                    displayUnitPrice = basePrice / 28; // BRL
                   }
                   const displayItemPrice = displayUnitPrice * item.quantity;
                   const productName = getTranslatedProductName(item.product.id, t);
@@ -260,17 +277,17 @@ const OrderReview: React.FC = () => {
                     </div>
                   )}
 
-                  {formData.country === 'Brasil' && (
-                    <>
-                      <div className="flex justify-between text-muted-foreground">
-                        <span>Imposto de Importação Federal ({subtotalWithCoupon < 250 ? '20%' : '60%'})</span>
-                        <span>{formatPrice(federalTax, 'BRL')}</span>
+                  {/* Estimated international taxes (shown only as reminder, not summed) */}
+                  {formData.country !== 'Japão' && estimatedTax > 0 && (
+                    <div className="bg-orange-50/50 dark:bg-orange-950/10 border border-orange-200/60 rounded-xl p-3 space-y-2 mt-2">
+                      <div className="flex justify-between text-xs font-bold text-orange-850 dark:text-orange-300">
+                        <span>{taxLabel}</span>
+                        <span>{formatPrice(estimatedTax, currency)}</span>
                       </div>
-                      <div className="flex justify-between text-muted-foreground">
-                        <span>ICMS Estadual (17%)</span>
-                        <span>{formatPrice(icmsTax, 'BRL')}</span>
-                      </div>
-                    </>
+                      <p className="text-[10px] text-orange-700 dark:text-orange-400 leading-relaxed font-semibold">
+                        ⚠️ <strong>Nota:</strong> Este imposto é aproximado e poderá ser cobrado pela alfândega local na chegada do pacote no país de destino. Ele <strong>NÃO</strong> foi adicionado ao total geral cobrado no site.
+                      </p>
+                    </div>
                   )}
 
                   <div className="flex justify-between text-muted-foreground">
@@ -279,7 +296,7 @@ const OrderReview: React.FC = () => {
                   </div>
 
                   <div className="text-[10px] text-gray-400 text-right">
-                    {isJapan ? 'Envio doméstico seguro de Mie Prefecture.' : 'Voo internacional Tóquio para Brasil.'} Entrega estimada: {shipping.estimatedDays} dias úteis
+                    {isJapan ? 'Envio doméstico seguro de Mie Prefecture.' : `Voo internacional Tóquio para ${formData.country}.`} Entrega estimada: {shipping.estimatedDays} dias úteis
                   </div>
 
                   <div className="flex justify-between pt-3 border-t border-border font-black text-lg">
@@ -334,9 +351,16 @@ const OrderReview: React.FC = () => {
                 <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
                   <MapPin className="w-5 h-5 text-primary" />
                 </div>
-                 <h2 className="font-sans text-xl font-bold text-foreground">
-                   Endereço de Entrega ({isJapan ? 'Japão 🇯🇵' : 'Brasil 🇧🇷'})
-                 </h2>
+                  <h2 className="font-sans text-xl font-bold text-foreground">
+                    Endereço de Entrega ({
+                      formData.country === 'Japão' ? 'Japão 🇯🇵' :
+                      formData.country === 'Brasil' ? 'Brasil 🇧🇷' :
+                      formData.country === 'Portugal' ? 'Portugal 🇵🇹' :
+                      formData.country === 'França' ? 'França 🇫🇷' :
+                      formData.country === 'Itália' ? 'Itália 🇮🇹' :
+                      'Espanha 🇪🇸'
+                    })
+                  </h2>
               </div>
               
               <div className="space-y-3 text-sm">

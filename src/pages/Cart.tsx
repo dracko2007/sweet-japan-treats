@@ -18,14 +18,7 @@ const Cart: React.FC = () => {
   const [activeCoupon, setActiveCoupon] = useState<{ code: string; discountPercent: number } | null>(null);
   const [couponError, setCouponError] = useState('');
 
-  // Enforce country destination if Japan-only items are in cart
-  const hasJapanOnlyItems = items.some(item => item.product.deliveryRestrict === 'Japão');
-
-  useEffect(() => {
-    if (hasJapanOnlyItems && selectedCountry !== 'Japão') {
-      setSelectedCountry('Japão');
-    }
-  }, [hasJapanOnlyItems, selectedCountry, setSelectedCountry]);
+  // No shipping restriction since all products are available globally
 
   // Check for Wheel of Fortune coupon in safeStorage on load
   useEffect(() => {
@@ -59,15 +52,18 @@ const Cart: React.FC = () => {
   };
 
   // Calculations in correct currency
-  const currency = selectedCountry === 'Japão' ? 'JPY' : 'BRL';
+  const isEuro = ['Portugal', 'França', 'Itália', 'Espanha'].includes(selectedCountry);
+  const currency = selectedCountry === 'Japão' ? 'JPY' : (isEuro ? 'EUR' : 'BRL');
   
   const baseTotalPrice = items.reduce((sum, item) => {
-    const price = item.size === 'small' ? item.product.prices.small : item.product.prices.large;
-    let unitPrice = price;
+    const basePrice = item.size === 'small' ? item.product.prices.small : item.product.prices.large;
+    let unitPrice = basePrice;
     if (selectedCountry === 'Japão') {
-      if (item.product.deliveryRestrict !== 'Japão') {
-        unitPrice = price * 28; // Convert BRL to JPY
-      }
+      unitPrice = basePrice;
+    } else if (isEuro) {
+      unitPrice = (basePrice / 28) * 0.16;
+    } else {
+      unitPrice = basePrice / 28; // BRL
     }
     return sum + unitPrice * item.quantity;
   }, 0);
@@ -76,24 +72,30 @@ const Cart: React.FC = () => {
   const discountAmount = baseTotalPrice * (discountPercent / 100);
   const subtotalWithDiscount = baseTotalPrice - discountAmount;
   
-  // Tax calculations
+  // Tax calculations (Estimated only, NOT added to grandTotal)
   let federalTax = 0;
   let icmsTax = 0;
-  let grandTotal = subtotalWithDiscount;
-
+  let estimatedTax = 0;
+  let taxLabel = '';
+  
   if (selectedCountry === 'Brasil') {
-    // New Brazilian Tax rules (post-August 2024):
-    // Up to $50 USD (approx. R$ 250): 20% Federal Tax + 17% ICMS
-    // Above $50 USD: 60% Federal Tax (with R$ 62.50 deduction) + 17% ICMS
     const isBelow50USD = subtotalWithDiscount < 250;
-    
     federalTax = isBelow50USD
       ? subtotalWithDiscount * 0.20
       : (subtotalWithDiscount * 0.60) - 62.50;
       
     icmsTax = (subtotalWithDiscount + federalTax) * 0.17;
-    grandTotal = subtotalWithDiscount + federalTax + icmsTax;
+    estimatedTax = federalTax + icmsTax;
+    taxLabel = 'Imposto de Importação Estimado (Brasil)';
+  } else if (isEuro) {
+    const rates: Record<string, number> = { Portugal: 0.23, França: 0.20, Itália: 0.22, Espanha: 0.21 };
+    const rate = rates[selectedCountry] || 0.20;
+    estimatedTax = subtotalWithDiscount * rate;
+    taxLabel = `IVA / VAT Estimado (${Math.round(rate * 100)}%)`;
   }
+
+  // Grand total ONLY has items subtotal (no taxes added!)
+  const grandTotal = subtotalWithDiscount;
 
   return (
     <Layout>
@@ -101,7 +103,15 @@ const Cart: React.FC = () => {
         <div className="container mx-auto px-4">
           <div className="text-center">
             <h1 className="font-display text-4xl lg:text-5xl font-bold text-foreground mb-4">
-              {selectedCountry === 'Japão' ? 'Carrinho de Compras (Japão 🇯🇵)' : 'Carrinho de Compras (Internacional 🇧🇷)'}
+              {selectedCountry === 'Japão' 
+                ? 'Carrinho de Compras (Japão 🇯🇵)' 
+                : `Carrinho de Compras (${selectedCountry} ${
+                    selectedCountry === 'Brasil' ? '🇧🇷' : 
+                    selectedCountry === 'Portugal' ? '🇵🇹' : 
+                    selectedCountry === 'França' ? '🇫🇷' : 
+                    selectedCountry === 'Itália' ? '🇮🇹' : '🇪🇸'
+                  })`
+              }
             </h1>
             <p className="text-muted-foreground text-lg">
               {items.length > 0 
@@ -134,20 +144,7 @@ const Cart: React.FC = () => {
                   </Button>
                 </div>
 
-                {/* Japan-only Restriction Warning Banner */}
-                {hasJapanOnlyItems && (
-                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
-                    <span className="text-xl">⚠️</span>
-                    <div>
-                      <h4 className="font-sans font-bold text-sm text-amber-800">
-                        Entrega Exclusiva no Japão
-                      </h4>
-                      <p className="text-xs text-amber-700 mt-1 leading-relaxed">
-                        O seu carrinho contém produtos de <strong>Doce de Leite Sabor do Campo</strong>. Estes produtos são fabricados artesanalmente e enviados apenas localmente dentro do Japão. Por este motivo, o destino de envio foi definido e fixado como Japão.
-                      </p>
-                    </div>
-                  </div>
-                )}
+
 
                 {items.map((item) => (
                   <CartItemComponent 
@@ -245,29 +242,17 @@ const Cart: React.FC = () => {
                       </div>
                     )}
 
-                    {/* Tax displays only for Brazil */}
-                    {selectedCountry === 'Brasil' && (
-                      <>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground flex items-center gap-1">
-                            Imposto Federal ({subtotalWithDiscount < 250 ? '20%' : '60%'})
-                            <span title={subtotalWithDiscount < 250 ? "Imposto federal de 20% para compras abaixo de US$ 50" : "Imposto federal de 60% para compras acima de US$ 50 (deduzido R$ 62,50)"}>
-                              <HelpCircle className="w-3.5 h-3.5 text-gray-400" />
-                            </span>
-                          </span>
-                          <span className="font-semibold text-gray-800">{formatPrice(federalTax, 'BRL')}</span>
+                    {/* Tax displays only as estimated warnings for international destinations */}
+                    {selectedCountry !== 'Japão' && estimatedTax > 0 && (
+                      <div className="bg-orange-50/50 dark:bg-orange-950/10 border border-orange-200/60 rounded-xl p-3 space-y-2 mt-2">
+                        <div className="flex justify-between text-xs font-bold text-orange-850 dark:text-orange-300">
+                          <span>{taxLabel}</span>
+                          <span>{formatPrice(estimatedTax, currency)}</span>
                         </div>
-
-                        <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground flex items-center gap-1">
-                            ICMS Estadual (17%)
-                            <span title="Imposto estadual aplicado sobre o valor aduaneiro">
-                              <HelpCircle className="w-3.5 h-3.5 text-gray-400" />
-                            </span>
-                          </span>
-                          <span className="font-semibold text-gray-800">{formatPrice(icmsTax, 'BRL')}</span>
-                        </div>
-                      </>
+                        <p className="text-[10px] text-orange-700 dark:text-orange-400 leading-relaxed font-semibold">
+                          ⚠️ <strong>Lembrete:</strong> Este imposto é apenas uma estimativa aproximada. Ele <strong>NÃO</strong> foi somado ao total geral do seu carrinho e poderá ser cobrado pela alfândega local na chegada do pacote ao país de destino.
+                        </p>
+                      </div>
                     )}
 
                     <div className="flex justify-between text-sm">
@@ -281,7 +266,7 @@ const Cart: React.FC = () => {
                         <span className="font-black text-2xl text-orange-600">
                           {formatPrice(grandTotal, currency)}
                         </span>
-                        {selectedCountry === 'Brasil' ? (
+                        {selectedCountry !== 'Japão' ? (
                           <p className="text-[10px] text-gray-400 font-semibold mt-0.5">ou até 12x no cartão</p>
                         ) : (
                           <p className="text-[10px] text-gray-400 font-semibold mt-0.5">Pague via PayPay ou Depósito</p>

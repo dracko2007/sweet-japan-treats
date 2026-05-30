@@ -87,14 +87,14 @@ const TrackingModal: React.FC<TrackingModalProps> = ({
           <style>
             body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
             .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-            .header { background: linear-gradient(135deg, #D2691E 0%, #8B4513 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+            .header { background: linear-gradient(135deg, #FF69B4 0%, #FFB6C1 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
             .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
-            .tracking-box { background: #fff; border: 2px solid #D2691E; border-radius: 8px; padding: 20px; margin: 20px 0; text-align: center; }
-            .tracking-number { font-size: 24px; font-weight: bold; color: #D2691E; letter-spacing: 2px; margin: 10px 0; }
-            .tracking-button { display: inline-block; background: #D2691E; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; margin-top: 15px; font-weight: bold; }
-            .tracking-button:hover { background: #8B4513; }
+            .tracking-box { background: #fff; border: 2px solid #FF69B4; border-radius: 8px; padding: 20px; margin: 20px 0; text-align: center; }
+            .tracking-number { font-size: 24px; font-weight: bold; color: #FF69B4; letter-spacing: 2px; margin: 10px 0; }
+            .tracking-button { display: inline-block; background: #FF69B4; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; margin-top: 15px; font-weight: bold; }
+            .tracking-button:hover { background: #FFB6C1; }
             .product-list { margin: 20px 0; }
-            .product-item { background: #fff; padding: 15px; margin: 10px 0; border-radius: 8px; border-left: 4px solid #D2691E; }
+            .product-item { background: #fff; padding: 15px; margin: 10px 0; border-radius: 8px; border-left: 4px solid #FF69B4; }
             .info-row { display: flex; justify-between; margin: 10px 0; padding: 10px 0; border-bottom: 1px solid #eee; }
             .footer { text-align: center; color: #666; margin-top: 30px; font-size: 12px; }
           </style>
@@ -132,7 +132,7 @@ const TrackingModal: React.FC<TrackingModalProps> = ({
                 `}
               </div>
 
-              <h3 style="color: #D2691E; margin-top: 30px;">📋 Resumo do Pedido</h3>
+              <h3 style="color: #FF69B4; margin-top: 30px;">📋 Resumo do Pedido</h3>
               
               <div class="product-list">
                 ${order.items.map((item: any) => `
@@ -149,13 +149,13 @@ const TrackingModal: React.FC<TrackingModalProps> = ({
                   <span>Subtotal:</span>
                   <strong>¥${order.totalPrice.toLocaleString()}</strong>
                 </div>
-                <div class="info-row" style="font-size: 18px; color: #D2691E; border-bottom: none;">
+                <div class="info-row" style="font-size: 18px; color: #FF69B4; border-bottom: none;">
                   <span><strong>Total:</strong></span>
                   <strong>¥${order.totalPrice.toLocaleString()}</strong>
                 </div>
               </div>
 
-              <h3 style="color: #D2691E; margin-top: 30px;">📍 Endereço de Entrega</h3>
+              <h3 style="color: #FF69B4; margin-top: 30px;">📍 Endereço de Entrega</h3>
               <div style="background: #fff; padding: 20px; border-radius: 8px;">
                 <p style="margin: 5px 0;"><strong>${order.shippingAddress.name}</strong></p>
                 <p style="margin: 5px 0;">〒${order.shippingAddress.postalCode}</p>
@@ -166,12 +166,12 @@ const TrackingModal: React.FC<TrackingModalProps> = ({
               </div>
 
               <p style="margin-top: 30px;">
-                Obrigado por comprar na <strong>Sabor do Campo</strong>! 🍯
+                Obrigado por comprar na <strong>Sakura Express</strong>! 🌸
               </p>
             </div>
 
             <div class="footer">
-              <p>Sabor do Campo - Doce de Leite Artesanal</p>
+              <p>Sakura Express - Produtos Importados do Japão</p>
               <p>Mie Prefecture, Japan</p>
             </div>
           </div>
@@ -253,7 +253,7 @@ ${order.items.map((item: any) =>
 
 *Total:* ¥${order.totalPrice.toLocaleString()}
 
-Obrigado por comprar na *Sabor do Campo*! 🍯
+Obrigado por comprar na *Sakura Express*! 🌸
         `.trim();
 
         try {

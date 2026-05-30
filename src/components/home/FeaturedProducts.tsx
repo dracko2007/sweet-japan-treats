@@ -20,14 +20,7 @@ const FAKE_STOCK_PERCENT: Record<string, number> = {
 
 const FeaturedProducts: React.FC = () => {
   const { t, selectedCountry } = useLanguage();
-  const filteredProducts = products.filter(p => {
-    if (selectedCountry === 'Japão') {
-      return p.deliveryRestrict === 'Japão';
-    } else {
-      return p.deliveryRestrict !== 'Japão';
-    }
-  });
-  const featuredProducts = filteredProducts.slice(0, 4);
+  const featuredProducts = products.slice(0, 4);
 
   // Countdown timer state
   const [timeLeft, setTimeLeft] = useState({ hours: 1, minutes: 48, seconds: 26 });
@@ -93,11 +86,12 @@ const FeaturedProducts: React.FC = () => {
         {/* Products Grid */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 mb-12">
           {featuredProducts.map((product, index) => {
-            const currency = product.deliveryRestrict === 'Japão' ? 'JPY' : (selectedCountry === 'Japão' ? 'JPY' : 'BRL');
+            const isEuro = ['Portugal', 'França', 'Itália', 'Espanha'].includes(selectedCountry);
+            const currency = selectedCountry === 'Japão' ? 'JPY' : (isEuro ? 'EUR' : 'BRL');
             const getDisplayPrice = (val: number) => {
-              if (product.deliveryRestrict === 'Japão') return val;
-              if (selectedCountry === 'Japão') return val * 28;
-              return val;
+              if (selectedCountry === 'Japão') return val;
+              if (isEuro) return (val / 28) * 0.16;
+              return val / 28;
             };
             const smallPrice = getDisplayPrice(product.prices.small);
             const originalPrice = smallPrice * 2.5;
@@ -120,13 +114,13 @@ const FeaturedProducts: React.FC = () => {
                   
                   {/* Free Shipping / Origin Tag */}
                   <div className="absolute top-2 left-2 flex flex-col gap-1.5">
-                    {product.id === 'doce-de-leite' ? (
+                    {selectedCountry === 'Japão' ? (
                       <span className="bg-green-600 text-white font-black text-[9px] px-2 py-0.5 rounded shadow-sm tracking-wider uppercase">
-                        Frete Grátis (No Japão 🇯🇵)
+                        Envio Doméstico (Mie) 🇯🇵
                       </span>
                     ) : (
                       <span className="bg-orange-600 text-white font-black text-[9px] px-2 py-0.5 rounded shadow-sm tracking-wider uppercase">
-                        Importado Aéreo
+                        Importado Aéreo ✈️
                       </span>
                     )}
                     <span className="bg-yellow-400 text-gray-900 font-extrabold text-[9px] px-2 py-0.5 rounded shadow-sm tracking-wider uppercase">

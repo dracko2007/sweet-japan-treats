@@ -19,8 +19,35 @@ export const whatsappService = {
   sendMessage: async (data: WhatsAppMessage): Promise<boolean> => {
     console.log('📱 WhatsApp Service - Sending message');
     console.log('📱 To:', data.to);
-    console.log('📱 From:', TWILIO_WHATSAPP_FROM);
     console.log('📱 Message preview:', data.message.substring(0, 100) + '...');
+
+    // Try sending via local WhatsApp Node.js service (http://localhost:3001/api/send)
+    try {
+      console.log('📱 Attempting local WhatsApp service (port 3001)...');
+      const cleanPhone = data.to.replace(/[^0-9]/g, '');
+      const response = await fetch('http://localhost:3001/api/send', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          phone: cleanPhone,
+          message: data.message
+        })
+      });
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success) {
+          console.log('✅ WhatsApp sent successfully via local service!');
+          return true;
+        }
+      }
+      console.log('⚠️ Local service failed, trying Twilio / Web fallback...');
+    } catch (e) {
+      console.log('⚠️ Local service not available on port 3001, trying Twilio / Web fallback...', e);
+    }
+
+    console.log('📱 From:', TWILIO_WHATSAPP_FROM);
     console.log('📱 Account SID configured:', !!TWILIO_ACCOUNT_SID, TWILIO_ACCOUNT_SID?.substring(0, 10) + '...');
     console.log('📱 Auth Token configured:', !!TWILIO_AUTH_TOKEN, TWILIO_AUTH_TOKEN?.substring(0, 5) + '...');
     

@@ -2,12 +2,14 @@ import React, { createContext, useContext, useState, useCallback, ReactNode } fr
 import { translations, Language } from '@/data/translations';
 import { safeStorage } from '@/utils/storage';
 
+export type CountryType = 'Brasil' | 'Japão' | 'Portugal' | 'França' | 'Itália' | 'Espanha';
+
 interface LanguageContextType {
   language: Language;
   setLanguage: (lang: Language) => void;
   t: (key: string) => string;
-  selectedCountry: 'Brasil' | 'Japão';
-  setSelectedCountry: (country: 'Brasil' | 'Japão') => void;
+  selectedCountry: CountryType;
+  setSelectedCountry: (country: CountryType) => void;
 }
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
@@ -30,9 +32,9 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
     return (stored as Language) || 'pt';
   });
 
-  const [selectedCountry, setSelectedCountryState] = useState<'Brasil' | 'Japão'>(() => {
+  const [selectedCountry, setSelectedCountryState] = useState<CountryType>(() => {
     const stored = safeStorage.getItem('sakura_selected_country');
-    return (stored as 'Brasil' | 'Japão') || 'Brasil';
+    return (stored as CountryType) || 'Brasil';
   });
 
   const setLanguage = useCallback((lang: Language) => {
@@ -40,7 +42,7 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
     safeStorage.setItem('preferred-language', lang);
   }, []);
 
-  const setSelectedCountry = useCallback((country: 'Brasil' | 'Japão') => {
+  const setSelectedCountry = useCallback((country: CountryType) => {
     setSelectedCountryState(country);
     safeStorage.setItem('sakura_selected_country', country);
   }, []);

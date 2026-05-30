@@ -12,11 +12,12 @@ import ShippingCalculator from '@/components/shipping/ShippingCalculator';
 import CouponSelector from '@/components/checkout/CouponSelector';
 import { prefectures } from '@/data/prefectures';
 import { japanPrefectures } from '@/data/japanPrefectures';
+import { europePrefectures } from '@/data/europePrefectures';
 import { couponService } from '@/services/couponService';
 import type { Coupon } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { usePostalCodeLookup } from '@/hooks/usePostalCodeLookup';
-import { useLanguage } from '@/context/LanguageContext';
+import { useLanguage, CountryType } from '@/context/LanguageContext';
 import { formatPrice } from '@/utils/currency';
 import { getTranslatedProductName } from '@/data/translations';
 
@@ -43,18 +44,21 @@ const Checkout: React.FC = () => {
   });
 
   // Calculate base total price dynamically in correct currency
+  const isEuro = ['Portugal', 'França', 'Itália', 'Espanha'].includes(formData.country);
+  const currency = formData.country === 'Japão' ? 'JPY' : (isEuro ? 'EUR' : 'BRL');
+
   const baseTotalPrice = items.reduce((sum, item) => {
-    const price = item.size === 'small' ? item.product.prices.small : item.product.prices.large;
-    let unitPrice = price;
+    const basePrice = item.size === 'small' ? item.product.prices.small : item.product.prices.large;
+    let unitPrice = basePrice;
     if (formData.country === 'Japão') {
-      if (item.product.deliveryRestrict !== 'Japão') {
-        unitPrice = price * 28; // Convert BRL to JPY
-      }
+      unitPrice = basePrice;
+    } else if (isEuro) {
+      unitPrice = (basePrice / 28) * 0.16;
+    } else {
+      unitPrice = basePrice / 28; // BRL
     }
     return sum + unitPrice * item.quantity;
   }, 0);
-
-  const currency = formData.country === 'Japão' ? 'JPY' : 'BRL';
 
   const [selectedShipping, setSelectedShipping] = useState<{
     carrier: string;
@@ -213,7 +217,7 @@ const Checkout: React.FC = () => {
           console.error('Erro ao buscar CEP japonês:', error);
         }
       }
-    } else {
+    } else if (formData.country === 'Brasil') {
       const cleanVal = val.replace(/\D/g, '').slice(0, 8);
       let formatted = cleanVal;
       if (cleanVal.length > 5) {
@@ -252,6 +256,9 @@ const Checkout: React.FC = () => {
           console.error('Erro ao buscar CEP:', error);
         }
       }
+    } else {
+      // European countries - free form format (e.g. 0000-000 for PT, 00000 for others)
+      setFormData(prev => ({ ...prev, postalCode: val }));
     }
   };
 
@@ -281,15 +288,7 @@ const Checkout: React.FC = () => {
       return;
     }
 
-    const hasDoceDeLeite = items.some(item => item.product.deliveryRestrict === 'Japão');
-    if (formData.country !== 'Japão' && hasDoceDeLeite) {
-      toast({
-        title: "Restrição de Produto",
-        description: "O Doce de Leite está disponível apenas para entrega dentro do Japão! Por favor, remova-o do carrinho ou altere o país de destino para Japão.",
-        variant: "destructive",
-      });
-      return;
-    }
+
 
     if (formData.country === 'Brasil' && formData.cpf.replace(/\D/g, '').length !== 11) {
       toast({
@@ -316,18 +315,31 @@ const Checkout: React.FC = () => {
   const actualShippingCost = appliedCoupon?.freeShipping ? 0 : (selectedShipping?.cost || 0);
 
   const subtotalWithCoupon = baseTotalPrice - couponDiscount;
-  const isBelow50USD = subtotalWithCoupon < 250;
   
-  const federalTax = formData.country === 'Brasil'
-    ? (isBelow50USD ? subtotalWithCoupon * 0.20 : (subtotalWithCoupon * 0.60) - 62.50)
-    : 0;
+  // Tax calculations (Estimated only, NOT added to grandTotal)
+  let federalTax = 0;
+  let icmsTax = 0;
+  let estimatedTax = 0;
+  let taxLabel = '';
+  
+  if (formData.country === 'Brasil') {
+    const isBelow50USD = subtotalWithCoupon < 250;
+    federalTax = isBelow50USD
+      ? subtotalWithCoupon * 0.20
+      : (subtotalWithCoupon * 0.60) - 62.50;
+      
+    icmsTax = (subtotalWithCoupon + federalTax) * 0.17;
+    estimatedTax = federalTax + icmsTax;
+    taxLabel = 'Impostos Estimados (Brasil)';
+  } else if (isEuro) {
+    const rates: Record<string, number> = { Portugal: 0.23, França: 0.20, Itália: 0.22, Espanha: 0.21 };
+    const rate = rates[formData.country] || 0.20;
+    estimatedTax = subtotalWithCoupon * rate;
+    taxLabel = `IVA / VAT Estimado (${Math.round(rate * 100)}%)`;
+  }
     
-  const icmsTax = formData.country === 'Brasil'
-    ? (subtotalWithCoupon + federalTax) * 0.17
-    : 0;
-    
-  const totalTax = federalTax + icmsTax;
-  const grandTotal = subtotalWithCoupon + actualShippingCost + totalTax;
+  // Taxes are completely omitted from checkout final price!
+  const grandTotal = subtotalWithCoupon + actualShippingCost;
 
   return (
     <Layout>
@@ -456,18 +468,10 @@ const Checkout: React.FC = () => {
                           name="country"
                           value={formData.country}
                           onChange={(e) => {
-                            const val = e.target.value;
-                            if (val === 'Brasil' && items.some(item => item.product.deliveryRestrict === 'Japão')) {
-                              toast({
-                                title: "Restrição de Destino",
-                                description: "Remova os produtos de Doce de Leite do carrinho para alterar o destino de envio para o Brasil.",
-                                variant: "destructive",
-                              });
-                              return;
-                            }
+                            const val = e.target.value as CountryType;
                             setFormData(prev => ({
                               ...prev,
-                              country: val as 'Japão' | 'Brasil',
+                              country: val,
                               prefecture: '', // Reset
                               postalCode: '',
                               city: '',
@@ -479,26 +483,33 @@ const Checkout: React.FC = () => {
                           className="w-full p-2.5 rounded-lg border border-border bg-background text-foreground focus:ring-2 focus:ring-primary focus:border-primary transition-all font-medium text-sm"
                         >
                           <option value="Brasil">Brasil 🇧🇷 (Envio Internacional)</option>
+                          <option value="Portugal">Portugal 🇵🇹 (Envio Internacional)</option>
+                          <option value="França">França 🇫🇷 (Envio Internacional)</option>
+                          <option value="Itália">Itália 🇮🇹 (Envio Internacional)</option>
+                          <option value="Espanha">Espanha 🇪🇸 (Envio Internacional)</option>
                           <option value="Japão">Japão 🇯🇵 (Envio Local)</option>
                         </select>
                       </div>
 
                       <div className="space-y-2">
                         <Label htmlFor="postalCode" className="font-semibold">
-                          {formData.country === 'Japão' ? 'Código Postal (ZIP) *' : 'CEP *'}
+                          {formData.country === 'Japão' ? 'Código Postal (ZIP) *' : ['Portugal', 'França', 'Itália', 'Espanha'].includes(formData.country) ? 'Código Postal *' : 'CEP *'}
                         </Label>
                         <Input
                           id="postalCode"
                           name="postalCode"
                           type="text"
-                          placeholder={formData.country === 'Japão' ? '123-4567' : '00000-000'}
+                          placeholder={formData.country === 'Japão' ? '123-4567' : formData.country === 'Portugal' ? '0000-000' : ['França', 'Itália', 'Espanha'].includes(formData.country) ? '00000' : '00000-000'}
                           value={formData.postalCode}
                           onChange={handlePostalCodeChange}
-                          maxLength={formData.country === 'Japão' ? 8 : 9}
                           required
                         />
                         <p className="text-[10px] text-gray-400">
-                          {formData.country === 'Japão' ? 'Preenche o endereço japonês automaticamente (7 dígitos).' : 'Preenche o endereço brasileiro automaticamente (8 dígitos).'}
+                          {formData.country === 'Japão' 
+                            ? 'Preenche o endereço japonês automaticamente (7 dígitos).' 
+                            : ['Portugal', 'França', 'Itália', 'Espanha'].includes(formData.country) 
+                            ? 'Digite o código postal de entrega.' 
+                            : 'Preenche o endereço brasileiro automaticamente (8 dígitos).'}
                         </p>
                       </div>
                     </div>
@@ -506,7 +517,7 @@ const Checkout: React.FC = () => {
                     <div className="grid md:grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="prefecture" className="font-semibold">
-                          {formData.country === 'Japão' ? 'Província *' : 'Estado (UF) *'}
+                          {formData.country === 'Japão' ? 'Província *' : ['Portugal', 'França', 'Itália', 'Espanha'].includes(formData.country) ? 'Região / Distrito *' : 'Estado (UF) *'}
                         </Label>
                         <select
                           id="prefecture"
@@ -516,10 +527,21 @@ const Checkout: React.FC = () => {
                           required
                           className="w-full p-2.5 rounded-lg border border-border bg-background text-foreground focus:ring-2 focus:ring-primary focus:border-primary transition-all font-medium text-sm"
                         >
-                          <option value="">{formData.country === 'Japão' ? 'Escolha a Província...' : 'Escolha seu Estado...'}</option>
-                          {(formData.country === 'Japão' ? japanPrefectures : prefectures).map((pref) => (
+                          <option value="">
+                            {formData.country === 'Japão' 
+                              ? 'Escolha a Província...' 
+                              : ['Portugal', 'França', 'Itália', 'Espanha'].includes(formData.country) 
+                              ? 'Escolha a Região/Distrito...' 
+                              : 'Escolha seu Estado...'}
+                          </option>
+                          {(formData.country === 'Japão' 
+                            ? japanPrefectures 
+                            : ['Portugal', 'França', 'Itália', 'Espanha'].includes(formData.country)
+                            ? europePrefectures[formData.country] || []
+                            : prefectures
+                          ).map((pref) => (
                             <option key={pref.name} value={pref.name}>
-                              {pref.nameJa} ({pref.name})
+                              {pref.nameJa || pref.name} ({pref.name})
                             </option>
                           ))}
                         </select>
@@ -579,7 +601,7 @@ const Checkout: React.FC = () => {
                     <ShippingCalculator 
                       selectedPrefecture={formData.prefecture}
                       onShippingSelect={setSelectedShipping}
-                      destinationCountry={formData.country as 'Brasil' | 'Japão'}
+                      destinationCountry={formData.country as CountryType}
                       couponDiscount={couponDiscount}
                     />
                   </div>
@@ -638,15 +660,17 @@ const Checkout: React.FC = () => {
 
                 <div className="space-y-4">
                   {items.map((item) => {
-                    const price = item.size === 'small' ? item.product.prices.small : item.product.prices.large;
-                    let displayUnitPrice = price;
+                    const basePrice = item.size === 'small' ? item.product.prices.small : item.product.prices.large;
+                    let displayUnitPrice = basePrice;
                     if (formData.country === 'Japão') {
-                      if (item.product.deliveryRestrict !== 'Japão') {
-                        displayUnitPrice = price * 28; // BRL to JPY conversion
-                      }
+                      displayUnitPrice = basePrice;
+                    } else if (isEuro) {
+                      displayUnitPrice = (basePrice / 28) * 0.16;
+                    } else {
+                      displayUnitPrice = basePrice / 28; // BRL
                     }
                     const displayItemPrice = displayUnitPrice * item.quantity;
-                    const currency = formData.country === 'Japão' ? 'JPY' : 'BRL';
+                    const currency = formData.country === 'Japão' ? 'JPY' : (isEuro ? 'EUR' : 'BRL');
                     const productName = getTranslatedProductName(item.product.id, t);
                     return (
                       <div 
@@ -693,21 +717,17 @@ const Checkout: React.FC = () => {
                       </div>
                     )}
 
-                    {formData.country === 'Brasil' && (
-                      <>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Imposto Federal ({isBelow50USD ? '20%' : '60%'})</span>
-                          <span className="font-semibold text-gray-800">
-                            {formatPrice(federalTax, 'BRL')}
-                          </span>
+                    {/* Tax displays only as estimated warnings in sidebar */}
+                    {formData.country !== 'Japão' && estimatedTax > 0 && (
+                      <div className="bg-orange-50/50 dark:bg-orange-950/10 border border-orange-200/60 rounded-xl p-3 space-y-2 mt-2">
+                        <div className="flex justify-between text-xs font-bold text-orange-850 dark:text-orange-300">
+                          <span>{taxLabel}</span>
+                          <span>{formatPrice(estimatedTax, currency)}</span>
                         </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">ICMS Estadual (17%)</span>
-                          <span className="font-semibold text-gray-800">
-                            {formatPrice(icmsTax, 'BRL')}
-                          </span>
-                        </div>
-                      </>
+                        <p className="text-[10px] text-orange-700 dark:text-orange-400 leading-relaxed font-semibold">
+                          ⚠️ <strong>Lembrete:</strong> Este imposto é estimado e poderá ser cobrado pela alfândega na chegada ao país. Ele <strong>NÃO</strong> está incluído no total cobrado no site.
+                        </p>
+                      </div>
                     )}
 
                     <div className="flex justify-between">

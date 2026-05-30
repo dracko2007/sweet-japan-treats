@@ -139,12 +139,24 @@ const Profile: React.FC = () => {
   };
 
   const handleSaveProfile = () => {
+    const turnedOnMarketing = editedUser.whatsappMarketing && !user.whatsappMarketing;
     updateProfile(editedUser);
     setIsEditing(false);
     toast({
       title: "Perfil atualizado!",
       description: "Suas informações foram salvas com sucesso.",
     });
+
+    if (turnedOnMarketing && editedUser.phone) {
+      const welcomeMsg = `*SAKURA EXPRESS* 🌸\n\nOlá, *${editedUser.name || user.name}*!\nVocê ativou as notificações e ofertas exclusivas no WhatsApp!\n\n🎟️ Seu cupom de 90% OFF está ativo: *SAKURA90*\n\n🔥 *Novidades fresquinhas do Japão:*\n• Protetor solar Bioré UV Aqua Rich com frete aéreo expresso grátis para o Brasil.\n• Snacks e cosméticos exclusivos direto do Japão!\n\nAcesse nossa loja: https://temushop.vercel.app`;
+      
+      import('@/services/whatsappService').then(({ whatsappService }) => {
+        whatsappService.sendMessage({
+          to: editedUser.phone!,
+          message: welcomeMsg
+        });
+      });
+    }
   };
 
   const handleLogout = () => {
@@ -239,6 +251,19 @@ const Profile: React.FC = () => {
                       value={editedUser.phone || ''}
                       onChange={handleInputChange}
                     />
+                  </div>
+                  <div className="flex items-center gap-2 pt-2 md:col-span-2">
+                    <input
+                      id="whatsappMarketing"
+                      name="whatsappMarketing"
+                      type="checkbox"
+                      checked={!!editedUser.whatsappMarketing}
+                      onChange={(e) => setEditedUser(prev => ({ ...prev, whatsappMarketing: e.target.checked }))}
+                      className="w-4 h-4 rounded border-input text-primary focus:ring-primary cursor-pointer"
+                    />
+                    <Label htmlFor="whatsappMarketing" className="text-sm font-semibold cursor-pointer select-none leading-none">
+                      Receber novidades e cupons diretamente no meu WhatsApp (Cupom SAKURA90)
+                    </Label>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="birthdate">Data de Nascimento</Label>
@@ -342,6 +367,15 @@ const Profile: React.FC = () => {
                       Telefone
                     </Label>
                     <p className="font-medium text-foreground">{user.phone}</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-muted-foreground flex items-center gap-2">
+                      <Cloud className="w-4 h-4" />
+                      Notificações por WhatsApp
+                    </Label>
+                    <p className="font-medium text-foreground">
+                      {user.whatsappMarketing ? '✅ Ativado (Cupom SAKURA90)' : '❌ Desativado'}
+                    </p>
                   </div>
                   {user.birthdate && (
                     <div className="space-y-2">

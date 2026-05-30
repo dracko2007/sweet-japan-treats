@@ -4,7 +4,8 @@ import Layout from '@/components/layout/Layout';
 import { useLanguage } from '@/context/LanguageContext';
 
 const About: React.FC = () => {
-  const { t } = useLanguage();
+  const { t, selectedCountry } = useLanguage();
+  const isJapan = selectedCountry === 'Japão';
 
   const values = [
     { icon: Heart, titleKey: 'aboutPage.value1.title', descKey: 'aboutPage.value1.desc' },
@@ -43,13 +44,13 @@ const About: React.FC = () => {
             <div className="relative">
               <div className="aspect-square rounded-3xl bg-gradient-to-br from-caramel-light/40 to-primary/30 flex items-center justify-center shadow-elevated">
                 <div className="text-center">
-                  <span className="text-8xl block mb-4">👨‍👩‍👧</span>
+                  <span className="text-8xl block mb-4">🌸</span>
                   <p className="font-display text-xl text-foreground">{t('aboutPage.family')}</p>
                 </div>
               </div>
               <div className="absolute -bottom-6 -right-6 bg-card rounded-2xl shadow-card p-4">
                 <div className="flex items-center gap-3">
-                  <span className="text-3xl">🏠</span>
+                  <span className="text-3xl">✈️</span>
                   <div>
                     <p className="font-display font-semibold text-sm">{t('aboutPage.location')}</p>
                     <p className="text-xs text-muted-foreground">{t('aboutPage.kitchen')}</p>
@@ -144,7 +145,7 @@ const About: React.FC = () => {
               {t('aboutPage.ctaProducts')}
             </a>
             <a 
-              href="mailto:contato@docedeleite.jp" 
+              href="mailto:contato@sakuraexpress.jp" 
               className="px-8 py-3 border-2 border-primary-foreground rounded-full font-semibold hover:bg-primary-foreground/10 transition-colors"
             >
               {t('aboutPage.ctaContact')}

@@ -20,13 +20,15 @@ const CartItemComponent: React.FC<CartItemProps> = ({ item }) => {
   const productFlavor = getTranslatedProductFlavor(item.product.id, t) || item.product.flavor;
 
   // Determine display price and currency
-  const currency = selectedCountry === 'Japão' ? 'JPY' : 'BRL';
+  const isEuro = ['Portugal', 'França', 'Itália', 'Espanha'].includes(selectedCountry);
+  const currency = selectedCountry === 'Japão' ? 'JPY' : (isEuro ? 'EUR' : 'BRL');
   let unitPrice = basePrice;
   if (selectedCountry === 'Japão') {
-    if (item.product.deliveryRestrict !== 'Japão') {
-      // Convert international product price from BRL to JPY
-      unitPrice = basePrice * 28;
-    }
+    unitPrice = basePrice;
+  } else if (isEuro) {
+    unitPrice = (basePrice / 28) * 0.16;
+  } else {
+    unitPrice = basePrice / 28;
   }
 
   const finalPrice = unitPrice * item.quantity;
@@ -50,7 +52,7 @@ const CartItemComponent: React.FC<CartItemProps> = ({ item }) => {
               {productName}
             </h3>
             <p className="text-sm text-muted-foreground">
-              {item.size === 'small' ? 'Padrão' : 'Deluxe'} • {productFlavor}
+              {productFlavor}
             </p>
             <span className={`
               inline-block mt-1 px-2 py-0.5 rounded text-xs font-medium

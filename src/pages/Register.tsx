@@ -25,6 +25,7 @@ const Register: React.FC = () => {
   });
   const [isLoading, setIsLoading] = useState(false);
   const [registrationComplete, setRegistrationComplete] = useState(false);
+  const [whatsappMarketing, setWhatsappMarketing] = useState(true);
 
   // Redirect if already authenticated
   React.useEffect(() => {
@@ -71,6 +72,7 @@ const Register: React.FC = () => {
         email: formData.email,
         phone: formData.phone,
         password: formData.password,
+        whatsappMarketing: whatsappMarketing,
         address: {
           postalCode: '',
           prefecture: '',
@@ -85,6 +87,18 @@ const Register: React.FC = () => {
           title: "Cadastro realizado!",
           description: "Verifique seu email para confirmar sua conta.",
         });
+
+        // Send automatic welcome message if opted in
+        if (whatsappMarketing && formData.phone) {
+          const welcomeMsg = `*SAKURA EXPRESS* 🌸\n\nOlá, *${formData.name}*!\nObrigado por se cadastrar em nossa loja!\n\n🎟️ Aqui está o seu cupom de boas-vindas: *SAKURA90* (dá *90% de desconto* em todo o site!).\n\n🔥 *Novidades fresquinhas do Japão:*\n• Protetor solar Bioré UV Aqua Rich com frete aéreo expresso grátis para o Brasil.\n• Snacks e cosméticos exclusivos direto do Japão!\n\nAcesse nossa loja: https://temushop.vercel.app`;
+          
+          import('@/services/whatsappService').then(({ whatsappService }) => {
+            whatsappService.sendMessage({
+              to: formData.phone,
+              message: welcomeMsg
+            });
+          });
+        }
       } else {
         toast({
           title: "Erro no cadastro",
@@ -246,6 +260,20 @@ const Register: React.FC = () => {
                     required
                     minLength={6}
                   />
+                </div>
+
+                <div className="flex items-start gap-2.5 pt-1">
+                  <input
+                    id="whatsappMarketing"
+                    name="whatsappMarketing"
+                    type="checkbox"
+                    checked={whatsappMarketing}
+                    onChange={(e) => setWhatsappMarketing(e.target.checked)}
+                    className="w-4 h-4 mt-0.5 rounded border-input text-primary focus:ring-primary"
+                  />
+                  <Label htmlFor="whatsappMarketing" className="text-xs text-muted-foreground cursor-pointer select-none leading-tight">
+                    Quero receber cupons de desconto (como o de 90% OFF) e novidades do Japão diretamente no meu WhatsApp.
+                  </Label>
                 </div>
 
                 <div className="pt-4">

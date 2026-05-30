@@ -143,10 +143,7 @@ const OrderConfirmation: React.FC = () => {
                 ID do pedido: <span className="font-mono font-semibold text-gray-900">{order.orderNumber || order.id}</span>
               </p>
               <p className="text-muted-foreground text-sm">
-                {order.currency === 'JPY'
-                  ? 'Obrigado por comprar na Sabor do Campo. Realize o pagamento para iniciar o preparo em Mie.'
-                  : 'Obrigado por comprar na SakuraExpress. Pague para iniciar o envio de Tóquio.'
-                }
+                Obrigado por comprar na Sakura Express. Realize o pagamento para iniciar o preparo e envio de Mie.
               </p>
             </div>
 
@@ -168,7 +165,7 @@ const OrderConfirmation: React.FC = () => {
                 <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 inline-block shadow-sm">
                   <img 
                     src="/products/paypay-qr.png" 
-                    alt="PayPay QR Code - Sabor do Campo" 
+                    alt="PayPay QR Code - Sakura Express" 
                     className="w-60 h-auto rounded-xl border border-gray-200 mx-auto shadow-md"
                     onError={(e) => {
                       e.currentTarget.src = "https://placehold.co/240x240/red/white?text=PayPay+QR";
@@ -180,7 +177,7 @@ const OrderConfirmation: React.FC = () => {
                 </div>
 
                 <div className="bg-gray-100 p-4 rounded-xl max-w-sm mx-auto text-xs space-y-2 font-mono text-left">
-                  <p><strong className="text-gray-800">Enviar para:</strong> Sabor do Campo</p>
+                  <p><strong className="text-gray-800">Enviar para:</strong> Sakura Express</p>
                   <p><strong className="text-gray-800">Telefone:</strong> 070-1367-1679</p>
                   <p><strong className="text-gray-800">Valor do Pedido:</strong> {formatPrice(order.total, 'JPY')}</p>
                 </div>
@@ -393,7 +390,7 @@ const OrderConfirmation: React.FC = () => {
                     </div>
                     <h3 className="font-sans font-bold text-lg text-green-800">Transação de Cartão Aprovada!</h3>
                     <p className="text-xs text-green-700 max-w-sm mx-auto leading-relaxed">
-                      Seu pagamento foi confirmado com sucesso. O pedido foi enviado para separação no porto logístico de Tóquio. Rastreamento dos Correios: <strong>{order.trackingCode}</strong>.
+                      Seu pagamento foi confirmado com sucesso. O pedido foi enviado para separação no porto logístico de Tóquio. Rastreamento {order.country === 'Brasil' ? 'dos Correios' : 'Postal'}: <strong>{order.trackingCode}</strong>.
                     </p>
                   </div>
                 )}
@@ -448,7 +445,7 @@ const OrderConfirmation: React.FC = () => {
             <div className="bg-card rounded-2xl border border-border p-8 mb-6">
               <div className="text-center mb-6 print:block hidden">
                 <h1 className="font-display text-3xl font-bold mb-2">
-                  {order.currency === 'JPY' ? 'Sabor do Campo' : 'SakuraExpress'}
+                  Sakura Express
                 </h1>
                 <p className="text-muted-foreground">
                   {order.currency === 'JPY' ? 'Recibo de Pedido Doméstico' : 'Recibo de Pedido Internacional'}
@@ -474,7 +471,7 @@ const OrderConfirmation: React.FC = () => {
                 <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 flex flex-col md:flex-row justify-between gap-3 text-xs md:text-sm">
                   <div>
                     <span className="text-muted-foreground block">
-                      {order.currency === 'JPY' ? 'Código de Rastreamento (Transportadora):' : 'Código de Rastreamento Aéreo (Correios):'}
+                      {order.currency === 'JPY' ? 'Código de Rastreamento (Transportadora):' : `Código de Rastreamento Aéreo (${order.country === 'Brasil' ? 'Correios' : 'Posta Local'}):`}
                     </span>
                     <span className="font-mono font-bold text-gray-800 text-base">{order.trackingCode}</span>
                   </div>
@@ -508,13 +505,23 @@ const OrderConfirmation: React.FC = () => {
                     </p>
                     <p className="text-gray-800">{order.address}</p>
                     {order.building && <p className="text-gray-500 text-xs">Complemento: {order.building}</p>}
+                    <p className="font-bold text-gray-800 mt-1">
+                      {order.country || 'Brasil'} {
+                        order.country === 'Japão' ? '🇯🇵' :
+                        order.country === 'Brasil' ? '🇧🇷' :
+                        order.country === 'Portugal' ? '🇵🇹' :
+                        order.country === 'França' ? '🇫🇷' :
+                        order.country === 'Itália' ? '🇮🇹' :
+                        order.country === 'Espanha' ? '🇪🇸' : '🇧🇷'
+                      }
+                    </p>
                   </div>
                 </div>
 
                 {/* Items list */}
                 <div>
                   <h4 className="font-semibold text-xs text-gray-500 uppercase tracking-wider mb-2">
-                    {order.currency === 'JPY' ? 'Doce de Leite Artesanal' : 'Produtos Importados'}
+                    Itens do Pedido
                   </h4>
                   <div className="space-y-3">
                     {order.items.map((item: any, idx: number) => (
@@ -559,30 +566,16 @@ const OrderConfirmation: React.FC = () => {
                     </div>
                   )}
 
-                  {order.currency !== 'JPY' && (
-                    <>
-                      {order.federalTax !== undefined ? (
-                        <>
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">Imposto de Importação Federal</span>
-                            <span className="font-semibold text-gray-800">{formatPrice(order.federalTax, 'BRL')}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">ICMS Estadual (17%)</span>
-                            <span className="font-semibold text-gray-800">{formatPrice(order.icmsTax, 'BRL')}</span>
-                          </div>
-                        </>
-                      ) : (
-                        <>
-                          {order.taxAmount > 0 && (
-                            <div className="flex justify-between">
-                              <span className="text-muted-foreground">Impostos Aduaneiros (Total)</span>
-                              <span className="font-semibold text-gray-800">{formatPrice(order.taxAmount, 'BRL')}</span>
-                            </div>
-                          )}
-                        </>
-                      )}
-                    </>
+                  {order.currency !== 'JPY' && (order.taxAmount > 0 || order.federalTax > 0) && (
+                    <div className="bg-orange-50/50 dark:bg-orange-950/10 border border-orange-200/60 rounded-xl p-3 space-y-2 mt-2">
+                      <div className="flex justify-between text-xs font-bold text-orange-850 dark:text-orange-300">
+                        <span>Imposto Aduaneiro Estimado (A cobrar na entrega)</span>
+                        <span>{formatPrice(order.taxAmount || (order.federalTax + order.icmsTax), order.currency)}</span>
+                      </div>
+                      <p className="text-[10px] text-orange-700 dark:text-orange-400 leading-relaxed font-semibold">
+                        ⚠️ <strong>Lembrete:</strong> Este valor é apenas uma estimativa do imposto que poderá ser cobrado pela alfândega local na chegada do pacote ao país de destino. Ele <strong>NÃO</strong> foi somado ao total pago no site.
+                      </p>
+                    </div>
                   )}
 
                   <div className="flex justify-between">
@@ -627,14 +620,14 @@ const OrderConfirmation: React.FC = () => {
                   <>
                     <div className="relative">
                       <div className="absolute -left-[30px] top-0 w-4 h-4 bg-orange-500 rounded-full border-2 border-white flex items-center justify-center text-white text-[8px]">✓</div>
-                      <h4 className="font-bold text-gray-800">Etapa 1: Embalagem em Mie (Cozinha Artesanal Sabor do Campo)</h4>
-                      <p className="mt-0.5">Seu Doce de Leite fresco é verificado, embalado com proteção térmica e preparado para envio no centro de Mie.</p>
+                      <h4 className="font-bold text-gray-800">Etapa 1: Embalagem em Mie (Centro de Distribuição Sakura Express)</h4>
+                      <p className="mt-0.5">Sua encomenda é conferida, embalada com proteção reforçada e preparada para envio no centro de Mie Prefecture.</p>
                     </div>
 
                     <div className="relative">
                       <div className="absolute -left-[30px] top-0 w-4 h-4 bg-gray-300 rounded-full border-2 border-white flex items-center justify-center text-white text-[8px]">2</div>
                       <h4 className="font-bold text-gray-700">Etapa 2: Coleta e Despacho Doméstico (Yamato / Sagawa / JP Post)</h4>
-                      <p className="mt-0.5">A transportadora local selecionada coleta os produtos diretamente em nossa sede em Mie Prefecture.</p>
+                      <p className="mt-0.5">A transportadora local selecionada coleta a encomenda diretamente em nosso centro de distribuição em Mie Prefecture.</p>
                     </div>
 
                     <div className="relative">
@@ -649,7 +642,7 @@ const OrderConfirmation: React.FC = () => {
                       <p className="mt-0.5">A transportadora realiza a entrega em mãos no seu endereço no Japão. Use o código para rastrear no site oficial.</p>
                     </div>
                   </>
-                ) : (
+                ) : order.country === 'Brasil' ? (
                   <>
                     <div className="relative">
                       <div className="absolute -left-[30px] top-0 w-4 h-4 bg-orange-500 rounded-full border-2 border-white flex items-center justify-center text-white text-[8px]">✓</div>
@@ -673,6 +666,32 @@ const OrderConfirmation: React.FC = () => {
                       <div className="absolute -left-[30px] top-0 w-4 h-4 bg-gray-300 rounded-full border-2 border-white flex items-center justify-center text-white text-[8px]">4</div>
                       <h4 className="font-bold text-gray-700">Etapa 4: Entrega no Seu Endereço</h4>
                       <p className="mt-0.5">Os Correios realizam a entrega direta na sua residência. Rastreie pelo site dos Correios com o código de rastreamento.</p>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="relative">
+                      <div className="absolute -left-[30px] top-0 w-4 h-4 bg-orange-500 rounded-full border-2 border-white flex items-center justify-center text-white text-[8px]">✓</div>
+                      <h4 className="font-bold text-gray-800">Etapa 1: Embalagem em Tóquio (Hub Logístico)</h4>
+                      <p className="mt-0.5">Após a aprovação do pagamento, seu pedido é inspecionado, embalado com plástico bolha e preparado para despacho aéreo.</p>
+                    </div>
+
+                    <div className="relative">
+                      <div className="absolute -left-[30px] top-0 w-4 h-4 bg-gray-300 rounded-full border-2 border-white flex items-center justify-center text-white text-[8px]">2</div>
+                      <h4 className="font-bold text-gray-700">Etapa 2: Voo Tóquio para Europa</h4>
+                      <p className="mt-0.5">Despacho no aeroporto de Narita (Tóquio) com destino ao aeroporto internacional europeu via priority mail express.</p>
+                    </div>
+
+                    <div className="relative">
+                      <div className="absolute -left-[30px] top-0 w-4 h-4 bg-gray-300 rounded-full border-2 border-white flex items-center justify-center text-white text-[8px]">3</div>
+                      <h4 className="font-bold text-gray-700">Etapa 3: Desembaraço Aduaneiro Simplificado</h4>
+                      <p className="mt-0.5">O pacote passa pelo processamento e liberação na alfândega do país de destino europeu de forma rápida e simplificada.</p>
+                    </div>
+
+                    <div className="relative">
+                      <div className="absolute -left-[30px] top-0 w-4 h-4 bg-gray-300 rounded-full border-2 border-white flex items-center justify-center text-white text-[8px]">4</div>
+                      <h4 className="font-bold text-gray-700">Etapa 4: Entrega no Seu Endereço</h4>
+                      <p className="mt-0.5">A transportadora postal local (como CTT, La Poste, Poste Italiane, Correos) realiza a entrega direta na sua residência.</p>
                     </div>
                   </>
                 )}

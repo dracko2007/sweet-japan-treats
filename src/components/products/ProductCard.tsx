@@ -38,13 +38,14 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
     }
   }, [user, product.id]);
 
-  const currency = product.deliveryRestrict === 'Japão' ? 'JPY' : (selectedCountry === 'Japão' ? 'JPY' : 'BRL');
+  const isEuro = ['Portugal', 'França', 'Itália', 'Espanha'].includes(selectedCountry);
+  const currency = selectedCountry === 'Japão' ? 'JPY' : (isEuro ? 'EUR' : 'BRL');
 
   const getDisplayPrice = (size: 'small' | 'large') => {
     const basePrice = size === 'small' ? product.prices.small : product.prices.large;
-    if (product.deliveryRestrict === 'Japão') return basePrice;
-    if (selectedCountry === 'Japão') return basePrice * 28;
-    return basePrice;
+    if (selectedCountry === 'Japão') return basePrice;
+    if (isEuro) return (basePrice / 28) * 0.16;
+    return basePrice / 28;
   };
 
   const currentPrice = getDisplayPrice(selectedSize);
@@ -93,7 +94,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
 
   const handleShare = () => {
     const url = `${window.location.origin}/produtos`;
-    const text = `${translatedName} 🍯`;
+    const text = `${translatedName} 🌸`;
 
     if (navigator.share) {
       navigator.share({ title: translatedName, text, url }).catch(() => {});
@@ -150,8 +151,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
         {/* Category Badge */}
         <div className="absolute top-4 left-4 z-10">
           <span className="px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wide bg-primary text-primary-foreground shadow-sm">
-            {product.category === 'doce-de-leite' ? 'Doce de Leite 🍯' : 
-             product.category === 'cosmeticos' ? 'Cosméticos 🧴' : 
+            {product.category === 'cosmeticos' ? 'Cosméticos 🧴' : 
              product.category === 'acessorios' ? 'Acessórios 🎮' : 
              product.category === 'doces' ? 'Doces & Chás 🍵' : 
              product.category === 'papelaria' ? 'Papelaria ✏️' : 'Importado 🌸'}
@@ -204,30 +204,12 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
           {translatedDesc}
         </p>
 
-        {/* Size Selection */}
-        <div className="flex gap-3 mb-4">
-          <button
-            onClick={() => setSelectedSize('small')}
-            className={cn(
-              "flex-1 py-2 px-3 rounded-lg border-2 text-sm font-medium transition-all",
-              selectedSize === 'small'
-                ? "border-primary bg-primary/10 text-primary"
-                : "border-border hover:border-primary/50"
-            )}
-          >
-            Padrão - {formatPrice(getDisplayPrice('small'), currency)}
-          </button>
-          <button
-            onClick={() => setSelectedSize('large')}
-            className={cn(
-              "flex-1 py-2 px-3 rounded-lg border-2 text-sm font-medium transition-all",
-              selectedSize === 'large'
-                ? "border-primary bg-primary/10 text-primary"
-                : "border-border hover:border-primary/50"
-            )}
-          >
-            Deluxe - {formatPrice(getDisplayPrice('large'), currency)}
-          </button>
+        {/* Price display */}
+        <div className="mb-4 flex items-center justify-between border-b pb-3 border-border/50">
+          <span className="text-sm font-semibold text-muted-foreground">Valor:</span>
+          <span className="text-xl font-bold text-primary">
+            {formatPrice(currentPrice, currency)}
+          </span>
         </div>
 
         {/* Quantity & Add to Cart */}

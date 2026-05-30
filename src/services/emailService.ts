@@ -176,7 +176,7 @@ export const emailService = {
             background: #f5f5f5;
           }
           .header {
-            background: linear-gradient(135deg, #d4a574 0%, #c08552 100%);
+            background: linear-gradient(135deg, #FF69B4 0%, #FFB6C1 100%);
             color: white;
             padding: 30px;
             text-align: center;
@@ -192,10 +192,10 @@ export const emailService = {
             padding: 20px;
             margin-bottom: 20px;
             border-radius: 8px;
-            border-left: 4px solid #c08552;
+            border-left: 4px solid #FF69B4;
           }
           .section h2 {
-            color: #c08552;
+            color: #FF69B4;
             margin-top: 0;
             margin-bottom: 15px;
             font-size: 18px;
@@ -203,7 +203,7 @@ export const emailService = {
           .order-number {
             font-size: 24px;
             font-weight: bold;
-            color: #c08552;
+            color: #FF69B4;
             margin: 10px 0;
             text-align: center;
             padding: 15px;
@@ -222,12 +222,12 @@ export const emailService = {
           .total {
             font-size: 20px;
             font-weight: bold;
-            color: #c08552;
+            color: #FF69B4;
             text-align: right;
             margin-top: 20px;
             padding: 15px;
             background: #fff;
-            border: 2px solid #c08552;
+            border: 2px solid #FF69B4;
             border-radius: 8px;
           }
           .shipping-label {
@@ -296,7 +296,7 @@ export const emailService = {
       </head>
       <body>
         <div class="header">
-          <h1>🍯 Doce de Leite</h1>
+          <h1>🌸 Sakura Express</h1>
           <p>Confirmação de Pedido</p>
         </div>
         
@@ -350,9 +350,9 @@ export const emailService = {
                 <td style="padding: 8px;">Frete (${shipping?.carrier || 'N/A'}):</td>
                 <td style="text-align: right; padding: 8px;">¥${shipping?.cost?.toLocaleString() || '0'}</td>
               </tr>
-              <tr style="border-top: 2px solid #c08552;">
+              <tr style="border-top: 2px solid #FF69B4;">
                 <td style="padding: 8px;"><strong>Total:</strong></td>
-                <td style="text-align: right; padding: 8px;"><strong style="font-size: 20px; color: #c08552;">¥${((totalPrice || 0) + (shipping?.cost || 0)).toLocaleString()}</strong></td>
+                <td style="text-align: right; padding: 8px;"><strong style="font-size: 20px; color: #FF69B4;">¥${((totalPrice || 0) + (shipping?.cost || 0)).toLocaleString()}</strong></td>
               </tr>
             </table>
             <p style="margin-top: 10px;"><strong>Entrega:</strong> ${shipping?.estimatedDays || 'N/A'} dias úteis</p>
@@ -483,9 +483,9 @@ export const emailService = {
         </div>
 
         <div class="footer">
-          <p><strong>Doce de Leite</strong> - Sabor Brasileiro no Japão 🇧🇷</p>
+          <p><strong>Sakura Express</strong> - Importados do Japão 🌸</p>
           <p>📍 Mie-ken Iga-shi Kirigaoka 5-292, 〒518-0225</p>
-          <p>📞 070-1367-1679 | 📧 contato@docedeleite.jp</p>
+          <p>📞 070-1367-1679 | 📧 contato@sakuraexpress.jp</p>
           <p style="margin-top: 15px; font-size: 12px; color: #999;">
             Se tiver dúvidas, entre em contato conosco via WhatsApp!
           </p>
@@ -515,11 +515,11 @@ export const emailService = {
         <title>Confirmação de Pedido</title>
         <style>
           body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 800px; margin: 0 auto; padding: 20px; background: #f5f5f5; }
-          .header { background: linear-gradient(135deg, #d4a574 0%, #c08552 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+          .header { background: linear-gradient(135deg, #FF69B4 0%, #FFB6C1 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
           .content { background: white; padding: 30px; border: 1px solid #ddd; }
-          .section { background: #f9f9f9; padding: 20px; margin-bottom: 20px; border-radius: 8px; border-left: 4px solid #c08552; }
-          .section h2 { color: #c08552; margin-top: 0; margin-bottom: 15px; font-size: 18px; }
-          .order-number { font-size: 24px; font-weight: bold; color: #c08552; margin: 10px 0; text-align: center; padding: 15px; background: #fff3cd; border-radius: 8px; }
+          .section { background: #f9f9f9; padding: 20px; margin-bottom: 20px; border-radius: 8px; border-left: 4px solid #FF69B4; }
+          .section h2 { color: #FF69B4; margin-top: 0; margin-bottom: 15px; font-size: 18px; }
+          .order-number { font-size: 24px; font-weight: bold; color: #FF69B4; margin: 10px 0; text-align: center; padding: 15px; background: #fff3cd; border-radius: 8px; }
           .product-item { padding: 10px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; }
           .product-item:last-child { border-bottom: none; }
           .info-box { background: #e3f2fd; border-left: 4px solid #2196f3; padding: 15px; margin: 15px 0; }
@@ -528,7 +528,7 @@ export const emailService = {
       </head>
       <body>
         <div class="header">
-          <h1>🍯 Sabor do Campo</h1>
+          <h1>🌸 Sakura Express</h1>
           <p>Confirmação de Pedido</p>
         </div>
         
@@ -581,9 +581,9 @@ export const emailService = {
                 <td style="padding: 8px;">Frete (${shipping?.carrier || 'N/A'}):</td>
                 <td style="text-align: right; padding: 8px;">¥${shipping?.cost?.toLocaleString() || '0'}</td>
               </tr>
-              <tr style="border-top: 2px solid #c08552;">
+              <tr style="border-top: 2px solid #FF69B4;">
                 <td style="padding: 8px;"><strong>Total:</strong></td>
-                <td style="text-align: right; padding: 8px;"><strong style="font-size: 20px; color: #c08552;">¥${((totalPrice || 0) + (shipping?.cost || 0)).toLocaleString()}</strong></td>
+                <td style="text-align: right; padding: 8px;"><strong style="font-size: 20px; color: #FF69B4;">¥${((totalPrice || 0) + (shipping?.cost || 0)).toLocaleString()}</strong></td>
               </tr>
             </table>
             <p style="margin-top: 10px;"><strong>Entrega:</strong> ${shipping?.estimatedDays || 'N/A'} dias úteis</p>
@@ -636,9 +636,9 @@ export const emailService = {
         </div>
 
         <div class="footer">
-          <p><strong>Sabor do Campo</strong> - Doce de Leite Artesanal 🇧🇷</p>
+          <p><strong>Sakura Express</strong> - Importados do Japão 🌸</p>
           <p>📍 Mie-ken Iga-shi Kirigaoka 5-292, 〒518-0225</p>
-          <p>📞 070-1367-1679 | 📧 dracko2007@gmail.com</p>
+          <p>📞 070-1367-1679 | 📧 contato@sakuraexpress.jp</p>
           <p style="margin-top: 15px; font-size: 12px; color: #999;">
             Se tiver dúvidas, entre em contato conosco via WhatsApp!
           </p>

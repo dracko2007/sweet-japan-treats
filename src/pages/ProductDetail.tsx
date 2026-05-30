@@ -31,7 +31,7 @@ const ProductDetail: React.FC = () => {
     user?.email ? wishlistService.isInWishlist(user.email, id || '') : false
   );
 
-  if (!product || (product.deliveryRestrict === 'Japão' && selectedCountry !== 'Japão')) {
+  if (!product) {
     return (
       <Layout>
         <div className="container mx-auto px-4 py-20 text-center">
@@ -46,13 +46,14 @@ const ProductDetail: React.FC = () => {
   const translatedDesc = getTranslatedProductDesc(product.id, t);
   const translatedFlavor = getTranslatedProductFlavor(product.id, t);
 
-  const currency = product.deliveryRestrict === 'Japão' ? 'JPY' : (selectedCountry === 'Japão' ? 'JPY' : 'BRL');
+  const isEuro = ['Portugal', 'França', 'Itália', 'Espanha'].includes(selectedCountry);
+  const currency = selectedCountry === 'Japão' ? 'JPY' : (isEuro ? 'EUR' : 'BRL');
   
   const getDisplayPrice = (size: 'small' | 'large') => {
     const basePrice = size === 'small' ? product.prices.small : product.prices.large;
-    if (product.deliveryRestrict === 'Japão') return basePrice;
-    if (selectedCountry === 'Japão') return basePrice * 28;
-    return basePrice;
+    if (selectedCountry === 'Japão') return basePrice;
+    if (isEuro) return (basePrice / 28) * 0.16;
+    return basePrice / 28;
   };
 
   const currentPrice = getDisplayPrice(selectedSize);
@@ -144,8 +145,7 @@ const ProductDetail: React.FC = () => {
               <div>
                 <div className="mb-4">
                   <span className="inline-block px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wide bg-primary/20 text-primary">
-                    {product.category === 'doce-de-leite' ? 'Doce de Leite 🍯' : 
-                     product.category === 'cosmeticos' ? 'Cosméticos 🧴' : 
+                    {product.category === 'cosmeticos' ? 'Cosméticos 🧴' : 
                      product.category === 'acessorios' ? 'Acessórios & Geek 🎮' : 
                      product.category === 'doces' ? 'Doces & Chás 🍵' : 
                      product.category === 'papelaria' ? 'Papelaria ✏️' : 'Importado 🌸'}
@@ -182,37 +182,10 @@ const ProductDetail: React.FC = () => {
                   <p className="font-semibold">{translatedFlavor}</p>
                 </div>
 
-                <div className="mb-6">
-                  <label className="block text-sm font-medium mb-3">{t('productDetail.size')}</label>
-                  <div className="grid grid-cols-2 gap-4">
-                    <button
-                      onClick={() => setSelectedSize('small')}
-                      className={cn(
-                        "p-4 rounded-xl border-2 transition-all text-left",
-                        selectedSize === 'small'
-                          ? "border-primary bg-primary/10"
-                          : "border-border hover:border-primary/50"
-                      )}
-                    >
-                      <div className="font-semibold mb-1">Padrão</div>
-                      <div className="text-2xl font-bold text-primary">
-                        {formatPrice(getDisplayPrice('small'), currency)}
-                      </div>
-                    </button>
-                    <button
-                      onClick={() => setSelectedSize('large')}
-                      className={cn(
-                        "p-4 rounded-xl border-2 transition-all text-left",
-                        selectedSize === 'large'
-                          ? "border-primary bg-primary/10"
-                          : "border-border hover:border-primary/50"
-                      )}
-                    >
-                      <div className="font-semibold mb-1">Deluxe</div>
-                      <div className="text-2xl font-bold text-primary">
-                        {formatPrice(getDisplayPrice('large'), currency)}
-                      </div>
-                    </button>
+                <div className="mb-6 border-b pb-4 border-border/50">
+                  <span className="block text-sm font-semibold text-muted-foreground mb-1">Preço Unitário</span>
+                  <div className="text-3xl font-black text-primary">
+                    {formatPrice(currentPrice, currency)}
                   </div>
                 </div>
 
