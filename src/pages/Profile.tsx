@@ -165,7 +165,7 @@ const Profile: React.FC = () => {
     });
 
     if (turnedOnMarketing && editedUser.phone) {
-      const welcomeMsg = `*SAKURA EXPRESS* 🌸\n\nOlá, *${editedUser.name || user.name}*!\nVocê ativou as notificações e ofertas exclusivas no WhatsApp!\n\n🎟️ Seu cupom de 90% OFF está ativo: *SAKURA90*\n\n🔥 *Novidades fresquinhas do Japão:*\n• Protetor solar Bioré UV Aqua Rich com frete aéreo expresso grátis para o Brasil.\n• Snacks e cosméticos exclusivos direto do Japão!\n\nAcesse nossa loja: https://japan-express.vercel.app`;
+      const welcomeMsg = `*SAKURA EXPRESS* 🌸\n\nOlá, *${editedUser.name || user.name}*!\nVocê ativou as notificações e ofertas exclusivas no WhatsApp!\n\n🎟️ Seu cupom de boas-vindas: *BEMVINDO10* (10% OFF)\n\n🔥 *Novidades fresquinhas do Japão:*\n• Protetor solar Bioré UV Aqua Rich com frete aéreo expresso grátis para o Brasil.\n• Snacks e cosméticos exclusivos direto do Japão!\n\nAcesse nossa loja: https://japan-express.vercel.app`;
       
       import('@/services/whatsappService').then(({ whatsappService }) => {
         whatsappService.sendMessage({
@@ -289,7 +289,7 @@ const Profile: React.FC = () => {
                       className="w-4 h-4 rounded border-input text-primary focus:ring-primary cursor-pointer"
                     />
                     <Label htmlFor="whatsappMarketing" className="text-sm font-semibold cursor-pointer select-none leading-none">
-                      Receber novidades e cupons diretamente no meu WhatsApp (Cupom SAKURA90)
+                      Receber novidades e cupons diretamente no meu WhatsApp (Cupom BEMVINDO10)
                     </Label>
                   </div>
                   <div className="space-y-2">
@@ -401,7 +401,7 @@ const Profile: React.FC = () => {
                       Notificações por WhatsApp
                     </Label>
                     <p className="font-medium text-foreground">
-                      {user.whatsappMarketing ? '✅ Ativado (Cupom SAKURA90)' : '❌ Desativado'}
+                      {user.whatsappMarketing ? '✅ Ativado (Cupom BEMVINDO10)' : '❌ Desativado'}
                     </p>
                   </div>
                   {user.birthdate && (

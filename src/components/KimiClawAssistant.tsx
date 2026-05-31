@@ -268,7 +268,7 @@ ${itemsText}
 • Status: Pago / Aguardando Envio\n\n`;
     }
 
-    const messageText = `*SAKURA EXPRESS* 🌸\n\nOlá, *${clientName}*! Obrigado por comprar conosco!\n\n${summaryText}🎟️ Seu cupom de 90% OFF está ativo: *SAKURA90* (aplique em sua próxima compra).\n\n🔥 *Novidades fresquinhas do Japão:*\n1. Protetor solar Bioré UV Aqua Rich com frete expresso para o Brasil.\n2. Canetas e artigos de papelaria Kawaii direto do Japão.\n3. Cosméticos e snacks exclusivos direto de Tóquio!\n\nAcesse nossa loja: https://japan-express.vercel.app`;
+    const messageText = `*SAKURA EXPRESS* 🌸\n\nOlá, *${clientName}*! Obrigado por comprar conosco!\n\n${summaryText}🎟️ Seu cupom de boas-vindas: *BEMVINDO10* (10% de desconto na próxima compra).\n\n🔥 *Novidades fresquinhas do Japão:*\n1. Protetor solar Bioré UV Aqua Rich com frete expresso para o Brasil.\n2. Canetas e artigos de papelaria Kawaii direto do Japão.\n3. Cosméticos e snacks exclusivos direto de Tóquio!\n\nAcesse nossa loja: https://japan-express.vercel.app`;
 
     const steps = [
       language === 'pt' ? '📱 Inicializando API de Comunicação Local...' : '📱 Initializing Local Communication API...',
@@ -292,7 +292,7 @@ ${itemsText}
     let responseText = '';
     if (success) {
       responseText = language === 'pt'
-        ? `Enviei de forma 100% automática! O sistema local realizou o disparo para **${phoneNumber}** com o cupom SAKURA90 e os detalhes da compra.`
+        ? `Enviei de forma 100% automática! O sistema local realizou o disparo para **${phoneNumber}** com o cupom BEMVINDO10 e os detalhes da compra.`
         : language === 'ja'
           ? `自動送信が完了しました！お電話番号 **${phoneNumber}** 宛てにメッセージをお送りしました。`
           : `Sent automatically! The message has been successfully dispatched to **${phoneNumber}** via our local background service.`;
@@ -429,20 +429,15 @@ ${itemsText}
       return;
     }
 
-    // 2. APPLY SAKURA90 COUPON
-    if (query.includes('sakura90') || query.includes('cupom') || query.includes('desconto')) {
+    // 2. INFORMA O CUPOM DE BOAS-VINDAS (validação real é feita no carrinho)
+    if (query.includes('cupom') || query.includes('desconto') || query.includes('coupon')) {
       const steps = [
-        language === 'pt' ? '🎟️ Verificando regras de cupons ativos...' : '🎟️ Validating coupon...',
-        language === 'pt' ? '🔑 Aplicando cupom SAKURA90 (90% OFF)...' : '🔑 Applying SAKURA90 (90% OFF)...',
+        language === 'pt' ? '🎟️ Buscando cupons disponíveis...' : '🎟️ Looking up coupons...',
       ];
 
-      safeStorage.setItem('sakura_active_coupon', 'SAKURA90');
-      window.dispatchEvent(new Event('storage'));
-      toast.success('Cupom SAKURA90 aplicado! 90% OFF.');
-
       const responseText = language === 'pt'
-        ? `Sensacional! O cupom **SAKURA90** (90% de desconto) foi ativado com sucesso e será deduzido no fechamento da sua compra no Carrinho/Checkout!`
-        : `Amazing! The coupon **SAKURA90** (90% discount) has been activated and will be automatically applied at checkout!`;
+        ? `Use o cupom de boas-vindas **BEMVINDO10** (10% de desconto) digitando-o no campo "Cupom de Desconto" do seu carrinho. Cupons são validados na hora — só funcionam se estiverem ativos e disponíveis para a sua conta.`
+        : `Use the welcome coupon **BEMVINDO10** (10% off) by typing it in the "Coupon" field in your cart. Coupons are validated on the spot — they only work if active and available for your account.`;
 
       await addKimiMessageWithTyping(responseText, steps);
       return;
@@ -553,9 +548,9 @@ ${itemsText}
       responseText = 'Olá! Sou o KimiClaw AI. Posso adicionar itens ao seu carrinho, mudar o idioma, calcular o frete ou enviar novidades e descontos via WhatsApp! O que deseja?';
     } else {
       const suggestions = language === 'pt'
-        ? 'Minhas habilidades: 🔍 **buscar** produtos | 📦 **calcular** frete | 🎟️ **cupom SAKURA90** | 📱 **whatsapp** | 🗑️ **limpar carrinho**'
+        ? 'Minhas habilidades: 🔍 **buscar** produtos | 📦 **calcular** frete | 🎟️ **cupom** | 📱 **whatsapp** | 🗑️ **limpar carrinho**'
         : language === 'ja'
-          ? '機能: 🔍 商品検索 | 📦 送料計算 | 🎟️ SAKURA90クーポン | 📱 WhatsApp | 🗑️ カート削除'
+          ? '機能: 🔍 商品検索 | 📦 送料計算 | 🎟️ クーポン | 📱 WhatsApp | 🗑️ カート削除'
           : 'My skills: 🔍 **search** products | 📦 **calculate** shipping | 🎟️ **coupon** | 📱 **whatsapp** | 🗑️ **clear cart**';
       responseText = suggestions;
     }
@@ -838,7 +833,7 @@ ${itemsText}
                   📦 {language === 'pt' ? 'Calcular Frete' : 'Calc. Shipping'}
                 </button>
                 <button
-                  onClick={() => handleSuggestionClick(t('kimiclaw.skill.apply_coupon'), 'sakura90')}
+                  onClick={() => handleSuggestionClick(t('kimiclaw.skill.apply_coupon'), 'cupom')}
                   className="text-[11px] bg-card hover:bg-primary/10 border border-border hover:border-primary/30 rounded-full px-2.5 py-1 text-foreground transition-all duration-200"
                 >
                   {t('kimiclaw.skill.apply_coupon')}

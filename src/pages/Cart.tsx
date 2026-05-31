@@ -1,54 +1,69 @@
-import { safeStorage } from '@/utils/storage';
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ShoppingBag, ArrowRight, Trash2, Tag, ShieldCheck, HelpCircle } from 'lucide-react';
+import { ShoppingBag, ArrowRight, Trash2, Tag, ShieldCheck, Loader2 } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import CartItemComponent from '@/components/cart/CartItem';
 import { Button } from '@/components/ui/button';
 import { useCart } from '@/context/CartContext';
 import { useLanguage } from '@/context/LanguageContext';
+import { useUser } from '@/context/UserContext';
+import { couponService } from '@/services/couponService';
+import type { Coupon } from '@/types';
 import { formatPrice } from '@/utils/currency';
 
 const Cart: React.FC = () => {
   const { items, clearCart } = useCart();
   const { t, selectedCountry, setSelectedCountry } = useLanguage();
+  const { user, orders } = useUser();
 
   // Coupon state
   const [couponCode, setCouponCode] = useState('');
-  const [activeCoupon, setActiveCoupon] = useState<{ code: string; discountPercent: number } | null>(null);
+  const [activeCoupon, setActiveCoupon] = useState<Coupon | null>(null);
   const [couponError, setCouponError] = useState('');
+  const [applying, setApplying] = useState(false);
 
-  // No shipping restriction since all products are available globally
-
-  // Check for Wheel of Fortune coupon in safeStorage on load
-  useEffect(() => {
-    const savedCoupon = safeStorage.getItem('sakura_active_coupon');
-    if (savedCoupon === 'SAKURA90') {
-      setActiveCoupon({ code: 'SAKURA90', discountPercent: 90 });
-    }
-  }, []);
-
-  const handleApplyCoupon = (e: React.FormEvent) => {
+  // Valida o cupom contra o serviço real (existência, ativo, expiração,
+  // uso e regras de elegibilidade) — sem códigos chumbados.
+  const handleApplyCoupon = async (e: React.FormEvent) => {
     e.preventDefault();
     setCouponError('');
 
-    const formattedCode = couponCode.trim().toUpperCase();
-    if (formattedCode === 'SAKURA90') {
-      setActiveCoupon({ code: 'SAKURA90', discountPercent: 90 });
-      safeStorage.setItem('sakura_active_coupon', 'SAKURA90');
+    const code = couponCode.trim();
+    if (!code) return;
+
+    setApplying(true);
+    try {
+      const result = await couponService.validateCouponAsync(code, user?.email);
+      if (!result.valid || !result.coupon) {
+        setActiveCoupon(null);
+        setCouponError(result.error || 'Cupom inválido ou expirado.');
+        return;
+      }
+
+      // Regras de quem pode usar (aniversário, fidelidade, e-mails específicos)
+      const eligible = couponService.checkTargetEligibility(
+        result.coupon,
+        user?.email,
+        user?.birthdate,
+        orders?.length || 0
+      );
+      if (!eligible) {
+        setActiveCoupon(null);
+        setCouponError('Este cupom não está disponível para a sua conta.');
+        return;
+      }
+
+      setActiveCoupon(result.coupon);
       setCouponCode('');
-    } else if (formattedCode === 'BEMVINDO10') {
-      setActiveCoupon({ code: 'BEMVINDO10', discountPercent: 10 });
-      safeStorage.setItem('sakura_active_coupon', 'BEMVINDO10');
-      setCouponCode('');
-    } else if (formattedCode !== '') {
-      setCouponError('Cupom inválido ou expirado.');
+    } catch {
+      setCouponError('Não foi possível validar o cupom. Tente novamente.');
+    } finally {
+      setApplying(false);
     }
   };
 
   const handleRemoveCoupon = () => {
     setActiveCoupon(null);
-    safeStorage.removeItem('sakura_active_coupon');
   };
 
   // Calculations in correct currency
@@ -68,8 +83,7 @@ const Cart: React.FC = () => {
     return sum + unitPrice * item.quantity;
   }, 0);
 
-  const discountPercent = activeCoupon ? activeCoupon.discountPercent : 0;
-  const discountAmount = baseTotalPrice * (discountPercent / 100);
+  const discountAmount = activeCoupon ? couponService.calculateDiscount(activeCoupon, baseTotalPrice) : 0;
   const subtotalWithDiscount = baseTotalPrice - discountAmount;
   
   // Tax calculations (Estimated only, NOT added to grandTotal)
@@ -205,13 +219,13 @@ const Cart: React.FC = () => {
                     <div className="flex gap-2">
                       <input
                         type="text"
-                        placeholder="Ex: SAKURA90"
+                        placeholder="Digite seu cupom"
                         value={couponCode}
                         onChange={(e) => setCouponCode(e.target.value)}
                         className="flex-1 px-3 py-2 text-sm rounded-lg border border-border bg-background uppercase font-bold"
                       />
-                      <Button type="submit" variant="secondary" className="px-4 text-xs font-bold">
-                        Aplicar
+                      <Button type="submit" variant="secondary" disabled={applying} className="px-4 text-xs font-bold">
+                        {applying ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Aplicar'}
                       </Button>
                     </div>
                     {couponError && <p className="text-xs text-red-500 font-semibold">{couponError}</p>}
@@ -230,8 +244,11 @@ const Cart: React.FC = () => {
                           <Tag className="w-3.5 h-3.5 shrink-0" /> Cupom ({activeCoupon.code})
                         </span>
                         <span className="flex items-center gap-1">
-                          -{activeCoupon.discountPercent}% (-{formatPrice(discountAmount, currency)})
-                          <button 
+                          {activeCoupon.type === 'percent' && activeCoupon.discountPercent
+                            ? `-${activeCoupon.discountPercent}% `
+                            : ''}
+                          (-{formatPrice(discountAmount, currency)})
+                          <button
                             onClick={handleRemoveCoupon}
                             className="text-red-500 hover:text-red-700 ml-1 text-xs"
                             title="Remover cupom"
