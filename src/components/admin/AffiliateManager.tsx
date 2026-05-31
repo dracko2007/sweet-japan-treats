@@ -1,16 +1,17 @@
 import React, { useEffect, useState } from 'react';
-import { Megaphone, Plus, Trash2, Link2, TrendingUp, DollarSign, Package, X } from 'lucide-react';
+import { Megaphone, Plus, Trash2, Link2, TrendingUp, DollarSign, Package, X, CheckCircle, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { affiliateService, Affiliate } from '@/services/affiliateService';
+import { affiliateService, Affiliate, PendingCommission } from '@/services/affiliateService';
 
 const SITE_URL = 'https://japan-express.vercel.app';
 
 const AffiliateManager: React.FC = () => {
   const { toast } = useToast();
   const [affiliates, setAffiliates] = useState<Affiliate[]>([]);
+  const [pending, setPending] = useState<PendingCommission[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -26,14 +27,38 @@ const AffiliateManager: React.FC = () => {
 
   const load = async () => {
     setLoading(true);
-    const list = await affiliateService.getAll();
+    const [list, pend] = await Promise.all([
+      affiliateService.getAll(),
+      affiliateService.getPendingCommissions(),
+    ]);
     setAffiliates(list.sort((a, b) => b.totalEarnings - a.totalEarnings));
+    setPending(pend.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
     setLoading(false);
   };
 
   useEffect(() => {
     load();
   }, []);
+
+  const handleConfirm = async (pc: PendingCommission) => {
+    if (!confirm(`Confirmar entrega e liberar comissão de ${pc.affiliateCode}?`)) return;
+    const ok = await affiliateService.confirmPendingCommission(pc.id);
+    if (ok) {
+      toast({ title: '✅ Comissão liberada', description: `${pc.affiliateCode} · ¥${pc.commissionYen.toLocaleString()}` });
+      load();
+    } else {
+      toast({ title: 'Erro ao confirmar', variant: 'destructive' });
+    }
+  };
+
+  const handleCancelPending = async (pc: PendingCommission) => {
+    if (!confirm(`Cancelar a comissão pendente de ${pc.affiliateCode} (pedido cancelado)?`)) return;
+    const ok = await affiliateService.cancelPendingCommission(pc.id);
+    if (ok) {
+      toast({ title: 'Comissão cancelada' });
+      load();
+    }
+  };
 
   const handleSave = async () => {
     if (!form.code.trim() || !form.ownerEmail.trim()) {
@@ -134,6 +159,39 @@ const AffiliateManager: React.FC = () => {
           <div className="flex justify-end gap-2 mt-4">
             <Button variant="outline" onClick={() => setCreating(false)}>Cancelar</Button>
             <Button onClick={handleSave} disabled={saving} className="btn-primary">{saving ? 'Salvando...' : 'Salvar'}</Button>
+          </div>
+        </div>
+      )}
+
+      {/* Comissões pendentes — liberar ao confirmar a entrega */}
+      {pending.length > 0 && (
+        <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-300 dark:border-amber-800 rounded-xl p-5">
+          <h3 className="font-semibold flex items-center gap-2 text-amber-800 dark:text-amber-300 mb-1">
+            <Clock className="w-5 h-5" /> Comissões pendentes ({pending.length})
+          </h3>
+          <p className="text-xs text-amber-700 dark:text-amber-400 mb-4">
+            A comissão só é creditada ao influencer quando você confirma a entrega do pedido.
+          </p>
+          <div className="space-y-2">
+            {pending.map((pc) => (
+              <div key={pc.id} className="flex flex-wrap items-center justify-between gap-3 bg-card rounded-lg border border-border p-3">
+                <div className="text-sm">
+                  <span className="font-bold font-mono text-primary">{pc.affiliateCode}</span>
+                  <span className="text-muted-foreground"> · Pedido {pc.orderId}</span>
+                  <div className="text-xs text-muted-foreground">
+                    {pc.buyerEmail || 'cliente'} · Venda líquida ¥{pc.netYen.toLocaleString()} · Comissão <strong className="text-green-600">¥{pc.commissionYen.toLocaleString()}</strong>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Button size="sm" className="btn-primary text-xs" onClick={() => handleConfirm(pc)}>
+                    <CheckCircle className="w-4 h-4 mr-1" /> Confirmar entrega
+                  </Button>
+                  <Button size="sm" variant="outline" className="text-xs text-destructive" onClick={() => handleCancelPending(pc)}>
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}

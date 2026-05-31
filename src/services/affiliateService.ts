@@ -18,6 +18,18 @@ import {
 import { ensureAdminAuth } from '@/utils/adminAuth';
 
 const COL = 'affiliates';
+const PENDING_COL = 'affiliate_pending';
+
+export interface PendingCommission {
+  id: string;
+  affiliateCode: string;
+  netYen: number;          // valor líquido da venda (¥)
+  commissionYen: number;   // comissão calculada (¥)
+  orderId: string;
+  buyerEmail: string;
+  status: 'pending' | 'confirmed';
+  createdAt: string;
+}
 
 export interface Affiliate {
   code: string;            // código anunciado (ex: GANHA10)
@@ -129,7 +141,7 @@ export const affiliateService = {
 
   /**
    * Credita uma venda ao afiliado: incrementa pedidos, receita líquida e a
-   * comissão (valor líquido × commissionPercent). Chamado ao finalizar o pedido.
+   * comissão (valor líquido × commissionPercent).
    */
   async creditSale(code: string, netValue: number): Promise<void> {
     if (!db || !code) return;
@@ -150,6 +162,100 @@ export const affiliateService = {
       );
     } catch (e) {
       console.warn('affiliateService.creditSale falhou:', e);
+    }
+  },
+
+  /**
+   * Registra uma comissão PENDENTE (na compra). Só vira comissão de verdade
+   * quando o admin confirmar a entrega do pedido.
+   */
+  async addPendingCommission(params: {
+    affiliateCode: string;
+    netYen: number;
+    orderId: string;
+    buyerEmail: string;
+  }): Promise<void> {
+    if (!db || !params.affiliateCode) return;
+    try {
+      const code = normalize(params.affiliateCode);
+      const affSnap = await getDoc(doc(db, COL, code));
+      const commissionPercent = affSnap.exists() ? (affSnap.data() as Affiliate).commissionPercent || 0 : 0;
+      const id = `${code}-${params.orderId || Date.now()}`;
+      const record: PendingCommission = {
+        id,
+        affiliateCode: code,
+        netYen: params.netYen,
+        commissionYen: Math.round((params.netYen * commissionPercent) / 100),
+        orderId: params.orderId || id,
+        buyerEmail: params.buyerEmail || '',
+        status: 'pending',
+        createdAt: new Date().toISOString(),
+      };
+      await setDoc(doc(db, PENDING_COL, id), record);
+    } catch (e) {
+      console.warn('affiliateService.addPendingCommission falhou:', e);
+    }
+  },
+
+  /** Lista comissões pendentes (admin). */
+  async getPendingCommissions(): Promise<PendingCommission[]> {
+    if (!db) return [];
+    try {
+      const q = query(collection(db, PENDING_COL), where('status', '==', 'pending'));
+      const snap = await getDocs(q);
+      return snap.docs.map((d) => d.data() as PendingCommission);
+    } catch (e) {
+      console.warn('affiliateService.getPendingCommissions falhou:', e);
+      return [];
+    }
+  },
+
+  /** Comissões pendentes de um afiliado (painel do influencer). */
+  async getPendingByCode(code: string): Promise<PendingCommission[]> {
+    if (!db || !code) return [];
+    try {
+      const q = query(
+        collection(db, PENDING_COL),
+        where('affiliateCode', '==', normalize(code)),
+        where('status', '==', 'pending')
+      );
+      const snap = await getDocs(q);
+      return snap.docs.map((d) => d.data() as PendingCommission);
+    } catch (e) {
+      console.warn('affiliateService.getPendingByCode falhou:', e);
+      return [];
+    }
+  },
+
+  /** Confirma a entrega: credita a comissão ao afiliado e marca como confirmada. */
+  async confirmPendingCommission(id: string): Promise<boolean> {
+    if (!db || !id) return false;
+    try {
+      await ensureAdminAuth();
+      const ref = doc(db, PENDING_COL, id);
+      const snap = await getDoc(ref);
+      if (!snap.exists()) return false;
+      const pc = snap.data() as PendingCommission;
+      if (pc.status === 'confirmed') return true;
+      await affiliateService.creditSale(pc.affiliateCode, pc.netYen);
+      await setDoc(ref, { status: 'confirmed' }, { merge: true });
+      return true;
+    } catch (e) {
+      console.error('affiliateService.confirmPendingCommission falhou:', e);
+      return false;
+    }
+  },
+
+  /** Cancela uma comissão pendente (pedido cancelado). */
+  async cancelPendingCommission(id: string): Promise<boolean> {
+    if (!db || !id) return false;
+    try {
+      await ensureAdminAuth();
+      await deleteDoc(doc(db, PENDING_COL, id));
+      return true;
+    } catch (e) {
+      console.error('affiliateService.cancelPendingCommission falhou:', e);
+      return false;
     }
   },
 };

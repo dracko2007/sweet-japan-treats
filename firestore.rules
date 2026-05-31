@@ -69,6 +69,12 @@ service cloud.firestore {
       allow write: if request.auth != null;   // admin cria/edita; comprador credita comissão
     }
 
+    // Comissões pendentes (liberadas pelo admin ao confirmar a entrega)
+    match /affiliate_pending/{id} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+
     // ---------- Coleção de teste ----------
     match /test/{docId} {
       allow read, write: if request.auth != null;

@@ -13,6 +13,7 @@ const AffiliatePage: React.FC = () => {
   const { user, isAuthenticated } = useUser();
   const { toast } = useToast();
   const [affiliates, setAffiliates] = useState<Affiliate[]>([]);
+  const [pendingByCode, setPendingByCode] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState<string | null>(null);
 
@@ -21,8 +22,17 @@ const AffiliatePage: React.FC = () => {
       setLoading(false);
       return;
     }
-    affiliateService.getByOwnerEmail(user.email).then((list) => {
+    affiliateService.getByOwnerEmail(user.email).then(async (list) => {
       setAffiliates(list);
+      // Soma das comissões pendentes (a liberar) por código
+      const map: Record<string, number> = {};
+      await Promise.all(
+        list.map(async (aff) => {
+          const pend = await affiliateService.getPendingByCode(aff.code);
+          map[aff.code] = pend.reduce((sum, p) => sum + (p.commissionYen || 0), 0);
+        })
+      );
+      setPendingByCode(map);
       setLoading(false);
     });
   }, [user?.email]);
@@ -105,9 +115,12 @@ const AffiliatePage: React.FC = () => {
                         <p className="text-xl font-bold">{yen(aff.totalRevenue)}</p>
                       </div>
                       <div className="bg-primary/10 rounded-xl p-4 border border-primary/20">
-                        <p className="text-xs text-primary flex items-center gap-1 mb-1"><DollarSign className="w-3 h-3" /> Sua comissão</p>
+                        <p className="text-xs text-primary flex items-center gap-1 mb-1"><DollarSign className="w-3 h-3" /> Comissão liberada</p>
                         <p className="text-xl font-bold text-primary">{yen(aff.totalEarnings)}</p>
-                        <p className="text-[10px] text-muted-foreground">{aff.commissionPercent}% das vendas</p>
+                        <p className="text-[10px] text-muted-foreground">
+                          {aff.commissionPercent}% das vendas
+                          {pendingByCode[aff.code] > 0 && ` · ¥${pendingByCode[aff.code].toLocaleString()} a liberar`}
+                        </p>
                       </div>
                     </div>
 
