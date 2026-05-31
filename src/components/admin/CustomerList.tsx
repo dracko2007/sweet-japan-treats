@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Users, ShoppingBag, DollarSign, TrendingUp, Package, Calendar, Mail, Phone, Trash2, AlertTriangle } from 'lucide-react';
+import { Users, ShoppingBag, DollarSign, TrendingUp, Package, Calendar, Mail, Phone, Trash2, AlertTriangle, Gift, X } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { customerService, CustomerStats } from '@/services/customerService';
 import { useToast } from '@/hooks/use-toast';
 import { usePagination } from '@/hooks/usePagination';
 import Pagination from '@/components/Pagination';
+import { firebaseSyncService } from '@/services/firebaseSyncService';
+import { ensureAdminAuth } from '@/utils/adminAuth';
+import type { Coupon } from '@/context/UserContext';
 
 const CustomerList: React.FC = () => {
   const [customers, setCustomers] = useState<CustomerStats[]>([]);
@@ -13,6 +16,59 @@ const CustomerList: React.FC = () => {
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerStats | null>(null);
   const { toast } = useToast();
   const customersPagination = usePagination(customers, 8);
+
+  // Concessão de cupom (admin → perfil do cliente)
+  const [grantTarget, setGrantTarget] = useState<{ email: string; name: string } | 'ALL' | null>(null);
+  const [granting, setGranting] = useState(false);
+  const [grantForm, setGrantForm] = useState({
+    code: '',
+    description: '',
+    discount: 10,
+    discountType: 'percentage' as 'percentage' | 'fixed',
+    validityDays: 30,
+  });
+
+  const handleGrantCoupon = async () => {
+    const code = grantForm.code.trim().toUpperCase();
+    if (!code || grantForm.discount <= 0) {
+      toast({ title: 'Preencha o código e o valor do desconto', variant: 'destructive' });
+      return;
+    }
+    const coupon: Coupon = {
+      id: `grant-${Date.now()}`,
+      code,
+      description: grantForm.description.trim() || `Cupom ${code}`,
+      discount: Number(grantForm.discount),
+      discountType: grantForm.discountType,
+      expiresAt: new Date(Date.now() + grantForm.validityDays * 86400000).toISOString(),
+      isUsed: false,
+    };
+
+    setGranting(true);
+    try {
+      await ensureAdminAuth();
+      const res =
+        grantTarget === 'ALL'
+          ? await firebaseSyncService.grantCouponToAllUsers(coupon)
+          : await firebaseSyncService.grantCouponToUserByEmail(grantTarget!.email, coupon);
+
+      if (res.success) {
+        toast({
+          title: '🎟️ Cupom concedido',
+          description:
+            grantTarget === 'ALL'
+              ? `${code} enviado para ${res.granted} cliente(s)`
+              : `${code} adicionado a ${(grantTarget as { name: string }).name}`,
+        });
+        setGrantTarget(null);
+        setGrantForm({ code: '', description: '', discount: 10, discountType: 'percentage', validityDays: 30 });
+      } else {
+        toast({ title: 'Erro ao conceder cupom', description: res.error, variant: 'destructive' });
+      }
+    } finally {
+      setGranting(false);
+    }
+  };
 
   useEffect(() => {
     loadCustomers();
@@ -156,7 +212,16 @@ const CustomerList: React.FC = () => {
             </h3>
             <p className="text-xs text-red-600 dark:text-red-300">Operações irreversíveis. Use com cuidado!</p>
           </div>
-          <div className="flex gap-2 flex-shrink-0">
+          <div className="flex gap-2 flex-shrink-0 flex-wrap justify-end">
+            <Button
+              size="sm"
+              variant="outline"
+              className="text-primary hover:text-primary border-primary/30 whitespace-nowrap"
+              onClick={() => setGrantTarget('ALL')}
+            >
+              <Gift className="w-4 h-4 mr-1" />
+              Dar cupom a todos
+            </Button>
             <Button
               size="sm"
               variant="outline"
@@ -278,7 +343,16 @@ const CustomerList: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="mt-3 pt-3 border-t flex gap-2">
+                  <div className="mt-3 pt-3 border-t flex flex-wrap gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-xs flex-1 text-primary border-primary/30 hover:bg-primary/5"
+                      onClick={() => setGrantTarget({ email: customer.email, name: customer.name })}
+                    >
+                      <Gift className="w-3 h-3 mr-1" />
+                      Dar cupom
+                    </Button>
                     <Button
                       size="sm"
                       variant="outline"
@@ -457,6 +531,94 @@ const CustomerList: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* Modal: conceder cupom */}
+      {grantTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-card rounded-2xl w-full max-w-md shadow-xl border border-border">
+            <div className="flex items-center justify-between p-5 border-b border-border">
+              <h3 className="font-bold text-lg flex items-center gap-2">
+                <Gift className="w-5 h-5 text-primary" />
+                {grantTarget === 'ALL'
+                  ? 'Dar cupom a todos os clientes'
+                  : `Dar cupom para ${grantTarget.name}`}
+              </h3>
+              <button onClick={() => setGrantTarget(null)} className="p-2 rounded-full hover:bg-secondary">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              <div>
+                <label className="text-sm font-semibold block mb-1">Código do cupom</label>
+                <input
+                  value={grantForm.code}
+                  onChange={(e) => setGrantForm({ ...grantForm, code: e.target.value.toUpperCase() })}
+                  placeholder="Ex: PRESENTE20"
+                  className="w-full px-3 py-2 rounded-lg border border-border bg-background uppercase font-bold"
+                />
+              </div>
+
+              <div>
+                <label className="text-sm font-semibold block mb-1">Descrição</label>
+                <input
+                  value={grantForm.description}
+                  onChange={(e) => setGrantForm({ ...grantForm, description: e.target.value })}
+                  placeholder="Ex: Presente especial"
+                  className="w-full px-3 py-2 rounded-lg border border-border bg-background"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-sm font-semibold block mb-1">Tipo</label>
+                  <select
+                    value={grantForm.discountType}
+                    onChange={(e) =>
+                      setGrantForm({ ...grantForm, discountType: e.target.value as 'percentage' | 'fixed' })
+                    }
+                    className="w-full px-3 py-2 rounded-lg border border-border bg-background"
+                  >
+                    <option value="percentage">Porcentagem (%)</option>
+                    <option value="fixed">Valor fixo (¥)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-sm font-semibold block mb-1">
+                    Desconto {grantForm.discountType === 'percentage' ? '(%)' : '(¥)'}
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={grantForm.discount}
+                    onChange={(e) => setGrantForm({ ...grantForm, discount: Number(e.target.value) })}
+                    className="w-full px-3 py-2 rounded-lg border border-border bg-background"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-sm font-semibold block mb-1">Validade (dias)</label>
+                <input
+                  type="number"
+                  min="1"
+                  value={grantForm.validityDays}
+                  onChange={(e) => setGrantForm({ ...grantForm, validityDays: Number(e.target.value) })}
+                  className="w-full px-3 py-2 rounded-lg border border-border bg-background"
+                />
+              </div>
+            </div>
+
+            <div className="p-5 border-t border-border flex justify-end gap-3">
+              <Button variant="outline" onClick={() => setGrantTarget(null)}>Cancelar</Button>
+              <Button onClick={handleGrantCoupon} disabled={granting} className="btn-primary gap-2">
+                <Gift className="w-4 h-4" />
+                {granting ? 'Concedendo...' : 'Conceder'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

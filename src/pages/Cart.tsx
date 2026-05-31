@@ -1,69 +1,62 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ShoppingBag, ArrowRight, Trash2, Tag, ShieldCheck, Loader2 } from 'lucide-react';
+import { ShoppingBag, ArrowRight, Trash2, Tag, ShieldCheck } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import CartItemComponent from '@/components/cart/CartItem';
 import { Button } from '@/components/ui/button';
 import { useCart } from '@/context/CartContext';
 import { useLanguage } from '@/context/LanguageContext';
-import { useUser } from '@/context/UserContext';
-import { couponService } from '@/services/couponService';
-import type { Coupon } from '@/types';
+import { useUser, Coupon } from '@/context/UserContext';
+import { useNavigate } from 'react-router-dom';
 import { formatPrice } from '@/utils/currency';
 
 const Cart: React.FC = () => {
   const { items, clearCart } = useCart();
   const { t, selectedCountry, setSelectedCountry } = useLanguage();
-  const { user, orders } = useUser();
+  const { isAuthenticated, validateProfileCoupon } = useUser();
+  const navigate = useNavigate();
 
   // Coupon state
   const [couponCode, setCouponCode] = useState('');
   const [activeCoupon, setActiveCoupon] = useState<Coupon | null>(null);
   const [couponError, setCouponError] = useState('');
-  const [applying, setApplying] = useState(false);
 
-  // Valida o cupom contra o serviço real (existência, ativo, expiração,
-  // uso e regras de elegibilidade) — sem códigos chumbados.
-  const handleApplyCoupon = async (e: React.FormEvent) => {
+  // Valida o cupom contra os cupons DO PERFIL da pessoa ("Meus Cupons").
+  // Só funciona se o cupom existir na conta, estiver ativo e não usado.
+  const handleApplyCoupon = (e: React.FormEvent) => {
     e.preventDefault();
     setCouponError('');
 
     const code = couponCode.trim();
     if (!code) return;
 
-    setApplying(true);
-    try {
-      const result = await couponService.validateCouponAsync(code, user?.email);
-      if (!result.valid || !result.coupon) {
-        setActiveCoupon(null);
-        setCouponError(result.error || 'Cupom inválido ou expirado.');
-        return;
-      }
-
-      // Regras de quem pode usar (aniversário, fidelidade, e-mails específicos)
-      const eligible = couponService.checkTargetEligibility(
-        result.coupon,
-        user?.email,
-        user?.birthdate,
-        orders?.length || 0
-      );
-      if (!eligible) {
-        setActiveCoupon(null);
-        setCouponError('Este cupom não está disponível para a sua conta.');
-        return;
-      }
-
-      setActiveCoupon(result.coupon);
-      setCouponCode('');
-    } catch {
-      setCouponError('Não foi possível validar o cupom. Tente novamente.');
-    } finally {
-      setApplying(false);
+    if (!isAuthenticated) {
+      setCouponError('Entre na sua conta para usar cupons.');
+      return;
     }
+
+    const result = validateProfileCoupon(code);
+    if (!result.valid || !result.coupon) {
+      setActiveCoupon(null);
+      setCouponError(result.error || 'Cupom inválido.');
+      return;
+    }
+
+    setActiveCoupon(result.coupon);
+    setCouponCode('');
   };
 
   const handleRemoveCoupon = () => {
     setActiveCoupon(null);
+  };
+
+  // Desconto a partir do cupom do perfil (porcentagem ou valor fixo)
+  const computeDiscount = (coupon: Coupon, subtotal: number): number => {
+    if (coupon.freeShipping) return 0; // frete é tratado no checkout
+    if (coupon.discountType === 'percentage') {
+      return subtotal * (coupon.discount / 100);
+    }
+    return Math.min(coupon.discount, subtotal);
   };
 
   // Calculations in correct currency
@@ -83,7 +76,7 @@ const Cart: React.FC = () => {
     return sum + unitPrice * item.quantity;
   }, 0);
 
-  const discountAmount = activeCoupon ? couponService.calculateDiscount(activeCoupon, baseTotalPrice) : 0;
+  const discountAmount = activeCoupon ? computeDiscount(activeCoupon, baseTotalPrice) : 0;
   const subtotalWithDiscount = baseTotalPrice - discountAmount;
   
   // Tax calculations (Estimated only, NOT added to grandTotal)
@@ -224,8 +217,8 @@ const Cart: React.FC = () => {
                         onChange={(e) => setCouponCode(e.target.value)}
                         className="flex-1 px-3 py-2 text-sm rounded-lg border border-border bg-background uppercase font-bold"
                       />
-                      <Button type="submit" variant="secondary" disabled={applying} className="px-4 text-xs font-bold">
-                        {applying ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Aplicar'}
+                      <Button type="submit" variant="secondary" className="px-4 text-xs font-bold">
+                        Aplicar
                       </Button>
                     </div>
                     {couponError && <p className="text-xs text-red-500 font-semibold">{couponError}</p>}
@@ -244,8 +237,8 @@ const Cart: React.FC = () => {
                           <Tag className="w-3.5 h-3.5 shrink-0" /> Cupom ({activeCoupon.code})
                         </span>
                         <span className="flex items-center gap-1">
-                          {activeCoupon.type === 'percent' && activeCoupon.discountPercent
-                            ? `-${activeCoupon.discountPercent}% `
+                          {activeCoupon.discountType === 'percentage'
+                            ? `-${activeCoupon.discount}% `
                             : ''}
                           (-{formatPrice(discountAmount, currency)})
                           <button
@@ -292,11 +285,12 @@ const Cart: React.FC = () => {
                     </div>
                   </div>
 
-                  <Button asChild className="w-full btn-primary rounded-xl py-6 text-lg font-bold">
-                    <Link to="/checkout">
-                      Finalizar Compra
-                      <ArrowRight className="w-5 h-5 ml-2" />
-                    </Link>
+                  <Button
+                    className="w-full btn-primary rounded-xl py-6 text-lg font-bold"
+                    onClick={() => navigate('/checkout', { state: { coupon: activeCoupon } })}
+                  >
+                    Finalizar Compra
+                    <ArrowRight className="w-5 h-5 ml-2" />
                   </Button>
                   
                   <p className="text-center text-xs text-muted-foreground">

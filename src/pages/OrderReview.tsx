@@ -5,6 +5,7 @@ import { Package, ArrowRight, Printer, CreditCard, Landmark, Smartphone, FileTex
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { useCart } from '@/context/CartContext';
+import { useUser } from '@/context/UserContext';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useToast } from '@/hooks/use-toast';
@@ -15,6 +16,7 @@ import { cn } from '@/lib/utils';
 
 const OrderReview: React.FC = () => {
   const { items, clearCart } = useCart();
+  const { consumeCouponByCode } = useUser();
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
@@ -162,6 +164,11 @@ const OrderReview: React.FC = () => {
     // Save to list of orders in safeStorage so Admin panel has access to it
     const existingOrders = JSON.parse(safeStorage.getItem('sakura_orders') || '[]');
     safeStorage.setItem('sakura_orders', JSON.stringify([mockOrder, ...existingOrders]));
+
+    // Consome o cupom usado (uso único) — some do perfil e não pode reusar
+    if (appliedCoupon?.code) {
+      consumeCouponByCode(appliedCoupon.code);
+    }
 
     // Clear cart upon final purchase order creation
     clearCart();

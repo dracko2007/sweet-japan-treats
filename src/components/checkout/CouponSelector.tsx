@@ -1,13 +1,9 @@
-import { safeStorage } from '@/utils/storage';
-import React, { useState, useEffect } from 'react';
-import { Tag, X, Check, Gift, Truck, Star } from 'lucide-react';
+import React, { useState } from 'react';
+import { Tag, X, Truck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { couponService } from '@/services/couponService';
-import { useUser } from '@/context/UserContext';
+import { useUser, Coupon } from '@/context/UserContext';
 import { useToast } from '@/hooks/use-toast';
-import type { Coupon } from '@/types';
-import { cn } from '@/lib/utils';
 
 interface CouponSelectorProps {
   totalPrice: number;
@@ -16,69 +12,44 @@ interface CouponSelectorProps {
   appliedCoupon: Coupon | null;
 }
 
+// Desconto a partir de um cupom do perfil (porcentagem ou valor fixo).
+export const computeCouponDiscount = (coupon: Coupon, subtotal: number): number => {
+  if (coupon.freeShipping) return 0;
+  if (coupon.discountType === 'percentage') return subtotal * (coupon.discount / 100);
+  return Math.min(coupon.discount, subtotal);
+};
+
 const CouponSelector: React.FC<CouponSelectorProps> = ({
   totalPrice,
   onCouponApply,
   onCouponRemove,
   appliedCoupon,
 }) => {
-  const [availableCoupons, setAvailableCoupons] = useState<Coupon[]>([]);
-  const [showCoupons, setShowCoupons] = useState(false);
-  const { user, orders } = useUser();
+  const { coupons, isAuthenticated } = useUser();
   const { toast } = useToast();
+  const [showCoupons, setShowCoupons] = useState(false);
 
-  // Reload coupons when user changes or when returning from order
-  useEffect(() => {
-    loadAvailableCoupons();
-  }, [user, appliedCoupon]);
-
-  const loadAvailableCoupons = async () => {
-    // Load latest coupons from Firestore first (so client sees admin-created ones)
-    const active = await couponService.getActiveAsync();
-    const userEmail = user?.email || '';
-    const userBirthdate = user?.birthdate || '';
-    const userTotalOrders = orders?.length || 0;
-    
-    // Filter coupons: check targeting, then usage
-    const filtered: typeof active = [];
-    for (const coupon of active) {
-      // Check targeting eligibility first
-      if (!couponService.checkTargetEligibility(coupon, userEmail, userBirthdate, userTotalOrders)) {
-        continue;
-      }
-      
-      // Check safeStorage first (fast)
-      const usedBy = couponService.getCouponUsage(coupon.code);
-      if (usedBy.includes(userEmail)) continue;
-      
-      // Check Firestore too (persistent)
-      if (userEmail) {
-        const asyncResult = await couponService.validateCouponAsync(coupon.code, userEmail);
-        if (!asyncResult.valid) continue;
-      }
-      
-      filtered.push(coupon);
-    }
-
-    setAvailableCoupons(filtered);
-  };
+  // Apenas os cupons do PERFIL que estão válidos (não usados, não expirados)
+  const now = new Date();
+  const availableCoupons = coupons.filter(
+    (c) => !c.isUsed && new Date(c.expiresAt) > now
+  );
 
   const handleSelectCoupon = (coupon: Coupon) => {
-    const discount = couponService.calculateDiscount(coupon, totalPrice);
+    const discount = computeCouponDiscount(coupon, totalPrice);
     onCouponApply(coupon, discount);
     setShowCoupons(false);
     toast({
-      title: "Cupom aplicado!",
-      description: `Desconto de ¥${discount.toLocaleString()} aplicado`,
+      title: 'Cupom aplicado!',
+      description: coupon.freeShipping
+        ? 'Frete grátis aplicado'
+        : `Desconto de ¥${Math.round(discount).toLocaleString()} aplicado`,
     });
   };
 
   const handleRemoveCoupon = () => {
     onCouponRemove();
-    toast({
-      title: "Cupom removido",
-      description: "O desconto foi removido",
-    });
+    toast({ title: 'Cupom removido', description: 'O desconto foi removido' });
   };
 
   return (
@@ -87,10 +58,14 @@ const CouponSelector: React.FC<CouponSelectorProps> = ({
         <div className="space-y-3">
           <Label className="flex items-center gap-2 text-sm font-medium">
             <Tag className="w-4 h-4" />
-            Cupom de Desconto
+            Meus Cupons
           </Label>
 
-          {availableCoupons.length > 0 ? (
+          {!isAuthenticated ? (
+            <p className="text-sm text-muted-foreground">
+              Entre na sua conta para ver e usar seus cupons.
+            </p>
+          ) : availableCoupons.length > 0 ? (
             <>
               <Button
                 type="button"
@@ -98,20 +73,22 @@ const CouponSelector: React.FC<CouponSelectorProps> = ({
                 variant="outline"
                 className="w-full"
               >
-                {showCoupons ? 'Ocultar cupons' : 'Ver cupons disponíveis'}
+                {showCoupons ? 'Ocultar cupons' : `Ver meus cupons (${availableCoupons.length})`}
               </Button>
 
               {showCoupons && (
                 <div className="space-y-2 max-h-64 overflow-y-auto">
                   {availableCoupons.map((coupon) => {
-                    const discount = couponService.calculateDiscount(coupon, totalPrice);
-                    const discountText = coupon.type === 'fixed' 
-                      ? `¥${coupon.discount.toLocaleString()}` 
-                      : `${coupon.discountPercent}%`;
+                    const discount = computeCouponDiscount(coupon, totalPrice);
+                    const discountText = coupon.freeShipping
+                      ? 'Frete Grátis'
+                      : coupon.discountType === 'fixed'
+                      ? `¥${coupon.discount.toLocaleString()}`
+                      : `${coupon.discount}%`;
 
                     return (
                       <button
-                        key={coupon.code}
+                        key={coupon.id}
                         type="button"
                         onClick={() => handleSelectCoupon(coupon)}
                         className="w-full p-3 rounded-lg border-2 border-border hover:border-primary transition-all text-left"
@@ -120,32 +97,23 @@ const CouponSelector: React.FC<CouponSelectorProps> = ({
                           <div className="flex-1">
                             <div className="flex items-center gap-2 mb-1 flex-wrap">
                               <span className="font-bold text-primary">{coupon.code}</span>
-                              <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300">
-                                {coupon.freeShipping ? '🚚 Frete Grátis' : `-${discountText}`}
+                              <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 flex items-center gap-1">
+                                {coupon.freeShipping && <Truck className="w-3 h-3" />}
+                                {coupon.freeShipping ? 'Frete Grátis' : `-${discountText}`}
                               </span>
-                              {coupon.targetType === 'birthday' && (
-                                <span className="text-xs px-2 py-0.5 rounded-full bg-pink-100 dark:bg-pink-900 text-pink-700 dark:text-pink-300 flex items-center gap-1">
-                                  <Gift className="w-3 h-3" /> Aniversário
-                                </span>
-                              )}
-                              {coupon.targetType === 'loyalty' && (
-                                <span className="text-xs px-2 py-0.5 rounded-full bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300 flex items-center gap-1">
-                                  <Star className="w-3 h-3" /> Fidelidade
-                                </span>
-                              )}
                             </div>
-                            <p className="text-sm text-muted-foreground mb-1">
-                              {coupon.description}
-                            </p>
+                            <p className="text-sm text-muted-foreground mb-1">{coupon.description}</p>
                             <p className="text-xs text-muted-foreground">
-                              Válido até {new Date(coupon.expiryDate).toLocaleDateString('pt-BR')}
+                              Válido até {new Date(coupon.expiresAt).toLocaleDateString('pt-BR')}
                             </p>
                           </div>
-                          <div className="text-right ml-2">
-                            <p className="text-sm font-bold text-green-600 dark:text-green-400">
-                              -¥{discount.toLocaleString()}
-                            </p>
-                          </div>
+                          {!coupon.freeShipping && (
+                            <div className="text-right ml-2">
+                              <p className="text-sm font-bold text-green-600 dark:text-green-400">
+                                -¥{Math.round(discount).toLocaleString()}
+                              </p>
+                            </div>
+                          )}
                         </div>
                       </button>
                     );
@@ -155,7 +123,7 @@ const CouponSelector: React.FC<CouponSelectorProps> = ({
             </>
           ) : (
             <p className="text-sm text-muted-foreground">
-              Nenhum cupom disponível no momento
+              Você não tem cupons disponíveis no momento.
             </p>
           )}
         </div>

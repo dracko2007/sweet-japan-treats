@@ -22,6 +22,7 @@ export interface UserProfile {
     building?: string;
   };
   createdAt: string;
+  coupons?: Coupon[]; // Cupons do perfil (sincronizados no Firestore)
 }
 
 export interface Coupon {
@@ -32,7 +33,19 @@ export interface Coupon {
   discountType: 'percentage' | 'fixed';
   expiresAt: string;
   isUsed: boolean;
+  freeShipping?: boolean;
 }
+
+// Fábrica do cupom de boas-vindas concedido no cadastro.
+export const makeWelcomeCoupon = (): Coupon => ({
+  id: `welcome-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+  code: 'BEMVINDO10',
+  description: 'Cupom de boas-vindas — 10% de desconto',
+  discount: 10,
+  discountType: 'percentage',
+  expiresAt: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString(),
+  isUsed: false,
+});
 
 export interface Order {
   id: string;
@@ -78,6 +91,8 @@ interface UserContextType {
   addPoints: (amount: number) => void;
   addCoupon: (coupon: Coupon) => void;
   useCoupon: (couponId: string) => void;
+  consumeCouponByCode: (code: string) => void;
+  validateProfileCoupon: (code: string) => { valid: boolean; coupon?: Coupon; error?: string };
   addOrder: (order: Omit<Order, 'id' | 'date'> & { orderNumber?: string }) => Promise<void> | void;
   clearOrderHistory: () => void;
   sendPasswordReset: (email: string) => Promise<{ success: boolean; error?: string }>;
@@ -132,6 +147,16 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
 
   const saveUserCoupons = (userId: string, coupons: Coupon[]) => {
     safeStorage.setItem(`coupons_${userId}`, JSON.stringify(coupons));
+  };
+
+  // Resolve a lista de cupons priorizando o que veio do Firestore (userData.coupons),
+  // caindo para o localStorage. Mantém o localStorage em sincronia como cache.
+  const resolveUserCoupons = (userData: { id: string; coupons?: Coupon[] }): Coupon[] => {
+    if (Array.isArray(userData.coupons)) {
+      saveUserCoupons(userData.id, userData.coupons);
+      return userData.coupons;
+    }
+    return getUserCoupons(userData.id);
   };
 
   const getUserOrders = (userId: string): Order[] => {
@@ -254,7 +279,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
         console.log('⚡ [INIT] Restoring user from safeStorage:', userData.email);
         setUser(userData);
         setIsAuthenticated(true);
-        const userCoupons = getUserCoupons(userData.id);
+        const userCoupons = resolveUserCoupons(userData);
         const userOrders = getUserOrders(userData.id).map(fixTrackingUrl);
         setCoupons(userCoupons);
         setOrders(userOrders);
@@ -307,7 +332,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
           
           // Load local orders
           const localOrders = getUserOrders(mergedUser.id);
-          const userCoupons = getUserCoupons(mergedUser.id);
+          const userCoupons = resolveUserCoupons(mergedUser);
           
           // Load Firestore orders
           const firestoreOrders = await loadOrdersFromFirestore(firebaseUser.uid);
@@ -338,7 +363,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
             console.log('🔥 [FIREBASE] Keeping safeStorage session for:', userData.email);
             setUser(userData);
             setIsAuthenticated(true);
-            const userCoupons = getUserCoupons(userData.id);
+            const userCoupons = resolveUserCoupons(userData);
             const userOrders = getUserOrders(userData.id);
             setCoupons(userCoupons);
             setOrders(userOrders);
@@ -424,7 +449,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       if (foundUser) {
         setUser(foundUser);
         setIsAuthenticated(true);
-        const userCoupons = getUserCoupons(foundUser.id);
+        const userCoupons = resolveUserCoupons(foundUser);
         const userOrders = getUserOrders(foundUser.id);
         setCoupons(userCoupons);
         setOrders(userOrders);
@@ -495,7 +520,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
         const firestoreOrders = await loadOrdersFromFirestore(firebaseUser.uid);
         const allOrders = mergeOrders(localOrders, firestoreOrders);
         
-        const userCoupons = getUserCoupons(userData.id);
+        const userCoupons = resolveUserCoupons(userData);
         setCoupons(userCoupons);
         setOrders(allOrders);
         
@@ -639,14 +664,21 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
         }
       }
       
+      // Concede o cupom de boas-vindas no perfil (uso único, vinculado à conta)
+      const welcomeCoupon = makeWelcomeCoupon();
+
       const newUser: UserProfile = {
         ...userData,
         email: normalizedEmail,
         id: firebaseUser.uid,
         createdAt: new Date().toISOString(),
         password: userData.password,
+        coupons: [welcomeCoupon],
       };
-      
+
+      // Salva os cupons localmente também (cache)
+      saveUserCoupons(newUser.id, [welcomeCoupon]);
+
       // Save to Firestore
       const syncResult = await firebaseSyncService.syncUserToFirestore(newUser.id, newUser);
       
@@ -747,16 +779,57 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     console.log(`✅ +${amount} pontos (total: ${newTotal})`);
   };
 
+  // Persiste a lista de cupons do usuário no localStorage e no Firestore.
+  const persistUserCoupons = (updated: Coupon[]) => {
+    if (!user) return;
+    saveUserCoupons(user.id, updated);
+    firebaseSyncService
+      .syncUserToFirestore(user.id, { coupons: updated })
+      .catch((e) => console.warn('⚠️ Falha ao sincronizar cupons:', e));
+  };
+
   const addCoupon = (coupon: Coupon) => {
-    setCoupons(prev => [...prev, coupon]);
+    setCoupons(prev => {
+      const updated = [...prev, coupon];
+      persistUserCoupons(updated);
+      return updated;
+    });
   };
 
   const useCoupon = (couponId: string) => {
-    setCoupons(prev => 
-      prev.map(coupon => 
+    setCoupons(prev => {
+      const updated = prev.map(coupon =>
         coupon.id === couponId ? { ...coupon, isUsed: true } : coupon
-      )
-    );
+      );
+      persistUserCoupons(updated);
+      return updated;
+    });
+  };
+
+  // Consome (marca como usado) um cupom do perfil pelo código — uso único.
+  const consumeCouponByCode = (code: string) => {
+    const normalized = code.trim().toUpperCase();
+    setCoupons(prev => {
+      const updated = prev.map(coupon =>
+        coupon.code.toUpperCase() === normalized && !coupon.isUsed
+          ? { ...coupon, isUsed: true }
+          : coupon
+      );
+      persistUserCoupons(updated);
+      return updated;
+    });
+  };
+
+  // Valida um cupom contra a lista do PERFIL (precisa existir, estar ativo
+  // e não usado). É assim que garantimos que só quem possui o cupom usa.
+  const validateProfileCoupon = (code: string): { valid: boolean; coupon?: Coupon; error?: string } => {
+    const normalized = code.trim().toUpperCase();
+    if (!normalized) return { valid: false, error: 'Digite um cupom.' };
+    const found = coupons.find(c => c.code.toUpperCase() === normalized);
+    if (!found) return { valid: false, error: 'Você não possui este cupom.' };
+    if (found.isUsed) return { valid: false, error: 'Este cupom já foi utilizado.' };
+    if (new Date(found.expiresAt) <= new Date()) return { valid: false, error: 'Cupom expirado.' };
+    return { valid: true, coupon: found };
   };
 
   const addOrder = async (orderData: Omit<Order, 'id' | 'date'> & { orderNumber?: string }) => {
@@ -844,6 +917,8 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     addPoints,
     addCoupon,
     useCoupon,
+    consumeCouponByCode,
+    validateProfileCoupon,
     addOrder,
     clearOrderHistory,
     sendPasswordReset,

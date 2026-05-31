@@ -291,6 +291,67 @@ export const firebaseSyncService = {
   },
 
   /**
+   * Concede um cupom ao perfil de um cliente (no documento do usuário no Firestore),
+   * para que ele apareça em "Meus Cupons" em qualquer dispositivo.
+   * Não duplica um código ativo já existente.
+   */
+  async grantCouponToUserByEmail(email: string, coupon: any) {
+    try {
+      ensureFirebaseReady();
+      const usersRef = collection(db, 'users');
+      const q = query(usersRef, where('email', '==', email));
+      const snap = await getDocs(q);
+      if (snap.empty) return { success: false, granted: 0, error: 'Cliente não encontrado no Firestore.' };
+
+      let granted = 0;
+      for (const d of snap.docs) {
+        const data = d.data() as { coupons?: any[] };
+        const existing = Array.isArray(data.coupons) ? data.coupons : [];
+        const already = existing.some(
+          (c) => (c.code || '').toUpperCase() === coupon.code.toUpperCase() && !c.isUsed
+        );
+        if (already) continue;
+        await updateDoc(doc(db, 'users', d.id), { coupons: [...existing, coupon] });
+        granted++;
+      }
+      return { success: true, granted };
+    } catch (error) {
+      console.error('❌ [FIREBASE] Error granting coupon:', error);
+      return { success: false, granted: 0, error: String(error) };
+    }
+  },
+
+  /**
+   * Concede um cupom a TODOS os clientes do Firestore.
+   */
+  async grantCouponToAllUsers(coupon: any) {
+    try {
+      ensureFirebaseReady();
+      const snap = await getDocs(collection(db, 'users'));
+      let granted = 0;
+      await Promise.all(
+        snap.docs.map(async (d) => {
+          const data = d.data() as { coupons?: any[] };
+          const existing = Array.isArray(data.coupons) ? data.coupons : [];
+          const already = existing.some(
+            (c) => (c.code || '').toUpperCase() === coupon.code.toUpperCase() && !c.isUsed
+          );
+          if (already) return;
+          // id único por usuário para o cupom
+          const perUser = { ...coupon, id: `${coupon.id}-${d.id.slice(0, 6)}` };
+          await updateDoc(doc(db, 'users', d.id), { coupons: [...existing, perUser] });
+          granted++;
+        })
+      );
+      console.log('🎟️ [FIREBASE] Coupon granted to all:', granted);
+      return { success: true, granted };
+    } catch (error) {
+      console.error('❌ [FIREBASE] Error granting coupon to all:', error);
+      return { success: false, granted: 0, error: String(error) };
+    }
+  },
+
+  /**
    * Registra usuário no Firebase Auth
    */
   async registerUser(email: string, password: string) {

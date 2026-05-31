@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Package, ArrowRight, MapPin, User, Phone, Mail, Clock, Tag, CreditCard } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
@@ -8,12 +8,11 @@ import { Label } from '@/components/ui/label';
 import { useCart } from '@/context/CartContext';
 import { useUser } from '@/context/UserContext';
 import ShippingCalculator from '@/components/shipping/ShippingCalculator';
-import CouponSelector from '@/components/checkout/CouponSelector';
+import CouponSelector, { computeCouponDiscount } from '@/components/checkout/CouponSelector';
 import { prefectures } from '@/data/prefectures';
 import { japanPrefectures } from '@/data/japanPrefectures';
 import { europePrefectures } from '@/data/europePrefectures';
-import { couponService } from '@/services/couponService';
-import type { Coupon } from '@/types';
+import { Coupon } from '@/context/UserContext';
 import { useToast } from '@/hooks/use-toast';
 import { usePostalCodeLookup } from '@/hooks/usePostalCodeLookup';
 import { useLanguage, CountryType } from '@/context/LanguageContext';
@@ -91,23 +90,11 @@ const Checkout: React.FC = () => {
     }
   }, [formData.country, selectedCountry, setSelectedCountry]);
 
-  // Handlers for coupon
-  const handleCouponApply = async (coupon: Coupon, discount: number) => {
-    if (user?.email) {
-      const validation = await couponService.validateCouponAsync(coupon.code, user.email);
-      if (!validation.valid) {
-        toast({
-          title: "Cupom inválido",
-          description: validation.error || "Não foi possível aplicar este cupom",
-          variant: "destructive",
-        });
-        return;
-      }
-    }
-    
+  // Aplica um cupom do perfil (já validado pelo CouponSelector)
+  const handleCouponApply = (coupon: Coupon, discount: number) => {
     setAppliedCoupon(coupon);
     setCouponDiscount(discount);
-    
+
     if (coupon.freeShipping && selectedShipping) {
       setSelectedShipping({
         ...selectedShipping,
@@ -128,6 +115,17 @@ const Checkout: React.FC = () => {
       setFormData(location.state.formData);
     }
   }, [location.state]);
+
+  // Pré-aplica o cupom escolhido no carrinho (uma única vez)
+  const cartCouponApplied = useRef(false);
+  useEffect(() => {
+    const cartCoupon = location.state?.coupon as Coupon | undefined;
+    if (!cartCouponApplied.current && cartCoupon && baseTotalPrice > 0) {
+      cartCouponApplied.current = true;
+      setAppliedCoupon(cartCoupon);
+      setCouponDiscount(computeCouponDiscount(cartCoupon, baseTotalPrice));
+    }
+  }, [location.state, baseTotalPrice]);
 
   // Auto-populate from user profile if authenticated
   useEffect(() => {
