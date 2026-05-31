@@ -832,6 +832,19 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     return { valid: true, coupon: found };
   };
 
+  // Garante o cupom de boas-vindas. Novos cadastros já vêm com ele; este
+  // efeito cobre contas antigas, concedendo BEMVINDO10 uma única vez por conta
+  // (se a conta já tem — usado ou não — não concede de novo).
+  useEffect(() => {
+    if (!user) return;
+    if (user.id === ADMIN_USER_ID || isAdminEmail(user.email)) return;
+    const hasWelcome = coupons.some(c => c.code.toUpperCase() === 'BEMVINDO10');
+    if (!hasWelcome) {
+      addCoupon(makeWelcomeCoupon());
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, coupons]);
+
   const addOrder = async (orderData: Omit<Order, 'id' | 'date'> & { orderNumber?: string }) => {
     const newOrder: Order = {
       ...orderData,
