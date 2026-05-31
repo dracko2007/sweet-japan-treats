@@ -1,0 +1,71 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Admin identificado pelo e-mail autenticado no Firebase Auth.
+    // (As regras rodam no servidor — é seguro ter o e-mail aqui.)
+    function isAdmin() {
+      return request.auth != null
+        && request.auth.token.email == 'dracko2007@gmail.com';
+    }
+
+    // ---------- Clientes ----------
+    match /users/{userId} {
+      // Admin lê tudo; usuário lê o próprio documento.
+      allow read: if isAdmin() || request.auth != null;
+      // Criar/atualizar: qualquer autenticado (cadastro/perfil).
+      allow create, update: if request.auth != null;
+      // Excluir: somente admin.
+      allow delete: if isAdmin();
+    }
+
+    // ---------- Pedidos ----------
+    match /orders/{orderId} {
+      allow read: if request.auth != null;
+      allow create, update: if request.auth != null;
+      // Excluir: somente admin.
+      allow delete: if isAdmin();
+    }
+
+    // ---------- Produtos ----------
+    match /products/{productId} {
+      allow read: if true;               // catálogo público
+      allow write, delete: if isAdmin(); // só admin altera
+    }
+
+    // ---------- Conteúdo do site (home) ----------
+    match /siteContent/{docId} {
+      allow read: if true;
+      allow write, delete: if isAdmin();
+    }
+
+    // ---------- Cupons ----------
+    match /coupons/{couponId} {
+      allow read: if true;               // cupons visíveis no checkout
+      allow write, delete: if isAdmin();
+    }
+
+    match /coupon_usage/{usageId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      allow update, delete: if isAdmin();
+    }
+
+    // ---------- Eventos de navegação ----------
+    match /eventos/{eventoId} {
+      allow create: if request.auth != null
+                    && request.resource.data.usuarioId == request.auth.uid;
+      allow read: if (request.auth != null
+                    && resource.data.usuarioId == request.auth.uid)
+                    || isAdmin();
+      allow update: if false;
+      allow delete: if isAdmin();
+    }
+
+    // ---------- Coleção de teste ----------
+    match /test/{docId} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}

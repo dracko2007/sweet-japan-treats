@@ -46,7 +46,7 @@ Deploy Vercel:          ~2 min
 
 - ✨ **200 imagens** no Firebase Storage
 - 🌐 **products.ts** atualizado com URLs permanentes
-- 🚀 **Site live** em: https://temushop.vercel.app
+- 🚀 **Site live** em: https://japan-express.vercel.app
 
 ---
 

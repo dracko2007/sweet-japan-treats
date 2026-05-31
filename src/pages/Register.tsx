@@ -105,7 +105,7 @@ const Register: React.FC = () => {
 
         // Send automatic welcome message if opted in
         if (whatsappMarketing && formData.phone) {
-          const welcomeMsg = `*SAKURA EXPRESS* 🌸\n\nOlá, *${formData.name}*!\nObrigado por se cadastrar em nossa loja!\n\n🎟️ Aqui está o seu cupom de boas-vindas: *SAKURA90* (dá *90% de desconto* em todo o site!).\n\n🔥 *Novidades fresquinhas do Japão:*\n• Protetor solar Bioré UV Aqua Rich com frete aéreo expresso grátis para o Brasil.\n• Snacks e cosméticos exclusivos direto do Japão!\n\nAcesse nossa loja: https://temushop.vercel.app`;
+          const welcomeMsg = `*SAKURA EXPRESS* 🌸\n\nOlá, *${formData.name}*!\nObrigado por se cadastrar em nossa loja!\n\n🎟️ Aqui está o seu cupom de boas-vindas: *SAKURA90* (dá *90% de desconto* em todo o site!).\n\n🔥 *Novidades fresquinhas do Japão:*\n• Protetor solar Bioré UV Aqua Rich com frete aéreo expresso grátis para o Brasil.\n• Snacks e cosméticos exclusivos direto do Japão!\n\nAcesse nossa loja: https://japan-express.vercel.app`;
           
           import('@/services/whatsappService').then(({ whatsappService }) => {
             whatsappService.sendMessage({
