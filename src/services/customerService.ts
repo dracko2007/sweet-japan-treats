@@ -3,6 +3,7 @@ import { safeStorage } from '@/utils/storage';
 import { firebaseSyncService } from '@/services/firebaseSyncService';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '@/config/firebase';
+import { ensureAdminAuth } from '@/utils/adminAuth';
 
 export interface CustomerStats {
   email: string;
@@ -268,74 +269,100 @@ export const customerService = {
     };
   },
 
-  // Delete um cliente específico (remove nome, email, pedidos)
+  // Delete um cliente específico (localStorage + Firestore)
   async deleteCustomer(email: string): Promise<boolean> {
+    let deletedLocal = false;
     try {
       const usersData = safeStorage.getItem('sweet-japan-users');
-      if (!usersData) return false;
-
-      const users = JSON.parse(usersData);
-      if (users[email]) {
-        delete users[email];
-        safeStorage.setItem('sweet-japan-users', JSON.stringify(users));
-        console.log(`✅ Cliente ${email} deletado`);
-        return true;
+      if (usersData) {
+        const users = JSON.parse(usersData);
+        if (users[email]) {
+          delete users[email];
+          safeStorage.setItem('sweet-japan-users', JSON.stringify(users));
+          deletedLocal = true;
+        }
       }
-      return false;
     } catch (error) {
-      console.error('❌ Erro ao deletar cliente:', error);
-      return false;
+      console.error('❌ Erro ao deletar cliente (local):', error);
     }
+
+    // Remove também do Firestore (senão reaparece ao recarregar)
+    let deletedRemote = false;
+    try {
+      await ensureAdminAuth();
+      deletedRemote = await firebaseSyncService.deleteUserByEmail(email);
+    } catch (error) {
+      console.error('❌ Erro ao deletar cliente (Firestore):', error);
+    }
+
+    return deletedLocal || deletedRemote;
   },
 
   // Delete apenas os pedidos de um cliente (mantém cliente)
   async deleteCustomerOrders(email: string): Promise<boolean> {
+    let updatedLocal = false;
     try {
       const usersData = safeStorage.getItem('sweet-japan-users');
-      if (!usersData) return false;
-
-      const users = JSON.parse(usersData);
-      if (users[email]) {
-        users[email].orders = [];
-        safeStorage.setItem('sweet-japan-users', JSON.stringify(users));
-        console.log(`✅ Histórico de ${email} deletado`);
-        return true;
+      if (usersData) {
+        const users = JSON.parse(usersData);
+        if (users[email]) {
+          users[email].orders = [];
+          safeStorage.setItem('sweet-japan-users', JSON.stringify(users));
+          updatedLocal = true;
+        }
       }
-      return false;
     } catch (error) {
-      console.error('❌ Erro ao deletar histórico:', error);
-      return false;
+      console.error('❌ Erro ao deletar histórico (local):', error);
     }
+
+    // Limpa também no Firestore
+    let updatedRemote = false;
+    try {
+      await ensureAdminAuth();
+      updatedRemote = await firebaseSyncService.clearUserOrdersByEmail(email);
+    } catch (error) {
+      console.error('❌ Erro ao deletar histórico (Firestore):', error);
+    }
+
+    return updatedLocal || updatedRemote;
   },
 
-  // Delete todos os clientes
+  // Delete todos os clientes (localStorage + Firestore)
   async deleteAllCustomers(): Promise<boolean> {
     try {
       safeStorage.setItem('sweet-japan-users', JSON.stringify({}));
-      console.log('✅ Todos os clientes foram deletados');
-      return true;
     } catch (error) {
-      console.error('❌ Erro ao deletar todos os clientes:', error);
-      return false;
+      console.error('❌ Erro ao deletar todos os clientes (local):', error);
     }
+    try {
+      await ensureAdminAuth();
+      await firebaseSyncService.deleteAllUsersFromFirestore();
+    } catch (error) {
+      console.error('❌ Erro ao deletar todos os clientes (Firestore):', error);
+    }
+    return true;
   },
 
-  // Delete todo o histórico (pedidos de todos os clientes)
+  // Delete todo o histórico (pedidos de todos os clientes, localStorage + Firestore)
   async deleteAllOrderHistory(): Promise<boolean> {
     try {
       const usersData = safeStorage.getItem('sweet-japan-users');
-      if (!usersData) return false;
-
-      const users = JSON.parse(usersData);
-      Object.keys(users).forEach(email => {
-        users[email].orders = [];
-      });
-      safeStorage.setItem('sweet-japan-users', JSON.stringify(users));
-      console.log('✅ Todo o histórico de pedidos foi deletado');
-      return true;
+      if (usersData) {
+        const users = JSON.parse(usersData);
+        Object.keys(users).forEach(email => {
+          users[email].orders = [];
+        });
+        safeStorage.setItem('sweet-japan-users', JSON.stringify(users));
+      }
     } catch (error) {
-      console.error('❌ Erro ao deletar histórico:', error);
-      return false;
+      console.error('❌ Erro ao deletar histórico (local):', error);
     }
+    try {
+      await ensureAdminAuth();
+      await firebaseSyncService.deleteAllOrdersFromFirestore();
+    } catch (error) {
+      console.error('❌ Erro ao deletar histórico (Firestore):', error);
+    }
+    return true;
   },
 };

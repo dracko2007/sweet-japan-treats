@@ -204,6 +204,93 @@ export const firebaseSyncService = {
   },
 
   /**
+   * Exclui um pedido do Firestore (delete real, não apenas status).
+   * O id do documento é o orderNumber (ver syncOrderToFirestore).
+   */
+  async deleteOrderFromFirestore(orderNumber: string) {
+    try {
+      ensureFirebaseReady();
+      await deleteDoc(doc(db, 'orders', orderNumber));
+      console.log('🗑️ [FIREBASE] Order deleted:', orderNumber);
+      return true;
+    } catch (error) {
+      console.error('❌ [FIREBASE] Error deleting order:', error);
+      return false;
+    }
+  },
+
+  /**
+   * Exclui do Firestore todos os documentos de usuário com o e-mail dado.
+   * O id do documento é auto-gerado, então buscamos pelo campo email.
+   */
+  async deleteUserByEmail(email: string) {
+    try {
+      ensureFirebaseReady();
+      const usersRef = collection(db, 'users');
+      const q = query(usersRef, where('email', '==', email));
+      const snap = await getDocs(q);
+      if (snap.empty) return true; // nada no Firestore, ok
+      await Promise.all(snap.docs.map((d) => deleteDoc(doc(db, 'users', d.id))));
+      console.log('🗑️ [FIREBASE] User deleted:', email);
+      return true;
+    } catch (error) {
+      console.error('❌ [FIREBASE] Error deleting user:', error);
+      return false;
+    }
+  },
+
+  /**
+   * Remove os pedidos de um usuário (limpa o array orders no doc do usuário).
+   */
+  async clearUserOrdersByEmail(email: string) {
+    try {
+      ensureFirebaseReady();
+      const usersRef = collection(db, 'users');
+      const q = query(usersRef, where('email', '==', email));
+      const snap = await getDocs(q);
+      await Promise.all(
+        snap.docs.map((d) => updateDoc(doc(db, 'users', d.id), { orders: [] }))
+      );
+      return true;
+    } catch (error) {
+      console.error('❌ [FIREBASE] Error clearing user orders:', error);
+      return false;
+    }
+  },
+
+  /**
+   * Exclui TODOS os usuários do Firestore (ação em massa do admin).
+   */
+  async deleteAllUsersFromFirestore() {
+    try {
+      ensureFirebaseReady();
+      const snap = await getDocs(collection(db, 'users'));
+      await Promise.all(snap.docs.map((d) => deleteDoc(doc(db, 'users', d.id))));
+      console.log('🗑️ [FIREBASE] All users deleted:', snap.size);
+      return true;
+    } catch (error) {
+      console.error('❌ [FIREBASE] Error deleting all users:', error);
+      return false;
+    }
+  },
+
+  /**
+   * Exclui TODOS os pedidos do Firestore (ação em massa do admin).
+   */
+  async deleteAllOrdersFromFirestore() {
+    try {
+      ensureFirebaseReady();
+      const snap = await getDocs(collection(db, 'orders'));
+      await Promise.all(snap.docs.map((d) => deleteDoc(doc(db, 'orders', d.id))));
+      console.log('🗑️ [FIREBASE] All orders deleted:', snap.size);
+      return true;
+    } catch (error) {
+      console.error('❌ [FIREBASE] Error deleting all orders:', error);
+      return false;
+    }
+  },
+
+  /**
    * Registra usuário no Firebase Auth
    */
   async registerUser(email: string, password: string) {

@@ -107,9 +107,9 @@ export const orderService = {
     return updated;
   },
 
-  // Delete/Cancel order
+  // Exclui o pedido de verdade (localStorage + Firestore)
   deleteOrder: async (orderNumber: string): Promise<boolean> => {
-    let deleted = false;
+    let deletedLocal = false;
 
     const users = JSON.parse(safeStorage.getItem('sweet-japan-users') || '{}');
     Object.keys(users).forEach((email) => {
@@ -120,23 +120,24 @@ export const orderService = {
         );
         if (orderIndex !== -1) {
           users[email].orders.splice(orderIndex, 1);
-          deleted = true;
+          deletedLocal = true;
         }
       }
     });
-    if (deleted) {
+    if (deletedLocal) {
       safeStorage.setItem('sweet-japan-users', JSON.stringify(users));
     }
 
+    // Exclui de verdade no Firestore (deleteDoc), não apenas marca como cancelado
+    let deletedRemote = false;
     try {
       await ensureAdminAuth();
-      await firebaseSyncService.updateOrderStatus(orderNumber, 'cancelled');
-      deleted = true; // pedido existe só no Firestore (sincronizado do ERP)
+      deletedRemote = await firebaseSyncService.deleteOrderFromFirestore(orderNumber);
     } catch (err) {
       console.error('❌ [ORDER] Firestore delete failed:', err);
     }
 
-    return deleted;
+    return deletedLocal || deletedRemote;
   },
 
   // Update order tracking info (both Firestore and safeStorage)
