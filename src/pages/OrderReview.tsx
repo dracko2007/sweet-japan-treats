@@ -46,6 +46,7 @@ const OrderReview: React.FC = () => {
     window.print();
   };
 
+  const isJapan = formData.country === 'Japão';
   const isEurope = ['Portugal', 'França', 'Itália', 'Espanha'].includes(formData.country);
   const currency = isJapan ? 'JPY' : (isEurope ? 'EUR' : 'BRL');
 

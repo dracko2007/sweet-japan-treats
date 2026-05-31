@@ -25,7 +25,7 @@ const Register: React.FC = () => {
     confirmPassword: '',
   });
   // Código do país (DDI), default pelo país selecionado na loja
-  const [dialCode, setDialCode] = useState(() => {
+  const [dialCode, setDialCode] = useState<string>(() => {
     const match = COUNTRY_DIAL_CODES.find((c) => c.country === selectedCountry);
     return match ? match.code : '+55';
   });

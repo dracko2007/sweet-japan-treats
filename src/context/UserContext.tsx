@@ -530,10 +530,10 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
         const firestoreOrders = await loadOrdersFromFirestore(firebaseUser.uid);
         const allOrders = mergeOrders(localOrders, firestoreOrders);
         
-        const userCoupons = resolveUserCoupons(userData);
+        const userCoupons = resolveUserCoupons(userData as UserProfile);
         setCoupons(userCoupons);
         setOrders(allOrders);
-        
+
         // Sync local-only orders UP to Firestore
         const localOnlyOrders = localOrders.filter(
           lo => !firestoreOrders.some(fo => fo.orderNumber === lo.orderNumber)
