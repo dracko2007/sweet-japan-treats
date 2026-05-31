@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { User, Mail, Phone, MapPin, Calendar, Gift, ShoppingBag, Edit2, LogOut, Package, RotateCcw, Cloud, Truck, Tag } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
+import { User, Mail, Phone, MapPin, Calendar, Gift, ShoppingBag, Edit2, LogOut, Package, RotateCcw, Cloud, Truck, Tag, Megaphone, ArrowRight } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,6 +12,7 @@ import { prefectures } from '@/data/prefectures';
 import { addAddressHints } from '@/utils/romanize';
 import { useProducts } from '@/context/ProductsContext';
 import { isValidEmail, isValidPhone, isNonEmpty, maskPhone } from '@/utils/validation';
+import { affiliateService } from '@/services/affiliateService';
 
 const Profile: React.FC = () => {
   const { user, isAuthenticated, coupons, orders, updateProfile, logout } = useUser();
@@ -21,6 +22,14 @@ const Profile: React.FC = () => {
   const { toast } = useToast();
   const [isEditing, setIsEditing] = useState(false);
   const [editedUser, setEditedUser] = useState<Partial<UserProfile>>(user || {});
+
+  // Mostra o atalho do painel de afiliado só se a conta for de um influencer
+  const [isAffiliate, setIsAffiliate] = useState(false);
+  useEffect(() => {
+    if (user?.email) {
+      affiliateService.getByOwnerEmail(user.email).then((list) => setIsAffiliate(list.length > 0));
+    }
+  }, [user?.email]);
 
   // Função para recomprar um pedido
   const handleReorder = (order: any) => {
@@ -433,6 +442,27 @@ const Profile: React.FC = () => {
                 </div>
               )}
             </div>
+
+            {/* Painel de Afiliado (só para influencers) */}
+            {isAffiliate && (
+              <Link
+                to="/afiliado"
+                className="block bg-gradient-to-r from-primary/10 to-primary/5 rounded-2xl border border-primary/30 p-6 hover:shadow-md transition-shadow"
+              >
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-full bg-primary/15 flex items-center justify-center">
+                      <Megaphone className="w-6 h-6 text-primary" />
+                    </div>
+                    <div>
+                      <h2 className="font-display text-lg font-bold text-foreground">Painel de Afiliado</h2>
+                      <p className="text-sm text-muted-foreground">Veja suas indicações, vendas e comissões</p>
+                    </div>
+                  </div>
+                  <ArrowRight className="w-5 h-5 text-primary flex-shrink-0" />
+                </div>
+              </Link>
+            )}
 
             {/* Coupons */}
             <div className="bg-card rounded-2xl border border-border p-6 lg:p-8">
