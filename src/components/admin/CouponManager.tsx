@@ -6,6 +6,8 @@ import { Label } from '@/components/ui/label';
 import { couponService } from '@/services/couponService';
 import type { Coupon } from '@/types';
 import { useToast } from '@/hooks/use-toast';
+import { firebaseSyncService } from '@/services/firebaseSyncService';
+import { ensureAdminAuth } from '@/utils/adminAuth';
 
 const CouponManager: React.FC = () => {
   const [coupons, setCoupons] = useState<Coupon[]>([]);
@@ -48,7 +50,7 @@ const CouponManager: React.FC = () => {
     setFormData(prev => ({ ...prev, type }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!formData.code.trim()) {
@@ -79,24 +81,58 @@ const CouponManager: React.FC = () => {
     }
 
     try {
+      const code = formData.code.toUpperCase();
+      const expiry = formData.expiryDate || new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString();
+      const emails = formData.targetType === 'specific' && formData.targetEmails
+        ? formData.targetEmails.split(',').map(e => e.trim()).filter(Boolean)
+        : [];
+
+      // 1) Registra o cupom na lista global (para histórico/visualização)
       couponService.create({
-        code: formData.code.toUpperCase(),
+        code,
         type: formData.type,
         discount: formData.type === 'fixed' ? formData.discount : 0,
         discountPercent: formData.type === 'percent' ? formData.discountPercent : undefined,
-        expiryDate: formData.expiryDate || new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString(),
+        expiryDate: expiry,
         usageLimit: formData.usageLimit || undefined,
         description: formData.description || 'Cupom de desconto',
         isActive: true,
         targetType: formData.targetType,
-        targetEmails: formData.targetType === 'specific' && formData.targetEmails ? formData.targetEmails.split(',').map(e => e.trim()).filter(Boolean) : undefined,
+        targetEmails: emails.length ? emails : undefined,
         minOrders: formData.targetType === 'loyalty' ? formData.minOrders : undefined,
         freeShipping: formData.freeShipping,
       });
 
+      // 2) Concede o cupom ao PERFIL dos clientes (para aparecer em "Meus Cupons")
+      const profileCoupon = {
+        id: `cm-${Date.now()}`,
+        code,
+        description: formData.description || 'Cupom de desconto',
+        discount: formData.type === 'fixed' ? formData.discount : formData.discountPercent,
+        discountType: formData.type === 'fixed' ? ('fixed' as const) : ('percentage' as const),
+        expiresAt: new Date(expiry).toISOString(),
+        isUsed: false,
+        freeShipping: formData.freeShipping,
+      };
+
+      await ensureAdminAuth();
+      let grantInfo = '';
+      if (formData.targetType === 'specific' && emails.length) {
+        let total = 0;
+        for (const email of emails) {
+          const res = await firebaseSyncService.grantCouponToUserByEmail(email, profileCoupon);
+          if (res.success) total += res.granted;
+        }
+        grantInfo = ` · adicionado a ${total} cliente(s)`;
+      } else {
+        // 'all', 'birthday' e 'loyalty' → concede a todos os perfis
+        const res = await firebaseSyncService.grantCouponToAllUsers(profileCoupon);
+        if (res.success) grantInfo = ` · adicionado a ${res.granted} cliente(s)`;
+      }
+
       toast({
         title: "Cupom criado!",
-        description: `Cupom ${formData.code} criado com sucesso`,
+        description: `Cupom ${code} criado${grantInfo}`,
       });
 
       setFormData({

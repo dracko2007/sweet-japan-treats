@@ -150,13 +150,23 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
   };
 
   // Resolve a lista de cupons priorizando o que veio do Firestore (userData.coupons),
-  // caindo para o localStorage. Mantém o localStorage em sincronia como cache.
-  const resolveUserCoupons = (userData: { id: string; coupons?: Coupon[] }): Coupon[] => {
-    if (Array.isArray(userData.coupons)) {
-      saveUserCoupons(userData.id, userData.coupons);
-      return userData.coupons;
+  // caindo para o localStorage. Garante o cupom de boas-vindas (exceto admin) de
+  // forma determinística, e mantém localStorage + Firestore em sincronia.
+  const resolveUserCoupons = (userData: { id: string; email?: string; coupons?: Coupon[] }): Coupon[] => {
+    let list = Array.isArray(userData.coupons) ? userData.coupons : getUserCoupons(userData.id);
+
+    const isAdmin = userData.id === ADMIN_USER_ID || isAdminEmail(userData.email);
+    const hasWelcome = list.some((c) => c.code.toUpperCase() === 'BEMVINDO10');
+    if (!isAdmin && !hasWelcome) {
+      list = [...list, makeWelcomeCoupon()];
+      // Persiste no Firestore para sincronizar entre dispositivos
+      firebaseSyncService
+        .syncUserToFirestore(userData.id, { coupons: list })
+        .catch(() => {});
     }
-    return getUserCoupons(userData.id);
+
+    saveUserCoupons(userData.id, list);
+    return list;
   };
 
   const getUserOrders = (userId: string): Order[] => {
@@ -831,19 +841,6 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     if (new Date(found.expiresAt) <= new Date()) return { valid: false, error: 'Cupom expirado.' };
     return { valid: true, coupon: found };
   };
-
-  // Garante o cupom de boas-vindas. Novos cadastros já vêm com ele; este
-  // efeito cobre contas antigas, concedendo BEMVINDO10 uma única vez por conta
-  // (se a conta já tem — usado ou não — não concede de novo).
-  useEffect(() => {
-    if (!user) return;
-    if (user.id === ADMIN_USER_ID || isAdminEmail(user.email)) return;
-    const hasWelcome = coupons.some(c => c.code.toUpperCase() === 'BEMVINDO10');
-    if (!hasWelcome) {
-      addCoupon(makeWelcomeCoupon());
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, coupons]);
 
   const addOrder = async (orderData: Omit<Order, 'id' | 'date'> & { orderNumber?: string }) => {
     const newOrder: Order = {
