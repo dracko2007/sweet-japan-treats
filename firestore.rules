@@ -71,8 +71,10 @@ service cloud.firestore {
 
     // Comissões pendentes (liberadas pelo admin ao confirmar a entrega)
     match /affiliate_pending/{id} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null;
+      // Qualquer comprador (mesmo convidado) registra a comissão como 'pending'
+      allow create: if request.resource.data.status == 'pending';
+      // Só admin/autenticado lê, confirma (update) ou cancela (delete)
+      allow read, update, delete: if request.auth != null;
     }
 
     // ---------- Coleção de teste ----------
