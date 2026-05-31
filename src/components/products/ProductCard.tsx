@@ -108,7 +108,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
   };
 
   return (
-    <div className="card-product group">
+    <div className="card-product group h-full flex flex-col">
       {/* Image/Video */}
       <div 
         className="aspect-square bg-secondary/50 relative overflow-hidden cursor-pointer group/image"
@@ -197,8 +197,8 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
       </div>
 
       {/* Content */}
-      <div className="p-6">
-        <h3 className="font-display text-xl font-bold text-foreground mb-2">
+      <div className="p-6 flex flex-col flex-1">
+        <h3 className="font-display text-xl font-bold text-foreground mb-2 line-clamp-2">
           {translatedName}
         </h3>
         <p className="text-sm text-muted-foreground line-clamp-2 mb-4">
@@ -206,7 +206,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
         </p>
 
         {/* Price display */}
-        <div className="mb-4 flex items-center justify-between border-b pb-3 border-border/50">
+        <div className="mt-auto mb-4 flex items-center justify-between border-b pb-3 border-border/50">
           <span className="text-sm font-semibold text-muted-foreground">Valor:</span>
           <span className="text-xl font-bold text-primary">
             {formatPrice(currentPrice, currency)}
