@@ -38,7 +38,7 @@ const CartItemComponent: React.FC<CartItemProps> = ({ item }) => {
       {/* Image */}
       <div className="w-24 h-24 rounded-lg overflow-hidden bg-secondary/50 flex-shrink-0">
         {item.product.image ? (
-          <img src={item.product.image} alt={productName} className="w-full h-full object-cover" />
+          <img src={item.product.image} alt={productName} loading="lazy" className="w-full h-full object-cover" />
         ) : (
           <span className="text-4xl">🌸</span>
         )}

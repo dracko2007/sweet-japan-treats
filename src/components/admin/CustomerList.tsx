@@ -4,12 +4,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { customerService, CustomerStats } from '@/services/customerService';
 import { useToast } from '@/hooks/use-toast';
+import { usePagination } from '@/hooks/usePagination';
+import Pagination from '@/components/Pagination';
 
 const CustomerList: React.FC = () => {
   const [customers, setCustomers] = useState<CustomerStats[]>([]);
   const [overview, setOverview] = useState<any>(null);
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerStats | null>(null);
   const { toast } = useToast();
+  const customersPagination = usePagination(customers, 8);
 
   useEffect(() => {
     loadCustomers();
@@ -242,7 +245,7 @@ const CustomerList: React.FC = () => {
                 <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
                 <p>Nenhum cliente encontrado</p>
               </div>
-            ) : customers.map((customer) => (
+            ) : customersPagination.pageItems.map((customer) => (
               <Card
                 key={customer.email}
                 className={`transition-all hover:shadow-md ${
@@ -314,6 +317,16 @@ const CustomerList: React.FC = () => {
               </Card>
             ))}
           </div>
+          {customers.length > 0 && (
+            <Pagination
+              page={customersPagination.page}
+              totalPages={customersPagination.totalPages}
+              onPageChange={customersPagination.setPage}
+              rangeStart={customersPagination.rangeStart}
+              rangeEnd={customersPagination.rangeEnd}
+              total={customersPagination.total}
+            />
+          )}
         </div>
 
         {/* Detalhes do Cliente Selecionado */}

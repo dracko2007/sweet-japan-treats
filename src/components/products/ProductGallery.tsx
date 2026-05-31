@@ -112,6 +112,7 @@ const ProductGallery: React.FC<ProductGalleryProps> = ({ images, productName, vi
                   <img
                     src={media}
                     alt={`${productName} ${index + 1}`}
+                    loading="lazy"
                     className="w-full h-full object-cover"
                   />
                 )}

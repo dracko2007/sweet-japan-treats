@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { QRCodeSVG } from 'qrcode.react';
 import { formatPrice } from '@/utils/currency';
+import DemoBanner from '@/components/DemoBanner';
 
 const OrderConfirmation: React.FC = () => {
   const navigate = useNavigate();
@@ -130,7 +131,10 @@ const OrderConfirmation: React.FC = () => {
       <section className="py-12 bg-background min-h-screen">
         <div className="container mx-auto px-4">
           <div className="max-w-3xl mx-auto">
-            
+
+            {/* Aviso de modo demonstração */}
+            <DemoBanner className="mb-6 print:hidden" />
+
             {/* Header Success Message */}
             <div className="text-center mb-8 print:hidden">
               <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4 animate-bounce">

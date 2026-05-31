@@ -52,7 +52,7 @@ const Vlog: React.FC = () => {
       id: 5,
       titleKey: 'vlog.video5.title',
       descKey: 'vlog.video5.desc',
-      thumbnail: '📦',
+      thumbnail: '',
       videoUrl: 'tYcA1j-fcKg',
       duration: '14:02',
       date: '2026-04-10',
@@ -62,13 +62,23 @@ const Vlog: React.FC = () => {
       id: 6,
       titleKey: 'vlog.video6.title',
       descKey: 'vlog.video6.desc',
-      thumbnail: '📮',
+      thumbnail: '',
       videoUrl: 'S7R97sV1w8k',
       duration: '13:28',
       date: '2026-04-01',
       views: '3.5K'
     }
   ];
+
+  // Usa o thumbnail local quando existe; senão, cai para a miniatura do YouTube.
+  const getThumb = (video: { thumbnail: string; videoUrl: string }) =>
+    video.thumbnail && (video.thumbnail.startsWith('/') || video.thumbnail.startsWith('http'))
+      ? video.thumbnail
+      : `https://img.youtube.com/vi/${video.videoUrl}/hqdefault.jpg`;
+
+  // Links de redes sociais (configuráveis via env)
+  const youtubeUrl = import.meta.env.VITE_YOUTUBE_URL || 'https://www.youtube.com';
+  const instagramUrl = import.meta.env.VITE_INSTAGRAM_URL || 'https://www.instagram.com';
 
   const dateLocale = language === 'pt' ? 'pt-BR' : language === 'ja' ? 'ja-JP' : 'en-US';
 
@@ -93,7 +103,7 @@ const Vlog: React.FC = () => {
           <div className="mb-12">
             <div 
               className="relative aspect-video rounded-3xl overflow-hidden bg-cover bg-center shadow-elevated group cursor-pointer border border-border/40"
-              style={{ backgroundImage: `url(${videos[0].thumbnail})` }}
+              style={{ backgroundImage: `url(${getThumb(videos[0])})` }}
               onClick={() => setPlayingVideo(videos[0].videoUrl)}
             >
               {/* Dark shading overlay */}
@@ -137,19 +147,15 @@ const Vlog: React.FC = () => {
                 onClick={() => setPlayingVideo(video.videoUrl)}
               >
                 <div className="aspect-video bg-secondary/50 relative overflow-hidden">
-                  {video.thumbnail.startsWith('/') ? (
-                    <img 
-                      src={video.thumbnail} 
-                      alt={t(video.titleKey)} 
-                      className="w-full h-full object-cover group-hover:scale-103 transition-transform duration-500"
-                    />
-                  ) : (
-                    <div className="absolute inset-0 bg-gradient-to-br from-caramel-light/30 to-primary/20 flex items-center justify-center">
-                      <span className="text-6xl group-hover:scale-110 transition-transform duration-300">
-                        {video.thumbnail}
-                      </span>
-                    </div>
-                  )}
+                  <img
+                    src={getThumb(video)}
+                    alt={t(video.titleKey)}
+                    loading="lazy"
+                    className="w-full h-full object-cover group-hover:scale-103 transition-transform duration-500"
+                    onError={(e) => {
+                      e.currentTarget.src = `https://img.youtube.com/vi/${video.videoUrl}/hqdefault.jpg`;
+                    }}
+                  />
                   
                   <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/40">
                     <div className="w-14 h-14 rounded-full bg-white text-primary flex items-center justify-center shadow-lg">
@@ -199,10 +205,20 @@ const Vlog: React.FC = () => {
               {t('vlog.subscribeDesc')}
             </p>
             <div className="flex justify-center gap-4">
-              <a href="#" className="px-6 py-2.5 rounded-full bg-destructive text-destructive-foreground font-medium hover:bg-destructive/90 transition-colors text-sm">
+              <a
+                href={youtubeUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-6 py-2.5 rounded-full bg-destructive text-destructive-foreground font-medium hover:bg-destructive/90 transition-colors text-sm"
+              >
                 YouTube
               </a>
-              <a href="#" className="px-6 py-2.5 rounded-full gradient-caramel text-primary-foreground font-medium hover:opacity-90 transition-opacity text-sm">
+              <a
+                href={instagramUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-6 py-2.5 rounded-full gradient-caramel text-primary-foreground font-medium hover:opacity-90 transition-opacity text-sm"
+              >
                 Instagram
               </a>
             </div>

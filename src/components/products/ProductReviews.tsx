@@ -239,7 +239,7 @@ const ProductReviews: React.FC<ProductReviewsProps> = ({ productId, productName 
               <div className="flex flex-wrap gap-2">
                 {images.map((img, index) => (
                   <div key={index} className="relative">
-                    <img src={img} alt="" className="w-20 h-20 object-cover rounded-lg" />
+                    <img src={img} alt="" loading="lazy" className="w-20 h-20 object-cover rounded-lg" />
                     <button
                       onClick={() => setImages(prev => prev.filter((_, i) => i !== index))}
                       className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1"
@@ -322,6 +322,7 @@ const ProductReviews: React.FC<ProductReviewsProps> = ({ productId, productName 
                       key={index}
                       src={img}
                       alt=""
+                      loading="lazy"
                       className="w-24 h-24 object-cover rounded-lg cursor-pointer hover:opacity-80"
                       onClick={() => window.open(img, '_blank')}
                     />

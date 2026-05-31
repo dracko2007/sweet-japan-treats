@@ -3,6 +3,7 @@ import { safeStorage } from '@/utils/storage';
 import { firebaseSyncService } from '@/services/firebaseSyncService';
 import { firebaseConfigReady, allowLocalOnly, auth } from '@/config/firebase';
 import { signInWithEmailAndPassword } from 'firebase/auth';
+import { ADMIN_EMAIL, ADMIN_PASSWORD, ADMIN_USER_ID, isAdminEmail } from '@/config/admin';
 
 export interface UserProfile {
   id: string;
@@ -67,6 +68,7 @@ export interface Order {
 interface UserContextType {
   user: UserProfile | null;
   isAuthenticated: boolean;
+  isAdmin: boolean;
   coupons: Coupon[];
   orders: Order[];
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string; code?: string; needsVerification?: boolean }>;
@@ -259,9 +261,9 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
 
         // Se a sessão restaurada for do admin, reautentica no Firebase para liberar
         // a escrita no painel (produtos) — necessário para sessões antigas.
-        const isAdminSession = userData.id === 'admin-001' || userData.email === 'dracko2007@gmail.com';
+        const isAdminSession = userData.id === ADMIN_USER_ID || isAdminEmail(userData.email);
         if (isAdminSession && auth && !auth.currentUser) {
-          signInWithEmailAndPassword(auth, 'dracko2007@gmail.com', 'admin123')
+          signInWithEmailAndPassword(auth, ADMIN_EMAIL, ADMIN_PASSWORD)
             .then(() => console.log('✅ Admin reautenticado no Firebase (sessão restaurada)'))
             .catch((err) => console.warn('⚠️ Falha ao reautenticar admin no Firebase:', err?.code));
         }
@@ -375,13 +377,10 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
 
   const login = async (email: string, password: string): Promise<{ success: boolean; error?: string; code?: string; needsVerification?: boolean }> => {
     const normalizedEmail = normalizeEmail(email);
-    // Admin default - sempre disponível
-    const ADMIN_EMAIL = 'dracko2007@gmail.com';
-    const ADMIN_PASSWORD = 'admin123';
-    
-    if (email === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
+    // Admin default - credenciais vêm de @/config/admin (env var com fallback)
+    if (isAdminEmail(email) && password === ADMIN_PASSWORD) {
       const adminUser: UserProfile = {
-        id: 'admin-001',
+        id: ADMIN_USER_ID,
         name: 'Administrador',
         email: ADMIN_EMAIL,
         phone: '070-1367-1679',
@@ -835,6 +834,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
   const value: UserContextType = {
     user,
     isAuthenticated,
+    isAdmin: user?.id === ADMIN_USER_ID || isAdminEmail(user?.email),
     coupons,
     orders,
     login,

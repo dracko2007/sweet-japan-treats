@@ -1,8 +1,6 @@
 import { auth } from '@/config/firebase';
 import { signInWithEmailAndPassword } from 'firebase/auth';
-
-const ADMIN_EMAIL = 'dracko2007@gmail.com';
-const ADMIN_PASSWORD = 'admin123';
+import { ADMIN_EMAIL, ADMIN_PASSWORD } from '@/config/admin';
 
 // Garante que o admin está autenticado no Firebase antes de qualquer escrita
 // que as regras de segurança exigem (pedidos, produtos, cupons...).

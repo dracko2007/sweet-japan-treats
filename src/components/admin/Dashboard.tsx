@@ -5,10 +5,11 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts';
 import { orderService } from '@/services/orderService';
+import type { Order, OrderStatistics, MonthlyDataPoint } from '@/types';
 
 const Dashboard: React.FC = () => {
-  const [stats, setStats] = useState<any>(null);
-  const [monthlyData, setMonthlyData] = useState<any[]>([]);
+  const [stats, setStats] = useState<OrderStatistics | null>(null);
+  const [monthlyData, setMonthlyData] = useState<MonthlyDataPoint[]>([]);
   const [topProducts, setTopProducts] = useState<{ name: string; count: number }[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<{ method: string; revenue: number }[]>([]);
 
@@ -17,14 +18,14 @@ const Dashboard: React.FC = () => {
   }, []);
 
   const loadData = async () => {
-    const orders = await orderService.getAllOrdersAsync();
+    const orders: Order[] = await orderService.getAllOrdersAsync();
     const statistics = orderService.getStatistics(orders);
     const monthly = orderService.getMonthlyData(6, orders);
 
     // Calcula top 5 produtos
     const productCount: Record<string, number> = {};
-    orders.forEach((order: any) => {
-      (order.items || []).forEach((item: any) => {
+    orders.forEach((order) => {
+      (order.items || []).forEach((item) => {
         productCount[item.productName] = (productCount[item.productName] || 0) + (item.quantity || 1);
       });
     });
@@ -35,7 +36,7 @@ const Dashboard: React.FC = () => {
 
     // Calcula receita por método de pagamento
     const byMethod: Record<string, number> = {};
-    orders.forEach((order: any) => {
+    orders.forEach((order) => {
       const method = order.paymentMethod === 'paypay' ? 'PayPay' : 'Transferência';
       const revenue = order.totalPrice || order.totalAmount || 0;
       byMethod[method] = (byMethod[method] || 0) + revenue;

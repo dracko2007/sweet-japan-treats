@@ -11,6 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { prefectures } from '@/data/prefectures';
 import { addAddressHints } from '@/utils/romanize';
 import { useProducts } from '@/context/ProductsContext';
+import { isValidEmail, isValidPhone, isNonEmpty, maskPhone } from '@/utils/validation';
 
 const Profile: React.FC = () => {
   const { user, isAuthenticated, coupons, orders, updateProfile, logout } = useUser();
@@ -80,7 +81,8 @@ const Profile: React.FC = () => {
         }
       }));
     } else {
-      setEditedUser(prev => ({ ...prev, [name]: value }));
+      const nextValue = name === 'phone' ? maskPhone(value) : value;
+      setEditedUser(prev => ({ ...prev, [name]: nextValue }));
     }
   };
 
@@ -140,6 +142,20 @@ const Profile: React.FC = () => {
   };
 
   const handleSaveProfile = () => {
+    // Valida antes de salvar
+    if (editedUser.name !== undefined && !isNonEmpty(editedUser.name, 2)) {
+      toast({ title: 'Nome inválido', description: 'Informe seu nome completo.', variant: 'destructive' });
+      return;
+    }
+    if (editedUser.email !== undefined && !isValidEmail(editedUser.email)) {
+      toast({ title: 'E-mail inválido', description: 'Verifique o endereço de e-mail.', variant: 'destructive' });
+      return;
+    }
+    if (editedUser.phone !== undefined && editedUser.phone !== '' && !isValidPhone(editedUser.phone)) {
+      toast({ title: 'Telefone inválido', description: 'Use 10 a 11 dígitos.', variant: 'destructive' });
+      return;
+    }
+
     const turnedOnMarketing = editedUser.whatsappMarketing && !user.whatsappMarketing;
     updateProfile(editedUser);
     setIsEditing(false);

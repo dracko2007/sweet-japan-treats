@@ -6,6 +6,8 @@ import { useProducts } from '@/context/ProductsContext';
 import { cn } from '@/lib/utils';
 import { Link } from 'react-router-dom';
 import { useLanguage } from '@/context/LanguageContext';
+import { usePagination } from '@/hooks/usePagination';
+import Pagination from '@/components/Pagination';
 
 const Products: React.FC = () => {
   const { category } = useParams<{ category?: string }>();
@@ -15,6 +17,10 @@ const Products: React.FC = () => {
   const displayProducts = category && category !== 'all'
     ? products.filter(p => p.category === category)
     : products;
+
+  // Paginação do catálogo (12 por página)
+  const { page, totalPages, pageItems, setPage, rangeStart, rangeEnd, total } =
+    usePagination(displayProducts, 12);
 
   // Só mostra categorias que realmente têm produtos cadastrados
   const availableCategories = Array.from(new Set(products.map(p => p.category)));
@@ -96,10 +102,22 @@ const Products: React.FC = () => {
           )}
 
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {displayProducts.map((product) => (
+            {pageItems.map((product) => (
               <ProductCard key={product.id} product={product} />
             ))}
           </div>
+
+          {displayProducts.length > 0 && (
+            <Pagination
+              page={page}
+              totalPages={totalPages}
+              onPageChange={setPage}
+              rangeStart={rangeStart}
+              rangeEnd={rangeEnd}
+              total={total}
+              className="mt-12"
+            />
+          )}
 
           {displayProducts.length === 0 && (
             <div className="text-center py-16">

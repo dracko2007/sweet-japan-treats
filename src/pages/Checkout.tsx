@@ -1,4 +1,3 @@
-import { safeStorage } from '@/utils/storage';
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Package, ArrowRight, MapPin, User, Phone, Mail, Clock, Tag, CreditCard } from 'lucide-react';
@@ -20,6 +19,8 @@ import { usePostalCodeLookup } from '@/hooks/usePostalCodeLookup';
 import { useLanguage, CountryType } from '@/context/LanguageContext';
 import { formatPrice } from '@/utils/currency';
 import { getTranslatedProductName } from '@/data/translations';
+import { isValidEmail, isValidCPF, isValidPhone, isNonEmpty, maskPhone, runValidations, FieldErrors } from '@/utils/validation';
+import DemoBanner from '@/components/DemoBanner';
 
 const Checkout: React.FC = () => {
   const { items, totalPrice } = useCart();
@@ -71,6 +72,9 @@ const Checkout: React.FC = () => {
   // Coupon state
   const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
   const [couponDiscount, setCouponDiscount] = useState(0);
+
+  // Erros de validação do formulário
+  const [errors, setErrors] = useState<FieldErrors>({});
 
   // Sync country in state with language context selectedCountry
   useEffect(() => {
@@ -125,26 +129,6 @@ const Checkout: React.FC = () => {
     }
   }, [location.state]);
 
-  // Check for auto-applied coupon won on the Wheel of Fortune
-  useEffect(() => {
-    const savedCoupon = safeStorage.getItem('sakura_active_coupon');
-    if (savedCoupon === 'SAKURA90' && baseTotalPrice > 0) {
-      const discount = baseTotalPrice * 0.90;
-      setAppliedCoupon({
-        code: 'SAKURA90',
-        discount: 0,
-        discountPercent: 90,
-        type: 'percent',
-        expiryDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
-        isActive: true,
-        usedCount: 0,
-        description: 'Cupom de 90% OFF da Roda da Fortuna',
-        createdAt: new Date().toISOString()
-      });
-      setCouponDiscount(discount);
-    }
-  }, [baseTotalPrice]);
-
   // Auto-populate from user profile if authenticated
   useEffect(() => {
     if (isAuthenticated && user && !location.state?.formData) {
@@ -172,10 +156,18 @@ const Checkout: React.FC = () => {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
+    const nextValue = name === 'phone' ? maskPhone(value) : value;
     setFormData(prev => ({
       ...prev,
-      [name]: value
+      [name]: nextValue
     }));
+    if (errors[name]) {
+      setErrors(prev => {
+        const next = { ...prev };
+        delete next[name];
+        return next;
+      });
+    }
   };
 
   // Auto address lookup by CEP/Postal Code
@@ -274,10 +266,44 @@ const Checkout: React.FC = () => {
       formatted = `${val.slice(0, 3)}.${val.slice(3, 6)}`;
     }
     setFormData(prev => ({ ...prev, cpf: formatted }));
+    if (errors.cpf) {
+      setErrors(prev => {
+        const next = { ...prev };
+        delete next.cpf;
+        return next;
+      });
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Valida os campos do formulário
+    const fieldErrors = runValidations({
+      name: () => (isNonEmpty(formData.name, 2) ? null : 'Informe o nome completo.'),
+      email: () => (isValidEmail(formData.email) ? null : 'E-mail inválido.'),
+      phone: () => (isValidPhone(formData.phone) ? null : 'Telefone inválido.'),
+      cpf: () =>
+        formData.country === 'Brasil'
+          ? isValidCPF(formData.cpf)
+            ? null
+            : 'CPF inválido (verifique os dígitos).'
+          : null,
+      postalCode: () => (isNonEmpty(formData.postalCode, 4) ? null : 'Informe o código postal.'),
+      prefecture: () => (isNonEmpty(formData.prefecture) ? null : 'Selecione o estado/província.'),
+      city: () => (isNonEmpty(formData.city) ? null : 'Informe a cidade.'),
+      address: () => (isNonEmpty(formData.address, 3) ? null : 'Informe a rua e número.'),
+    });
+    setErrors(fieldErrors);
+
+    if (Object.keys(fieldErrors).length > 0) {
+      toast({
+        title: 'Confira os campos destacados',
+        description: 'Alguns dados precisam de correção antes de continuar.',
+        variant: 'destructive',
+      });
+      return;
+    }
 
     if (!selectedShipping) {
       toast({
@@ -288,19 +314,8 @@ const Checkout: React.FC = () => {
       return;
     }
 
-
-
-    if (formData.country === 'Brasil' && formData.cpf.replace(/\D/g, '').length !== 11) {
-      toast({
-        title: "CPF inválido",
-        description: "Por favor, insira um CPF válido para liberação alfandegária.",
-        variant: "destructive",
-      });
-      return;
-    }
-
     // Navigate to order review page
-    navigate('/order-review', { 
+    navigate('/order-review', {
       state: { 
         formData,
         shipping: selectedShipping,
@@ -358,6 +373,9 @@ const Checkout: React.FC = () => {
 
       <section className="py-12 bg-background">
         <div className="container mx-auto px-4">
+          <div className="max-w-6xl mx-auto mb-6">
+            <DemoBanner />
+          </div>
           <div className="grid lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
             {/* Checkout Form */}
             <div className="lg:col-span-2">
@@ -391,8 +409,11 @@ const Checkout: React.FC = () => {
                           placeholder="Ex: João Silva"
                           value={formData.name}
                           onChange={handleInputChange}
+                          aria-invalid={!!errors.name}
+                          className={errors.name ? 'border-destructive' : ''}
                           required
                         />
+                        {errors.name && <p className="text-xs text-destructive">{errors.name}</p>}
                       </div>
 
                       <div className="space-y-2">
@@ -404,11 +425,15 @@ const Checkout: React.FC = () => {
                           id="phone"
                           name="phone"
                           type="tel"
-                          placeholder="Ex: (11) 99999-9999"
+                          placeholder="Ex: 090-1234-5678"
                           value={formData.phone}
                           onChange={handleInputChange}
+                          aria-invalid={!!errors.phone}
+                          className={errors.phone ? 'border-destructive' : ''}
+                          maxLength={13}
                           required
                         />
+                        {errors.phone && <p className="text-xs text-destructive">{errors.phone}</p>}
                       </div>
                     </div>
 
@@ -425,8 +450,11 @@ const Checkout: React.FC = () => {
                           placeholder="exemplo@email.com"
                           value={formData.email}
                           onChange={handleInputChange}
+                          aria-invalid={!!errors.email}
+                          className={errors.email ? 'border-destructive' : ''}
                           required
                         />
+                        {errors.email && <p className="text-xs text-destructive">{errors.email}</p>}
                       </div>
 
                     {formData.country === 'Brasil' && (
@@ -442,11 +470,17 @@ const Checkout: React.FC = () => {
                           placeholder="000.000.000-00"
                           value={formData.cpf}
                           onChange={handleCpfChange}
+                          aria-invalid={!!errors.cpf}
+                          className={errors.cpf ? 'border-destructive' : ''}
                           required
                         />
-                        <p className="text-[10px] text-gray-400">
-                          Exigido pela Receita Federal para desembaraço de importação.
-                        </p>
+                        {errors.cpf ? (
+                          <p className="text-xs text-destructive">{errors.cpf}</p>
+                        ) : (
+                          <p className="text-[10px] text-gray-400">
+                            Exigido pela Receita Federal para desembaraço de importação.
+                          </p>
+                        )}
                       </div>
                     )}
                     </div>
@@ -558,8 +592,11 @@ const Checkout: React.FC = () => {
                           placeholder="Ex: São Paulo"
                           value={formData.city}
                           onChange={handleInputChange}
+                          aria-invalid={!!errors.city}
+                          className={errors.city ? 'border-destructive' : ''}
                           required
                         />
+                        {errors.city && <p className="text-xs text-destructive">{errors.city}</p>}
                       </div>
                     </div>
 
@@ -574,8 +611,11 @@ const Checkout: React.FC = () => {
                         placeholder="Ex: Avenida Paulista, 1000"
                         value={formData.address}
                         onChange={handleInputChange}
+                        aria-invalid={!!errors.address}
+                        className={errors.address ? 'border-destructive' : ''}
                         required
                       />
+                      {errors.address && <p className="text-xs text-destructive">{errors.address}</p>}
                     </div>
 
                     <div className="space-y-2">
@@ -760,7 +800,7 @@ const Checkout: React.FC = () => {
                   </div>
 
                   <div className="pt-4 border-t border-border flex items-center justify-center gap-1.5 text-[10px] text-muted-foreground uppercase font-bold">
-                    <CreditCard className="w-4 h-4 text-green-600 animate-pulse" /> Pagamento 100% Protegido
+                    <CreditCard className="w-4 h-4 text-amber-600" /> Ambiente de demonstração
                   </div>
                 </div>
               </div>

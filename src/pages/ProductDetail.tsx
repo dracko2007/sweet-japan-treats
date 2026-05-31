@@ -24,7 +24,7 @@ const ProductDetail: React.FC = () => {
   const { user } = useUser();
   const { toast } = useToast();
   const { t, selectedCountry } = useLanguage();
-  const { products } = useProducts();
+  const { products, loading: productsLoading } = useProducts();
 
   const product = products.find(p => p.id === id);
   const [selectedSize, setSelectedSize] = useState<'small' | 'large'>('small');
@@ -40,6 +40,18 @@ const ProductDetail: React.FC = () => {
       registrarEvento('viu_produto', product.id, product.category);
     }
   }, [product?.id]);
+
+  // Enquanto os produtos carregam, evita piscar "não encontrado".
+  if (!product && productsLoading) {
+    return (
+      <Layout>
+        <div className="container mx-auto px-4 py-20 flex flex-col items-center justify-center gap-4">
+          <div className="w-10 h-10 border-4 border-primary/30 border-t-primary rounded-full animate-spin" />
+          <p className="text-muted-foreground">{t('common.loading') || 'Carregando...'}</p>
+        </div>
+      </Layout>
+    );
+  }
 
   if (!product) {
     return (

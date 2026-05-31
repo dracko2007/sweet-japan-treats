@@ -9,6 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useUser } from '@/context/UserContext';
 import { useLanguage } from '@/context/LanguageContext';
 import LanguageSwitcher from '@/components/LanguageSwitcher';
+import { isValidEmail, isValidPhone, isNonEmpty, maskPhone, runValidations, FieldErrors } from '@/utils/validation';
 
 const Register: React.FC = () => {
   const navigate = useNavigate();
@@ -26,6 +27,7 @@ const Register: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [registrationComplete, setRegistrationComplete] = useState(false);
   const [whatsappMarketing, setWhatsappMarketing] = useState(true);
+  const [errors, setErrors] = useState<FieldErrors>({});
 
   // Redirect if already authenticated
   React.useEffect(() => {
@@ -36,35 +38,48 @@ const Register: React.FC = () => {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
+    // Aplica máscara no telefone enquanto digita
+    const nextValue = name === 'phone' ? maskPhone(value) : value;
     setFormData(prev => ({
       ...prev,
-      [name]: value
+      [name]: nextValue
     }));
+    // Limpa o erro do campo ao editar
+    if (errors[name]) {
+      setErrors(prev => {
+        const next = { ...prev };
+        delete next[name];
+        return next;
+      });
+    }
+  };
+
+  const validateForm = (): boolean => {
+    const fieldErrors = runValidations({
+      name: () => (isNonEmpty(formData.name, 2) ? null : 'Informe seu nome completo.'),
+      email: () => (isValidEmail(formData.email) ? null : 'E-mail inválido.'),
+      phone: () => (isValidPhone(formData.phone) ? null : 'Telefone inválido (10–11 dígitos).'),
+      password: () => (formData.password.length >= 6 ? null : 'A senha deve ter ao menos 6 caracteres.'),
+      confirmPassword: () =>
+        formData.password === formData.confirmPassword ? null : 'As senhas não coincidem.',
+    });
+    setErrors(fieldErrors);
+    return Object.keys(fieldErrors).length === 0;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!validateForm()) {
+      toast({
+        title: 'Confira os campos',
+        description: 'Alguns dados precisam de correção.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setIsLoading(true);
-
-    if (formData.password !== formData.confirmPassword) {
-      toast({
-        title: "Erro",
-        description: "As senhas não coincidem.",
-        variant: "destructive",
-      });
-      setIsLoading(false);
-      return;
-    }
-
-    if (formData.password.length < 6) {
-      toast({
-        title: "Erro",
-        description: "A senha deve ter pelo menos 6 caracteres.",
-        variant: "destructive",
-      });
-      setIsLoading(false);
-      return;
-    }
 
     try {
       const result = await registerUser({
@@ -192,8 +207,11 @@ const Register: React.FC = () => {
                     placeholder="山田 太郎"
                     value={formData.name}
                     onChange={handleInputChange}
+                    aria-invalid={!!errors.name}
+                    className={errors.name ? 'border-destructive' : ''}
                     required
                   />
+                  {errors.name && <p className="text-xs text-destructive">{errors.name}</p>}
                 </div>
 
                 <div className="space-y-2">
@@ -208,8 +226,11 @@ const Register: React.FC = () => {
                     placeholder="exemplo@email.com"
                     value={formData.email}
                     onChange={handleInputChange}
+                    aria-invalid={!!errors.email}
+                    className={errors.email ? 'border-destructive' : ''}
                     required
                   />
+                  {errors.email && <p className="text-xs text-destructive">{errors.email}</p>}
                 </div>
 
                 <div className="space-y-2">
@@ -224,8 +245,12 @@ const Register: React.FC = () => {
                     placeholder="090-1234-5678"
                     value={formData.phone}
                     onChange={handleInputChange}
+                    aria-invalid={!!errors.phone}
+                    className={errors.phone ? 'border-destructive' : ''}
+                    maxLength={13}
                     required
                   />
+                  {errors.phone && <p className="text-xs text-destructive">{errors.phone}</p>}
                 </div>
 
                 <div className="space-y-2">
@@ -257,9 +282,12 @@ const Register: React.FC = () => {
                     placeholder="••••••••"
                     value={formData.confirmPassword}
                     onChange={handleInputChange}
+                    aria-invalid={!!errors.confirmPassword}
+                    className={errors.confirmPassword ? 'border-destructive' : ''}
                     required
                     minLength={6}
                   />
+                  {errors.confirmPassword && <p className="text-xs text-destructive">{errors.confirmPassword}</p>}
                 </div>
 
                 <div className="flex items-start gap-2.5 pt-1">

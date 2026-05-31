@@ -7,7 +7,7 @@ import { CartProvider } from "@/context/CartContext";
 import { UserProvider } from "@/context/UserContext";
 import { LanguageProvider } from "@/context/LanguageContext";
 import { ProductsProvider } from "@/context/ProductsContext";
-import { firebaseConfigReady, firebaseConfigSource, firebaseConfig } from "@/config/firebase";
+import { firebaseConfigReady, firebaseConfigSource } from "@/config/firebase";
 import Index from "./pages/Index";
 import Products from "./pages/Products";
 import Cart from "./pages/Cart";
@@ -28,6 +28,8 @@ import NotFound from "./pages/NotFound";
 import FirebaseSync from "./pages/FirebaseSync";
 import SyncData from "./pages/SyncData";
 import ScrollToTop from "./components/ScrollToTop";
+import ErrorBoundary from "./components/ErrorBoundary";
+import RequireAdmin from "./components/RequireAdmin";
 
 const queryClient = new QueryClient();
 
@@ -38,25 +40,6 @@ const App = () => (
       <ProductsProvider>
       <CartProvider>
         <TooltipProvider>
-          {typeof window !== "undefined" && new URLSearchParams(window.location.search).get("debug") === "1" && (
-            <div style={{ 
-              backgroundColor: '#dc2626', 
-              color: '#fef08a', 
-              padding: '20px', 
-              fontFamily: 'monospace',
-              fontSize: '14px',
-              lineHeight: '1.8'
-            }}>
-              <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
-                <div style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '15px' }}>🔍 DEBUG FIREBASE</div>
-                <div><strong>Source:</strong> {String(firebaseConfigSource || 'UNDEFINED')}</div>
-                <div><strong>ProjectId:</strong> {String(firebaseConfig?.projectId || 'UNDEFINED')}</div>
-                <div><strong>AuthDomain:</strong> {String(firebaseConfig?.authDomain || 'UNDEFINED')}</div>
-                <div><strong>API Key (primeiros 30):</strong> {String(firebaseConfig?.apiKey?.substring(0, 30) || 'UNDEFINED')}...</div>
-                <div><strong>Storage Bucket:</strong> {String(firebaseConfig?.storageBucket || 'UNDEFINED')}</div>
-              </div>
-            </div>
-          )}
           {!firebaseConfigReady && (
             <div className="bg-red-600 text-white text-sm text-center py-2 px-4">
               Firebase não configurado. Fonte: {firebaseConfigSource}. Verifique as variáveis VITE_FIREBASE_* no Vercel e faça redeploy.
@@ -66,29 +49,31 @@ const App = () => (
           <Sonner />
           <BrowserRouter>
             <ScrollToTop />
-            <Routes>
-              <Route path="/" element={<Index />} />
-              <Route path="/produtos" element={<Products />} />
-              <Route path="/produtos/:category" element={<Products />} />
-              <Route path="/produto/:id" element={<ProductDetail />} />
-              <Route path="/carrinho" element={<Cart />} />
-              <Route path="/checkout" element={<Checkout />} />
-              <Route path="/order-review" element={<OrderReview />} />
-              <Route path="/order-confirmation" element={<OrderConfirmation />} />
-              <Route path="/cadastro" element={<Register />} />
-              <Route path="/login" element={<Login />} />
-              <Route path="/perfil" element={<Profile />} />
-              <Route path="/frete" element={<Shipping />} />
-              <Route path="/sobre" element={<About />} />
-              <Route path="/vlog" element={<Vlog />} />
-              <Route path="/admin" element={<Admin />} />
-              <Route path="/favoritos" element={<Wishlist />} />
-              <Route path="/rastrear" element={<TrackOrder />} />
-              <Route path="/firebase-sync" element={<FirebaseSync />} />
-              <Route path="/sync-data" element={<SyncData />} />
-              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-              <Route path="*" element={<NotFound />} />
-            </Routes>
+            <ErrorBoundary>
+              <Routes>
+                <Route path="/" element={<Index />} />
+                <Route path="/produtos" element={<Products />} />
+                <Route path="/produtos/:category" element={<Products />} />
+                <Route path="/produto/:id" element={<ProductDetail />} />
+                <Route path="/carrinho" element={<Cart />} />
+                <Route path="/checkout" element={<Checkout />} />
+                <Route path="/order-review" element={<OrderReview />} />
+                <Route path="/order-confirmation" element={<OrderConfirmation />} />
+                <Route path="/cadastro" element={<Register />} />
+                <Route path="/login" element={<Login />} />
+                <Route path="/perfil" element={<Profile />} />
+                <Route path="/frete" element={<Shipping />} />
+                <Route path="/sobre" element={<About />} />
+                <Route path="/vlog" element={<Vlog />} />
+                <Route path="/admin" element={<RequireAdmin><Admin /></RequireAdmin>} />
+                <Route path="/favoritos" element={<Wishlist />} />
+                <Route path="/rastrear" element={<TrackOrder />} />
+                <Route path="/firebase-sync" element={<RequireAdmin><FirebaseSync /></RequireAdmin>} />
+                <Route path="/sync-data" element={<RequireAdmin><SyncData /></RequireAdmin>} />
+                {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </ErrorBoundary>
           </BrowserRouter>
         </TooltipProvider>
       </CartProvider>

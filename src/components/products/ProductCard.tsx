@@ -137,9 +137,10 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
             }}
           />
         ) : product.image ? (
-          <img 
-            src={product.image} 
+          <img
+            src={product.image}
             alt={translatedName}
+            loading="lazy"
             className="absolute inset-0 w-full h-full object-cover"
           />
         ) : (

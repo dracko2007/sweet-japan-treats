@@ -17,16 +17,22 @@ import ProductManager from '@/components/admin/ProductManager';
 import HomeContentManager from '@/components/admin/HomeContentManager';
 import TrackingModal from '@/components/admin/TrackingModal';
 import { orderService } from '@/services/orderService';
+import { usePagination } from '@/hooks/usePagination';
+import Pagination from '@/components/Pagination';
 
 const Admin: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useUser();
   const { toast } = useToast();
   const [allOrders, setAllOrders] = useState<any[]>([]);
+  const [ordersLoading, setOrdersLoading] = useState(true);
   const [isTesting, setIsTesting] = useState(false);
   const [activeTab, setActiveTab] = useState<'orders' | 'coupons' | 'dashboard' | 'customers' | 'products' | 'home'>('dashboard');
   const [trackingModalOpen, setTrackingModalOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
+
+  // Paginação da lista de pedidos (10 por página)
+  const ordersPagination = usePagination(allOrders, 10);
 
   // Admin email - apenas Paula pode acessar
   const ADMIN_EMAIL = 'dracko2007@gmail.com';
@@ -47,6 +53,7 @@ const Admin: React.FC = () => {
   const loadOrders = async () => {
     const orders = await orderService.getAllOrdersAsync();
     setAllOrders(orders);
+    setOrdersLoading(false);
   };
 
   const handleUpdateStatus = async (orderNumber: string, newStatus: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled') => {
@@ -482,13 +489,18 @@ _This is an automated test message_
                 Pedidos Recentes
               </h2>
               
-              {allOrders.length === 0 ? (
+              {ordersLoading ? (
+                <div className="bg-card rounded-2xl border border-border p-12 text-center flex flex-col items-center gap-4">
+                  <div className="w-10 h-10 border-4 border-primary/30 border-t-primary rounded-full animate-spin" />
+                  <p className="text-muted-foreground">Carregando pedidos...</p>
+                </div>
+              ) : allOrders.length === 0 ? (
                 <div className="bg-card rounded-2xl border border-border p-12 text-center">
                   <Package className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
                   <p className="text-muted-foreground">Nenhum pedido encontrado</p>
                 </div>
               ) : (
-                allOrders.map((order, index) => (
+                ordersPagination.pageItems.map((order, index) => (
                   <div key={index} className="bg-card rounded-2xl border border-border p-6 hover:shadow-lg transition-shadow">
                     <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 mb-4">
                       <div className="flex-1">
@@ -674,6 +686,18 @@ _This is an automated test message_
                     </div>
                   </div>
                 ))
+              )}
+
+              {allOrders.length > 0 && (
+                <Pagination
+                  page={ordersPagination.page}
+                  totalPages={ordersPagination.totalPages}
+                  onPageChange={ordersPagination.setPage}
+                  rangeStart={ordersPagination.rangeStart}
+                  rangeEnd={ordersPagination.rangeEnd}
+                  total={ordersPagination.total}
+                  className="pt-4"
+                />
               )}
             </div>
             </>

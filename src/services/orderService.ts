@@ -6,6 +6,7 @@ import { safeStorage } from '@/utils/storage';
 
 import { firebaseSyncService } from '@/services/firebaseSyncService';
 import { ensureAdminAuth } from '@/utils/adminAuth';
+import type { Order, OrderStatistics, MonthlyDataPoint } from '@/types';
 
 export interface OrderStatus {
   status: 'pending' | 'processing' | 'confirmed' | 'shipped' | 'delivered' | 'cancelled';
@@ -42,7 +43,7 @@ export const orderService = {
   },
 
   // Async version that fetches from Firestore + merges with safeStorage
-  getAllOrdersAsync: async (): Promise<any[]> => {
+  getAllOrdersAsync: async (): Promise<Order[]> => {
     try {
       const firestoreOrders = await firebaseSyncService.getAllOrdersFromFirestore();
       const localOrders = getLocalOrders();
@@ -213,8 +214,8 @@ export const orderService = {
   },
 
   // Get statistics (accepts pre-loaded orders)
-  getStatistics: (orders?: any[]) => {
-    const allOrders = orders || orderService.getAllOrders();
+  getStatistics: (orders?: Order[]): OrderStatistics => {
+    const allOrders: Order[] = orders || orderService.getAllOrders();
     const now = new Date();
     const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
@@ -251,9 +252,9 @@ export const orderService = {
   },
 
   // Get monthly data for charts (accepts pre-loaded orders)
-  getMonthlyData: (months: number = 6, orders?: any[]) => {
-    const allOrders = orders || orderService.getAllOrders();
-    const data = [];
+  getMonthlyData: (months: number = 6, orders?: Order[]): MonthlyDataPoint[] => {
+    const allOrders: Order[] = orders || orderService.getAllOrders();
+    const data: MonthlyDataPoint[] = [];
     const now = new Date();
 
     for (let i = months - 1; i >= 0; i--) {

@@ -20,6 +20,81 @@ export interface CartItem {
   quantity: number;
 }
 
+/* ------------------------------------------------------------------ */
+/*  Pedidos                                                             */
+/* ------------------------------------------------------------------ */
+
+export type OrderStatusValue =
+  | 'pending'
+  | 'processing'
+  | 'confirmed'
+  | 'shipped'
+  | 'delivered'
+  | 'cancelled';
+
+export interface OrderItem {
+  productId?: string;
+  productName: string;
+  name?: string;
+  size: 'small' | 'large';
+  quantity: number;
+  price: number;
+  image?: string;
+}
+
+export interface OrderShippingAddress {
+  name?: string;
+  phone?: string;
+  postalCode?: string;
+  prefecture?: string;
+  city?: string;
+  address?: string;
+  building?: string;
+}
+
+export interface Order {
+  id?: string;
+  orderNumber?: string;
+  orderDate?: string;
+  date?: string;
+  status?: OrderStatusValue | string;
+  paymentMethod?: string;
+  items: OrderItem[];
+  totalPrice?: number;
+  totalAmount?: number;
+  taxAmount?: number;
+  currency?: string;
+  customerEmail?: string;
+  customerName?: string;
+  cpf?: string;
+  couponCode?: string;
+  couponDiscount?: number;
+  shippingCarrier?: string;
+  shipping?: { cost?: number; carrier?: string };
+  shippingAddress?: OrderShippingAddress;
+  trackingNumber?: string;
+  trackingUrl?: string;
+}
+
+export interface OrderStatistics {
+  totalOrders: number;
+  totalRevenue: number;
+  ordersThisMonth: number;
+  revenueThisMonth: number;
+  ordersLastMonth: number;
+  revenueLastMonth: number;
+  pendingOrders: number;
+  shippedOrders: number;
+  deliveredOrders: number;
+  cancelledOrders: number;
+}
+
+export interface MonthlyDataPoint {
+  month: string;
+  orders: number;
+  revenue: number;
+}
+
 export interface ShippingRate {
   carrier: string;
   price: number;

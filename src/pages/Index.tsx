@@ -4,7 +4,6 @@ import HeroSection from '@/components/home/HeroSection';
 import FeaturedProducts from '@/components/home/FeaturedProducts';
 import HomeVideos from '@/components/home/HomeVideos';
 import ShippingBanner from '@/components/home/ShippingBanner';
-import { WheelOfFortune } from '@/components/home/WheelOfFortune';
 import { useLanguage } from '@/context/LanguageContext';
 
 const Index: React.FC = () => {
@@ -12,7 +11,6 @@ const Index: React.FC = () => {
 
   return (
     <Layout>
-      <WheelOfFortune />
       <HeroSection />
       <FeaturedProducts />
       <HomeVideos />
