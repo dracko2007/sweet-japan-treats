@@ -13,13 +13,26 @@ import { formatPrice } from '@/utils/currency';
 const Cart: React.FC = () => {
   const { items, clearCart } = useCart();
   const { t, selectedCountry, setSelectedCountry } = useLanguage();
-  const { isAuthenticated, validateProfileCoupon } = useUser();
+  const { isAuthenticated, validateProfileCoupon, coupons } = useUser();
   const navigate = useNavigate();
 
   // Coupon state
   const [couponCode, setCouponCode] = useState('');
   const [activeCoupon, setActiveCoupon] = useState<Coupon | null>(null);
   const [couponError, setCouponError] = useState('');
+  const [showCouponList, setShowCouponList] = useState(false);
+
+  // Cupons do perfil que estão válidos (para sugerir ao clicar no campo)
+  const availableCoupons = coupons.filter(
+    (c) => !c.isUsed && new Date(c.expiresAt) > new Date()
+  );
+
+  const applyCouponObject = (coupon: Coupon) => {
+    setActiveCoupon(coupon);
+    setCouponCode('');
+    setCouponError('');
+    setShowCouponList(false);
+  };
 
   // Valida o cupom contra os cupons DO PERFIL da pessoa ("Meus Cupons").
   // Só funciona se o cupom existir na conta, estiver ativo e não usado.
@@ -204,25 +217,70 @@ const Cart: React.FC = () => {
                 <div className="bg-card rounded-2xl border border-border p-6 sticky top-24 space-y-6 shadow-sm">
                   <h3 className="font-sans text-lg font-bold text-foreground">Resumo do Pedido</h3>
                   
-                  {/* Coupon Application Input */}
-                  <form onSubmit={handleApplyCoupon} className="space-y-2">
-                    <label className="text-xs font-bold text-gray-500 uppercase flex items-center gap-1.5">
-                      <Tag className="w-3.5 h-3.5" /> Cupom de Desconto
-                    </label>
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        placeholder="Digite seu cupom"
-                        value={couponCode}
-                        onChange={(e) => setCouponCode(e.target.value)}
-                        className="flex-1 px-3 py-2 text-sm rounded-lg border border-border bg-background uppercase font-bold"
-                      />
-                      <Button type="submit" variant="secondary" className="px-4 text-xs font-bold">
-                        Aplicar
-                      </Button>
-                    </div>
-                    {couponError && <p className="text-xs text-red-500 font-semibold">{couponError}</p>}
-                  </form>
+                  {/* Coupon Application Input + lista de cupons disponíveis */}
+                  {!activeCoupon && (
+                    <form onSubmit={handleApplyCoupon} className="space-y-2 relative">
+                      <label className="text-xs font-bold text-gray-500 uppercase flex items-center gap-1.5">
+                        <Tag className="w-3.5 h-3.5" /> Cupom de Desconto
+                      </label>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          placeholder={isAuthenticated ? 'Digite ou escolha um cupom' : 'Entre para usar cupons'}
+                          value={couponCode}
+                          onChange={(e) => setCouponCode(e.target.value)}
+                          onFocus={() => setShowCouponList(true)}
+                          onBlur={() => setTimeout(() => setShowCouponList(false), 150)}
+                          className="flex-1 px-3 py-2 text-sm rounded-lg border border-border bg-background uppercase font-bold"
+                        />
+                        <Button type="submit" variant="secondary" className="px-4 text-xs font-bold">
+                          Aplicar
+                        </Button>
+                      </div>
+                      {couponError && <p className="text-xs text-red-500 font-semibold">{couponError}</p>}
+
+                      {/* Dropdown de cupons do perfil */}
+                      {showCouponList && isAuthenticated && availableCoupons.length > 0 && (
+                        <div className="absolute z-20 left-0 right-0 top-full mt-1 bg-card border border-border rounded-xl shadow-lg max-h-60 overflow-y-auto">
+                          <p className="text-[10px] uppercase font-bold text-muted-foreground px-3 pt-2 pb-1">
+                            Seus cupons
+                          </p>
+                          {availableCoupons.map((coupon) => {
+                            const preview = computeDiscount(coupon, baseTotalPrice);
+                            const label = coupon.freeShipping
+                              ? 'Frete Grátis'
+                              : coupon.discountType === 'percentage'
+                              ? `${coupon.discount}% OFF`
+                              : `¥${coupon.discount.toLocaleString()} OFF`;
+                            return (
+                              <button
+                                key={coupon.id}
+                                type="button"
+                                onMouseDown={(e) => e.preventDefault()}
+                                onClick={() => applyCouponObject(coupon)}
+                                className="w-full text-left px-3 py-2 hover:bg-secondary transition-colors border-t border-border/50 first:border-t-0"
+                              >
+                                <div className="flex items-center justify-between">
+                                  <span className="font-bold text-primary text-sm">{coupon.code}</span>
+                                  <span className="text-xs font-bold text-green-600">
+                                    {coupon.freeShipping ? label : `-${formatPrice(preview, currency)}`}
+                                  </span>
+                                </div>
+                                <p className="text-[11px] text-muted-foreground">{coupon.description} · {label}</p>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                      {showCouponList && isAuthenticated && availableCoupons.length === 0 && (
+                        <div className="absolute z-20 left-0 right-0 top-full mt-1 bg-card border border-border rounded-xl shadow-lg p-3">
+                          <p className="text-xs text-muted-foreground text-center">
+                            Você não tem cupons disponíveis.
+                          </p>
+                        </div>
+                      )}
+                    </form>
+                  )}
 
                   {/* Price Summary List */}
                   <div className="space-y-3 pt-2 border-t border-border">

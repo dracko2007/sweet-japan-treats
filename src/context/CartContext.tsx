@@ -1,5 +1,19 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { CartItem, Product } from '@/types';
+import { safeStorage } from '@/utils/storage';
+
+const CART_STORAGE_KEY = 'sakura_cart';
+
+// Carrega o carrinho salvo (persiste entre recarregamentos da página)
+const loadCart = (): CartItem[] => {
+  try {
+    const raw = safeStorage.getItem(CART_STORAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+};
 
 interface CartContextType {
   items: CartItem[];
@@ -15,7 +29,12 @@ interface CartContextType {
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [items, setItems] = useState<CartItem[]>([]);
+  const [items, setItems] = useState<CartItem[]>(loadCart);
+
+  // Persiste o carrinho a cada mudança
+  useEffect(() => {
+    safeStorage.setItem(CART_STORAGE_KEY, JSON.stringify(items));
+  }, [items]);
 
   const addToCart = useCallback((product: Product, size: 'small' | 'large', quantity = 1) => {
     setItems(prev => {
