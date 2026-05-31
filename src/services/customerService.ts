@@ -246,7 +246,7 @@ export const customerService = {
   // Async customer overview
   async getCustomerOverviewAsync(): Promise<any> {
     const customers = await this.getAllCustomersAsync();
-    
+
     const totalCustomers = customers.length;
     const activeCustomers = customers.filter(c => c.totalOrders > 0).length;
     const totalRevenue = customers.reduce((sum, c) => sum + c.totalSpent, 0);
@@ -266,5 +266,76 @@ export const customerService = {
       averageRevenuePerCustomer,
       topCustomers,
     };
+  },
+
+  // Delete um cliente específico (remove nome, email, pedidos)
+  async deleteCustomer(email: string): Promise<boolean> {
+    try {
+      const usersData = safeStorage.getItem('sweet-japan-users');
+      if (!usersData) return false;
+
+      const users = JSON.parse(usersData);
+      if (users[email]) {
+        delete users[email];
+        safeStorage.setItem('sweet-japan-users', JSON.stringify(users));
+        console.log(`✅ Cliente ${email} deletado`);
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('❌ Erro ao deletar cliente:', error);
+      return false;
+    }
+  },
+
+  // Delete apenas os pedidos de um cliente (mantém cliente)
+  async deleteCustomerOrders(email: string): Promise<boolean> {
+    try {
+      const usersData = safeStorage.getItem('sweet-japan-users');
+      if (!usersData) return false;
+
+      const users = JSON.parse(usersData);
+      if (users[email]) {
+        users[email].orders = [];
+        safeStorage.setItem('sweet-japan-users', JSON.stringify(users));
+        console.log(`✅ Histórico de ${email} deletado`);
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('❌ Erro ao deletar histórico:', error);
+      return false;
+    }
+  },
+
+  // Delete todos os clientes
+  async deleteAllCustomers(): Promise<boolean> {
+    try {
+      safeStorage.setItem('sweet-japan-users', JSON.stringify({}));
+      console.log('✅ Todos os clientes foram deletados');
+      return true;
+    } catch (error) {
+      console.error('❌ Erro ao deletar todos os clientes:', error);
+      return false;
+    }
+  },
+
+  // Delete todo o histórico (pedidos de todos os clientes)
+  async deleteAllOrderHistory(): Promise<boolean> {
+    try {
+      const usersData = safeStorage.getItem('sweet-japan-users');
+      if (!usersData) return false;
+
+      const users = JSON.parse(usersData);
+      Object.keys(users).forEach(email => {
+        users[email].orders = [];
+      });
+      safeStorage.setItem('sweet-japan-users', JSON.stringify(users));
+      console.log('✅ Todo o histórico de pedidos foi deletado');
+      return true;
+    } catch (error) {
+      console.error('❌ Erro ao deletar histórico:', error);
+      return false;
+    }
   },
 };

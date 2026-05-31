@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { Users, ShoppingBag, DollarSign, TrendingUp, Package, Calendar, Mail, Phone } from 'lucide-react';
+import { Users, ShoppingBag, DollarSign, TrendingUp, Package, Calendar, Mail, Phone, Trash2, AlertTriangle } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { customerService, CustomerStats } from '@/services/customerService';
+import { useToast } from '@/hooks/use-toast';
 
 const CustomerList: React.FC = () => {
   const [customers, setCustomers] = useState<CustomerStats[]>([]);
   const [overview, setOverview] = useState<any>(null);
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerStats | null>(null);
+  const { toast } = useToast();
 
   useEffect(() => {
     loadCustomers();
@@ -57,12 +60,122 @@ const CustomerList: React.FC = () => {
     );
   };
 
+  const handleDeleteCustomerOrders = async (email: string, customerName: string) => {
+    if (!confirm(`Deletar histórico de pedidos de "${customerName}"?\n\n⚠️ Essa ação não pode ser desfeita!`)) {
+      return;
+    }
+    const success = await customerService.deleteCustomerOrders(email);
+    if (success) {
+      toast({
+        title: '✅ Histórico deletado',
+        description: `Pedidos de ${customerName} foram removidos`,
+      });
+      loadCustomers();
+      if (selectedCustomer?.email === email) {
+        setSelectedCustomer(null);
+      }
+    } else {
+      toast({
+        title: '❌ Erro ao deletar histórico',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleDeleteCustomer = async (email: string, customerName: string) => {
+    if (!confirm(`Deletar cliente "${customerName}" e TODO seu histórico?\n\n⚠️ Essa ação não pode ser desfeita!`)) {
+      return;
+    }
+    const success = await customerService.deleteCustomer(email);
+    if (success) {
+      toast({
+        title: '✅ Cliente deletado',
+        description: `${customerName} foi removido`,
+      });
+      loadCustomers();
+      if (selectedCustomer?.email === email) {
+        setSelectedCustomer(null);
+      }
+    } else {
+      toast({
+        title: '❌ Erro ao deletar cliente',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleDeleteAllCustomers = async () => {
+    if (!confirm('⚠️ DELETAR TODOS OS CLIENTES?\n\nEssa ação é IRREVERSÍVEL e removerá tudo!')) {
+      return;
+    }
+    if (!confirm('Tem CERTEZA? Digite "SIM" para confirmar:\n\n[Clique OK e confirme novamente]')) {
+      return;
+    }
+    const success = await customerService.deleteAllCustomers();
+    if (success) {
+      toast({
+        title: '✅ Todos os clientes foram deletados',
+        variant: 'destructive',
+      });
+      loadCustomers();
+      setSelectedCustomer(null);
+    }
+  };
+
+  const handleDeleteAllOrderHistory = async () => {
+    if (!confirm('⚠️ DELETAR TODO O HISTÓRICO DE PEDIDOS?\n\nEssa ação é IRREVERSÍVEL!')) {
+      return;
+    }
+    const success = await customerService.deleteAllOrderHistory();
+    if (success) {
+      toast({
+        title: '✅ Todo o histórico de pedidos foi deletado',
+        variant: 'destructive',
+      });
+      loadCustomers();
+      setSelectedCustomer(null);
+    }
+  };
+
   if (!overview) {
     return <div className="text-center py-8">Carregando...</div>;
   }
 
   return (
     <div className="space-y-6">
+      {/* Botões de Ação em Massa */}
+      <div className="bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/50 rounded-lg p-4">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h3 className="font-semibold text-red-700 dark:text-red-400 flex items-center gap-2 mb-1">
+              <AlertTriangle className="w-5 h-5" />
+              Ações em Massa
+            </h3>
+            <p className="text-xs text-red-600 dark:text-red-300">Operações irreversíveis. Use com cuidado!</p>
+          </div>
+          <div className="flex gap-2 flex-shrink-0">
+            <Button
+              size="sm"
+              variant="outline"
+              className="text-orange-600 hover:text-orange-700 border-orange-200 whitespace-nowrap"
+              onClick={handleDeleteAllOrderHistory}
+            >
+              <Trash2 className="w-4 h-4 mr-1" />
+              Limpar Todo Histórico
+            </Button>
+            <Button
+              size="sm"
+              variant="destructive"
+              className="whitespace-nowrap"
+              onClick={handleDeleteAllCustomers}
+            >
+              <Trash2 className="w-4 h-4 mr-1" />
+              Deletar Todos
+            </Button>
+          </div>
+        </div>
+      </div>
+
       {/* Overview Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
@@ -132,30 +245,55 @@ const CustomerList: React.FC = () => {
             ) : customers.map((customer) => (
               <Card
                 key={customer.email}
-                className={`cursor-pointer transition-all hover:shadow-md ${
+                className={`transition-all hover:shadow-md ${
                   selectedCustomer?.email === customer.email ? 'ring-2 ring-primary' : ''
                 }`}
-                onClick={() => setSelectedCustomer(customer)}
               >
                 <CardContent className="p-3 sm:p-4">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-base sm:text-lg truncate">{customer.name}</h3>
-                      <p className="text-xs sm:text-sm text-muted-foreground flex items-center gap-1 truncate">
-                        <Mail className="h-3 w-3 flex-shrink-0" />
-                        <span className="truncate">{customer.email}</span>
-                      </p>
-                      {customer.phone !== 'N/A' && (
-                        <p className="text-xs sm:text-sm text-muted-foreground flex items-center gap-1">
-                          <Phone className="h-3 w-3 flex-shrink-0" />
-                          {customer.phone}
+                  <div
+                    className="cursor-pointer"
+                    onClick={() => setSelectedCustomer(customer)}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-base sm:text-lg truncate">{customer.name}</h3>
+                        <p className="text-xs sm:text-sm text-muted-foreground flex items-center gap-1 truncate">
+                          <Mail className="h-3 w-3 flex-shrink-0" />
+                          <span className="truncate">{customer.email}</span>
                         </p>
-                      )}
+                        {customer.phone !== 'N/A' && (
+                          <p className="text-xs sm:text-sm text-muted-foreground flex items-center gap-1">
+                            <Phone className="h-3 w-3 flex-shrink-0" />
+                            {customer.phone}
+                          </p>
+                        )}
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        <div className="text-base sm:text-lg font-bold text-primary">{formatCurrency(customer.totalSpent)}</div>
+                        <div className="text-xs sm:text-sm text-muted-foreground">{customer.totalOrders} pedidos</div>
+                      </div>
                     </div>
-                    <div className="text-right flex-shrink-0">
-                      <div className="text-base sm:text-lg font-bold text-primary">{formatCurrency(customer.totalSpent)}</div>
-                      <div className="text-xs sm:text-sm text-muted-foreground">{customer.totalOrders} pedidos</div>
-                    </div>
+                  </div>
+
+                  <div className="mt-3 pt-3 border-t flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-xs flex-1"
+                      onClick={() => handleDeleteCustomerOrders(customer.email, customer.name)}
+                    >
+                      <Trash2 className="w-3 h-3 mr-1" />
+                      Limpar Histórico
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      className="text-xs flex-1"
+                      onClick={() => handleDeleteCustomer(customer.email, customer.name)}
+                    >
+                      <Trash2 className="w-3 h-3 mr-1" />
+                      Deletar Cliente
+                    </Button>
                   </div>
                   
                   {customer.totalOrders > 0 && (
@@ -266,6 +404,35 @@ const CustomerList: React.FC = () => {
                   </CardContent>
                 </Card>
               )}
+
+              {/* Ações de Delete */}
+              <Card className="border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/20">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-red-700 dark:text-red-400">
+                    <AlertTriangle className="h-5 w-5" />
+                    Ações Perigosas
+                  </CardTitle>
+                  <CardDescription>Cuidado! Essas ações não podem ser desfeitas.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start text-orange-600 hover:text-orange-700 border-orange-200"
+                    onClick={() => handleDeleteCustomerOrders(selectedCustomer.email, selectedCustomer.name)}
+                  >
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Limpar Histórico de Pedidos
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    className="w-full justify-start"
+                    onClick={() => handleDeleteCustomer(selectedCustomer.email, selectedCustomer.name)}
+                  >
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Deletar Cliente
+                  </Button>
+                </CardContent>
+              </Card>
             </>
           ) : (
             <div className="flex items-center justify-center h-full text-muted-foreground">
