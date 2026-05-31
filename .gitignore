@@ -63,3 +63,4 @@ auto-setup-images.ts
 upload-images.ts
 add-sitecontent-rule.cjs
 provision-storage.cjs
+add-eventos-rule.cjs

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, ShoppingCart, Heart, Share2, Star } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
@@ -10,6 +10,7 @@ import { useCart } from '@/context/CartContext';
 import { useUser } from '@/context/UserContext';
 import { wishlistService } from '@/services/wishlistService';
 import { reviewService } from '@/services/reviewService';
+import { registrarEvento } from '@/services/eventosService';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { useLanguage } from '@/context/LanguageContext';
@@ -31,6 +32,14 @@ const ProductDetail: React.FC = () => {
   const [isFavorite, setIsFavorite] = useState(
     user?.email ? wishlistService.isInWishlist(user.email, id || '') : false
   );
+
+  // Registra que o usuário abriu este produto (coleta para futuras recomendações).
+  // Só dispara quando o ID do produto muda — não a cada re-render da tela.
+  useEffect(() => {
+    if (product) {
+      registrarEvento('viu_produto', product.id, product.category);
+    }
+  }, [product?.id]);
 
   if (!product) {
     return (
