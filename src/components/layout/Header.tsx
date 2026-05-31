@@ -14,7 +14,7 @@ const Header: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isProductsOpen, setIsProductsOpen] = useState(false);
   const { totalItems } = useCart();
-  const { isAuthenticated, user } = useUser();
+  const { isAuthenticated, user, isAdmin } = useUser();
   const { t, selectedCountry } = useLanguage();
   const location = useLocation();
 
@@ -119,11 +119,11 @@ const Header: React.FC = () => {
               <LanguageSwitcher />
             </div>
 
-            {/* Admin Link - Visible for testing convenience */}
-            {
-              <Button 
+            {/* Admin Link - visível apenas para administradores */}
+            {isAdmin && (
+              <Button
                 asChild
-                variant="ghost" 
+                variant="ghost"
                 size="sm"
                 className="hidden lg:flex items-center gap-2 text-orange-600 hover:text-orange-700"
               >
@@ -132,7 +132,7 @@ const Header: React.FC = () => {
                   <span>{t('nav.admin')}</span>
                 </Link>
               </Button>
-            }
+            )}
             
             <Button 
               asChild
@@ -239,10 +239,10 @@ const Header: React.FC = () => {
               </Button>
             )}
             {/* Admin Mobile - Visible for testing convenience */}
-            {
-              <Button 
+            {isAdmin && (
+              <Button
                 asChild
-                variant="ghost" 
+                variant="ghost"
                 className="w-full justify-start text-base font-medium text-orange-600 hover:text-orange-700"
               >
                 <Link to="/admin" onClick={() => setIsMenuOpen(false)}>
@@ -250,7 +250,7 @@ const Header: React.FC = () => {
                   {t('nav.admin')}
                 </Link>
               </Button>
-            }
+            )}
           </nav>
         )}
       </div>
