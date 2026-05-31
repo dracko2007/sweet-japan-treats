@@ -62,6 +62,11 @@ const Footer: React.FC = () => {
                   {t('nav.about')}
                 </Link>
               </li>
+              <li>
+                <Link to="/afiliado" className="text-sm text-accent-foreground/80 hover:text-accent-foreground transition-colors">
+                  Programa de Afiliados
+                </Link>
+              </li>
             </ul>
           </div>
 

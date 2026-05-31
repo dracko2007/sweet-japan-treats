@@ -34,6 +34,7 @@ export interface Coupon {
   expiresAt: string;
   isUsed: boolean;
   freeShipping?: boolean;
+  affiliateCode?: string; // se preenchido, é um código de influencer (gera comissão)
 }
 
 // Fábrica do cupom de boas-vindas concedido no cadastro.

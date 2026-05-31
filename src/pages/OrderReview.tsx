@@ -166,8 +166,20 @@ const OrderReview: React.FC = () => {
     const existingOrders = JSON.parse(safeStorage.getItem('sakura_orders') || '[]');
     safeStorage.setItem('sakura_orders', JSON.stringify([mockOrder, ...existingOrders]));
 
-    // Consome o cupom usado (uso único) — some do perfil e não pode reusar
-    if (appliedCoupon?.code) {
+    // Cupom de afiliado/influencer → credita comissão sobre o valor líquido (em ¥)
+    if (appliedCoupon?.affiliateCode) {
+      const netYenBase = items.reduce((sum, item) => {
+        const p = item.size === 'small' ? item.product.prices.small : item.product.prices.large;
+        return sum + p * item.quantity;
+      }, 0);
+      const fraction = appliedCoupon.discountType === 'percentage' ? appliedCoupon.discount / 100 : 0;
+      const netYen = Math.round(netYenBase * (1 - fraction));
+      import('@/services/affiliateService').then(({ affiliateService }) => {
+        affiliateService.creditSale(appliedCoupon.affiliateCode, netYen);
+      });
+      safeStorage.removeItem('affiliate_ref');
+    } else if (appliedCoupon?.code) {
+      // Cupom pessoal → consome (uso único, some do perfil)
       consumeCouponByCode(appliedCoupon.code);
     }
 

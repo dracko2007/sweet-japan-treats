@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { ShoppingBag, ArrowRight, Trash2, Tag, ShieldCheck } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
@@ -9,6 +9,20 @@ import { useLanguage } from '@/context/LanguageContext';
 import { useUser, Coupon } from '@/context/UserContext';
 import { useNavigate } from 'react-router-dom';
 import { formatPrice } from '@/utils/currency';
+import { affiliateService, Affiliate } from '@/services/affiliateService';
+import { safeStorage } from '@/utils/storage';
+
+// Converte um afiliado num "cupom" aplicável (carrega o código para gerar comissão)
+const affiliateToCoupon = (aff: Affiliate): Coupon => ({
+  id: `aff-${aff.code}`,
+  code: aff.code,
+  description: `Indicação de ${aff.ownerName} — ${aff.discountPercent}% OFF`,
+  discount: aff.discountPercent,
+  discountType: 'percentage',
+  expiresAt: aff.expiresAt,
+  isUsed: false,
+  affiliateCode: aff.code,
+});
 
 const Cart: React.FC = () => {
   const { items, clearCart } = useCart();
@@ -34,30 +48,53 @@ const Cart: React.FC = () => {
     setShowCouponList(false);
   };
 
-  // Valida o cupom contra os cupons DO PERFIL da pessoa ("Meus Cupons").
-  // Só funciona se o cupom existir na conta, estiver ativo e não usado.
-  const handleApplyCoupon = (e: React.FormEvent) => {
+  // Aplica um cupom: primeiro tenta o cupom PESSOAL (Meus Cupons), depois um
+  // código de AFILIADO/influencer (público e reutilizável, gera comissão).
+  const handleApplyCoupon = async (e: React.FormEvent) => {
     e.preventDefault();
     setCouponError('');
 
     const code = couponCode.trim();
     if (!code) return;
 
-    if (!isAuthenticated) {
-      setCouponError('Entre na sua conta para usar cupons.');
+    // 1) Cupom pessoal (precisa estar logado e possuir o cupom)
+    if (isAuthenticated) {
+      const personal = validateProfileCoupon(code);
+      if (personal.valid && personal.coupon) {
+        applyCouponObject(personal.coupon);
+        return;
+      }
+    }
+
+    // 2) Código de afiliado/influencer (público)
+    const aff = await affiliateService.validate(code);
+    if (aff.valid && aff.affiliate) {
+      applyCouponObject(affiliateToCoupon(aff.affiliate));
+      safeStorage.setItem('affiliate_ref', aff.affiliate.code);
       return;
     }
 
-    const result = validateProfileCoupon(code);
-    if (!result.valid || !result.coupon) {
-      setActiveCoupon(null);
-      setCouponError(result.error || 'Cupom inválido.');
-      return;
-    }
-
-    setActiveCoupon(result.coupon);
-    setCouponCode('');
+    // 3) Falhou
+    setActiveCoupon(null);
+    setCouponError(
+      isAuthenticated
+        ? 'Cupom inválido ou você não possui este cupom.'
+        : 'Cupom inválido. Cupons pessoais exigem login.'
+    );
   };
+
+  // Aplica automaticamente o código de indicação vindo do link (?ref=CODE)
+  useEffect(() => {
+    const ref = safeStorage.getItem('affiliate_ref');
+    if (ref && !activeCoupon) {
+      affiliateService.validate(ref).then((res) => {
+        if (res.valid && res.affiliate) {
+          setActiveCoupon(affiliateToCoupon(res.affiliate));
+        }
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleRemoveCoupon = () => {
     setActiveCoupon(null);
