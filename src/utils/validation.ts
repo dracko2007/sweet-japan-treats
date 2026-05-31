@@ -41,11 +41,24 @@ export const isValidJapanesePostalCode = (cep: string): boolean => {
   return digits.length === 7;
 };
 
-/** Telefone: aceita formatos JP/BR, exige 10–11 dígitos. */
+/** Telefone internacional (E.164): 8 a 15 dígitos, com ou sem código do país. */
 export const isValidPhone = (phone: string): boolean => {
   const digits = phone.replace(/\D/g, '');
-  return digits.length >= 10 && digits.length <= 11;
+  return digits.length >= 8 && digits.length <= 15;
 };
+
+/** Lista de países com código de discagem (DDI) para o cadastro. */
+export const COUNTRY_DIAL_CODES = [
+  { country: 'Brasil', code: '+55', flag: '🇧🇷' },
+  { country: 'Japão', code: '+81', flag: '🇯🇵' },
+  { country: 'Portugal', code: '+351', flag: '🇵🇹' },
+  { country: 'França', code: '+33', flag: '🇫🇷' },
+  { country: 'Itália', code: '+39', flag: '🇮🇹' },
+  { country: 'Espanha', code: '+34', flag: '🇪🇸' },
+  { country: 'Reino Unido', code: '+44', flag: '🇬🇧' },
+  { country: 'Alemanha', code: '+49', flag: '🇩🇪' },
+  { country: 'EUA/Canadá', code: '+1', flag: '🇺🇸' },
+] as const;
 
 export const isNonEmpty = (value: string, min = 1): boolean =>
   value.trim().length >= min;

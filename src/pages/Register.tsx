@@ -9,20 +9,25 @@ import { useToast } from '@/hooks/use-toast';
 import { useUser } from '@/context/UserContext';
 import { useLanguage } from '@/context/LanguageContext';
 import LanguageSwitcher from '@/components/LanguageSwitcher';
-import { isValidEmail, isValidPhone, isNonEmpty, maskPhone, runValidations, FieldErrors } from '@/utils/validation';
+import { isValidEmail, isNonEmpty, runValidations, FieldErrors, COUNTRY_DIAL_CODES } from '@/utils/validation';
 
 const Register: React.FC = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { register: registerUser, isAuthenticated } = useUser();
-  const { t } = useLanguage();
-  
+  const { t, selectedCountry } = useLanguage();
+
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     phone: '',
     password: '',
     confirmPassword: '',
+  });
+  // Código do país (DDI), default pelo país selecionado na loja
+  const [dialCode, setDialCode] = useState(() => {
+    const match = COUNTRY_DIAL_CODES.find((c) => c.country === selectedCountry);
+    return match ? match.code : '+55';
   });
   const [isLoading, setIsLoading] = useState(false);
   const [registrationComplete, setRegistrationComplete] = useState(false);
@@ -38,8 +43,8 @@ const Register: React.FC = () => {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    // Aplica máscara no telefone enquanto digita
-    const nextValue = name === 'phone' ? maskPhone(value) : value;
+    // Telefone: mantém apenas dígitos e espaços (formato varia por país)
+    const nextValue = name === 'phone' ? value.replace(/[^\d\s]/g, '') : value;
     setFormData(prev => ({
       ...prev,
       [name]: nextValue
@@ -54,11 +59,18 @@ const Register: React.FC = () => {
     }
   };
 
+  // Telefone completo no formato internacional: "+351 912345678"
+  const fullPhone = () => `${dialCode} ${formData.phone.trim()}`.trim();
+
   const validateForm = (): boolean => {
+    const phoneDigits = formData.phone.replace(/\D/g, '');
     const fieldErrors = runValidations({
       name: () => (isNonEmpty(formData.name, 2) ? null : 'Informe seu nome completo.'),
       email: () => (isValidEmail(formData.email) ? null : 'E-mail inválido.'),
-      phone: () => (isValidPhone(formData.phone) ? null : 'Telefone inválido (10–11 dígitos).'),
+      phone: () =>
+        phoneDigits.length >= 6 && phoneDigits.length <= 13
+          ? null
+          : 'Telefone inválido (digite o número sem o código do país).',
       password: () => (formData.password.length >= 6 ? null : 'A senha deve ter ao menos 6 caracteres.'),
       confirmPassword: () =>
         formData.password === formData.confirmPassword ? null : 'As senhas não coincidem.',
@@ -85,7 +97,7 @@ const Register: React.FC = () => {
       const result = await registerUser({
         name: formData.name,
         email: formData.email,
-        phone: formData.phone,
+        phone: fullPhone(), // inclui o código do país (ex: "+351 912345678")
         password: formData.password,
         whatsappMarketing: whatsappMarketing,
         address: {
@@ -109,7 +121,7 @@ const Register: React.FC = () => {
           
           import('@/services/whatsappService').then(({ whatsappService }) => {
             whatsappService.sendMessage({
-              to: formData.phone,
+              to: fullPhone(),
               message: welcomeMsg
             });
           });
@@ -238,18 +250,35 @@ const Register: React.FC = () => {
                     <Phone className="w-4 h-4" />
                     {t('auth.register.phone')}
                   </Label>
-                  <Input
-                    id="phone"
-                    name="phone"
-                    type="tel"
-                    placeholder="090-1234-5678"
-                    value={formData.phone}
-                    onChange={handleInputChange}
-                    aria-invalid={!!errors.phone}
-                    className={errors.phone ? 'border-destructive' : ''}
-                    maxLength={13}
-                    required
-                  />
+                  <div className="flex gap-2">
+                    <select
+                      value={dialCode}
+                      onChange={(e) => setDialCode(e.target.value)}
+                      className="px-2 py-2 rounded-lg border border-input bg-background text-sm font-medium focus:ring-2 focus:ring-primary focus:border-primary"
+                      aria-label="Código do país"
+                    >
+                      {COUNTRY_DIAL_CODES.map((c) => (
+                        <option key={c.country} value={c.code}>
+                          {c.flag} {c.code}
+                        </option>
+                      ))}
+                    </select>
+                    <Input
+                      id="phone"
+                      name="phone"
+                      type="tel"
+                      placeholder="912 345 678"
+                      value={formData.phone}
+                      onChange={handleInputChange}
+                      aria-invalid={!!errors.phone}
+                      className={`flex-1 ${errors.phone ? 'border-destructive' : ''}`}
+                      maxLength={15}
+                      required
+                    />
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    Selecione o país e digite o número <strong>sem</strong> o código (ex: {dialCode} 912345678).
+                  </p>
                   {errors.phone && <p className="text-xs text-destructive">{errors.phone}</p>}
                 </div>
 
