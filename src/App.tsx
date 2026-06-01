@@ -31,8 +31,8 @@ import SyncData from "./pages/SyncData";
 import ScrollToTop from "./components/ScrollToTop";
 import ErrorBoundary from "./components/ErrorBoundary";
 import RequireAdmin from "./components/RequireAdmin";
+import MaintenanceGuard from "./components/MaintenanceGuard";
 
-// build: rollback estável (sem modo manutenção) — força redeploy limpo
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -52,6 +52,7 @@ const App = () => (
           <BrowserRouter>
             <ScrollToTop />
             <ErrorBoundary>
+              <MaintenanceGuard>
               <Routes>
                 <Route path="/" element={<Index />} />
                 <Route path="/produtos" element={<Products />} />
@@ -76,6 +77,7 @@ const App = () => (
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>
+              </MaintenanceGuard>
             </ErrorBoundary>
           </BrowserRouter>
         </TooltipProvider>

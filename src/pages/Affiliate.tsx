@@ -4,6 +4,7 @@ import { Megaphone, Link2, Copy, Check, DollarSign, Package, TrendingUp, Percent
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { useUser } from '@/context/UserContext';
+import { useProducts } from '@/context/ProductsContext';
 import { useToast } from '@/hooks/use-toast';
 import { affiliateService, Affiliate } from '@/services/affiliateService';
 
@@ -11,11 +12,13 @@ const SITE_URL = 'https://japan-express.vercel.app';
 
 const AffiliatePage: React.FC = () => {
   const { user, isAuthenticated } = useUser();
+  const { products } = useProducts();
   const { toast } = useToast();
   const [affiliates, setAffiliates] = useState<Affiliate[]>([]);
   const [pendingByCode, setPendingByCode] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState<string | null>(null);
+  const [selectedProductId, setSelectedProductId] = useState('');
 
   useEffect(() => {
     if (!user?.email) {
@@ -141,6 +144,43 @@ const AffiliatePage: React.FC = () => {
                       <p className="text-[11px] text-muted-foreground mt-2">
                         Compartilhe este link ou divulgue o código <strong>{aff.code}</strong>. Quem comprar usando ele
                         ganha {aff.discountPercent}% de desconto, e você recebe {aff.commissionPercent}% do valor líquido.
+                      </p>
+                    </div>
+
+                    {/* Gerador de link de um produto específico */}
+                    <div className="border-t border-border pt-5">
+                      <p className="text-xs uppercase font-bold text-muted-foreground mb-2 flex items-center gap-1">
+                        <Link2 className="w-3.5 h-3.5" /> Link de um produto específico
+                      </p>
+                      <select
+                        value={selectedProductId}
+                        onChange={(e) => setSelectedProductId(e.target.value)}
+                        className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-background mb-2"
+                      >
+                        <option value="">Escolha um produto para gerar o link...</option>
+                        {products.map((p) => (
+                          <option key={p.id} value={p.id}>{p.name}</option>
+                        ))}
+                      </select>
+                      {selectedProductId && (
+                        <div className="flex gap-2">
+                          <input
+                            readOnly
+                            value={`${SITE_URL}/produto/${selectedProductId}?ref=${aff.code}`}
+                            className="flex-1 px-3 py-2 text-sm rounded-lg border border-border bg-secondary/30 font-mono"
+                            onFocus={(e) => e.currentTarget.select()}
+                          />
+                          <Button
+                            variant="outline"
+                            onClick={() => copy(`${SITE_URL}/produto/${selectedProductId}?ref=${aff.code}`, `prod-${aff.code}`)}
+                            className="px-3"
+                          >
+                            {copied === `prod-${aff.code}` ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
+                          </Button>
+                        </div>
+                      )}
+                      <p className="text-[11px] text-muted-foreground mt-2">
+                        Gere o link de qualquer produto. Quem abrir já entra com o seu código aplicado e vai direto pro produto.
                       </p>
                     </div>
                   </div>

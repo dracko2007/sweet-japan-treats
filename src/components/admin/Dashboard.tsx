@@ -6,6 +6,7 @@ import {
 } from 'recharts';
 import { orderService } from '@/services/orderService';
 import type { Order, OrderStatistics, MonthlyDataPoint } from '@/types';
+import MaintenanceToggle from '@/components/admin/MaintenanceToggle';
 
 const Dashboard: React.FC = () => {
   const [stats, setStats] = useState<OrderStatistics | null>(null);
@@ -54,8 +55,11 @@ const Dashboard: React.FC = () => {
 
   if (!stats) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <p className="text-muted-foreground">Carregando dados...</p>
+      <div className="space-y-6">
+        <MaintenanceToggle />
+        <div className="flex items-center justify-center py-12">
+          <p className="text-muted-foreground">Carregando dados...</p>
+        </div>
       </div>
     );
   }
@@ -86,6 +90,9 @@ const Dashboard: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      {/* Controle de Manutenção */}
+      <MaintenanceToggle />
+
       {/* 6 Cards de Métricas */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {/* Receita Total */}
