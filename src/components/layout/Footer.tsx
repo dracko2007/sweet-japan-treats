@@ -25,7 +25,13 @@ const Footer: React.FC = () => {
               {t('footer.description')}
             </p>
             <div className="flex items-center gap-4 mt-6">
-              <a href="#" className="p-2 rounded-full bg-primary/20 hover:bg-primary/30 transition-colors">
+              <a
+                href="https://www.instagram.com/japan_express_oficial/"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Instagram @japan_express_oficial"
+                className="p-2 rounded-full bg-primary/20 hover:bg-primary/30 transition-colors"
+              >
                 <Instagram className="w-5 h-5" />
               </a>
               <a href="#" className="p-2 rounded-full bg-primary/20 hover:bg-primary/30 transition-colors">
