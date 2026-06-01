@@ -199,6 +199,42 @@ const KimiClawAssistant: React.FC = () => {
       .map((item) => item.product);
   };
 
+  // Detecta intenção de navegar por CATEGORIA ("quais doces tem", "me mostra cosméticos")
+  const CATEGORY_WORDS: Record<string, string[]> = {
+    doces: ['doce', 'doces', 'snack', 'snacks', 'chocolate', 'chocolates', 'guloseima', 'salgadinho', 'candy', 'sweets', 'okashi'],
+    cosmeticos: ['cosmetico', 'cosmeticos', 'cosmetic', 'skincare', 'beleza', 'maquiagem', 'creme', 'cremes', 'protetor'],
+    acessorios: ['acessorio', 'acessorios', 'figura', 'figuras', 'colecionavel', 'colecionaveis', 'anime', 'figure', 'goods'],
+    papelaria: ['papelaria', 'caneta', 'canetas', 'caderno', 'cadernos', 'escritorio', 'stationery'],
+  };
+  const CATEGORY_LABEL: Record<string, string> = {
+    doces: 'doces', cosmeticos: 'cosméticos', acessorios: 'acessórios', papelaria: 'papelaria',
+  };
+  const detectCategory = (query: string): string | null => {
+    const toks = tokenize(query);
+    for (const [cat, words] of Object.entries(CATEGORY_WORDS)) {
+      if (words.some((w) => toks.includes(normalizeText(w)))) return cat;
+    }
+    return null;
+  };
+  // Mostra todos os produtos de uma categoria. Retorna true se mostrou algo.
+  const showCategory = (cat: string): boolean => {
+    const list = products.filter((p) => p.category === cat).slice(0, 8);
+    if (list.length === 0) return false;
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: Math.random().toString(36).substring(7),
+        sender: 'kimi',
+        text: language === 'pt'
+          ? `Aqui estão nossos **${CATEGORY_LABEL[cat]}** (${list.length}):`
+          : `Here are our **${cat}** (${list.length}):`,
+        timestamp: new Date(),
+        products: list,
+      },
+    ]);
+    return true;
+  };
+
   // Calculate shipping options for a given country and weight
   const calculateShipping = (country: string, weightKg: number): ShippingOption[] => {
     const normalizedCountry = normalizeText(country);
@@ -304,6 +340,12 @@ const KimiClawAssistant: React.FC = () => {
       return;
     }
 
+    // 0.A NAVEGAR POR CATEGORIA (prioridade alta: "quais doces tem", "me mostra cosméticos")
+    const detectedCat = detectCategory(query);
+    if (detectedCat) {
+      if (showCategory(detectedCat)) return;
+    }
+
     // 0. SEARCH PRODUCTS SKILL
     if (query.includes('buscar') || query.includes('procurar') || query.includes('pesquisar') || query.includes('search') || query.includes('find') || query.includes('tem ') || query.includes('quero ') || query.includes('mostrar') || query.includes('achar') || query.includes('encontrar')) {
       // O searchProducts já ignora palavras de ligação/comando ("procurar por kitkat" → kitkat)
@@ -330,9 +372,9 @@ const KimiClawAssistant: React.FC = () => {
       return;
     }
 
-    // 1. ADD PRODUCT SKILL
-    if (query.includes('doce') || query.includes('cremoso') || query.includes('artesanal') || query.includes('carrinho') && query.includes('adicionar') || query.includes('add')) {
-      const targetProduct = products.find(p => p.id === 'art-cremoso') || products[0];
+    // 1. ADD PRODUCT SKILL — só com intenção explícita de adicionar ao carrinho
+    if ((query.includes('adicionar') || query.includes('add') || query.includes('coloca')) && query.includes('carrinho')) {
+      const targetProduct = products[0];
       const steps = [
         language === 'pt' ? '🔍 Buscando produto no banco de dados...' : '🔍 Searching database...',
         language === 'pt' ? `📦 Selecionando "${targetProduct.name}" (Tamanho: Pequeno)...` : `📦 Selecting "${targetProduct.name}"...`,
