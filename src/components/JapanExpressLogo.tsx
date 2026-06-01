@@ -9,7 +9,7 @@ interface Props {
 // em círculo para encaixar no header/rodapé.
 const JapanExpressLogo: React.FC<Props> = ({ size = 48, className = '' }) => (
   <img
-    src="/logo.jfif"
+    src="/logo.jpg"
     alt="Japan Express"
     width={size}
     height={size}
