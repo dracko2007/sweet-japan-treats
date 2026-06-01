@@ -2,6 +2,18 @@ export const BRL_TO_JPY_RATE = 28;
 export const BRL_TO_EUR_RATE = 0.16;
 
 /**
+ * Converte qualquer valor para IENE (¥), de acordo com a moeda de origem.
+ * Usado no dashboard para somar vendas de moedas diferentes de forma consistente.
+ * Moeda ausente/desconhecida → assume que já está em ¥ (não infla o valor).
+ */
+export const toYen = (amount: number, currency?: string): number => {
+  if (!amount) return 0;
+  if (currency === 'BRL') return Math.round(amount * BRL_TO_JPY_RATE);
+  if (currency === 'EUR') return Math.round((amount / BRL_TO_EUR_RATE) * BRL_TO_JPY_RATE);
+  return Math.round(amount); // JPY ou desconhecido
+};
+
+/**
  * Formats a numeric price into a localized string based on the currency (JPY, BRL, or EUR).
  */
 export const formatPrice = (price: number, currency: 'BRL' | 'JPY' | 'EUR' | string, noConvert = false): string => {

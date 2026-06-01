@@ -7,6 +7,7 @@ export interface Product {
     small: number; // 280g
     large: number; // 800g
   };
+  cost?: number; // Custo de aquisição em ¥ (só admin — NÃO aparece para o cliente)
   image: string;
   gallery?: string[]; // Múltiplas imagens do produto
   video?: string; // Vídeo do produto (opcional)
@@ -39,6 +40,7 @@ export interface OrderItem {
   size: 'small' | 'large';
   quantity: number;
   price: number;
+  cost?: number; // Custo de aquisição em ¥ no momento da compra (snapshot, admin)
   image?: string;
 }
 
@@ -70,6 +72,7 @@ export interface Order {
   couponCode?: string;
   couponDiscount?: number;
   shippingCarrier?: string;
+  shippingCost?: number;
   shipping?: { cost?: number; carrier?: string };
   shippingAddress?: OrderShippingAddress;
   trackingNumber?: string;

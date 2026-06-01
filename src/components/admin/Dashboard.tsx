@@ -5,25 +5,102 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts';
 import { orderService } from '@/services/orderService';
-import type { Order, OrderStatistics, MonthlyDataPoint } from '@/types';
+import type { Order, OrderStatistics } from '@/types';
+import { toYen } from '@/utils/currency';
+import { useProducts } from '@/context/ProductsContext';
 import MaintenanceToggle from '@/components/admin/MaintenanceToggle';
 
+interface MonthlyFin {
+  month: string;
+  orders: number;
+  receitaComFrete: number;
+  receitaSemFrete: number;
+  custo: number;
+  lucro: number;
+}
+
+interface FinanceSummary {
+  receitaComFrete: number;
+  receitaSemFrete: number;
+  custo: number;
+  lucro: number;
+}
+
 const Dashboard: React.FC = () => {
+  const { products } = useProducts();
   const [stats, setStats] = useState<OrderStatistics | null>(null);
-  const [monthlyData, setMonthlyData] = useState<MonthlyDataPoint[]>([]);
+  const [finance, setFinance] = useState<FinanceSummary>({ receitaComFrete: 0, receitaSemFrete: 0, custo: 0, lucro: 0 });
+  const [monthlyData, setMonthlyData] = useState<MonthlyFin[]>([]);
   const [topProducts, setTopProducts] = useState<{ name: string; count: number }[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<{ method: string; revenue: number }[]>([]);
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [products]);
+
+  // Helpers: tudo convertido para IENE (¥) conforme a moeda de cada pedido
+  const orderRevYen = (o: Order) => toYen(o.totalPrice || o.totalAmount || 0, o.currency);
+  const orderShipYen = (o: Order) => toYen(o.shippingCost ?? o.shipping?.cost ?? 0, o.currency);
+  // Custo (¥): snapshot no item, ou busca no produto atual (fallback p/ pedidos antigos)
+  const orderCostYen = (o: Order) =>
+    (o.items || []).reduce((sum, it) => {
+      const snap = (it as any).cost;
+      const fromProduct = products.find(
+        (p) => p.id === it.productId || p.name === (it.productName || it.name)
+      )?.cost;
+      const unitCost = snap != null ? snap : fromProduct || 0;
+      return sum + unitCost * (it.quantity || 1);
+    }, 0);
 
   const loadData = async () => {
     const orders: Order[] = await orderService.getAllOrdersAsync();
     const statistics = orderService.getStatistics(orders);
-    const monthly = orderService.getMonthlyData(6, orders);
+    const active = orders.filter((o) => o.status !== 'cancelled');
 
-    // Calcula top 5 produtos
+    // Totais financeiros (¥)
+    let receitaComFrete = 0;
+    let receitaSemFrete = 0;
+    let custo = 0;
+    active.forEach((o) => {
+      const rev = orderRevYen(o);
+      const prod = Math.max(rev - orderShipYen(o), 0);
+      receitaComFrete += rev;
+      receitaSemFrete += prod;
+      custo += orderCostYen(o);
+    });
+    const lucro = receitaSemFrete - custo;
+
+    // Receita do mês atual / anterior (¥, sem frete = base de lucro)
+    const now = new Date();
+    const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const inRange = (o: Order, from: Date, to?: Date) => {
+      const d = new Date(o.orderDate || o.date || 0);
+      return d >= from && (!to || d < to);
+    };
+    const revenueThisMonth = active.filter((o) => inRange(o, thisMonth)).reduce((s, o) => s + orderRevYen(o), 0);
+    const revenueLastMonth = active.filter((o) => inRange(o, lastMonth, thisMonth)).reduce((s, o) => s + orderRevYen(o), 0);
+
+    // Série mensal (6 meses) com com/sem frete, custo e lucro
+    const monthly: MonthlyFin[] = [];
+    for (let i = 5; i >= 0; i--) {
+      const mStart = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const mEnd = new Date(now.getFullYear(), now.getMonth() - i + 1, 1);
+      const mOrders = active.filter((o) => inRange(o, mStart, mEnd));
+      const cf = mOrders.reduce((s, o) => s + orderRevYen(o), 0);
+      const sf = mOrders.reduce((s, o) => s + Math.max(orderRevYen(o) - orderShipYen(o), 0), 0);
+      const ct = mOrders.reduce((s, o) => s + orderCostYen(o), 0);
+      monthly.push({
+        month: mStart.toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' }),
+        orders: mOrders.length,
+        receitaComFrete: cf,
+        receitaSemFrete: sf,
+        custo: ct,
+        lucro: sf - ct,
+      });
+    }
+
+    // Top 5 produtos
     const productCount: Record<string, number> = {};
     orders.forEach((order) => {
       (order.items || []).forEach((item) => {
@@ -35,19 +112,17 @@ const Dashboard: React.FC = () => {
       .sort((a, b) => b.count - a.count)
       .slice(0, 5);
 
-    // Calcula receita por método de pagamento
+    // Receita por método de pagamento (¥, com frete)
     const byMethod: Record<string, number> = {};
-    orders.forEach((order) => {
+    active.forEach((order) => {
       const method = order.paymentMethod === 'paypay' ? 'PayPay' : 'Transferência';
-      const revenue = order.totalPrice || order.totalAmount || 0;
-      byMethod[method] = (byMethod[method] || 0) + revenue;
+      byMethod[method] = (byMethod[method] || 0) + orderRevYen(order);
     });
-    const payment = Object.entries(byMethod).map(([method, revenue]) => ({
-      method,
-      revenue: revenue as number,
-    }));
+    const payment = Object.entries(byMethod).map(([method, revenue]) => ({ method, revenue: revenue as number }));
 
-    setStats(statistics);
+    // stats com receita JÁ convertida para ¥
+    setStats({ ...statistics, totalRevenue: receitaComFrete, revenueThisMonth, revenueLastMonth });
+    setFinance({ receitaComFrete, receitaSemFrete, custo, lucro });
     setMonthlyData(monthly);
     setTopProducts(top5);
     setPaymentMethods(payment);
@@ -208,36 +283,45 @@ const Dashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Gráfico de Receita + Pedidos por Mês */}
+      {/* Resumo Financeiro (tudo em ¥) */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-card rounded-xl border border-border p-5">
+          <p className="text-xs text-muted-foreground mb-1">Receita c/ frete</p>
+          <p className="text-xl font-bold">¥{finance.receitaComFrete.toLocaleString()}</p>
+          <p className="text-[11px] text-muted-foreground mt-1">Total recebido</p>
+        </div>
+        <div className="bg-card rounded-xl border border-border p-5">
+          <p className="text-xs text-muted-foreground mb-1">Receita s/ frete</p>
+          <p className="text-xl font-bold text-pink-600">¥{finance.receitaSemFrete.toLocaleString()}</p>
+          <p className="text-[11px] text-muted-foreground mt-1">Só produtos (frete não é lucro)</p>
+        </div>
+        <div className="bg-card rounded-xl border border-border p-5">
+          <p className="text-xs text-muted-foreground mb-1">Custo dos produtos</p>
+          <p className="text-xl font-bold text-gray-500">¥{finance.custo.toLocaleString()}</p>
+          <p className="text-[11px] text-muted-foreground mt-1">Quanto você pagou</p>
+        </div>
+        <div className={`rounded-xl border p-5 ${finance.lucro >= 0 ? 'bg-green-50 dark:bg-green-950/20 border-green-300 dark:border-green-800' : 'bg-red-50 dark:bg-red-950/20 border-red-300'}`}>
+          <p className="text-xs text-muted-foreground mb-1">Lucro estimado</p>
+          <p className={`text-xl font-bold ${finance.lucro >= 0 ? 'text-green-600' : 'text-red-600'}`}>¥{finance.lucro.toLocaleString()}</p>
+          <p className="text-[11px] text-muted-foreground mt-1">Receita s/ frete − custo</p>
+        </div>
+      </div>
+
+      {/* Gráfico Financeiro Mensal */}
       <div className="bg-card rounded-xl border border-border p-6">
-        <h3 className="font-semibold text-lg mb-6">Receita e Pedidos Mensais</h3>
-        <ResponsiveContainer width="100%" height={280}>
+        <h3 className="font-semibold text-lg mb-1">Financeiro Mensal (¥)</h3>
+        <p className="text-xs text-muted-foreground mb-6">Comparação receita com/sem frete, custo e lucro — tudo convertido para ienes.</p>
+        <ResponsiveContainer width="100%" height={300}>
           <BarChart data={monthlyData}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="month" />
-            <YAxis yAxisId="left" tickFormatter={(v) => `¥${(v / 1000).toFixed(0)}k`} />
-            <YAxis yAxisId="right" orientation="right" />
-            <Tooltip
-              formatter={(value) => {
-                if (typeof value === 'number') return value.toLocaleString();
-                return value;
-              }}
-            />
+            <YAxis tickFormatter={(v) => `¥${(v / 1000).toFixed(0)}k`} />
+            <Tooltip formatter={(value) => (typeof value === 'number' ? `¥${value.toLocaleString()}` : value)} />
             <Legend />
-            <Bar
-              yAxisId="left"
-              dataKey="revenue"
-              name="Receita (¥)"
-              fill="#ec4899"
-              radius={[4, 4, 0, 0]}
-            />
-            <Bar
-              yAxisId="right"
-              dataKey="orders"
-              name="Pedidos"
-              fill="#f59e0b"
-              radius={[4, 4, 0, 0]}
-            />
+            <Bar dataKey="receitaComFrete" name="Receita c/ frete" fill="#fbcfe8" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="receitaSemFrete" name="Receita s/ frete" fill="#ec4899" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="custo" name="Custo" fill="#9ca3af" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="lucro" name="Lucro" fill="#22c55e" radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </div>

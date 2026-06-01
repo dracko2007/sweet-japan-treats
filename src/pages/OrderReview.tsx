@@ -158,7 +158,8 @@ const OrderReview: React.FC = () => {
           image: item.product.image,
           quantity: item.quantity,
           size: item.size === 'small' ? 'Padrão' : 'Deluxe',
-          price: finalUnitPrice
+          price: finalUnitPrice,
+          cost: item.product.cost || 0, // custo de aquisição em ¥ (admin)
         };
       })
     };
@@ -211,6 +212,7 @@ const OrderReview: React.FC = () => {
         quantity: it.quantity,
         size: it.size,
         price: it.price,
+        cost: it.cost || 0,
       })),
     };
 

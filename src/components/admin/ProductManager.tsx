@@ -134,6 +134,7 @@ const ProductManager: React.FC = () => {
         id,
         image: gallery[0] || editing.image || '',
         gallery,
+        cost: Number(editing.cost) || 0,
         prices: {
           small: Number(editing.prices.small) || 0,
           large: Number(editing.prices.large) || Number(editing.prices.small) || 0,
@@ -290,6 +291,28 @@ const ProductManager: React.FC = () => {
                 </div>
               </div>
               <p className="text-xs text-muted-foreground -mt-2">Preços em ienes (¥). O site converte automático para R$/€ conforme o país.</p>
+
+              {/* Custo de aquisição — SÓ ADMIN, não aparece para o cliente */}
+              <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
+                <label className="text-sm font-semibold block mb-1 flex items-center gap-1.5">
+                  🔒 Custo de aquisição (¥) <span className="text-[10px] font-normal text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded">interno</span>
+                </label>
+                <input
+                  type="number"
+                  value={editing.cost || ''}
+                  onChange={(e) => setEditing({ ...editing, cost: Number(e.target.value) })}
+                  placeholder="Quanto você pagou no produto (ex: 500)"
+                  className="w-full px-3 py-2 rounded-lg border border-amber-300 bg-background"
+                />
+                {editing.cost && editing.prices.small ? (
+                  <p className="text-xs text-amber-800 dark:text-amber-300 mt-1.5">
+                    Margem (pequeno): <strong>¥{(editing.prices.small - editing.cost).toLocaleString()}</strong>
+                    {editing.prices.small > 0 && ` (${Math.round(((editing.prices.small - editing.cost) / editing.prices.small) * 100)}%)`}
+                  </p>
+                ) : (
+                  <p className="text-xs text-amber-700/80 dark:text-amber-400/80 mt-1.5">Para calcular lucro real no dashboard. O cliente NUNCA vê este valor.</p>
+                )}
+              </div>
 
               {/* Descrição */}
               <div>
