@@ -32,6 +32,7 @@ import ScrollToTop from "./components/ScrollToTop";
 import ErrorBoundary from "./components/ErrorBoundary";
 import RequireAdmin from "./components/RequireAdmin";
 
+// build: rollback estável (sem modo manutenção) — força redeploy limpo
 const queryClient = new QueryClient();
 
 const App = () => (
