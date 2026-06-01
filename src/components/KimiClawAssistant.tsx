@@ -56,6 +56,8 @@ const KimiClawAssistant: React.FC = () => {
   const [isTyping, setIsTyping] = useState(false);
   const [currentSteps, setCurrentSteps] = useState<string[]>([]);
   const [showAttentionBadge, setShowAttentionBadge] = useState(true);
+  // Pedidos cujo consentimento já foi respondido (esconde os botões Sim/Não)
+  const [respondedOrders, setRespondedOrders] = useState<string[]>([]);
 
 
   // Shipping flow states
@@ -64,6 +66,8 @@ const KimiClawAssistant: React.FC = () => {
   const [shippingData, setShippingData] = useState<{ country?: string; weight?: number }>({});
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  // Garante que a mensagem de confirmação do pedido é mostrada só UMA vez por pedido
+  const promptedOrderRef = useRef<string | null>(null);
 
   // Auto-scroll to bottom of chat
   const scrollToBottom = () => {
@@ -95,40 +99,42 @@ const KimiClawAssistant: React.FC = () => {
     }
   }, [isOpen]);
 
-  // Listen to order confirmation page lands
+  // Listen to order confirmation page lands (mostra a mensagem só uma vez por pedido)
   useEffect(() => {
-    if (location.pathname === '/order-confirmation') {
-      const order = location.state?.order;
-      if (order) {
-        setIsOpen(true);
-        const timer = setTimeout(() => {
-          const clientName = order.name || (user ? user.name : 'Cliente');
-          
-          let confirmationText = '';
-          if (language === 'pt') {
-            confirmationText = `Parabéns pela sua compra, **${clientName}**! 🎉 Seu pedido **${order.orderNumber}** foi recebido. \n\nQuer receber **novidades e cupons exclusivos**? É só confirmar que eu marco no seu perfil. 🎁`;
-          } else if (language === 'ja') {
-            confirmationText = `ご購入ありがとうございます、**${clientName}** 様！🎉 ご注文 **${order.orderNumber}** を承りました。\n\n**新着情報と限定クーポン**を受け取りますか？確認するとマイページに登録します。🎁`;
-          } else {
-            confirmationText = `Thank you for your purchase, **${clientName}**! 🎉 Your order **${order.orderNumber}** has been received.\n\nWant to receive **news and exclusive coupons**? Just confirm and I'll enable it on your profile. 🎁`;
-          }
-          
-          setMessages(prev => [
-            ...prev,
-            {
-              id: 'order-confirmed-prompt',
-              sender: 'kimi',
-              text: confirmationText,
-              timestamp: new Date(),
-              isConsentPrompt: true,
-              orderToShare: order
-            }
-          ]);
-        }, 1200);
-        return () => clearTimeout(timer);
+    if (location.pathname !== '/order-confirmation') return;
+    const order = location.state?.order;
+    const orderNum = order?.orderNumber || order?.id || '';
+    if (!order || !orderNum) return;
+    if (promptedOrderRef.current === orderNum) return; // já mostrou para este pedido
+    promptedOrderRef.current = orderNum;
+
+    setIsOpen(true);
+    const timer = setTimeout(() => {
+      const clientName = order.name || (user ? user.name : 'Cliente');
+
+      let confirmationText = '';
+      if (language === 'pt') {
+        confirmationText = `Parabéns pela sua compra, **${clientName}**! 🎉 Seu pedido **${orderNum}** foi recebido. \n\nQuer receber **novidades e cupons exclusivos**? É só confirmar que eu marco no seu perfil. 🎁`;
+      } else if (language === 'ja') {
+        confirmationText = `ご購入ありがとうございます、**${clientName}** 様！🎉 ご注文 **${orderNum}** を承りました。\n\n**新着情報と限定クーポン**を受け取りますか？確認するとマイページに登録します。🎁`;
+      } else {
+        confirmationText = `Thank you for your purchase, **${clientName}**! 🎉 Your order **${orderNum}** has been received.\n\nWant to receive **news and exclusive coupons**? Just confirm and I'll enable it on your profile. 🎁`;
       }
-    }
-  }, [location, language, user]);
+
+      setMessages(prev => [
+        ...prev,
+        {
+          id: `order-prompt-${orderNum}`,
+          sender: 'kimi',
+          text: confirmationText,
+          timestamp: new Date(),
+          isConsentPrompt: true,
+          orderToShare: order
+        }
+      ]);
+    }, 1200);
+    return () => clearTimeout(timer);
+  }, [location]);
 
   // Normalize text for search - remove accents and lowercase
   const normalizeText = (text: string): string => {
@@ -497,6 +503,13 @@ const KimiClawAssistant: React.FC = () => {
   };
 
   const handleConsentAction = async (accept: boolean, order?: any) => {
+    // Marca este pedido como respondido → esconde os botões e evita repetição
+    const orderKey = order?.orderNumber || order?.id;
+    if (orderKey) {
+      if (respondedOrders.includes(orderKey)) return; // já respondeu, ignora cliques extras
+      setRespondedOrders(prev => [...prev, orderKey]);
+    }
+
     if (!accept) {
       setMessages(prev => [
         ...prev,
@@ -610,8 +623,9 @@ const KimiClawAssistant: React.FC = () => {
                     )}
                   </div>
                   
-                  {/* CONSENT PROMPT ACTION BUTTONS */}
-                  {msg.isConsentPrompt && (
+                  {/* CONSENT PROMPT ACTION BUTTONS (somem após responder) */}
+                  {msg.isConsentPrompt &&
+                    !respondedOrders.includes(msg.orderToShare?.orderNumber || msg.orderToShare?.id) && (
                     <div className="flex gap-2 mt-1">
                       <button
                         onClick={() => handleConsentAction(true, msg.orderToShare)}
@@ -620,7 +634,7 @@ const KimiClawAssistant: React.FC = () => {
                         ✅ {language === 'pt' ? 'Sim, quero receber!' : 'Yes, subscribe me!'}
                       </button>
                       <button
-                        onClick={() => handleConsentAction(false)}
+                        onClick={() => handleConsentAction(false, msg.orderToShare)}
                         className="text-[11px] font-semibold bg-secondary hover:bg-secondary/80 text-foreground px-3 py-1.5 rounded-lg transition-all"
                       >
                         ❌ {language === 'pt' ? 'Não, obrigado' : 'No, thanks'}

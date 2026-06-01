@@ -399,11 +399,32 @@ const Profile: React.FC = () => {
                   <div className="space-y-2">
                     <Label className="text-muted-foreground flex items-center gap-2">
                       <Cloud className="w-4 h-4" />
-                      Notificações por WhatsApp
+                      Receber novidades e promoções
                     </Label>
-                    <p className="font-medium text-foreground">
-                      {user.whatsappMarketing ? '✅ Ativado (Cupom BEMVINDO10)' : '❌ Desativado'}
-                    </p>
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <p className="font-medium text-foreground">
+                        {user.whatsappMarketing ? '✅ Ativado' : '❌ Desativado'}
+                      </p>
+                      <button
+                        onClick={() => {
+                          const novo = !user.whatsappMarketing;
+                          updateProfile({ whatsappMarketing: novo });
+                          toast({
+                            title: novo ? '✅ Inscrição ativada' : 'Inscrição cancelada',
+                            description: novo
+                              ? 'Você vai receber novidades e promoções.'
+                              : 'Você não vai mais receber novidades.',
+                          });
+                        }}
+                        className={`text-xs font-semibold px-3 py-1.5 rounded-lg border transition-colors ${
+                          user.whatsappMarketing
+                            ? 'border-red-300 text-red-600 hover:bg-red-50'
+                            : 'border-green-300 text-green-600 hover:bg-green-50'
+                        }`}
+                      >
+                        {user.whatsappMarketing ? 'Desativar' : 'Ativar'}
+                      </button>
+                    </div>
                   </div>
                   {user.birthdate && (
                     <div className="space-y-2">
