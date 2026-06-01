@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Plus, Trash2, Save, Loader2, Video, Star, Film } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { siteContentService, VlogContent, VlogVideo } from '@/services/siteContentService';
+import { siteContentService, VlogContent, VlogVideo, DEFAULT_VLOG_CONTENT } from '@/services/siteContentService';
 import { useToast } from '@/hooks/use-toast';
 
 function getYouTubeId(s: string): string {
@@ -91,9 +91,20 @@ const VlogManager: React.FC = () => {
   const { toast } = useToast();
   const [content, setContent] = useState<VlogContent | null>(null);
   const [saving, setSaving] = useState(false);
+  const [usingDefaults, setUsingDefaults] = useState(false);
 
   useEffect(() => {
-    siteContentService.getVlog().then(setContent);
+    siteContentService.getVlog().then((c) => {
+      const isEmpty = !c.featured?.url && (!c.videos || c.videos.length === 0);
+      if (isEmpty) {
+        // Nada salvo ainda → carrega os vídeos atuais (padrão) para poder editar/excluir
+        setContent(JSON.parse(JSON.stringify(DEFAULT_VLOG_CONTENT)));
+        setUsingDefaults(true);
+      } else {
+        setContent(c);
+        setUsingDefaults(false);
+      }
+    });
   }, []);
 
   if (!content) {
@@ -123,6 +134,7 @@ const VlogManager: React.FC = () => {
       };
       await siteContentService.saveVlog(clean);
       setContent(clean);
+      setUsingDefaults(false);
       toast({ title: '✅ Vlog atualizado!', description: 'Os vídeos já estão no ar na página /vlog.' });
     } catch (e: any) {
       toast({ title: 'Erro ao salvar', description: e?.message, variant: 'destructive' });
@@ -142,6 +154,12 @@ const VlogManager: React.FC = () => {
           {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Salvar
         </Button>
       </div>
+
+      {usingDefaults && (
+        <div className="mb-6 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4 text-sm text-blue-800 dark:text-blue-300">
+          ℹ️ Estes são os <strong>vídeos atuais</strong> que aparecem em <strong>/vlog</strong>. Edite, exclua ou adicione e clique em <strong>Salvar</strong> para personalizar. (Enquanto não salvar, eles continuam como padrão.)
+        </div>
+      )}
 
       {/* Títulos da página (opcional) */}
       <div className="grid sm:grid-cols-2 gap-3 mb-6">
