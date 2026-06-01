@@ -8,11 +8,11 @@ const HeroSection: React.FC = () => {
   const { t } = useLanguage();
 
   return (
-    <section className="relative min-h-[85vh] bg-gradient-to-b from-orange-50 via-orange-50/50 to-white overflow-hidden pt-12">
+    <section className="relative min-h-[85vh] bg-gradient-to-b from-pink-100 via-pink-50/60 to-white overflow-hidden pt-12">
       {/* Background Decorative Blobs */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-[500px] h-[500px] bg-orange-200/40 rounded-full blur-3xl" />
-        <div className="absolute -bottom-20 -left-40 w-[600px] h-[600px] bg-yellow-100/50 rounded-full blur-3xl" />
+        <div className="absolute -top-40 -right-40 w-[500px] h-[500px] bg-pink-200/50 rounded-full blur-3xl" />
+        <div className="absolute -bottom-20 -left-40 w-[600px] h-[600px] bg-pink-100/60 rounded-full blur-3xl" />
       </div>
 
       <div className="container mx-auto px-4 py-12 md:py-20 relative z-10">

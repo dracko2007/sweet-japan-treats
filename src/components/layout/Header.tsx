@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import LanguageSwitcher from '@/components/LanguageSwitcher';
 import CountrySwitcher from '@/components/CountrySwitcher';
+import JapanExpressLogo from '@/components/JapanExpressLogo';
 import { useToast } from '@/hooks/use-toast';
 
 const Header: React.FC = () => {
@@ -39,10 +40,10 @@ const Header: React.FC = () => {
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-20">
           {/* Logo */}
-          <Link to="/" className="flex items-center gap-2">
-            <span className="text-3xl animate-float">🌸</span>
+          <Link to="/" className="flex items-center gap-2.5">
+            <JapanExpressLogo size={48} className="animate-float drop-shadow-sm" />
             <span className="font-display text-2xl font-black text-primary tracking-tight flex items-center">
-              Sakura<span className="text-yellow-500 font-extrabold text-xs bg-orange-50 border border-orange-200 px-1.5 py-0.5 rounded-md ml-1">Express</span>
+              Japan<span className="text-primary font-extrabold text-xs bg-primary/10 border border-primary/20 px-1.5 py-0.5 rounded-md ml-1">Express</span>
             </span>
           </Link>
 

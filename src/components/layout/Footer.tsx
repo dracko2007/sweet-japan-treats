@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { Instagram, Facebook, Mail, MapPin } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
+import JapanExpressLogo from '@/components/JapanExpressLogo';
 
 const Footer: React.FC = () => {
   const { t, selectedCountry } = useLanguage();
@@ -14,9 +15,9 @@ const Footer: React.FC = () => {
           {/* Brand */}
           <div className="md:col-span-2">
             <div className="flex items-center gap-3 mb-4">
-              <span className="text-2xl animate-float">🌸</span>
+              <JapanExpressLogo size={44} />
               <span className="font-display text-xl font-bold tracking-tight flex items-center">
-                Sakura<span className="text-yellow-500 font-extrabold text-xs bg-orange-50 border border-orange-200 px-1.5 py-0.5 rounded-md ml-1">Express</span>
+                Japan<span className="font-extrabold text-xs bg-white/10 border border-white/20 px-1.5 py-0.5 rounded-md ml-1">Express</span>
               </span>
             </div>
             <p className="text-accent-foreground/80 text-sm leading-relaxed max-w-md">
