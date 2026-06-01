@@ -141,7 +141,7 @@ export const emailService = {
       recipientPhone: formData.phone,
       senderName: 'Paula Shiokawa',
       senderPostal: '518-0225',
-      senderAddress: 'Mie-ken Iga-shi Kirigaoka 5-292',
+      senderAddress: 'Hiroshima-ken, Japan',
       senderPhone: '070-1367-1679',
       carrier: shipping?.carrier || '',
       deliveryTime: deliveryTime || 'Qualquer horário'
@@ -296,7 +296,7 @@ export const emailService = {
       </head>
       <body>
         <div class="header">
-          <h1>🌸 Sakura Express</h1>
+          <h1>🌸 Japan Express</h1>
           <p>Confirmação de Pedido</p>
         </div>
         
@@ -436,7 +436,7 @@ export const emailService = {
               <div class="label-section-title">📤 REMETENTE (ご依頼主)</div>
               <div class="postal-code">〒 518-0225</div>
               <div class="address-line"><strong>Paula Shiokawa</strong></div>
-              <div class="address-line">Mie-ken Iga-shi Kirigaoka 5-292</div>
+              <div class="address-line">Hiroshima-ken, Japan</div>
               <div class="address-line">三重県 伊賀市 桐ヶ丘 5-292</div>
               <div class="address-line">📞 070-1367-1679</div>
             </div>
@@ -483,9 +483,9 @@ export const emailService = {
         </div>
 
         <div class="footer">
-          <p><strong>Sakura Express</strong> - Importados do Japão 🌸</p>
-          <p>📍 Mie-ken Iga-shi Kirigaoka 5-292, 〒518-0225</p>
-          <p>📞 070-1367-1679 | 📧 contato@sakuraexpress.jp</p>
+          <p><strong>Japan Express</strong> - Importados do Japão 🌸</p>
+          <p>📍 Hiroshima-ken, Japão</p>
+          <p>📞 070-1367-1679 | 📧 contato@japanexpress.jp</p>
           <p style="margin-top: 15px; font-size: 12px; color: #999;">
             Se tiver dúvidas, entre em contato conosco via WhatsApp!
           </p>
@@ -528,7 +528,7 @@ export const emailService = {
       </head>
       <body>
         <div class="header">
-          <h1>🌸 Sakura Express</h1>
+          <h1>🌸 Japan Express</h1>
           <p>Confirmação de Pedido</p>
         </div>
         
@@ -636,9 +636,9 @@ export const emailService = {
         </div>
 
         <div class="footer">
-          <p><strong>Sakura Express</strong> - Importados do Japão 🌸</p>
-          <p>📍 Mie-ken Iga-shi Kirigaoka 5-292, 〒518-0225</p>
-          <p>📞 070-1367-1679 | 📧 contato@sakuraexpress.jp</p>
+          <p><strong>Japan Express</strong> - Importados do Japão 🌸</p>
+          <p>📍 Hiroshima-ken, Japão</p>
+          <p>📞 070-1367-1679 | 📧 contato@japanexpress.jp</p>
           <p style="margin-top: 15px; font-size: 12px; color: #999;">
             Se tiver dúvidas, entre em contato conosco via WhatsApp!
           </p>

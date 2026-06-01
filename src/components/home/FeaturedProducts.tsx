@@ -61,7 +61,7 @@ const FeaturedProducts: React.FC = () => {
                   <div className="absolute top-2 left-2">
                     {selectedCountry === 'Japão' ? (
                       <span className="bg-green-600 text-white font-black text-[9px] px-2 py-0.5 rounded shadow-sm tracking-wider uppercase">
-                        Envio Doméstico (Mie) 🇯🇵
+                        Envio Doméstico (Hiroshima) 🇯🇵
                       </span>
                     ) : (
                       <span className="bg-primary text-white font-black text-[9px] px-2 py-0.5 rounded shadow-sm tracking-wider uppercase">

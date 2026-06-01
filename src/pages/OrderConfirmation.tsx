@@ -79,7 +79,7 @@ const OrderConfirmation: React.FC = () => {
   if (!order) return null;
 
   // Format PIX Payload Code
-  const pixPayload = `00020101021226870014br.gov.bcb.pix25800263600020000000000000000000000000000000000000000000000000000000000000000000000053039865405${order.total.toFixed(2)}5802BR5914SakuraExpress6009Sao Paulo62070503***6304`;
+  const pixPayload = `00020101021226870014br.gov.bcb.pix25800263600020000000000000000000000000000000000000000000000000000000000000000000000053039865405${order.total.toFixed(2)}5802BR5914Japan Express6009Sao Paulo62070503***6304`;
 
   const copyToClipboard = () => {
     navigator.clipboard.writeText(pixPayload);
@@ -147,7 +147,7 @@ const OrderConfirmation: React.FC = () => {
                 ID do pedido: <span className="font-mono font-semibold text-gray-900">{order.orderNumber || order.id}</span>
               </p>
               <p className="text-muted-foreground text-sm">
-                Obrigado por comprar na Sakura Express. Realize o pagamento para iniciar o preparo e envio de Mie.
+                Obrigado por comprar na Japan Express. Realize o pagamento para iniciar o preparo e envio de Hiroshima.
               </p>
             </div>
 
@@ -169,7 +169,7 @@ const OrderConfirmation: React.FC = () => {
                 <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 inline-block shadow-sm">
                   <img 
                     src="/products/paypay-qr.png" 
-                    alt="PayPay QR Code - Sakura Express" 
+                    alt="PayPay QR Code - Japan Express" 
                     className="w-60 h-auto rounded-xl border border-gray-200 mx-auto shadow-md"
                     onError={(e) => {
                       e.currentTarget.src = "https://placehold.co/240x240/red/white?text=PayPay+QR";
@@ -181,7 +181,7 @@ const OrderConfirmation: React.FC = () => {
                 </div>
 
                 <div className="bg-gray-100 p-4 rounded-xl max-w-sm mx-auto text-xs space-y-2 font-mono text-left">
-                  <p><strong className="text-gray-800">Enviar para:</strong> Sakura Express</p>
+                  <p><strong className="text-gray-800">Enviar para:</strong> Japan Express</p>
                   <p><strong className="text-gray-800">Telefone:</strong> 070-1367-1679</p>
                   <p><strong className="text-gray-800">Valor do Pedido:</strong> {formatPrice(order.total, 'JPY')}</p>
                 </div>
@@ -449,7 +449,7 @@ const OrderConfirmation: React.FC = () => {
             <div className="bg-card rounded-2xl border border-border p-8 mb-6">
               <div className="text-center mb-6 print:block hidden">
                 <h1 className="font-display text-3xl font-bold mb-2">
-                  Sakura Express
+                  Japan Express
                 </h1>
                 <p className="text-muted-foreground">
                   {order.currency === 'JPY' ? 'Recibo de Pedido Doméstico' : 'Recibo de Pedido Internacional'}
@@ -624,14 +624,14 @@ const OrderConfirmation: React.FC = () => {
                   <>
                     <div className="relative">
                       <div className="absolute -left-[30px] top-0 w-4 h-4 bg-orange-500 rounded-full border-2 border-white flex items-center justify-center text-white text-[8px]">✓</div>
-                      <h4 className="font-bold text-gray-800">Etapa 1: Embalagem em Mie (Centro de Distribuição Sakura Express)</h4>
-                      <p className="mt-0.5">Sua encomenda é conferida, embalada com proteção reforçada e preparada para envio no centro de Mie Prefecture.</p>
+                      <h4 className="font-bold text-gray-800">Etapa 1: Embalagem em Hiroshima (Centro de Distribuição Japan Express)</h4>
+                      <p className="mt-0.5">Sua encomenda é conferida, embalada com proteção reforçada e preparada para envio no centro de Hiroshima Prefecture.</p>
                     </div>
 
                     <div className="relative">
                       <div className="absolute -left-[30px] top-0 w-4 h-4 bg-gray-300 rounded-full border-2 border-white flex items-center justify-center text-white text-[8px]">2</div>
                       <h4 className="font-bold text-gray-700">Etapa 2: Coleta e Despacho Doméstico (Yamato / Sagawa / JP Post)</h4>
-                      <p className="mt-0.5">A transportadora local selecionada coleta a encomenda diretamente em nosso centro de distribuição em Mie Prefecture.</p>
+                      <p className="mt-0.5">A transportadora local selecionada coleta a encomenda diretamente em nosso centro de distribuição em Hiroshima Prefecture.</p>
                     </div>
 
                     <div className="relative">

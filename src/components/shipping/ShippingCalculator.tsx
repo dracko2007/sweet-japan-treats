@@ -233,7 +233,7 @@ const ShippingCalculator: React.FC<ShippingCalculatorProps> = ({
             </h2>
             <p className="text-sm text-muted-foreground">
               {isJapan 
-                ? 'De Mie para todo o Japão' 
+                ? 'De Hiroshima para todo o Japão' 
                 : isEurope 
                 ? `Diretamente do Japão para ${destinationCountry}` 
                 : 'Diretamente do Japão para o Brasil'}
@@ -276,7 +276,7 @@ const ShippingCalculator: React.FC<ShippingCalculatorProps> = ({
         </select>
       </div>
 
-      {/* Free Shipping Promotion Banner for Japan Sakura Express */}
+      {/* Free Shipping Promotion Banner for Japan Japan Express */}
       {isFreeShipping && items.length > 0 && (
         <div className="bg-gradient-to-r from-emerald-50 to-green-50 dark:from-emerald-950/20 dark:to-green-950/20 rounded-xl p-4 mb-6 border border-emerald-200">
           <div className="flex items-center gap-2 mb-1">
@@ -284,7 +284,7 @@ const ShippingCalculator: React.FC<ShippingCalculatorProps> = ({
             <h3 className="font-bold text-emerald-800 dark:text-emerald-200">Frete Local Grátis!</h3>
           </div>
           <p className="text-sm text-emerald-700 dark:text-emerald-300 font-medium">
-            Benefício Sakura Express: Envio 100% gratuito para entregas no território japonês.
+            Benefício Japan Express: Envio 100% gratuito para entregas no território japonês.
           </p>
         </div>
       )}
@@ -296,7 +296,7 @@ const ShippingCalculator: React.FC<ShippingCalculatorProps> = ({
             <h3 className="font-bold text-amber-800 dark:text-amber-200">Frete Grátis acima de ¥6.000</h3>
           </div>
           <p className="text-sm text-amber-700 dark:text-amber-300 font-medium">
-            O frete local é gratuito para compras de produtos Sakura Express acima de ¥6.000. Falta apenas {formatPrice(6000 - finalAmountForFreeShipping, 'JPY')} para obter o frete grátis.
+            O frete local é gratuito para compras de produtos Japan Express acima de ¥6.000. Falta apenas {formatPrice(6000 - finalAmountForFreeShipping, 'JPY')} para obter o frete grátis.
           </p>
         </div>
       )}

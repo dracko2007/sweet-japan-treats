@@ -174,7 +174,7 @@ const Profile: React.FC = () => {
     });
 
     if (turnedOnMarketing && editedUser.phone) {
-      const welcomeMsg = `*SAKURA EXPRESS* 🌸\n\nOlá, *${editedUser.name || user.name}*!\nVocê ativou as notificações e ofertas exclusivas no WhatsApp!\n\n🎟️ Seu cupom de boas-vindas: *BEMVINDO10* (10% OFF)\n\n🔥 *Novidades fresquinhas do Japão:*\n• Protetor solar Bioré UV Aqua Rich com frete aéreo expresso grátis para o Brasil.\n• Snacks e cosméticos exclusivos direto do Japão!\n\nAcesse nossa loja: https://japan-express.vercel.app`;
+      const welcomeMsg = `*JAPAN EXPRESS* 🌸\n\nOlá, *${editedUser.name || user.name}*!\nVocê ativou as notificações e ofertas exclusivas no WhatsApp!\n\n🎟️ Seu cupom de boas-vindas: *BEMVINDO10* (10% OFF)\n\n🔥 *Novidades fresquinhas do Japão:*\n• Protetor solar Bioré UV Aqua Rich com frete aéreo expresso grátis para o Brasil.\n• Snacks e cosméticos exclusivos direto do Japão!\n\nAcesse nossa loja: https://japan-express.vercel.app`;
       
       import('@/services/whatsappService').then(({ whatsappService }) => {
         whatsappService.sendMessage({

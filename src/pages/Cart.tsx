@@ -242,7 +242,7 @@ const Cart: React.FC = () => {
                         Envio Nacional Seguro (Japan Post / Yamato / Sagawa)
                       </h4>
                       <p className="text-xs text-emerald-700 mt-1 leading-relaxed">
-                        Seu pedido será embalado e despachado diretamente de nossa cozinha em Mie. O frete será calculado na próxima etapa com base no tamanho das caixas e na província selecionada.
+                        Seu pedido será embalado e despachado diretamente de nossa cozinha em Hiroshima. O frete será calculado na próxima etapa com base no tamanho das caixas e na província selecionada.
                       </p>
                     </div>
                   </div>
@@ -390,7 +390,7 @@ const Cart: React.FC = () => {
                   
                   <p className="text-center text-xs text-muted-foreground">
                     {selectedCountry === 'Japão' 
-                      ? '🏠 Cozinha artesanal em Mie - Frete rápido e seguro.'
+                      ? '🏠 Cozinha artesanal em Hiroshima - Frete rápido e seguro.'
                       : '✈️ Despachado de Tóquio com entrega expressa pelos Correios.'
                     }
                   </p>

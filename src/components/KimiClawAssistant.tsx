@@ -268,7 +268,7 @@ ${itemsText}
 • Status: Pago / Aguardando Envio\n\n`;
     }
 
-    const messageText = `*SAKURA EXPRESS* 🌸\n\nOlá, *${clientName}*! Obrigado por comprar conosco!\n\n${summaryText}🎟️ Seu cupom de boas-vindas: *BEMVINDO10* (10% de desconto na próxima compra).\n\n🔥 *Novidades fresquinhas do Japão:*\n1. Protetor solar Bioré UV Aqua Rich com frete expresso para o Brasil.\n2. Canetas e artigos de papelaria Kawaii direto do Japão.\n3. Cosméticos e snacks exclusivos direto de Tóquio!\n\nAcesse nossa loja: https://japan-express.vercel.app`;
+    const messageText = `*JAPAN EXPRESS* 🌸\n\nOlá, *${clientName}*! Obrigado por comprar conosco!\n\n${summaryText}🎟️ Seu cupom de boas-vindas: *BEMVINDO10* (10% de desconto na próxima compra).\n\n🔥 *Novidades fresquinhas do Japão:*\n1. Protetor solar Bioré UV Aqua Rich com frete expresso para o Brasil.\n2. Canetas e artigos de papelaria Kawaii direto do Japão.\n3. Cosméticos e snacks exclusivos direto de Tóquio!\n\nAcesse nossa loja: https://japan-express.vercel.app`;
 
     const steps = [
       language === 'pt' ? '📱 Inicializando API de Comunicação Local...' : '📱 Initializing Local Communication API...',

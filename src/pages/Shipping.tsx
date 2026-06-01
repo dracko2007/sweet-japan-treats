@@ -481,7 +481,7 @@ const Shipping: React.FC = () => {
                       <span>{formatPrice(simTax.total, currency)}</span>
                     </div>
                     <p className="text-[10px] text-orange-700 dark:text-orange-400 leading-relaxed font-semibold">
-                      ⚠️ <strong>Nota Fiscal:</strong> Este imposto é apenas uma estimativa aproximada cobrada pelas autoridades fiscais na alfândega do país de destino. Ele <strong>NÃO</strong> é adicionado ao checkout da SakuraExpress e deve ser pago na chegada caso o pacote seja tributado.
+                      ⚠️ <strong>Nota Fiscal:</strong> Este imposto é apenas uma estimativa aproximada cobrada pelas autoridades fiscais na alfândega do país de destino. Ele <strong>NÃO</strong> é adicionado ao checkout da Japan Express e deve ser pago na chegada caso o pacote seja tributado.
                     </p>
                   </div>
                 )}
@@ -491,7 +491,7 @@ const Shipping: React.FC = () => {
                 <Info className="w-5 h-5 text-primary shrink-0 mt-0.5" />
                 <div>
                   <p className="text-xs text-muted-foreground leading-relaxed">
-                    <strong>Dica de Economia Sakura:</strong> Adicione mais itens para preencher totalmente o espaço da caixa (60cm ou 80cm) e diluir o custo unitário do frete aéreo internacional por item!
+                    <strong>Dica de Economia Japan Express:</strong> Adicione mais itens para preencher totalmente o espaço da caixa (60cm ou 80cm) e diluir o custo unitário do frete aéreo internacional por item!
                   </p>
                   <Button asChild variant="link" className="mt-1.5 p-0 h-auto text-primary text-xs font-bold">
                     <Link to="/produtos" className="flex items-center gap-1">
@@ -578,7 +578,7 @@ const Shipping: React.FC = () => {
                       ✓ <strong>Envio Nacional Local (Isento de Taxas de Importação)</strong>
                     </div>
                     <p>
-                      Como o envio é doméstico (despachado de nossa cozinha em Mie), não há nenhum trâmite alfandegário ou cobrança de impostos de importação internacional.
+                      Como o envio é doméstico (despachado de nossa cozinha em Hiroshima), não há nenhum trâmite alfandegário ou cobrança de impostos de importação internacional.
                     </p>
                     <div className="border-t border-primary/10 pt-2.5 space-y-2">
                       <div className="flex justify-between font-bold text-foreground">
@@ -599,7 +599,7 @@ const Shipping: React.FC = () => {
                         <span className="text-emerald-600">Disponível</span>
                       </div>
                       <p className="text-[10px] pl-2 border-l-2 border-border">
-                        Seu frete local no Japão é 100% gratuito para compras acima de ¥6.000 na Sakura Express!
+                        Seu frete local no Japão é 100% gratuito para compras acima de ¥6.000 na Japan Express!
                       </p>
                     </div>
                   </div>

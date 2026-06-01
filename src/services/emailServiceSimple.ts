@@ -96,7 +96,7 @@ export const emailServiceSimple = {
 
 <!-- Header -->
 <tr><td style="background:linear-gradient(135deg,#FF69B4 0%,#FFB6C1 100%);padding:40px 30px;text-align:center;">
-<h1 style="margin:0;color:#ffffff;font-size:28px;font-weight:600;">🌸 Sakura Express</h1>
+<h1 style="margin:0;color:#ffffff;font-size:28px;font-weight:600;">🌸 Japan Express</h1>
 <p style="margin:10px 0 0 0;color:#f5e6d3;font-size:14px;letter-spacing:1px;">PRODUTOS IMPORTADOS DO JAPÃO</p>
 </td></tr>
 
@@ -203,16 +203,16 @@ ${orderData.formData.building ? `<p style="margin:5px 0;font-size:14px;color:#1a
 
 <!-- Footer -->
 <tr><td style="background-color:#f8f9fa;padding:30px;text-align:center;border-top:1px solid #e5e7eb;">
-<p style="margin:0 0 10px 0;color:#1a1a1a;font-size:16px;font-weight:600;">Sakura Express - Importados do Japão</p>
+<p style="margin:0 0 10px 0;color:#1a1a1a;font-size:16px;font-weight:600;">Japan Express - Importados do Japão</p>
 <p style="margin:0 0 15px 0;color:#666666;font-size:14px;line-height:1.6;">
 Sua conexão direta com os melhores cosméticos, papelaria, acessórios e doces exclusivos direto do Japão.<br>
 Enviado com carinho e rapidez.
 </p>
 <div style="margin:20px 0;">
 <a href="tel:070-1367-1679" style="display:inline-block;margin:0 10px;color:#FF69B4;text-decoration:none;font-size:14px;">📞 070-1367-1679</a>
-<a href="mailto:contato@sakuraexpress.jp" style="display:inline-block;margin:0 10px;color:#FF69B4;text-decoration:none;font-size:14px;">📧 contato@sakuraexpress.jp</a>
+<a href="mailto:contato@japanexpress.jp" style="display:inline-block;margin:0 10px;color:#FF69B4;text-decoration:none;font-size:14px;">📧 contato@japanexpress.jp</a>
 </div>
-<p style="margin:15px 0 0 0;color:#999999;font-size:12px;">© 2026 Sakura Express. Todos os direitos reservados.</p>
+<p style="margin:15px 0 0 0;color:#999999;font-size:12px;">© 2026 Japan Express. Todos os direitos reservados.</p>
 </td></tr>
 
 </table>

@@ -102,7 +102,7 @@ const OrderReview: React.FC = () => {
   const handleConfirmOrder = () => {
     toast({
       title: "Processando Pedido...",
-      description: isJapan ? "Preparando seu pedido com o centro de Mie." : `Preparando seus dados com a aduana ${formData.country === 'Brasil' ? 'do Brasil' : 'de destino'}.`,
+      description: isJapan ? "Preparando seu pedido com o centro de Hiroshima." : `Preparando seus dados com a aduana ${formData.country === 'Brasil' ? 'do Brasil' : 'de destino'}.`,
     });
 
     const countryPrefix = isJapan ? 'JP' : formData.country === 'Brasil' ? 'BR' : formData.country === 'Portugal' ? 'PT' : formData.country === 'França' ? 'FR' : formData.country === 'Itália' ? 'IT' : 'ES';
@@ -378,7 +378,7 @@ const OrderReview: React.FC = () => {
                   </div>
 
                   <div className="text-[10px] text-gray-400 text-right">
-                    {isJapan ? 'Envio doméstico seguro de Mie Prefecture.' : `Voo internacional Tóquio para ${formData.country}.`} Entrega estimada: {shipping.estimatedDays} dias úteis
+                    {isJapan ? 'Envio doméstico seguro de Hiroshima Prefecture.' : `Voo internacional Tóquio para ${formData.country}.`} Entrega estimada: {shipping.estimatedDays} dias úteis
                   </div>
 
                   <div className="flex justify-between pt-3 border-t border-border font-black text-lg">

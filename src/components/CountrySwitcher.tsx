@@ -13,12 +13,12 @@ const CountrySwitcher: React.FC = () => {
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const countries: { code: CountryType; flag: string; label: string; details: string }[] = [
-    { code: 'Japão', flag: '🇯🇵', label: 'Japão', details: 'SakuraExpress (Local)' },
-    { code: 'Brasil', flag: '🇧🇷', label: 'Brasil', details: 'SakuraExpress (Aéreo)' },
-    { code: 'Portugal', flag: '🇵🇹', label: 'Portugal', details: 'SakuraExpress (Aéreo)' },
-    { code: 'França', flag: '🇫🇷', label: 'França', details: 'SakuraExpress (Aéreo)' },
-    { code: 'Itália', flag: '🇮🇹', label: 'Itália', details: 'SakuraExpress (Aéreo)' },
-    { code: 'Espanha', flag: '🇪🇸', label: 'Espanha', details: 'SakuraExpress (Aéreo)' },
+    { code: 'Japão', flag: '🇯🇵', label: 'Japão', details: 'Japan Express (Local)' },
+    { code: 'Brasil', flag: '🇧🇷', label: 'Brasil', details: 'Japan Express (Aéreo)' },
+    { code: 'Portugal', flag: '🇵🇹', label: 'Portugal', details: 'Japan Express (Aéreo)' },
+    { code: 'França', flag: '🇫🇷', label: 'França', details: 'Japan Express (Aéreo)' },
+    { code: 'Itália', flag: '🇮🇹', label: 'Itália', details: 'Japan Express (Aéreo)' },
+    { code: 'Espanha', flag: '🇪🇸', label: 'Espanha', details: 'Japan Express (Aéreo)' },
   ];
 
   // Close dropdown on click outside

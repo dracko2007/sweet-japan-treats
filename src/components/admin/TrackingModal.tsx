@@ -166,13 +166,13 @@ const TrackingModal: React.FC<TrackingModalProps> = ({
               </div>
 
               <p style="margin-top: 30px;">
-                Obrigado por comprar na <strong>Sakura Express</strong>! 🌸
+                Obrigado por comprar na <strong>Japan Express</strong>! 🌸
               </p>
             </div>
 
             <div class="footer">
-              <p>Sakura Express - Produtos Importados do Japão</p>
-              <p>Mie Prefecture, Japan</p>
+              <p>Japan Express - Produtos Importados do Japão</p>
+              <p>Hiroshima Prefecture, Japan</p>
             </div>
           </div>
         </body>
@@ -253,7 +253,7 @@ ${order.items.map((item: any) =>
 
 *Total:* ¥${order.totalPrice.toLocaleString()}
 
-Obrigado por comprar na *Sakura Express*! 🌸
+Obrigado por comprar na *Japan Express*! 🌸
         `.trim();
 
         try {

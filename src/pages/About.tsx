@@ -2,6 +2,7 @@ import React from 'react';
 import { Heart, Star, Users, Award } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import { useLanguage } from '@/context/LanguageContext';
+import JapanExpressLogo from '@/components/JapanExpressLogo';
 
 const About: React.FC = () => {
   const { t, selectedCountry } = useLanguage();
@@ -44,7 +45,7 @@ const About: React.FC = () => {
             <div className="relative">
               <div className="aspect-square rounded-3xl bg-gradient-to-br from-caramel-light/40 to-primary/30 flex items-center justify-center shadow-elevated">
                 <div className="text-center">
-                  <span className="text-8xl block mb-4">🌸</span>
+                  <JapanExpressLogo size={140} className="mx-auto mb-4 shadow-elevated" />
                   <p className="font-display text-xl text-foreground">{t('aboutPage.family')}</p>
                 </div>
               </div>
@@ -145,7 +146,7 @@ const About: React.FC = () => {
               {t('aboutPage.ctaProducts')}
             </a>
             <a 
-              href="mailto:contato@sakuraexpress.jp" 
+              href="mailto:contato@japanexpress.jp" 
               className="px-8 py-3 border-2 border-primary-foreground rounded-full font-semibold hover:bg-primary-foreground/10 transition-colors"
             >
               {t('aboutPage.ctaContact')}

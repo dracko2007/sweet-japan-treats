@@ -38,7 +38,7 @@ const Footer: React.FC = () => {
                 <Facebook className="w-5 h-5" />
               </a>
               <a 
-                href="mailto:contato@sakuraexpress.jp" 
+                href="mailto:contato@japanexpress.jp" 
                 className="p-2 rounded-full bg-primary/20 hover:bg-primary/30 transition-colors"
               >
                 <Mail className="w-5 h-5" />
@@ -85,13 +85,13 @@ const Footer: React.FC = () => {
               <div className="flex items-start gap-2">
                 <MapPin className="w-4 h-4 mt-0.5 text-primary" />
                 <span className="text-sm text-accent-foreground/80">
-                  Mie Prefecture, Japan
+                  Hiroshima Prefecture, Japan
                 </span>
               </div>
               <div className="flex items-start gap-2">
                 <Mail className="w-4 h-4 mt-0.5 text-primary" />
                 <span className="text-sm text-accent-foreground/80">
-                  contato@sakuraexpress.jp
+                  contato@japanexpress.jp
                 </span>
               </div>
             </div>
@@ -100,7 +100,7 @@ const Footer: React.FC = () => {
 
         <div className="border-t border-accent-foreground/10 mt-10 pt-6 text-center">
           <p className="text-sm text-accent-foreground/60">
-            © {new Date().getFullYear()} Sakura Express. {t('footer.rights')}
+            © {new Date().getFullYear()} Japan Express. {t('footer.rights')}
           </p>
         </div>
       </div>
