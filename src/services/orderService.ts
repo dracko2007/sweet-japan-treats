@@ -140,6 +140,48 @@ export const orderService = {
     return deletedLocal || deletedRemote;
   },
 
+  // RESET TOTAL: apaga TODO o histórico de pedidos (localStorage + Firestore).
+  // Retorna quantos pedidos foram removidos do Firestore.
+  clearAllOrders: async (): Promise<number> => {
+    let firestoreDeleted = 0;
+
+    // 1) Firestore — apaga todos os docs da coleção 'orders'
+    try {
+      await ensureAdminAuth();
+      const { collection, getDocs, deleteDoc, doc } = await import('firebase/firestore');
+      const { db } = await import('@/config/firebase');
+      if (db) {
+        const snap = await getDocs(collection(db, 'orders'));
+        for (const d of snap.docs) {
+          await deleteDoc(doc(db, 'orders', d.id));
+          firestoreDeleted++;
+        }
+      }
+    } catch (err) {
+      console.error('❌ [ORDER] clearAllOrders Firestore falhou:', err);
+    }
+
+    // 2) localStorage — chaves orders_*, sakura_orders e .orders de cada usuário
+    try {
+      safeStorage.keys().forEach((key) => {
+        if (key.startsWith('orders_')) safeStorage.removeItem(key);
+      });
+      safeStorage.removeItem('sakura_orders');
+
+      const users = JSON.parse(safeStorage.getItem('sweet-japan-users') || '{}');
+      Object.keys(users).forEach((email) => {
+        if (users[email] && Array.isArray(users[email].orders)) {
+          users[email].orders = [];
+        }
+      });
+      safeStorage.setItem('sweet-japan-users', JSON.stringify(users));
+    } catch (err) {
+      console.error('❌ [ORDER] clearAllOrders localStorage falhou:', err);
+    }
+
+    return firestoreDeleted;
+  },
+
   // Update order tracking info (both Firestore and safeStorage)
   updateOrderTracking: async (orderNumber: string, trackingNumber: string, trackingUrl: string, carrier: string): Promise<boolean> => {
     let updated = false;
@@ -185,7 +227,7 @@ export const orderService = {
     safeStorage.setItem('sweet-japan-users', JSON.stringify(users));
 
     // Also update per-user orders storage
-    const allKeys = Object.keys(safeStorage);
+    const allKeys = safeStorage.keys();
     allKeys.forEach(key => {
       if (key.startsWith('orders_')) {
         try {

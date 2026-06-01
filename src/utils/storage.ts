@@ -60,6 +60,18 @@ class SafeStorage {
     }
     this.fallback = {};
   }
+
+  // Retorna as chaves REAIS armazenadas (não os campos da classe).
+  keys(): string[] {
+    if (this.isAvailable) {
+      try {
+        return Object.keys(window.localStorage);
+      } catch (e) {
+        console.error('Error reading localStorage keys:', e);
+      }
+    }
+    return Object.keys(this.fallback);
+  }
 }
 
 export const safeStorage = new SafeStorage();

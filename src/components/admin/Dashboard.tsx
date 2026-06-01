@@ -9,6 +9,7 @@ import type { Order, OrderStatistics } from '@/types';
 import { toYen } from '@/utils/currency';
 import { useProducts } from '@/context/ProductsContext';
 import MaintenanceToggle from '@/components/admin/MaintenanceToggle';
+import ResetOrdersButton from '@/components/admin/ResetOrdersButton';
 
 interface MonthlyFin {
   month: string;
@@ -167,6 +168,9 @@ const Dashboard: React.FC = () => {
     <div className="space-y-6">
       {/* Controle de Manutenção */}
       <MaintenanceToggle />
+
+      {/* Reset de histórico de pedidos */}
+      <ResetOrdersButton />
 
       {/* 6 Cards de Métricas */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
