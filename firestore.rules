@@ -22,8 +22,10 @@ service cloud.firestore {
 
     // ---------- Pedidos ----------
     match /orders/{orderId} {
-      allow read: if request.auth != null;
-      allow create, update: if request.auth != null;
+      allow read: if request.auth != null;     // admin/autenticado lê
+      // Comprador (mesmo convidado, sem login) cria o pedido no checkout.
+      allow create: if request.resource.data.status == 'pending';
+      allow update: if request.auth != null;   // admin atualiza status/rastreio
       // Excluir: somente admin.
       allow delete: if isAdmin();
     }

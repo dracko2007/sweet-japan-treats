@@ -13,10 +13,11 @@ import { useLanguage } from '@/context/LanguageContext';
 import { formatPrice } from '@/utils/currency';
 import { getTranslatedProductName } from '@/data/translations';
 import { cn } from '@/lib/utils';
+import { firebaseSyncService } from '@/services/firebaseSyncService';
 
 const OrderReview: React.FC = () => {
   const { items, clearCart } = useCart();
-  const { consumeCouponByCode } = useUser();
+  const { consumeCouponByCode, user } = useUser();
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
@@ -162,9 +163,62 @@ const OrderReview: React.FC = () => {
       })
     };
 
-    // Save to list of orders in safeStorage so Admin panel has access to it
+    // Save to list of orders in safeStorage (backup local / mesmo dispositivo)
     const existingOrders = JSON.parse(safeStorage.getItem('sakura_orders') || '[]');
     safeStorage.setItem('sakura_orders', JSON.stringify([mockOrder, ...existingOrders]));
+
+    // ⭐ GRAVA NO FIRESTORE — sem isto o pedido só fica no navegador do comprador
+    // e o admin (em outro dispositivo) NUNCA vê. Formato exato que o painel espera:
+    // shippingAddress aninhado, items[].productName, orderNumber, totalPrice, status 'pending'.
+    const firestoreOrder = {
+      orderNumber: orderId,
+      id: orderId,
+      customerName: formData.name,
+      customerEmail: formData.email || '',
+      status: 'pending',
+      orderDate: new Date().toISOString(),
+      date: mockOrder.date,
+      totalPrice: grandTotal,
+      total: grandTotal,
+      totalAmount: grandTotal,
+      currency,
+      paymentMethod,
+      trackingCode,
+      couponCode: appliedCoupon?.code || '',
+      couponDiscount,
+      pixDiscount,
+      taxAmount,
+      shippingCarrier: shipping.carrier,
+      shippingCost: finalShippingCost,
+      shipping: { cost: finalShippingCost, carrier: shipping.carrier, estimatedDays: shipping.estimatedDays },
+      affiliateCode: appliedCoupon?.affiliateCode || '',
+      shippingAddress: {
+        name: formData.name,
+        phone: formData.phone || '',
+        email: formData.email || '',
+        postalCode: formData.postalCode || '',
+        prefecture: formData.prefecture || '',
+        city: formData.city || '',
+        address: formData.address || '',
+        building: formData.building || '',
+        country: formData.country,
+      },
+      items: mockOrder.items.map((it) => ({
+        productId: it.id,
+        productName: it.name,
+        name: it.name,
+        image: it.image,
+        quantity: it.quantity,
+        size: it.size,
+        price: it.price,
+      })),
+    };
+
+    // Fire-and-forget: não trava a confirmação para o comprador
+    firebaseSyncService
+      .syncOrderToFirestore(user?.id || formData.email || 'guest', firestoreOrder)
+      .then((ok) => console.log(ok ? '✅ Pedido salvo no Firestore' : '⚠️ Falha ao salvar pedido no Firestore'))
+      .catch((e) => console.error('❌ Erro ao salvar pedido no Firestore:', e));
 
     // Cupom de afiliado/influencer → registra comissão PENDENTE (liberada só
     // quando o admin confirmar a entrega do pedido)
