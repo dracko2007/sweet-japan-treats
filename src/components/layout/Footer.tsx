@@ -14,11 +14,12 @@ const Footer: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           {/* Brand */}
           <div className="md:col-span-2">
-            <div className="flex items-center gap-3 mb-4">
-              <JapanExpressLogo size={44} />
-              <span className="font-display text-xl font-bold tracking-tight flex items-center">
-                Japan<span className="font-extrabold text-xs bg-white/10 border border-white/20 px-1.5 py-0.5 rounded-md ml-1">Express</span>
-              </span>
+            <div className="flex items-center gap-2.5 mb-4">
+              <JapanExpressLogo size={56} />
+              <div className="flex flex-col leading-tight">
+                <span className="font-display text-lg font-bold tracking-tight">Japan</span>
+                <span className="font-display font-extrabold text-sm bg-white/15 border border-white/30 px-1.5 py-0.5 rounded-lg">Express</span>
+              </div>
             </div>
             <p className="text-accent-foreground/80 text-sm leading-relaxed max-w-md">
               {t('footer.description')}

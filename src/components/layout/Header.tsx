@@ -40,11 +40,12 @@ const Header: React.FC = () => {
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-20">
           {/* Logo */}
-          <Link to="/" className="flex items-center gap-2.5">
-            <JapanExpressLogo size={48} className="animate-float drop-shadow-sm" />
-            <span className="font-display text-2xl font-black text-primary tracking-tight flex items-center">
-              Japan<span className="text-primary font-extrabold text-xs bg-primary/10 border border-primary/20 px-1.5 py-0.5 rounded-md ml-1">Express</span>
-            </span>
+          <Link to="/" className="flex items-center gap-3 lg:gap-4 group">
+            <JapanExpressLogo size={72} className="animate-float drop-shadow-lg group-hover:scale-105 transition-transform" />
+            <div className="flex items-baseline gap-1.5">
+              <span className="font-display text-3xl lg:text-4xl font-black text-foreground tracking-tight">Japan</span>
+              <span className="font-display text-2xl lg:text-3xl font-extrabold text-white bg-gradient-to-r from-primary to-accent shadow-lg px-2.5 py-1 rounded-xl transform -rotate-6">Express</span>
+            </div>
           </Link>
 
           {/* Desktop Navigation */}

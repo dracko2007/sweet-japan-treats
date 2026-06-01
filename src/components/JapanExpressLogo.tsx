@@ -14,7 +14,7 @@ const JapanExpressLogo: React.FC<Props> = ({ size = 48, className = '' }) => (
     width={size}
     height={size}
     style={{ width: size, height: size }}
-    className={`rounded-full object-cover shadow-sm ${className}`}
+    className={`rounded-full object-cover shadow-lg border-2 border-primary/10 ${className}`}
   />
 );
 
