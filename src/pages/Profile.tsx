@@ -166,23 +166,15 @@ const Profile: React.FC = () => {
     }
 
     const turnedOnMarketing = editedUser.whatsappMarketing && !user.whatsappMarketing;
+    // Apenas salva a preferência — NÃO envia/abre WhatsApp Web.
     updateProfile(editedUser);
     setIsEditing(false);
     toast({
       title: "Perfil atualizado!",
-      description: "Suas informações foram salvas com sucesso.",
+      description: turnedOnMarketing
+        ? "✅ Você foi inscrito para receber novidades e promoções."
+        : "Suas informações foram salvas com sucesso.",
     });
-
-    if (turnedOnMarketing && editedUser.phone) {
-      const welcomeMsg = `*JAPAN EXPRESS* 🌸\n\nOlá, *${editedUser.name || user.name}*!\nVocê ativou as notificações e ofertas exclusivas no WhatsApp!\n\n🎟️ Seu cupom de boas-vindas: *BEMVINDO10* (10% OFF)\n\n🔥 *Novidades fresquinhas do Japão:*\n• Protetor solar Bioré UV Aqua Rich com frete aéreo expresso grátis para o Brasil.\n• Snacks e cosméticos exclusivos direto do Japão!\n\nAcesse nossa loja: https://japan-express.vercel.app`;
-      
-      import('@/services/whatsappService').then(({ whatsappService }) => {
-        whatsappService.sendMessage({
-          to: editedUser.phone!,
-          message: welcomeMsg
-        });
-      });
-    }
   };
 
   const handleLogout = () => {

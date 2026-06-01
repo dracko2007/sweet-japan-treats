@@ -108,11 +108,11 @@ const KimiClawAssistant: React.FC = () => {
           
           let confirmationText = '';
           if (language === 'pt') {
-            confirmationText = `Parabéns pela sua compra, **${clientName}**! 🎉 Seu pedido **${order.orderNumber}** foi recebido. \n\nGostaria de receber o resumo deste pedido, novidades e cupons exclusivos no seu WhatsApp de forma automática?`;
+            confirmationText = `Parabéns pela sua compra, **${clientName}**! 🎉 Seu pedido **${order.orderNumber}** foi recebido. \n\nQuer receber **novidades e cupons exclusivos**? É só confirmar que eu marco no seu perfil. 🎁`;
           } else if (language === 'ja') {
-            confirmationText = `ご購入ありがとうございます、**${clientName}** 様！🎉 ご注文 **${order.orderNumber}** を承りました。\n\nこの注文の概要、新着情報、限定クーポンをWhatsAppで自動的に受け取りますか？`;
+            confirmationText = `ご購入ありがとうございます、**${clientName}** 様！🎉 ご注文 **${order.orderNumber}** を承りました。\n\n**新着情報と限定クーポン**を受け取りますか？確認するとマイページに登録します。🎁`;
           } else {
-            confirmationText = `Thank you for your purchase, **${clientName}**! 🎉 Your order **${order.orderNumber}** has been received.\n\nWould you like to receive the summary of this order, news, and exclusive coupons automatically on your WhatsApp?`;
+            confirmationText = `Thank you for your purchase, **${clientName}**! 🎉 Your order **${order.orderNumber}** has been received.\n\nWant to receive **news and exclusive coupons**? Just confirm and I'll enable it on your profile. 🎁`;
           }
           
           setMessages(prev => [
@@ -443,24 +443,16 @@ ${itemsText}
       return;
     }
 
-    // 3. WHATSAPP MARKETING & LAUNCH NEWS
+    // 3. INSCRIÇÃO EM NOVIDADES (apenas marca a flag — NÃO envia/abre WhatsApp Web)
     if (query.includes('whatsapp') || query.includes('whatsappweb') || query.includes('enviar') || query.includes('notificac') || query.includes('novidades')) {
-      // Check if user has phone registered
-      const phoneNum = user?.phone;
-      if (phoneNum) {
-        // Automatically opt-in if not already
-        if (!user?.whatsappMarketing) {
-          updateProfile({ whatsappMarketing: true });
-        }
-        await sendAutomatedWhatsApp(phoneNum, user.name);
-      } else {
-        setAskingForPhone(true);
-        await addKimiMessageWithTyping(
-          language === 'pt'
-            ? 'Para enviar as novidades e o cupom de desconto de 90% no seu WhatsApp, digite o seu número com DDI (Ex: 5511999999999):'
-            : 'Please enter your phone number with country code (e.g., 5511999999999) to receive the coupon and updates:'
-        );
-      }
+      updateProfile({ whatsappMarketing: true });
+      await addKimiMessageWithTyping(
+        language === 'pt'
+          ? 'Pronto! ✅ Você foi inscrito para receber **novidades e promoções exclusivas**. Pode gerenciar isso em **Meu Perfil** quando quiser.'
+          : language === 'ja'
+            ? '完了しました！✅ 新着情報と限定プロモーションの受信に登録されました。**マイページ**で管理できます。'
+            : 'Done! ✅ You are subscribed to **news and exclusive promotions**. Manage it anytime in **My Profile**.'
+      );
       return;
     }
 
@@ -596,33 +588,33 @@ ${itemsText}
         {
           id: Math.random().toString(36).substring(7),
           sender: 'kimi',
-          text: language === 'pt' ? 'Tudo bem! Se mudar de ideia, pode me chamar.' : 'No problem!',
+          text: language === 'pt' ? 'Tudo bem! Se mudar de ideia, é só ativar no seu perfil.' : 'No problem! You can enable it anytime in your profile.',
           timestamp: new Date()
         }
       ]);
       return;
     }
 
-    // Grab phone number
+    // Apenas MARCA o cliente para receber novidades/promoções (NÃO envia nada,
+    // não abre WhatsApp Web). O telefone do pedido fica salvo para uso futuro.
     const phone = order?.phone || user?.phone;
-    if (phone) {
-      updateProfile({ whatsappMarketing: true });
-      const clientName = order?.name || user?.name || 'Cliente';
-      await sendAutomatedWhatsApp(phone, clientName, order);
-    } else {
-      setAskingForPhone(true);
-      setMessages(prev => [
-        ...prev,
-        {
-          id: Math.random().toString(36).substring(7),
-          sender: 'kimi',
-          text: language === 'pt' 
-            ? 'Por favor, digite o seu número do WhatsApp com DDI (Ex: 5511999999999) para que eu possa enviar o comprovante:'
-            : 'Please enter your WhatsApp phone number with country code (e.g. 5511999999999):',
-          timestamp: new Date()
-        }
-      ]);
-    }
+    updateProfile({ whatsappMarketing: true, ...(phone ? { phone } : {}) });
+
+    const confirmText = language === 'pt'
+      ? 'Pronto! ✅ Você foi inscrito para receber **novidades e promoções exclusivas**. Pode ativar ou desativar isso quando quiser em **Meu Perfil**.'
+      : language === 'ja'
+        ? '完了しました！✅ 新着情報と限定プロモーションの受信に登録されました。**マイページ**でいつでも変更できます。'
+        : 'Done! ✅ You are now subscribed to **news and exclusive promotions**. You can turn this on/off anytime in **My Profile**.';
+
+    setMessages(prev => [
+      ...prev,
+      {
+        id: Math.random().toString(36).substring(7),
+        sender: 'kimi',
+        text: confirmText,
+        timestamp: new Date()
+      }
+    ]);
   };
 
   return (
@@ -710,7 +702,7 @@ ${itemsText}
                         onClick={() => handleConsentAction(true, msg.orderToShare)}
                         className="text-[11px] font-bold bg-primary hover:bg-primary/95 text-white px-3 py-1.5 rounded-lg shadow-soft transition-all"
                       >
-                        ✅ {language === 'pt' ? 'Sim, enviar WhatsApp!' : 'Yes, send WhatsApp!'}
+                        ✅ {language === 'pt' ? 'Sim, quero receber!' : 'Yes, subscribe me!'}
                       </button>
                       <button
                         onClick={() => handleConsentAction(false)}
