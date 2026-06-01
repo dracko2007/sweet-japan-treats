@@ -19,8 +19,17 @@ import HomeContentManager from '@/components/admin/HomeContentManager';
 import VlogManager from '@/components/admin/VlogManager';
 import TrackingModal from '@/components/admin/TrackingModal';
 import { orderService } from '@/services/orderService';
+import { customerService } from '@/services/customerService';
 import { usePagination } from '@/hooks/usePagination';
 import Pagination from '@/components/Pagination';
+
+// Badge de contagem exibido acima das abas (pedidos pendentes / novos clientes)
+const TabBadge: React.FC<{ count: number }> = ({ count }) =>
+  count > 0 ? (
+    <span className="absolute -top-0.5 -right-1.5 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center shadow-sm ring-2 ring-background">
+      {count > 99 ? '99+' : count}
+    </span>
+  ) : null;
 
 const Admin: React.FC = () => {
   const navigate = useNavigate();
@@ -28,6 +37,8 @@ const Admin: React.FC = () => {
   const { toast } = useToast();
   const [allOrders, setAllOrders] = useState<any[]>([]);
   const [ordersLoading, setOrdersLoading] = useState(true);
+  const [customerCount, setCustomerCount] = useState(0);
+  const [newCustomers, setNewCustomers] = useState(0);
   const [isTesting, setIsTesting] = useState(false);
   const [activeTab, setActiveTab] = useState<'orders' | 'coupons' | 'dashboard' | 'customers' | 'products' | 'home' | 'vlog' | 'affiliates'>('dashboard');
   const [trackingModalOpen, setTrackingModalOpen] = useState(false);
@@ -42,11 +53,13 @@ const Admin: React.FC = () => {
   useEffect(() => {
     // Verifica se é admin (Passe livre para demonstração de testes)
     loadOrders();
+    loadCustomers();
 
     // Auto-refresh orders every 30 seconds
     const interval = setInterval(() => {
       console.log('🔄 [ADMIN] Auto-refreshing orders...');
       loadOrders();
+      loadCustomers();
     }, 30000);
 
     return () => clearInterval(interval);
@@ -57,6 +70,35 @@ const Admin: React.FC = () => {
     setAllOrders(orders);
     setOrdersLoading(false);
   };
+
+  const loadCustomers = async () => {
+    try {
+      const list = await customerService.getAllCustomersAsync();
+      const total = list.length;
+      setCustomerCount(total);
+      const seenRaw = safeStorage.getItem('admin_seen_customers');
+      const seen = seenRaw == null ? null : parseInt(seenRaw, 10);
+      if (seen == null || isNaN(seen)) {
+        safeStorage.setItem('admin_seen_customers', String(total)); // 1ª vez: sem badge
+        setNewCustomers(0);
+      } else {
+        setNewCustomers(Math.max(0, total - seen));
+      }
+    } catch (e) {
+      console.warn('[admin] contagem de clientes falhou:', e);
+    }
+  };
+
+  // Pedidos pendentes (= novos pedidos a processar)
+  const pendingOrdersCount = allOrders.filter((o) => o.status === 'pending').length;
+
+  // Ao abrir a aba Clientes, marca todos como vistos (zera o badge)
+  useEffect(() => {
+    if (activeTab === 'customers' && customerCount > 0) {
+      safeStorage.setItem('admin_seen_customers', String(customerCount));
+      setNewCustomers(0);
+    }
+  }, [activeTab, customerCount]);
 
   const handleUpdateStatus = async (orderNumber: string, newStatus: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled') => {
     const success = await orderService.updateOrderStatus(orderNumber, newStatus);
@@ -354,7 +396,7 @@ _This is an automated test message_
                 <nav className="-mb-px flex overflow-x-auto scrollbar-hide space-x-2 sm:space-x-6">
                   <button
                     onClick={() => setActiveTab('orders')}
-                    className={`py-3 sm:py-4 px-3 sm:px-1 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap flex items-center gap-1.5 ${
+                    className={`relative py-3 sm:py-4 px-3 sm:px-1 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap flex items-center gap-1.5 ${
                       activeTab === 'orders'
                         ? 'border-primary text-primary'
                         : 'border-transparent text-muted-foreground hover:text-foreground hover:border-gray-300'
@@ -362,6 +404,7 @@ _This is an automated test message_
                   >
                     <Package className="w-4 h-4 flex-shrink-0" />
                     <span>Pedidos</span>
+                    <TabBadge count={pendingOrdersCount} />
                   </button>
                   <button
                     onClick={() => setActiveTab('coupons')}
@@ -421,7 +464,7 @@ _This is an automated test message_
                   </button>
                   <button
                     onClick={() => setActiveTab('customers')}
-                    className={`py-3 sm:py-4 px-3 sm:px-1 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap flex items-center gap-1.5 ${
+                    className={`relative py-3 sm:py-4 px-3 sm:px-1 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap flex items-center gap-1.5 ${
                       activeTab === 'customers'
                         ? 'border-primary text-primary'
                         : 'border-transparent text-muted-foreground hover:text-foreground hover:border-gray-300'
@@ -429,6 +472,7 @@ _This is an automated test message_
                   >
                     <Users className="w-4 h-4 flex-shrink-0" />
                     <span>Clientes</span>
+                    <TabBadge count={newCustomers} />
                   </button>
                   <button
                     onClick={() => setActiveTab('affiliates')}
