@@ -678,24 +678,22 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       // Salva os cupons localmente também (cache)
       saveUserCoupons(newUser.id, [welcomeCoupon]);
 
-      // Save to Firestore
-      const syncResult = await firebaseSyncService.syncUserToFirestore(newUser.id, newUser);
-      
-      if (!syncResult) {
-        console.error('❌ [CRITICAL] Failed to save user to Firestore. User created in Auth but has no profile.');
-        return { success: false, error: 'Falha ao salvar na nuvem. Verifique a configuração do Firebase.' };
-      }
-      
-      // Also save to safeStorage as backup
+      // Salva sempre no backup local (garante login mesmo se a nuvem falhar)
       const allUsers = getAllUsers();
       const updatedUsers = [...allUsers, newUser];
       saveAllUsers(updatedUsers);
-      
-      // DO NOT auto-login - user must verify email first
-      // Sign out the Firebase user created during registration
+
+      // Tenta salvar no Firestore — NÃO é fatal: o usuário já existe no Auth e
+      // no backup local; se a nuvem falhar, o perfil sincroniza no próximo login.
+      const syncResult = await firebaseSyncService.syncUserToFirestore(newUser.id, newUser);
+      if (!syncResult) {
+        console.warn('⚠️ [REGISTER] Falha ao sincronizar perfil na nuvem — seguindo com backup local. Sincroniza no próximo login.');
+      }
+
+      // Encerra a sessão criada durante o cadastro (login é feito depois)
       await firebaseSyncService.logoutUser();
-      
-      console.log('✅ [DEBUG] ===== REGISTER COMPLETE - Email verification required =====');
+
+      console.log('✅ [REGISTER] Cadastro concluído (sync nuvem:', syncResult, ')');
       return { success: true };
     } catch (error) {
       console.error('❌ [DEBUG] Error registering user:', error);
