@@ -20,6 +20,7 @@ import VlogManager from '@/components/admin/VlogManager';
 import TrackingModal from '@/components/admin/TrackingModal';
 import { orderService } from '@/services/orderService';
 import { customerService } from '@/services/customerService';
+import { requireAdminPassword } from '@/utils/adminGuard';
 import { usePagination } from '@/hooks/usePagination';
 import Pagination from '@/components/Pagination';
 
@@ -135,6 +136,7 @@ const Admin: React.FC = () => {
     if (!confirm(`Tem certeza que deseja excluir o pedido ${orderNumber}?`)) {
       return;
     }
+    if (!requireAdminPassword(`excluir o pedido ${orderNumber}`)) return;
 
     const success = await orderService.deleteOrder(orderNumber);
     

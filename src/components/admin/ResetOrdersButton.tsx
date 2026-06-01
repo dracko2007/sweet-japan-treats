@@ -3,6 +3,7 @@ import { Trash2, Loader2, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { orderService } from '@/services/orderService';
 import { useToast } from '@/hooks/use-toast';
+import { requireAdminPassword } from '@/utils/adminGuard';
 
 // Botão de RESET TOTAL do histórico de pedidos (localStorage + Firestore).
 const ResetOrdersButton: React.FC = () => {
@@ -17,6 +18,7 @@ const ResetOrdersButton: React.FC = () => {
       'Esta ação NÃO pode ser desfeita.'
     );
     if (!ok) return;
+    if (!requireAdminPassword('o reset do histórico de pedidos')) return;
 
     setBusy(true);
     try {

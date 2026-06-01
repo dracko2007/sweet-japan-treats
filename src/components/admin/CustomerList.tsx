@@ -8,6 +8,7 @@ import { usePagination } from '@/hooks/usePagination';
 import Pagination from '@/components/Pagination';
 import { firebaseSyncService } from '@/services/firebaseSyncService';
 import { ensureAdminAuth } from '@/utils/adminAuth';
+import { requireAdminPassword } from '@/utils/adminGuard';
 import type { Coupon } from '@/context/UserContext';
 
 const CustomerList: React.FC = () => {
@@ -123,6 +124,7 @@ const CustomerList: React.FC = () => {
     if (!confirm(`Deletar histórico de pedidos de "${customerName}"?\n\n⚠️ Essa ação não pode ser desfeita!`)) {
       return;
     }
+    if (!requireAdminPassword(`deletar o histórico de ${customerName}`)) return;
     const success = await customerService.deleteCustomerOrders(email);
     if (success) {
       toast({
@@ -145,6 +147,7 @@ const CustomerList: React.FC = () => {
     if (!confirm(`Deletar cliente "${customerName}" e TODO seu histórico?\n\n⚠️ Essa ação não pode ser desfeita!`)) {
       return;
     }
+    if (!requireAdminPassword(`deletar o cliente ${customerName}`)) return;
     const success = await customerService.deleteCustomer(email);
     if (success) {
       toast({
@@ -170,6 +173,7 @@ const CustomerList: React.FC = () => {
     if (!confirm('Tem CERTEZA? Digite "SIM" para confirmar:\n\n[Clique OK e confirme novamente]')) {
       return;
     }
+    if (!requireAdminPassword('deletar TODOS os clientes')) return;
     const success = await customerService.deleteAllCustomers();
     if (success) {
       toast({
@@ -185,6 +189,7 @@ const CustomerList: React.FC = () => {
     if (!confirm('⚠️ DELETAR TODO O HISTÓRICO DE PEDIDOS?\n\nEssa ação é IRREVERSÍVEL!')) {
       return;
     }
+    if (!requireAdminPassword('deletar TODO o histórico de pedidos')) return;
     const success = await customerService.deleteAllOrderHistory();
     if (success) {
       toast({
