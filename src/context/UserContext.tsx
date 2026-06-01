@@ -491,25 +491,13 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
         };
       }
       
-      // THEN: Check email verification (only for users who actually registered)
+      // Verificação de e-mail NÃO é exigida (ambiente de demonstração).
+      // O usuário pode entrar logo após o cadastro. Para produção, reative o
+      // bloqueio abaixo conferindo firebaseUser.emailVerified.
       if (!firebaseUser.emailVerified) {
-        console.log('⚠️ [LOGIN] Email not verified:', normalizedEmail);
-        // Resend verification email before signing out
-        try {
-          await firebaseSyncService.resendVerificationEmail();
-          console.log('📧 [LOGIN] Verification email resent to:', normalizedEmail);
-        } catch (e) {
-          console.warn('⚠️ [LOGIN] Could not resend verification email:', e);
-        }
-        // Sign out since unverified
-        await firebaseSyncService.logoutUser();
-        return { 
-          success: false, 
-          error: 'Seu email ainda não foi verificado. Reenviamos o link de confirmação para sua caixa de entrada.',
-          needsVerification: true
-        };
+        console.log('ℹ️ [LOGIN] E-mail não verificado, mas login liberado (modo demo):', normalizedEmail);
       }
-      
+
       // Get user data - we already have userProfile from above
       console.log('🔥 [LOGIN] Fetching user data from Firestore...');
       let userData = userProfile;

@@ -112,7 +112,7 @@ const Register: React.FC = () => {
         setRegistrationComplete(true);
         toast({
           title: "Cadastro realizado!",
-          description: "Verifique seu email para confirmar sua conta.",
+          description: "Sua conta foi criada. Você já pode fazer login.",
         });
 
         // Send automatic welcome message if opted in
