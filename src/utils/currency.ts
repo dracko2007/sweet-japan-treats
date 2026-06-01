@@ -18,10 +18,8 @@ export const toYen = (amount: number, currency?: string): number => {
  */
 export const formatPrice = (price: number, currency: 'BRL' | 'JPY' | 'EUR' | string, noConvert = false): string => {
   if (currency === 'JPY') {
-    const mainStr = `¥ ${Math.round(price).toLocaleString()}`;
-    if (noConvert) return mainStr;
-    const brlVal = price / BRL_TO_JPY_RATE;
-    return `${mainStr} (R$ ${brlVal.toFixed(2)})`;
+    // No Japão já estamos em ienes — mostra só ¥, sem converter para R$.
+    return `¥ ${Math.round(price).toLocaleString()}`;
   }
   if (currency === 'EUR') {
     const mainStr = `€ ${price.toFixed(2)}`;
