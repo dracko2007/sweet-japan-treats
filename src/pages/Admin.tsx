@@ -1,7 +1,7 @@
 import { safeStorage } from '@/utils/storage';
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Package, Printer, ShoppingBag, User, MapPin, Phone, Mail, Calendar, TestTube, Tag, Truck, CheckCircle, XCircle, Trash2, BarChart3, Users, PackagePlus, Video, Megaphone } from 'lucide-react';
+import { Package, Printer, ShoppingBag, User, MapPin, Phone, Mail, Calendar, TestTube, Tag, Truck, CheckCircle, XCircle, Trash2, BarChart3, Users, PackagePlus, Video, Megaphone, Clapperboard } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { useUser } from '@/context/UserContext';
@@ -16,6 +16,7 @@ import Dashboard from '@/components/admin/Dashboard';
 import CustomerList from '@/components/admin/CustomerList';
 import ProductManager from '@/components/admin/ProductManager';
 import HomeContentManager from '@/components/admin/HomeContentManager';
+import VlogManager from '@/components/admin/VlogManager';
 import TrackingModal from '@/components/admin/TrackingModal';
 import { orderService } from '@/services/orderService';
 import { usePagination } from '@/hooks/usePagination';
@@ -28,7 +29,7 @@ const Admin: React.FC = () => {
   const [allOrders, setAllOrders] = useState<any[]>([]);
   const [ordersLoading, setOrdersLoading] = useState(true);
   const [isTesting, setIsTesting] = useState(false);
-  const [activeTab, setActiveTab] = useState<'orders' | 'coupons' | 'dashboard' | 'customers' | 'products' | 'home' | 'affiliates'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'orders' | 'coupons' | 'dashboard' | 'customers' | 'products' | 'home' | 'vlog' | 'affiliates'>('dashboard');
   const [trackingModalOpen, setTrackingModalOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
 
@@ -408,6 +409,17 @@ _This is an automated test message_
                     <span>Início</span>
                   </button>
                   <button
+                    onClick={() => setActiveTab('vlog')}
+                    className={`py-3 sm:py-4 px-3 sm:px-1 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap flex items-center gap-1.5 ${
+                      activeTab === 'vlog'
+                        ? 'border-primary text-primary'
+                        : 'border-transparent text-muted-foreground hover:text-foreground hover:border-gray-300'
+                    }`}
+                  >
+                    <Clapperboard className="w-4 h-4 flex-shrink-0" />
+                    <span>Vlog</span>
+                  </button>
+                  <button
                     onClick={() => setActiveTab('customers')}
                     className={`py-3 sm:py-4 px-3 sm:px-1 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap flex items-center gap-1.5 ${
                       activeTab === 'customers'
@@ -721,6 +733,8 @@ _This is an automated test message_
               <ProductManager />
             ) : activeTab === 'home' ? (
               <HomeContentManager />
+            ) : activeTab === 'vlog' ? (
+              <VlogManager />
             ) : activeTab === 'affiliates' ? (
               <AffiliateManager />
             ) : (

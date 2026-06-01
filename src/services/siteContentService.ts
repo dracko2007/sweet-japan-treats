@@ -22,6 +22,27 @@ const DEFAULT_HOME: HomeContent = {
   videos: [],
 };
 
+/* ----------------------------- Vlog ----------------------------- */
+export interface VlogVideo {
+  id: string;
+  title: string;
+  description?: string;
+  url: string; // link do YouTube (ou ID)
+  thumbnail?: string; // miniatura custom (opcional; senão usa a do YouTube)
+  duration?: string;
+  date?: string; // ISO (YYYY-MM-DD)
+  views?: string;
+}
+
+export interface VlogContent {
+  title?: string;
+  subtitle?: string;
+  featured?: VlogVideo | null; // vídeo principal (destaque)
+  videos: VlogVideo[]; // vídeos secundários
+}
+
+const DEFAULT_VLOG: VlogContent = { featured: null, videos: [] };
+
 export const siteContentService = {
   async getHome(): Promise<HomeContent> {
     if (!db) return DEFAULT_HOME;
@@ -42,6 +63,29 @@ export const siteContentService = {
     await setDoc(
       doc(db, 'siteContent', 'home'),
       { ...content, updatedAt: serverTimestamp() },
+      { merge: true }
+    );
+  },
+
+  async getVlog(): Promise<VlogContent> {
+    if (!db) return DEFAULT_VLOG;
+    try {
+      const snap = await getDoc(doc(db, 'siteContent', 'vlog'));
+      if (!snap.exists()) return DEFAULT_VLOG;
+      const data = snap.data() as Partial<VlogContent>;
+      return { ...DEFAULT_VLOG, ...data, videos: data.videos || [] };
+    } catch (e) {
+      console.warn('siteContentService.getVlog falhou:', e);
+      return DEFAULT_VLOG;
+    }
+  },
+
+  async saveVlog(content: VlogContent): Promise<void> {
+    if (!db) throw new Error('Firebase indisponível');
+    await ensureAdminAuth();
+    await setDoc(
+      doc(db, 'siteContent', 'vlog'),
+      { ...content, featured: content.featured || null, updatedAt: serverTimestamp() },
       { merge: true }
     );
   },
