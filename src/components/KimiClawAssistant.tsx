@@ -379,8 +379,13 @@ const KimiClawAssistant: React.FC = () => {
       return;
     }
 
+    // Detecção de idioma só com INTENÇÃO explícita (evita 'brasil'/'frete' trocarem idioma)
+    const nquery = normalizeText(query);
+    const langIntent = /(idioma|lingua|language|mudar|trocar|alterar|falar|switch)/.test(nquery);
+
     // 4. LANGUAGE TO JAPANESE
-    if (query.includes('japon') || query.includes('ja') || query.includes('nihongo') || query.includes('日本語')) {
+    if (/\b(japones|nihongo)\b/.test(nquery) || query.includes('日本語') ||
+        (langIntent && /(japao|japan|\bjp\b|\bja\b)/.test(nquery))) {
       setLanguage('ja');
       toast.success('Idioma alterado para 日本語');
       await addKimiMessageWithTyping('言語を日本語に切り替えました！', ['🌐 Mudar idioma...']);
@@ -388,7 +393,8 @@ const KimiClawAssistant: React.FC = () => {
     }
 
     // 5. LANGUAGE TO PORTUGUESE
-    if (query.includes('portug') || query.includes('pt') || query.includes('br') || query.includes('português')) {
+    if (/\bportugues\b/.test(nquery) ||
+        (langIntent && /(portug|brasil|\bbr\b|\bpt\b)/.test(nquery))) {
       setLanguage('pt');
       toast.success('Idioma alterado para Português');
       await addKimiMessageWithTyping('Idioma alterado de volta para Português com sucesso!', ['🌐 Mudar idioma...']);
