@@ -141,56 +141,62 @@ const KimiClawAssistant: React.FC = () => {
     return text.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
   };
 
-  // Search for products based on query
-  const searchProducts = (query: string): Product[] => {
-    const normalized = normalizeText(query);
+  // Palavras de ligação/comando ignoradas na busca (pt/en)
+  const STOP_WORDS = new Set([
+    'por', 'pro', 'pra', 'para', 'o', 'a', 'os', 'as', 'um', 'uma', 'uns', 'umas',
+    'de', 'do', 'da', 'dos', 'das', 'e', 'em', 'no', 'na', 'com', 'me', 'meu', 'minha',
+    'tem', 'ter', 'tinha', 'algum', 'alguma', 'algo', 'quero', 'queria', 'gostaria',
+    'mostrar', 'mostra', 'ver', 'buscar', 'procurar', 'pesquisar', 'achar', 'encontrar',
+    'voce', 'vc', 'ai', 'existe', 'vende', 'vendem', 'possui', 'teria', 'produto', 'produtos',
+    'search', 'find', 'show', 'want', 'the', 'for', 'of', 'an', 'is', 'do', 'you', 'have',
+  ]);
 
-    // Category aliases in multiple languages
+  // Quebra a busca em palavras úteis (ignora ligação e palavras curtas)
+  const tokenize = (query: string): string[] =>
+    normalizeText(query)
+      .split(/[\s,.;:!?'"()/_\-]+/)
+      .map((t) => t.trim())
+      .filter((t) => t.length >= 2 && !STOP_WORDS.has(t));
+
+  // Search for products based on query (pontua por palavra → bem mais tolerante)
+  const searchProducts = (query: string): Product[] => {
+    const tokens = tokenize(query);
+    if (tokens.length === 0) return [];
+
     const categoryAliases: Record<string, string[]> = {
-      'doces': ['doce', 'snack', 'chocolate', 'candy', 'sweet', 'お菓子', 'okashi', 'kit kat', 'pocky', 'jagariko'],
-      'cosmeticos': ['cosmetico', 'skincare', 'protetor', 'creme', 'mascara', 'skin', 'lotion', 'コスメ', '化粧品', 'biore', 'hada', 'dhc'],
-      'acessorios': ['acessorio', 'figura', 'boneco', 'figure', 'anime', 'plush', 'アクセサリー', 'グッズ', 'luffy', 'naruto', 'demon'],
-      'papelaria': ['caneta', 'caderno', 'pen', 'notebook', 'paper', 'notepad', '文房具', 'sakura', 'tombow', 'kokuyo']
+      'doces': ['doce', 'snack', 'chocolate', 'candy', 'sweet', 'お菓子', 'okashi', 'kitkat', 'kit kat', 'pocky', 'jagariko', 'calbee', 'nestle', 'meiji', 'glico'],
+      'cosmeticos': ['cosmetico', 'skincare', 'protetor', 'creme', 'mascara', 'skin', 'lotion', 'コスメ', '化粧品', 'biore', 'hada', 'dhc', 'shiseido'],
+      'acessorios': ['acessorio', 'figura', 'boneco', 'figure', 'anime', 'plush', 'アクセサリー', 'グッズ', 'luffy', 'naruto', 'demon', 'pokemon'],
+      'papelaria': ['caneta', 'caderno', 'pen', 'notebook', 'paper', 'notepad', '文房具', 'sakura', 'tombow', 'kokuyo', 'pilot', 'zebra'],
     };
 
-    const scored = products.map(product => {
+    const scored = products.map((product) => {
       let score = 0;
-      const normalizedId = normalizeText(product.id);
-      const normalizedName = normalizeText(product.name);
-      const normalizedDesc = normalizeText(product.description);
-      const normalizedFlavor = normalizeText(product.flavor);
+      const nId = normalizeText(product.id);
+      const nName = normalizeText(product.name);
+      const nDesc = normalizeText(product.description);
+      const nFlavor = normalizeText(product.flavor);
+      const nCat = normalizeText(product.category);
+      const aliases = (categoryAliases[product.category] || []).map((a) => normalizeText(a).replace(/\s+/g, ''));
 
-      // Exact ID match
-      if (normalizedId.includes(normalized)) score += 10;
-
-      // Category matches
-      Object.entries(categoryAliases).forEach(([category, aliases]) => {
-        if (product.category === category) {
-          aliases.forEach(alias => {
-            const normalizedAlias = normalizeText(alias);
-            if (normalized.includes(normalizedAlias) || normalizedAlias.includes(normalized)) score += 5;
-          });
-        }
+      tokens.forEach((tok) => {
+        const t = tok.replace(/\s+/g, '');
+        if (nName.includes(tok)) score += 5;
+        if (nId.includes(tok)) score += 5;
+        if (nFlavor.includes(tok)) score += 3;
+        if (nCat.includes(tok)) score += 4;
+        if (nDesc.includes(tok)) score += 2;
+        if (aliases.some((a) => a.includes(t) || t.includes(a))) score += 4;
       });
-
-      // Name match
-      if (normalizedName.includes(normalized)) score += 3;
-      if (normalized.split(' ').every(word => normalizedName.includes(word))) score += 2;
-
-      // Description match
-      if (normalizedDesc.includes(normalized)) score += 1;
-
-      // Flavor match
-      if (normalizedFlavor.includes(normalized)) score += 1;
 
       return { product, score };
     });
 
     return scored
-      .filter(item => item.score > 0)
+      .filter((item) => item.score > 0)
       .sort((a, b) => b.score - a.score)
       .slice(0, 5)
-      .map(item => item.product);
+      .map((item) => item.product);
   };
 
   // Calculate shipping options for a given country and weight
@@ -299,17 +305,13 @@ const KimiClawAssistant: React.FC = () => {
     }
 
     // 0. SEARCH PRODUCTS SKILL
-    if (query.includes('buscar') || query.includes('procurar') || query.includes('pesquisar') || query.includes('search') || query.includes('find') || query.includes('tem ') || query.includes('quero ') || query.includes('mostrar')) {
-      // Extract search query
-      const searchTerms = query
-        .replace(/buscar|procurar|pesquisar|search|find|tem|quero|mostrar/gi, '')
-        .trim();
-
-      const results = searchProducts(searchTerms || 'produtos');
+    if (query.includes('buscar') || query.includes('procurar') || query.includes('pesquisar') || query.includes('search') || query.includes('find') || query.includes('tem ') || query.includes('quero ') || query.includes('mostrar') || query.includes('achar') || query.includes('encontrar')) {
+      // O searchProducts já ignora palavras de ligação/comando ("procurar por kitkat" → kitkat)
+      const results = searchProducts(query);
 
       if (results.length === 0) {
         await addKimiMessageWithTyping(
-          t('kimiclaw.search.no_results').replace('{query}', searchTerms)
+          t('kimiclaw.search.no_results').replace('{query}', text.trim())
         );
         return;
       }
@@ -455,16 +457,34 @@ const KimiClawAssistant: React.FC = () => {
       return;
     }
 
+    // 8.5 BUSCA AUTOMÁTICA — se o texto bate com algum produto, mostra (ex: "kitkat", "calbee")
+    if (!query.includes('oi') && !query.includes('ola') && !query.includes('hello')) {
+      const autoResults = searchProducts(query);
+      if (autoResults.length > 0) {
+        setMessages(prev => [
+          ...prev,
+          {
+            id: Math.random().toString(36).substring(7),
+            sender: 'kimi',
+            text: t('kimiclaw.search.found').replace('{count}', autoResults.length.toString()),
+            timestamp: new Date(),
+            products: autoResults,
+          }
+        ]);
+        return;
+      }
+    }
+
     // 9. GENERAL RESPONSE
     let responseText = '';
     if (query.includes('oi') || query.includes('ola') || query.includes('hello')) {
-      responseText = 'Olá! Sou o KimiClaw AI. Posso adicionar itens ao seu carrinho, mudar o idioma, calcular o frete ou enviar novidades e descontos via WhatsApp! O que deseja?';
+      responseText = 'Olá! Sou o KimiClaw AI. Posso buscar produtos, adicionar itens ao carrinho, mudar o idioma, calcular o frete ou inscrever você em novidades. O que deseja?';
     } else {
       const suggestions = language === 'pt'
-        ? 'Minhas habilidades: 🔍 **buscar** produtos | 📦 **calcular** frete | 🎟️ **cupom** | 📱 **whatsapp** | 🗑️ **limpar carrinho**'
+        ? 'Não encontrei isso. Minhas habilidades: 🔍 **buscar** produtos (ex: "kitkat", "calbee") | 📦 **calcular** frete | 🎟️ **cupom** | 📱 **novidades** | 🗑️ **limpar carrinho**'
         : language === 'ja'
-          ? '機能: 🔍 商品検索 | 📦 送料計算 | 🎟️ クーポン | 📱 WhatsApp | 🗑️ カート削除'
-          : 'My skills: 🔍 **search** products | 📦 **calculate** shipping | 🎟️ **coupon** | 📱 **whatsapp** | 🗑️ **clear cart**';
+          ? '機能: 🔍 商品検索 | 📦 送料計算 | 🎟️ クーポン | 📱 お知らせ | 🗑️ カート削除'
+          : "Didn't find that. My skills: 🔍 **search** products | 📦 **calculate** shipping | 🎟️ **coupon** | 📱 **news** | 🗑️ **clear cart**";
       responseText = suggestions;
     }
     await addKimiMessageWithTyping(responseText);
