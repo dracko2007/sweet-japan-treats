@@ -51,18 +51,27 @@ const Admin: React.FC = () => {
   const ADMIN_EMAIL = 'dracko2007@gmail.com';
 
   useEffect(() => {
-    // Verifica se é admin (Passe livre para demonstração de testes)
-    loadOrders();
-    loadCustomers();
-
-    // Auto-refresh orders every 30 seconds
-    const interval = setInterval(() => {
-      console.log('🔄 [ADMIN] Auto-refreshing orders...');
+    const refresh = () => {
       loadOrders();
       loadCustomers();
-    }, 30000);
+    };
+    refresh();
 
-    return () => clearInterval(interval);
+    // Auto-refresh a cada 30s
+    const interval = setInterval(refresh, 30000);
+
+    // Recarrega na hora ao voltar para a aba/janela (ex: após fazer um pedido)
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') refresh();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', refresh);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', refresh);
+    };
   }, [user, navigate]);
 
   const loadOrders = async () => {
@@ -89,8 +98,12 @@ const Admin: React.FC = () => {
     }
   };
 
-  // Pedidos pendentes (= novos pedidos a processar)
-  const pendingOrdersCount = allOrders.filter((o) => o.status === 'pending').length;
+  // Pedidos a processar (= novos): tudo que não foi enviado/entregue/cancelado.
+  // Robusto a variações de status ('pending', 'Pendente', 'paid', 'processing'...).
+  const DONE_STATUSES = ['shipped', 'delivered', 'cancelled', 'enviado', 'entregue', 'cancelado'];
+  const pendingOrdersCount = allOrders.filter(
+    (o) => !DONE_STATUSES.includes(String(o.status || 'pending').toLowerCase())
+  ).length;
 
   // Ao abrir a aba Clientes, marca todos como vistos (zera o badge)
   useEffect(() => {
