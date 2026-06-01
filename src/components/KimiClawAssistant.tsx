@@ -57,8 +57,6 @@ const KimiClawAssistant: React.FC = () => {
   const [currentSteps, setCurrentSteps] = useState<string[]>([]);
   const [showAttentionBadge, setShowAttentionBadge] = useState(true);
 
-  // Keep track of pending state if we need to ask user for their phone number
-  const [askingForPhone, setAskingForPhone] = useState(false);
 
   // Shipping flow states
   type ShippingStep = 'idle' | 'ask_country' | 'ask_weight';
@@ -252,92 +250,9 @@ const KimiClawAssistant: React.FC = () => {
     ]);
   };
 
-  // Automated WhatsApp messaging function
-  const sendAutomatedWhatsApp = async (phoneNumber: string, clientName: string, orderDetails?: any) => {
-    let summaryText = '';
-    if (orderDetails) {
-      const itemsText = orderDetails.items ? orderDetails.items.map((item: any) => 
-        `  • ${item.productName} (${item.size === 'small' ? 'Padrão' : 'Deluxe'}) x${item.quantity}`
-      ).join('\n') : '';
-      
-      summaryText = `📋 *Resumo do Pedido:*
-• Pedido: #${orderDetails.orderNumber}
-• Cliente: ${clientName}
-${itemsText}
-• Total: ${formatPrice(orderDetails.totalAmount || orderDetails.total, orderDetails.currency || 'BRL', true)}
-• Status: Pago / Aguardando Envio\n\n`;
-    }
-
-    const messageText = `*JAPAN EXPRESS* 🌸\n\nOlá, *${clientName}*! Obrigado por comprar conosco!\n\n${summaryText}🎟️ Seu cupom de boas-vindas: *BEMVINDO10* (10% de desconto na próxima compra).\n\n🔥 *Novidades fresquinhas do Japão:*\n1. Protetor solar Bioré UV Aqua Rich com frete expresso para o Brasil.\n2. Canetas e artigos de papelaria Kawaii direto do Japão.\n3. Cosméticos e snacks exclusivos direto de Tóquio!\n\nAcesse nossa loja: https://japan-express.vercel.app`;
-
-    const steps = [
-      language === 'pt' ? '📱 Inicializando API de Comunicação Local...' : '📱 Initializing Local Communication API...',
-      language === 'pt' ? `📤 Enviando mensagem automática via WhatsApp para ${phoneNumber}...` : `📤 Sending automated message via WhatsApp to ${phoneNumber}...`,
-    ];
-
-    setIsTyping(true);
-    setCurrentSteps(steps);
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    // Dynamically import whatsappService to send message
-    const { whatsappService } = await import('@/services/whatsappService');
-    const success = await whatsappService.sendMessage({
-      to: phoneNumber,
-      message: messageText
-    });
-    
-    setIsTyping(false);
-    setCurrentSteps([]);
-
-    let responseText = '';
-    if (success) {
-      responseText = language === 'pt'
-        ? `Enviei de forma 100% automática! O sistema local realizou o disparo para **${phoneNumber}** com o cupom BEMVINDO10 e os detalhes da compra.`
-        : language === 'ja'
-          ? `自動送信が完了しました！お電話番号 **${phoneNumber}** 宛てにメッセージをお送りしました。`
-          : `Sent automatically! The message has been successfully dispatched to **${phoneNumber}** via our local background service.`;
-    } else {
-      responseText = language === 'pt'
-        ? `O serviço automático em segundo plano está offline. Por isso, abri o **WhatsApp Web** pré-preenchido para você em uma nova aba!`
-        : `Automatic service offline. Opened WhatsApp Web tab in the background!`;
-    }
-
-    setMessages(prev => [
-      ...prev,
-      {
-        id: Math.random().toString(36).substring(7),
-        sender: 'kimi',
-        text: responseText,
-        timestamp: new Date(),
-      }
-    ]);
-  };
-
   const handleCommandExecution = async (text: string) => {
     const query = text.toLowerCase().trim();
 
-    // If waiting for phone number input
-    if (askingForPhone) {
-      setAskingForPhone(false);
-      const cleanPhone = query.replace(/[^0-9]/g, '');
-      if (cleanPhone.length < 8) {
-        await addKimiMessageWithTyping(
-          language === 'pt'
-            ? 'Número inválido. Digite apenas números com o DDI (Ex: 5511999999999).'
-            : 'Invalid number format. Please try again.'
-        );
-        setAskingForPhone(true);
-        return;
-      }
-
-      if (user) {
-        updateProfile({ phone: cleanPhone, whatsappMarketing: true });
-      }
-
-      const clientName = user ? user.name : 'Cliente';
-      await sendAutomatedWhatsApp(cleanPhone, clientName);
-      return;
-    }
 
     // If in shipping flow, handle weight/country input
     if (shippingFlow === 'ask_country') {
