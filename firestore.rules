@@ -85,6 +85,14 @@ service cloud.firestore {
       allow write: if isAdmin();          // só admin liga/desliga
     }
 
+    // ---------- Pedidos personalizados ("Faça seu Pedido") ----------
+    match /custom_requests/{reqId} {
+      // Qualquer pessoa (mesmo sem login) envia um pedido com status 'new'
+      allow create: if request.resource.data.status == 'new';
+      // Só admin/autenticado lê, atualiza status ou exclui
+      allow read, update, delete: if request.auth != null;
+    }
+
     // ---------- Coleção de teste ----------
     match /test/{docId} {
       allow read, write: if request.auth != null;

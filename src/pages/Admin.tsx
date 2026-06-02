@@ -17,6 +17,7 @@ import CustomerList from '@/components/admin/CustomerList';
 import ProductManager from '@/components/admin/ProductManager';
 import HomeContentManager from '@/components/admin/HomeContentManager';
 import VlogManager from '@/components/admin/VlogManager';
+import CustomRequestManager from '@/components/admin/CustomRequestManager';
 import TrackingModal from '@/components/admin/TrackingModal';
 import { orderService } from '@/services/orderService';
 import { customerService } from '@/services/customerService';
@@ -41,7 +42,7 @@ const Admin: React.FC = () => {
   const [customerCount, setCustomerCount] = useState(0);
   const [newCustomers, setNewCustomers] = useState(0);
   const [isTesting, setIsTesting] = useState(false);
-  const [activeTab, setActiveTab] = useState<'orders' | 'coupons' | 'dashboard' | 'customers' | 'products' | 'home' | 'vlog' | 'affiliates'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'orders' | 'coupons' | 'dashboard' | 'customers' | 'products' | 'home' | 'vlog' | 'affiliates' | 'requests'>('dashboard');
   const [trackingModalOpen, setTrackingModalOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
 
@@ -500,6 +501,17 @@ _This is an automated test message_
                     <Megaphone className="w-4 h-4 flex-shrink-0" />
                     <span>Afiliados</span>
                   </button>
+                  <button
+                    onClick={() => setActiveTab('requests')}
+                    className={`py-3 sm:py-4 px-3 sm:px-1 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap flex items-center gap-1.5 ${
+                      activeTab === 'requests'
+                        ? 'border-primary text-primary'
+                        : 'border-transparent text-muted-foreground hover:text-foreground hover:border-gray-300'
+                    }`}
+                  >
+                    <PackagePlus className="w-4 h-4 flex-shrink-0" />
+                    <span>Personalizados</span>
+                  </button>
                 </nav>
               </div>
             </div>
@@ -796,6 +808,8 @@ _This is an automated test message_
               <VlogManager />
             ) : activeTab === 'affiliates' ? (
               <AffiliateManager />
+            ) : activeTab === 'requests' ? (
+              <CustomRequestManager />
             ) : (
               <CustomerList />
             )}
