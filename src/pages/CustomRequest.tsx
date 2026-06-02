@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { PackagePlus, Send, CheckCircle, Loader2, Sparkles } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
-import { useUser } from '@/context/UserContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { useToast } from '@/hooks/use-toast';
 import { customRequestService } from '@/services/customRequestService';
@@ -10,13 +9,12 @@ import { customRequestService } from '@/services/customRequestService';
 const COUNTRIES = ['Japão', 'Brasil', 'Portugal', 'França', 'Itália', 'Espanha'];
 
 const CustomRequest: React.FC = () => {
-  const { user } = useUser();
   const { selectedCountry } = useLanguage();
   const { toast } = useToast();
 
   const [form, setForm] = useState({
-    name: user?.name || '',
-    contact: user?.phone || user?.email || '',
+    name: '',
+    contact: '',
     country: selectedCountry || 'Brasil',
     productDesc: '',
     referenceLink: '',
