@@ -10,6 +10,7 @@ import { toYen } from '@/utils/currency';
 import { useProducts } from '@/context/ProductsContext';
 import MaintenanceToggle from '@/components/admin/MaintenanceToggle';
 import ResetOrdersButton from '@/components/admin/ResetOrdersButton';
+import WisePaymentSettings from '@/components/admin/WisePaymentSettings';
 
 interface MonthlyFin {
   month: string;
@@ -168,6 +169,9 @@ const Dashboard: React.FC = () => {
     <div className="space-y-6">
       {/* Controle de Manutenção */}
       <MaintenanceToggle />
+
+      {/* Pagamento Wise */}
+      <WisePaymentSettings />
 
       {/* Reset de histórico de pedidos */}
       <ResetOrdersButton />

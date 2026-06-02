@@ -14,6 +14,8 @@ import { formatPrice } from '@/utils/currency';
 import { getTranslatedProductName } from '@/data/translations';
 import { cn } from '@/lib/utils';
 import { firebaseSyncService } from '@/services/firebaseSyncService';
+import { paymentSettingsService } from '@/services/paymentSettingsService';
+import { Wallet } from 'lucide-react';
 
 const OrderReview: React.FC = () => {
   const { items, clearCart } = useCart();
@@ -31,6 +33,11 @@ const OrderReview: React.FC = () => {
   const [paymentMethod, setPaymentMethod] = useState(() => {
     return formData?.country === 'Japão' ? 'paypay' : 'pix';
   });
+  const [wiseEnabled, setWiseEnabled] = useState(false);
+
+  useEffect(() => {
+    paymentSettingsService.get().then((s) => setWiseEnabled(s.wiseEnabled && !!s.wiseLink));
+  }, []);
 
   // Redirect if no form data or shipping
   useEffect(() => {
@@ -575,6 +582,25 @@ const OrderReview: React.FC = () => {
                           </p>
                         </Label>
                       </div>
+
+                      {/* Wise Option (transferência internacional) */}
+                      {wiseEnabled && (
+                        <div className={cn(
+                          "flex items-start space-x-3 p-4 rounded-xl border-2 transition-all cursor-pointer",
+                          paymentMethod === 'wise' ? "border-emerald-500 bg-emerald-50/50" : "border-border hover:border-gray-300"
+                        )}>
+                          <RadioGroupItem value="wise" id="wise" className="mt-1" />
+                          <Label htmlFor="wise" className="flex-1 cursor-pointer">
+                            <div className="flex items-center gap-2 mb-1">
+                              <Wallet className="w-5 h-5 text-emerald-600" />
+                              <span className="font-bold text-base text-gray-800">Wise (Transferência Internacional)</span>
+                            </div>
+                            <p className="text-xs text-muted-foreground leading-relaxed">
+                              Pague em qualquer moeda com câmbio justo. Mostraremos o link de pagamento Wise na próxima tela.
+                            </p>
+                          </Label>
+                        </div>
+                      )}
                     </>
                   )}
                 </div>

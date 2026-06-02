@@ -1,7 +1,7 @@
 import { safeStorage } from '@/utils/storage';
 import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { CheckCircle, Home, Mail, Printer, Copy, AlertCircle, Smartphone, CreditCard, FileText, Landmark } from 'lucide-react';
+import { CheckCircle, Home, Mail, Printer, Copy, AlertCircle, Smartphone, CreditCard, FileText, Landmark, Wallet, ExternalLink } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { QRCodeSVG } from 'qrcode.react';
 import { formatPrice } from '@/utils/currency';
+import { paymentSettingsService } from '@/services/paymentSettingsService';
 import DemoBanner from '@/components/DemoBanner';
 
 const OrderConfirmation: React.FC = () => {
@@ -22,6 +23,13 @@ const OrderConfirmation: React.FC = () => {
   const [copied, setCopied] = useState(false);
   const [cardData, setCardData] = useState({ number: '', name: '', expiry: '', cvv: '' });
   const [cardStatus, setCardStatus] = useState<'idle' | 'processing' | 'success'>('idle');
+  const [wiseLink, setWiseLink] = useState('');
+
+  useEffect(() => {
+    if (order?.paymentMethod === 'wise') {
+      paymentSettingsService.get().then((s) => setWiseLink(s.wiseLink || ''));
+    }
+  }, [order]);
 
   // Redirect if no order data is received
   useEffect(() => {
@@ -442,6 +450,32 @@ const OrderConfirmation: React.FC = () => {
                     Imprimir Boleto
                   </Button>
                 </div>
+              </div>
+            )}
+
+            {order.paymentMethod === 'wise' && (
+              <div className="bg-white rounded-3xl border-2 border-emerald-500 p-6 mb-8 shadow-md print:hidden text-center space-y-4">
+                <div className="flex items-center justify-center gap-2 text-emerald-600 font-extrabold text-lg">
+                  <Wallet className="w-6 h-6" />
+                  <span>PAGAMENTO VIA WISE</span>
+                </div>
+                <p className="text-sm text-muted-foreground max-w-md mx-auto">
+                  Pague <strong>{formatPrice(order.total, order.currency || 'BRL')}</strong> pelo Wise com câmbio justo. Após pagar, nos envie o comprovante pelo contato informado.
+                </p>
+                {wiseLink ? (
+                  <a
+                    href={wiseLink.startsWith('http') ? wiseLink : `https://wise.com/pay/${wiseLink.replace(/^@/, '')}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-6 py-3 rounded-xl transition-colors"
+                  >
+                    <ExternalLink className="w-5 h-5" /> Pagar pelo Wise
+                  </a>
+                ) : (
+                  <p className="text-sm text-muted-foreground italic">
+                    Em instantes enviaremos o link de pagamento Wise pelo seu contato.
+                  </p>
+                )}
               </div>
             )}
 
