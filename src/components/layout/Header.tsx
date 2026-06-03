@@ -36,6 +36,8 @@ const Header: React.FC = () => {
   ];
 
   const isActive = (path: string) => location.pathname === path || location.pathname.startsWith(path + '/');
+  // No painel admin a loja é só em português → esconde o seletor de idioma
+  const isAdminPage = location.pathname.startsWith('/admin');
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-md border-b border-border">
@@ -118,10 +120,12 @@ const Header: React.FC = () => {
               <CountrySwitcher />
             </div>
 
-            {/* Language Switcher */}
-            <div className="hidden sm:block">
-              <LanguageSwitcher />
-            </div>
+            {/* Language Switcher (escondido no admin — só português lá) */}
+            {!isAdminPage && (
+              <div className="hidden sm:block">
+                <LanguageSwitcher />
+              </div>
+            )}
 
             {/* Admin Link - visível apenas para administradores */}
             {isAdmin && (
@@ -188,7 +192,7 @@ const Header: React.FC = () => {
             {/* Mobile Language & Country Switcher */}
             <div className="flex flex-col items-center gap-3 pb-4 mb-4 border-b border-border">
               <CountrySwitcher />
-              <LanguageSwitcher />
+              {!isAdminPage && <LanguageSwitcher />}
             </div>
 
             {navItems.map((item) => (
