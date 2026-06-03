@@ -1,7 +1,7 @@
 import { safeStorage } from '@/utils/storage';
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Package, Printer, ShoppingBag, User, MapPin, Phone, Mail, Calendar, TestTube, Tag, Truck, CheckCircle, XCircle, Trash2, BarChart3, Users, PackagePlus, Video, Megaphone, Clapperboard, Building2 } from 'lucide-react';
+import { Package, Printer, ShoppingBag, User, MapPin, Phone, Mail, Calendar, TestTube, Tag, Truck, CheckCircle, XCircle, Trash2, BarChart3, Users, PackagePlus, Video, Megaphone, Clapperboard, Building2, Sparkles } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { useUser } from '@/context/UserContext';
@@ -26,13 +26,16 @@ import { requireAdminPassword } from '@/utils/adminGuard';
 import { usePagination } from '@/hooks/usePagination';
 import Pagination from '@/components/Pagination';
 
-// Badge de contagem exibido acima das abas (pedidos pendentes / novos clientes)
-const TabBadge: React.FC<{ count: number }> = ({ count }) =>
-  count > 0 ? (
-    <span className="absolute -top-0.5 -right-1.5 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center shadow-sm ring-2 ring-background">
-      {count > 99 ? '99+' : count}
-    </span>
-  ) : null;
+type AdminTab =
+  | 'orders' | 'coupons' | 'dashboard' | 'customers' | 'products'
+  | 'home' | 'vlog' | 'affiliates' | 'requests' | 'b2b';
+
+interface AdminTabItem {
+  id: AdminTab;
+  label: string;
+  icon: React.FC<{ className?: string }>;
+  badge?: number;
+}
 
 const Admin: React.FC = () => {
   const navigate = useNavigate();
@@ -43,7 +46,7 @@ const Admin: React.FC = () => {
   const [customerCount, setCustomerCount] = useState(0);
   const [newCustomers, setNewCustomers] = useState(0);
   const [isTesting, setIsTesting] = useState(false);
-  const [activeTab, setActiveTab] = useState<'orders' | 'coupons' | 'dashboard' | 'customers' | 'products' | 'home' | 'vlog' | 'affiliates' | 'requests' | 'b2b'>('dashboard');
+  const [activeTab, setActiveTab] = useState<AdminTab>('dashboard');
   const [trackingModalOpen, setTrackingModalOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
 
@@ -388,6 +391,30 @@ _This is an automated test message_
     return null;
   }
 
+  // Abas agrupadas (menu lateral) — orientado a dados
+  const tabGroups: { title: string; items: AdminTabItem[] }[] = [
+    { title: 'Visão geral', items: [{ id: 'dashboard', label: 'Dashboard', icon: BarChart3 }] },
+    { title: 'Vendas', items: [
+      { id: 'orders', label: 'Pedidos', icon: Package, badge: pendingOrdersCount },
+      { id: 'customers', label: 'Clientes', icon: Users, badge: newCustomers },
+      { id: 'affiliates', label: 'Afiliados', icon: Megaphone },
+    ] },
+    { title: 'Catálogo', items: [
+      { id: 'products', label: 'Produtos', icon: PackagePlus },
+      { id: 'coupons', label: 'Cupons', icon: Tag },
+    ] },
+    { title: 'Solicitações', items: [
+      { id: 'requests', label: 'Personalizados', icon: Sparkles },
+      { id: 'b2b', label: 'Empresas', icon: Building2 },
+    ] },
+    { title: 'Conteúdo', items: [
+      { id: 'home', label: 'Início', icon: Video },
+      { id: 'vlog', label: 'Vlog', icon: Clapperboard },
+    ] },
+  ];
+  const allTabs: AdminTabItem[] = tabGroups.flatMap((g) => g.items);
+  const activeLabel = allTabs.find((t) => t.id === activeTab)?.label || '';
+
   return (
     <Layout>
       <div className="gradient-hero py-16">
@@ -405,128 +432,67 @@ _This is an automated test message_
 
       <section className="py-12 bg-background">
         <div className="container mx-auto px-4">
-          <div className="max-w-6xl mx-auto">
-            
-            {/* Tabs */}
-            <div className="mb-8">
-              <div className="border-b border-border">
-                <nav className="-mb-px flex overflow-x-auto scrollbar-hide space-x-2 sm:space-x-6">
-                  <button
-                    onClick={() => setActiveTab('orders')}
-                    className={`relative py-3 sm:py-4 px-3 sm:px-1 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap flex items-center gap-1.5 ${
-                      activeTab === 'orders'
-                        ? 'border-primary text-primary'
-                        : 'border-transparent text-muted-foreground hover:text-foreground hover:border-gray-300'
-                    }`}
-                  >
-                    <Package className="w-4 h-4 flex-shrink-0" />
-                    <span>Pedidos</span>
-                    <TabBadge count={pendingOrdersCount} />
-                  </button>
-                  <button
-                    onClick={() => setActiveTab('coupons')}
-                    className={`py-3 sm:py-4 px-3 sm:px-1 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap flex items-center gap-1.5 ${
-                      activeTab === 'coupons'
-                        ? 'border-primary text-primary'
-                        : 'border-transparent text-muted-foreground hover:text-foreground hover:border-gray-300'
-                    }`}
-                  >
-                    <Tag className="w-4 h-4 flex-shrink-0" />
-                    <span className="hidden sm:inline">Cupons de Desconto</span>
-                    <span className="sm:hidden">Cupons</span>
-                  </button>
-                  <button
-                    onClick={() => setActiveTab('dashboard')}
-                    className={`py-3 sm:py-4 px-3 sm:px-1 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap flex items-center gap-1.5 ${
-                      activeTab === 'dashboard'
-                        ? 'border-primary text-primary'
-                        : 'border-transparent text-muted-foreground hover:text-foreground hover:border-gray-300'
-                    }`}
-                  >
-                    <BarChart3 className="w-4 h-4 flex-shrink-0" />
-                    <span>Dashboard</span>
-                  </button>
-                  <button
-                    onClick={() => setActiveTab('products')}
-                    className={`py-3 sm:py-4 px-3 sm:px-1 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap flex items-center gap-1.5 ${
-                      activeTab === 'products'
-                        ? 'border-primary text-primary'
-                        : 'border-transparent text-muted-foreground hover:text-foreground hover:border-gray-300'
-                    }`}
-                  >
-                    <PackagePlus className="w-4 h-4 flex-shrink-0" />
-                    <span>Produtos</span>
-                  </button>
-                  <button
-                    onClick={() => setActiveTab('home')}
-                    className={`py-3 sm:py-4 px-3 sm:px-1 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap flex items-center gap-1.5 ${
-                      activeTab === 'home'
-                        ? 'border-primary text-primary'
-                        : 'border-transparent text-muted-foreground hover:text-foreground hover:border-gray-300'
-                    }`}
-                  >
-                    <Video className="w-4 h-4 flex-shrink-0" />
-                    <span>Início</span>
-                  </button>
-                  <button
-                    onClick={() => setActiveTab('vlog')}
-                    className={`py-3 sm:py-4 px-3 sm:px-1 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap flex items-center gap-1.5 ${
-                      activeTab === 'vlog'
-                        ? 'border-primary text-primary'
-                        : 'border-transparent text-muted-foreground hover:text-foreground hover:border-gray-300'
-                    }`}
-                  >
-                    <Clapperboard className="w-4 h-4 flex-shrink-0" />
-                    <span>Vlog</span>
-                  </button>
-                  <button
-                    onClick={() => setActiveTab('customers')}
-                    className={`relative py-3 sm:py-4 px-3 sm:px-1 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap flex items-center gap-1.5 ${
-                      activeTab === 'customers'
-                        ? 'border-primary text-primary'
-                        : 'border-transparent text-muted-foreground hover:text-foreground hover:border-gray-300'
-                    }`}
-                  >
-                    <Users className="w-4 h-4 flex-shrink-0" />
-                    <span>Clientes</span>
-                    <TabBadge count={newCustomers} />
-                  </button>
-                  <button
-                    onClick={() => setActiveTab('affiliates')}
-                    className={`py-3 sm:py-4 px-3 sm:px-1 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap flex items-center gap-1.5 ${
-                      activeTab === 'affiliates'
-                        ? 'border-primary text-primary'
-                        : 'border-transparent text-muted-foreground hover:text-foreground hover:border-gray-300'
-                    }`}
-                  >
-                    <Megaphone className="w-4 h-4 flex-shrink-0" />
-                    <span>Afiliados</span>
-                  </button>
-                  <button
-                    onClick={() => setActiveTab('requests')}
-                    className={`py-3 sm:py-4 px-3 sm:px-1 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap flex items-center gap-1.5 ${
-                      activeTab === 'requests'
-                        ? 'border-primary text-primary'
-                        : 'border-transparent text-muted-foreground hover:text-foreground hover:border-gray-300'
-                    }`}
-                  >
-                    <PackagePlus className="w-4 h-4 flex-shrink-0" />
-                    <span>Personalizados</span>
-                  </button>
-                  <button
-                    onClick={() => setActiveTab('b2b')}
-                    className={`py-3 sm:py-4 px-3 sm:px-1 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap flex items-center gap-1.5 ${
-                      activeTab === 'b2b'
-                        ? 'border-primary text-primary'
-                        : 'border-transparent text-muted-foreground hover:text-foreground hover:border-gray-300'
-                    }`}
-                  >
-                    <Building2 className="w-4 h-4 flex-shrink-0" />
-                    <span>Empresas</span>
-                  </button>
+          <div className="max-w-7xl mx-auto lg:flex lg:gap-8 lg:items-start">
+
+            {/* MENU LATERAL (desktop) */}
+            <aside className="hidden lg:block lg:w-56 shrink-0 lg:sticky lg:top-24">
+              <div className="bg-card rounded-2xl border border-border p-3 space-y-4">
+                {tabGroups.map((group) => (
+                  <div key={group.title}>
+                    <p className="px-3 mb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">{group.title}</p>
+                    <div className="space-y-0.5">
+                      {group.items.map((item) => {
+                        const Icon = item.icon;
+                        const active = activeTab === item.id;
+                        return (
+                          <button
+                            key={item.id}
+                            onClick={() => setActiveTab(item.id)}
+                            className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${active ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-secondary/60 hover:text-foreground'}`}
+                          >
+                            <Icon className="w-4 h-4 shrink-0" />
+                            <span className="flex-1 text-left">{item.label}</span>
+                            {item.badge ? (
+                              <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
+                                {item.badge > 99 ? '99+' : item.badge}
+                              </span>
+                            ) : null}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </aside>
+
+            {/* COLUNA DE CONTEÚDO */}
+            <div className="flex-1 min-w-0">
+              {/* Navegação mobile (scroll horizontal) */}
+              <div className="lg:hidden mb-6">
+                <nav className="flex overflow-x-auto scrollbar-hide gap-2 pb-1">
+                  {allTabs.map((item) => {
+                    const Icon = item.icon;
+                    const active = activeTab === item.id;
+                    return (
+                      <button
+                        key={item.id}
+                        onClick={() => setActiveTab(item.id)}
+                        className={`shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-semibold border transition-colors ${active ? 'bg-primary text-primary-foreground border-primary' : 'bg-card text-muted-foreground border-border'}`}
+                      >
+                        <Icon className="w-3.5 h-3.5" />
+                        {item.label}
+                        {item.badge ? (
+                          <span className="ml-0.5 min-w-[16px] h-[16px] px-1 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center">
+                            {item.badge > 99 ? '99+' : item.badge}
+                          </span>
+                        ) : null}
+                      </button>
+                    );
+                  })}
                 </nav>
               </div>
-            </div>
+              <h2 className="hidden lg:block font-display text-2xl font-bold text-foreground mb-5">{activeLabel}</h2>
 
             {/* Content */}
             {activeTab === 'orders' ? (
@@ -827,6 +793,7 @@ _This is an automated test message_
             ) : (
               <CustomerList />
             )}
+            </div>
           </div>
         </div>
       </section>
