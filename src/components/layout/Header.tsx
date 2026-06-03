@@ -42,18 +42,18 @@ const Header: React.FC = () => {
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-md border-b border-border">
       <div className="container mx-auto px-4">
-        <div className="flex items-center justify-between h-20">
+        <div className="flex items-center justify-between h-20 gap-4">
           {/* Logo */}
-          <Link to="/" className="flex items-center gap-3 lg:gap-4 group">
-            <JapanExpressLogo size={72} className="animate-float drop-shadow-lg group-hover:scale-105 transition-transform" />
-            <div className="flex items-baseline gap-1.5">
-              <span className="font-display text-3xl lg:text-4xl font-black text-foreground tracking-tight">Japan</span>
-              <span className="font-display text-2xl lg:text-3xl font-extrabold text-white bg-gradient-to-r from-primary to-accent shadow-lg px-2.5 py-1 rounded-xl transform -rotate-6">Express</span>
+          <Link to="/" className="flex items-center gap-2.5 group shrink-0">
+            <JapanExpressLogo size={56} className="animate-float drop-shadow-lg group-hover:scale-105 transition-transform shrink-0" />
+            <div className="flex items-baseline gap-1">
+              <span className="font-display text-2xl lg:text-3xl font-black text-foreground tracking-tight">Japan</span>
+              <span className="font-display text-lg lg:text-2xl font-extrabold text-white bg-gradient-to-r from-primary to-accent shadow-md px-2 py-0.5 rounded-lg transform -rotate-6">Express</span>
             </div>
           </Link>
 
           {/* Desktop Navigation (escondida no painel admin) */}
-          <nav className={cn("items-center gap-6", isAdminPage ? "hidden" : "hidden xl:flex")}>
+          <nav className={cn("items-center gap-5", isAdminPage ? "hidden" : "hidden xl:flex")}>
             {navItems.map((item) => (
               <div key={item.label} className="relative group">
                 {item.submenu ? (
