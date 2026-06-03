@@ -356,8 +356,12 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
           const mergedUser: UserProfile = {
             ...localUser,
             ...firestoreUser,
+            // O e-mail AUTENTICADO no Firebase é a fonte da verdade de QUEM logou.
+            // Sem isto, um perfil do Firestore podia sobrescrever o e-mail do admin
+            // e derrubar o acesso de admin logo após o login.
+            email: firebaseUser.email || (firestoreUser as any).email || localUser.email,
             // Keep the most complete address (Firestore if has data, else local)
-            address: (firestoreUser as any).address?.postalCode 
+            address: (firestoreUser as any).address?.postalCode
               ? { ...localUser.address, ...(firestoreUser as any).address }
               : localUser.address || (firestoreUser as any).address || {},
             // Keep birthdate from whichever source has it
