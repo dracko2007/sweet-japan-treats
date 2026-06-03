@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { ShoppingBag, ArrowRight, Trash2, Tag, ShieldCheck } from 'lucide-react';
+import { ShoppingBag, ArrowRight, Trash2, Tag, ShieldCheck, Sparkles } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import CartItemComponent from '@/components/cart/CartItem';
 import { Button } from '@/components/ui/button';
@@ -10,6 +10,7 @@ import { useUser, Coupon } from '@/context/UserContext';
 import { useNavigate } from 'react-router-dom';
 import { formatPrice } from '@/utils/currency';
 import { effectiveYen } from '@/utils/pricing';
+import { POINTS } from '@/services/pointsService';
 import { affiliateService, Affiliate } from '@/services/affiliateService';
 import { safeStorage } from '@/utils/storage';
 
@@ -28,7 +29,7 @@ const affiliateToCoupon = (aff: Affiliate): Coupon => ({
 const Cart: React.FC = () => {
   const { items, clearCart } = useCart();
   const { t, selectedCountry, setSelectedCountry } = useLanguage();
-  const { isAuthenticated, validateProfileCoupon, coupons } = useUser();
+  const { isAuthenticated, validateProfileCoupon, coupons, user } = useUser();
   const navigate = useNavigate();
 
   // Coupon state
@@ -36,6 +37,12 @@ const Cart: React.FC = () => {
   const [activeCoupon, setActiveCoupon] = useState<Coupon | null>(null);
   const [couponError, setCouponError] = useState('');
   const [showCouponList, setShowCouponList] = useState(false);
+
+  // Pontos de fidelidade a resgatar (persistido para o checkout/revisão usarem)
+  const [pointsToUse, setPointsToUse] = useState<number>(() => {
+    const v = Number(safeStorage.getItem('redeem_points'));
+    return Number.isFinite(v) && v > 0 ? v : 0;
+  });
 
   // Cupons do perfil que estão válidos (para sugerir ao clicar no campo)
   const availableCoupons = coupons.filter(
@@ -128,7 +135,21 @@ const Cart: React.FC = () => {
   }, 0);
 
   const discountAmount = activeCoupon ? computeDiscount(activeCoupon, baseTotalPrice) : 0;
-  const subtotalWithDiscount = baseTotalPrice - discountAmount;
+
+  // Resgate de pontos: 1 ponto = ¥1, limitado ao valor dos produtos (em ¥)
+  const convertYen = (yen: number) => selectedCountry === 'Japão' ? yen : isEuro ? (yen / 28) * 0.16 : yen / 28;
+  const productSubtotalYen = items.reduce((sum, item) => sum + effectiveYen(item.product, item.size) * item.quantity, 0);
+  const availablePoints = user?.points || 0;
+  const maxRedeemable = Math.min(availablePoints, Math.floor(productSubtotalYen / POINTS.yenPerPoint));
+  const redeemPoints = Math.max(0, Math.min(pointsToUse, maxRedeemable));
+  const pointsDiscount = convertYen(redeemPoints * POINTS.yenPerPoint);
+
+  // Mantém o valor escolhido salvo para o checkout/revisão aplicarem
+  useEffect(() => {
+    safeStorage.setItem('redeem_points', String(redeemPoints));
+  }, [redeemPoints]);
+
+  const subtotalWithDiscount = Math.max(0, baseTotalPrice - discountAmount - pointsDiscount);
   
   // Tax calculations (Estimated only, NOT added to grandTotal)
   let federalTax = 0;
@@ -320,6 +341,34 @@ const Cart: React.FC = () => {
                     </form>
                   )}
 
+                  {/* Resgate de pontos de fidelidade */}
+                  {isAuthenticated && availablePoints > 0 && (
+                    <div className="bg-purple-50 dark:bg-purple-950/20 border border-dashed border-purple-300 rounded-xl p-3">
+                      <label className="text-xs font-bold text-purple-700 uppercase flex items-center justify-between gap-1.5 mb-2">
+                        <span className="flex items-center gap-1.5"><Sparkles className="w-3.5 h-3.5" /> Usar pontos</span>
+                        <span className="font-semibold normal-case">{availablePoints} disp. · 1 pt = ¥1</span>
+                      </label>
+                      <div className="flex gap-2">
+                        <input
+                          type="number" min={0} max={maxRedeemable}
+                          value={pointsToUse || ''}
+                          onChange={(e) => setPointsToUse(Math.max(0, Math.min(maxRedeemable, Number(e.target.value) || 0)))}
+                          placeholder="0"
+                          className="flex-1 px-3 py-2 text-sm rounded-lg border border-purple-300 bg-background font-bold"
+                        />
+                        <Button type="button" variant="secondary" onClick={() => setPointsToUse(maxRedeemable)} className="px-3 text-xs font-bold whitespace-nowrap">
+                          Usar máx.
+                        </Button>
+                      </div>
+                      {redeemPoints > 0 && (
+                        <p className="text-[11px] text-purple-700 font-semibold mt-1.5">
+                          −{formatPrice(pointsDiscount, currency)} de desconto ({redeemPoints} pts)
+                          <button onClick={() => setPointsToUse(0)} className="text-muted-foreground hover:underline ml-2">limpar</button>
+                        </p>
+                      )}
+                    </div>
+                  )}
+
                   {/* Price Summary List */}
                   <div className="space-y-3 pt-2 border-t border-border">
                     <div className="flex justify-between text-sm">
@@ -345,6 +394,15 @@ const Cart: React.FC = () => {
                             ×
                           </button>
                         </span>
+                      </div>
+                    )}
+
+                    {pointsDiscount > 0 && (
+                      <div className="flex justify-between text-sm text-purple-700 font-bold bg-purple-50/60 p-2 rounded-lg border border-dashed border-purple-200">
+                        <span className="flex items-center gap-1">
+                          <Sparkles className="w-3.5 h-3.5 shrink-0" /> Pontos ({redeemPoints} pts)
+                        </span>
+                        <span>-{formatPrice(pointsDiscount, currency)}</span>
                       </div>
                     )}
 

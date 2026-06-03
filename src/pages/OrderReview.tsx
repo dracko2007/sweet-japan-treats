@@ -23,7 +23,10 @@ import { Wallet } from 'lucide-react';
 const OrderReview: React.FC = () => {
   const { items, clearCart } = useCart();
   const { consumeCouponByCode, user, addPoints } = useUser();
-  const [pointsToUse, setPointsToUse] = useState(0);
+  const [pointsToUse, setPointsToUse] = useState<number>(() => {
+    const v = Number(safeStorage.getItem('redeem_points'));
+    return Number.isFinite(v) && v > 0 ? v : 0;
+  });
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
@@ -271,6 +274,7 @@ const OrderReview: React.FC = () => {
 
     // Clear cart upon final purchase order creation
     clearCart();
+    safeStorage.removeItem('redeem_points');
 
     // Navigate to confirmation page
     navigate('/order-confirmation', {

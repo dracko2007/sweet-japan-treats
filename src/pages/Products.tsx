@@ -80,7 +80,7 @@ const Products: React.FC = () => {
                 type="text"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder={t('productsPage.searchPlaceholder') || 'Buscar produto por nome, sabor...'}
+                placeholder="Pesquisar produto por nome, sabor..."
                 className="w-full pl-12 pr-11 py-3 rounded-full border border-border bg-card text-foreground shadow-sm focus:ring-2 focus:ring-primary focus:outline-none transition"
               />
               {query && (
