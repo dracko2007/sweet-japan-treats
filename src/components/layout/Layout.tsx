@@ -3,7 +3,6 @@ import { useLocation } from 'react-router-dom';
 import Header from './Header';
 import Footer from './Footer';
 import KimiClawAssistant from '../KimiClawAssistant';
-import AdminPreviewBar from './AdminPreviewBar';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -20,7 +19,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       </main>
       <Footer />
       {!isAdminPage && <KimiClawAssistant />}
-      <AdminPreviewBar />
     </div>
   );
 };
