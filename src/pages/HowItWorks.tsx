@@ -23,7 +23,7 @@ const JOURNEY = [
   },
   {
     icon: CreditCard, color: '#f59e0b', title: 'Pagamento',
-    desc: 'Você paga por PIX (Brasil), PayPay (Japão) ou Wise (internacional). Só preparamos o pacote depois do pagamento confirmado.',
+    desc: 'Você paga por PIX ou Wise (Brasil), PayPay (Japão) ou Wise (internacional). Só preparamos o pacote depois do pagamento confirmado.',
   },
   {
     icon: Package, color: '#8b5cf6', title: 'Preparo em Hiroshima',
@@ -173,8 +173,8 @@ const PAYMENTS = [
     ],
   },
   {
-    id: 'wise', icon: Globe2, color: '#3b82f6', label: 'Wise', tag: 'Internacional 🌍',
-    short: 'Transferência internacional barata (Europa e outros países).',
+    id: 'wise', icon: Globe2, color: '#3b82f6', label: 'Wise', tag: 'Brasil 🇧🇷 & Internacional 🌍',
+    short: 'Transferência internacional barata — Brasil, Europa e outros países.',
     steps: [
       'No checkout, escolha Wise.',
       'Você recebe um link de cobrança Wise (ou Wisetag).',
