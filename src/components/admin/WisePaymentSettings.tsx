@@ -3,9 +3,11 @@ import { Loader2, Save, Wallet } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { paymentSettingsService, PaymentSettings } from '@/services/paymentSettingsService';
 import { useToast } from '@/hooks/use-toast';
+import { useUser } from '@/context/UserContext';
 
 const WisePaymentSettings: React.FC = () => {
   const { toast } = useToast();
+  const { permissions } = useUser();
   const [settings, setSettings] = useState<PaymentSettings | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -13,6 +15,8 @@ const WisePaymentSettings: React.FC = () => {
     paymentSettingsService.get().then(setSettings);
   }, []);
 
+  // Configuração de pagamento é financeiro → só nível 3
+  if (!permissions.canFinancial) return null;
   if (!settings) return null;
 
   const save = async () => {

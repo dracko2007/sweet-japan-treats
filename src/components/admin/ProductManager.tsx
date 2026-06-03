@@ -5,6 +5,7 @@ import { Product } from '@/types';
 import { useProducts } from '@/context/ProductsContext';
 import { productService } from '@/services/productService';
 import { useToast } from '@/hooks/use-toast';
+import { useUser } from '@/context/UserContext';
 
 const CATEGORIES = [
   { id: 'cosmeticos', label: 'Cosméticos', icon: '🧴' },
@@ -70,6 +71,8 @@ const emptyForm = (): Product => ({
 const ProductManager: React.FC = () => {
   const { products, refresh } = useProducts();
   const { toast } = useToast();
+  const { permissions } = useUser();
+  const canPrice = permissions.canFinancial; // preço/custo só nível 3
   const [editing, setEditing] = useState<Product | null>(null);
   const [isNew, setIsNew] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -276,7 +279,8 @@ const ProductManager: React.FC = () => {
                     value={editing.prices.small || ''}
                     onChange={(e) => setEditing({ ...editing, prices: { ...editing.prices, small: Number(e.target.value) } })}
                     placeholder="980"
-                    className="w-full px-3 py-2 rounded-lg border border-border bg-background"
+                    disabled={!canPrice}
+                    className="w-full px-3 py-2 rounded-lg border border-border bg-background disabled:opacity-60 disabled:cursor-not-allowed"
                   />
                 </div>
                 <div>
@@ -286,11 +290,14 @@ const ProductManager: React.FC = () => {
                     value={editing.prices.large || ''}
                     onChange={(e) => setEditing({ ...editing, prices: { ...editing.prices, large: Number(e.target.value) } })}
                     placeholder="2400"
-                    className="w-full px-3 py-2 rounded-lg border border-border bg-background"
+                    disabled={!canPrice}
+                    className="w-full px-3 py-2 rounded-lg border border-border bg-background disabled:opacity-60 disabled:cursor-not-allowed"
                   />
                 </div>
               </div>
-              <p className="text-xs text-muted-foreground -mt-2">Preços em ienes (¥). O site converte automático para R$/€ conforme o país.</p>
+              <p className="text-xs text-muted-foreground -mt-2">
+                {canPrice ? 'Preços em ienes (¥). O site converte automático para R$/€ conforme o país.' : '🔒 Preço/custo só podem ser alterados por admin nível 3.'}
+              </p>
 
               {/* Custo de aquisição — SÓ ADMIN, não aparece para o cliente */}
               <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
@@ -302,7 +309,8 @@ const ProductManager: React.FC = () => {
                   value={editing.cost || ''}
                   onChange={(e) => setEditing({ ...editing, cost: Number(e.target.value) })}
                   placeholder="Quanto você pagou no produto (ex: 500)"
-                  className="w-full px-3 py-2 rounded-lg border border-amber-300 bg-background"
+                  disabled={!canPrice}
+                  className="w-full px-3 py-2 rounded-lg border border-amber-300 bg-background disabled:opacity-60 disabled:cursor-not-allowed"
                 />
                 {editing.cost && editing.prices.small ? (
                   <p className="text-xs text-amber-800 dark:text-amber-300 mt-1.5">

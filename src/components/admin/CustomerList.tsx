@@ -9,6 +9,7 @@ import Pagination from '@/components/Pagination';
 import { firebaseSyncService } from '@/services/firebaseSyncService';
 import { ensureAdminAuth } from '@/utils/adminAuth';
 import { requireAdminPassword } from '@/utils/adminGuard';
+import { useUser } from '@/context/UserContext';
 import type { Coupon } from '@/context/UserContext';
 
 const CustomerList: React.FC = () => {
@@ -16,6 +17,8 @@ const CustomerList: React.FC = () => {
   const [overview, setOverview] = useState<any>(null);
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerStats | null>(null);
   const { toast } = useToast();
+  const { permissions } = useUser();
+  const denyDelete = () => toast({ title: 'Sem permissão', description: 'Seu nível não permite excluir. (Nível 2+)', variant: 'destructive' });
   const customersPagination = usePagination(customers, 8);
 
   // Concessão de cupom (admin → perfil do cliente)
@@ -121,6 +124,7 @@ const CustomerList: React.FC = () => {
   };
 
   const handleDeleteCustomerOrders = async (email: string, customerName: string) => {
+    if (!permissions.canDelete) return denyDelete();
     if (!confirm(`Deletar histórico de pedidos de "${customerName}"?\n\n⚠️ Essa ação não pode ser desfeita!`)) {
       return;
     }
@@ -144,6 +148,7 @@ const CustomerList: React.FC = () => {
   };
 
   const handleDeleteCustomer = async (email: string, customerName: string) => {
+    if (!permissions.canDelete) return denyDelete();
     if (!confirm(`Deletar cliente "${customerName}" e TODO seu histórico?\n\n⚠️ Essa ação não pode ser desfeita!`)) {
       return;
     }
@@ -167,6 +172,7 @@ const CustomerList: React.FC = () => {
   };
 
   const handleDeleteAllCustomers = async () => {
+    if (!permissions.canDelete) return denyDelete();
     if (!confirm('⚠️ DELETAR TODOS OS CLIENTES?\n\nEssa ação é IRREVERSÍVEL e removerá tudo!')) {
       return;
     }
@@ -186,6 +192,10 @@ const CustomerList: React.FC = () => {
   };
 
   const handleDeleteAllOrderHistory = async () => {
+    if (!permissions.canFinancial) {
+      toast({ title: 'Sem permissão', description: 'Resetar histórico é financeiro (Nível 3).', variant: 'destructive' });
+      return;
+    }
     if (!confirm('⚠️ DELETAR TODO O HISTÓRICO DE PEDIDOS?\n\nEssa ação é IRREVERSÍVEL!')) {
       return;
     }

@@ -79,6 +79,12 @@ service cloud.firestore {
       allow read, update, delete: if request.auth != null;
     }
 
+    // ---------- Administradores e níveis ----------
+    match /admins/{adminEmail} {
+      allow read: if request.auth != null;   // app lê o nível do admin logado
+      allow write: if isAdmin();              // só o super-admin adiciona/remove
+    }
+
     // ---------- Settings (manutenção, config) ----------
     match /settings/{docId} {
       allow read: if true;                // todos leem (saber se está em manutenção)

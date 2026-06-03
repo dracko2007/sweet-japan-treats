@@ -4,11 +4,16 @@ import { Button } from '@/components/ui/button';
 import { orderService } from '@/services/orderService';
 import { useToast } from '@/hooks/use-toast';
 import { requireAdminPassword } from '@/utils/adminGuard';
+import { useUser } from '@/context/UserContext';
 
 // Botão de RESET TOTAL do histórico de pedidos (localStorage + Firestore).
 const ResetOrdersButton: React.FC = () => {
   const { toast } = useToast();
+  const { permissions } = useUser();
   const [busy, setBusy] = useState(false);
+
+  // Resetar histórico é financeiro → só nível 3
+  if (!permissions.canFinancial) return null;
 
   const handleReset = async () => {
     const ok = window.confirm(

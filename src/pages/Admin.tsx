@@ -1,7 +1,7 @@
 import { safeStorage } from '@/utils/storage';
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Package, Printer, ShoppingBag, User, MapPin, Phone, Mail, Calendar, TestTube, Tag, Truck, CheckCircle, XCircle, Trash2, BarChart3, Users, PackagePlus, Video, Megaphone, Clapperboard, Building2, Sparkles } from 'lucide-react';
+import { Package, Printer, ShoppingBag, User, MapPin, Phone, Mail, Calendar, TestTube, Tag, Truck, CheckCircle, XCircle, Trash2, BarChart3, Users, PackagePlus, Video, Megaphone, Clapperboard, Building2, Sparkles, ShieldCheck } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { useUser } from '@/context/UserContext';
@@ -19,6 +19,7 @@ import HomeContentManager from '@/components/admin/HomeContentManager';
 import VlogManager from '@/components/admin/VlogManager';
 import CustomRequestManager from '@/components/admin/CustomRequestManager';
 import B2BRequestManager from '@/components/admin/B2BRequestManager';
+import AdminAccessManager from '@/components/admin/AdminAccessManager';
 import TrackingModal from '@/components/admin/TrackingModal';
 import { orderService } from '@/services/orderService';
 import { customerService } from '@/services/customerService';
@@ -28,7 +29,7 @@ import Pagination from '@/components/Pagination';
 
 type AdminTab =
   | 'orders' | 'coupons' | 'dashboard' | 'customers' | 'products'
-  | 'home' | 'vlog' | 'affiliates' | 'requests' | 'b2b';
+  | 'home' | 'vlog' | 'affiliates' | 'requests' | 'b2b' | 'admins';
 
 interface AdminTabItem {
   id: AdminTab;
@@ -39,7 +40,7 @@ interface AdminTabItem {
 
 const Admin: React.FC = () => {
   const navigate = useNavigate();
-  const { user } = useUser();
+  const { user, permissions } = useUser();
   const { toast } = useToast();
   const [allOrders, setAllOrders] = useState<any[]>([]);
   const [ordersLoading, setOrdersLoading] = useState(true);
@@ -138,6 +139,10 @@ const Admin: React.FC = () => {
   };
 
   const handleDeleteOrder = async (orderNumber: string) => {
+    if (!permissions.canDelete) {
+      toast({ title: 'Sem permissão', description: 'Seu nível de admin não permite excluir. (Nível 2+)', variant: 'destructive' });
+      return;
+    }
     if (!confirm(`Tem certeza que deseja excluir o pedido ${orderNumber}?`)) {
       return;
     }
@@ -411,6 +416,10 @@ _This is an automated test message_
       { id: 'home', label: 'Início', icon: Video },
       { id: 'vlog', label: 'Vlog', icon: Clapperboard },
     ] },
+    // Só nível 3 vê o gerenciamento de administradores
+    ...(permissions.canManageAdmins
+      ? [{ title: 'Configurações', items: [{ id: 'admins' as AdminTab, label: 'Administradores', icon: ShieldCheck }] }]
+      : []),
   ];
   const allTabs: AdminTabItem[] = tabGroups.flatMap((g) => g.items);
   const activeLabel = allTabs.find((t) => t.id === activeTab)?.label || '';
@@ -790,6 +799,8 @@ _This is an automated test message_
               <CustomRequestManager />
             ) : activeTab === 'b2b' ? (
               <B2BRequestManager />
+            ) : activeTab === 'admins' ? (
+              <AdminAccessManager />
             ) : (
               <CustomerList />
             )}

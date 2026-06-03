@@ -4,6 +4,7 @@ import { firebaseSyncService } from '@/services/firebaseSyncService';
 import { firebaseConfigReady, allowLocalOnly, auth } from '@/config/firebase';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { ADMIN_EMAIL, ADMIN_PASSWORD, ADMIN_USER_ID, isAdminEmail } from '@/config/admin';
+import { adminService } from '@/services/adminService';
 
 export interface UserProfile {
   id: string;
@@ -87,6 +88,8 @@ interface UserContextType {
   isAuthenticated: boolean;
   isAdmin: boolean;          // agindo como admin (conta admin E modo != cliente)
   isAdminAccount: boolean;   // a conta É admin (independente do modo escolhido)
+  adminRole: number;         // 0=não admin, 1/2/3
+  permissions: { canDelete: boolean; canFinancial: boolean; canManageAdmins: boolean };
   loginAs: 'admin' | 'user' | null;
   setLoginAs: (mode: 'admin' | 'user') => void;
   coupons: Coupon[];
@@ -134,6 +137,15 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     setLoginAsState(mode);
     safeStorage.setItem('loginAs', mode);
   };
+  // Nível do admin (0=não admin, 1/2/3). Super-admin = 3 imediato; demais via Firestore.
+  const [adminRole, setAdminRole] = useState(0);
+  useEffect(() => {
+    if (!user?.email) { setAdminRole(0); return; }
+    if (isAdminEmail(user.email)) { setAdminRole(3); return; }
+    let active = true;
+    adminService.getRole(user.email).then((r) => { if (active) setAdminRole(r); });
+    return () => { active = false; };
+  }, [user?.email]);
 
   const normalizeEmail = (email: string) => email.trim().toLowerCase();
 
@@ -921,10 +933,16 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
   const value: UserContextType = {
     user,
     isAuthenticated,
-    // É admin a conta? (super-admin por e-mail/id)
-    isAdminAccount: user?.id === ADMIN_USER_ID || isAdminEmail(user?.email),
+    // É admin a conta? (super-admin OU nível carregado do Firestore)
+    isAdminAccount: adminRole > 0 || isAdminEmail(user?.email),
     // Está AGINDO como admin? Só se a conta é admin E não escolheu modo cliente.
-    isAdmin: (user?.id === ADMIN_USER_ID || isAdminEmail(user?.email)) && loginAs !== 'user',
+    isAdmin: (adminRole > 0 || isAdminEmail(user?.email)) && loginAs !== 'user',
+    adminRole,
+    permissions: {
+      canDelete: adminRole >= 2,
+      canFinancial: adminRole >= 3,
+      canManageAdmins: adminRole >= 3,
+    },
     loginAs,
     setLoginAs,
     coupons,
