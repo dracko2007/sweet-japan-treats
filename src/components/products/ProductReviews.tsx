@@ -1,12 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Star, ThumbsUp, Camera, X, Video, Gift, PlayCircle } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
+import { Star, Video, PlayCircle, ShoppingBag } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { useUser } from '@/context/UserContext';
 import { reviewService } from '@/services/reviewService';
 import { Review, ProductRating } from '@/types/review';
-import { pointsService, POINTS } from '@/services/pointsService';
-import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
 // Converte um link de vídeo (YouTube) em URL embutível; senão devolve null.
@@ -20,140 +17,24 @@ interface ProductReviewsProps {
   productName: string;
 }
 
-const ProductReviews: React.FC<ProductReviewsProps> = ({ productId, productName }) => {
-  const { user, addPoints } = useUser();
-  const { toast } = useToast();
+// Página do produto: SOMENTE LEITURA das avaliações.
+// A avaliação é feita pelo cliente no histórico de pedidos (só quem comprou avalia).
+const ProductReviews: React.FC<ProductReviewsProps> = ({ productId }) => {
+  const { isAuthenticated } = useUser();
   const [reviews, setReviews] = useState<Review[]>([]);
   const [rating, setRating] = useState<ProductRating | null>(null);
-  const [canReview, setCanReview] = useState(false);
-  
-  // Form state
-  const [showForm, setShowForm] = useState(false);
-  const [selectedRating, setSelectedRating] = useState(0);
-  const [hoverRating, setHoverRating] = useState(0);
-  const [comment, setComment] = useState('');
-  const [images, setImages] = useState<string[]>([]);
-  const [videoUrl, setVideoUrl] = useState('');
-  const [alreadyHasVideo, setAlreadyHasVideo] = useState(false);
 
   useEffect(() => {
-    loadReviews();
+    setReviews(reviewService.getProductReviews(productId));
+    setRating(reviewService.getProductRating(productId));
   }, [productId]);
 
-  useEffect(() => {
-    if (user) {
-      setCanReview(reviewService.canUserReview(user.id, productId));
-      pointsService.hasVideoForProduct(user.id, productId).then(setAlreadyHasVideo);
-    }
-  }, [user, productId, reviews]);
-
-  const loadReviews = () => {
-    const productReviews = reviewService.getProductReviews(productId);
-    const productRating = reviewService.getProductRating(productId);
-    setReviews(productReviews);
-    setRating(productRating);
-  };
-
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files) return;
-
-    Array.from(files).forEach(file => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImages(prev => [...prev, reader.result as string]);
-      };
-      reader.readAsDataURL(file);
-    });
-  };
-
-  const handleSubmit = () => {
-    if (!user) {
-      toast({
-        title: 'Erro',
-        description: 'Faça login para avaliar',
-        variant: 'destructive'
-      });
-      return;
-    }
-
-    if (selectedRating === 0) {
-      toast({
-        title: 'Erro',
-        description: 'Selecione uma avaliação',
-        variant: 'destructive'
-      });
-      return;
-    }
-
-    if (comment.trim().length < 10) {
-      toast({
-        title: 'Erro',
-        description: 'Escreva pelo menos 10 caracteres',
-        variant: 'destructive'
-      });
-      return;
-    }
-
-    const trimmedVideo = videoUrl.trim();
-
-    // 1 ponto pela avaliação (qualquer nota), 1 por produto
-    reviewService.addReview({
-      productId,
-      userId: user.id,
-      userName: user.name,
-      rating: selectedRating,
-      comment: comment.trim(),
-      images: images.length > 0 ? images : undefined,
-      videoUrl: trimmedVideo || undefined,
-      pointsAwarded: POINTS.perReview,
-      verified: reviewService.hasPurchased(user.id, productName)
-    });
-    addPoints(POINTS.perReview);
-
-    // Vídeo de review → vai para validação do admin (pontos só depois de aprovado)
-    let videoMsg = '';
-    if (trimmedVideo && !alreadyHasVideo) {
-      pointsService.submitVideo({
-        userId: user.id,
-        userName: user.name,
-        userEmail: user.email,
-        productId,
-        productName,
-        videoUrl: trimmedVideo,
-      });
-      setAlreadyHasVideo(true);
-      videoMsg = ' Seu vídeo foi enviado para validação — os pontos do vídeo entram após a aprovação do time.';
-    } else if (trimmedVideo && alreadyHasVideo) {
-      videoMsg = ' (Você já tinha enviado um vídeo deste produto.)';
-    }
-
-    toast({
-      title: `🎉 Avaliação enviada! +${POINTS.perReview} ponto`,
-      description: `Você agora tem ${(user.points || 0) + POINTS.perReview} pontos.` + videoMsg,
-    });
-
-    // Reset form
-    setShowForm(false);
-    setSelectedRating(0);
-    setComment('');
-    setImages([]);
-    setVideoUrl('');
-    loadReviews();
-  };
-
-  const renderStars = (rating: number, size: 'sm' | 'md' | 'lg' = 'md') => {
+  const renderStars = (value: number, size: 'sm' | 'md' | 'lg' = 'md') => {
     const sizeClass = size === 'sm' ? 'w-4 h-4' : size === 'md' ? 'w-5 h-5' : 'w-6 h-6';
     return (
       <div className="flex gap-1">
         {[1, 2, 3, 4, 5].map((star) => (
-          <Star
-            key={star}
-            className={cn(
-              sizeClass,
-              star <= rating ? 'fill-gold text-gold' : 'text-gray-300'
-            )}
-          />
+          <Star key={star} className={cn(sizeClass, star <= value ? 'fill-gold text-gold' : 'text-gray-300')} />
         ))}
       </div>
     );
@@ -161,7 +42,7 @@ const ProductReviews: React.FC<ProductReviewsProps> = ({ productId, productName 
 
   return (
     <div className="space-y-6">
-      {/* Rating Summary */}
+      {/* Resumo das notas */}
       {rating && rating.totalReviews > 0 && (
         <div className="bg-card rounded-xl border border-border p-6">
           <div className="flex items-start gap-6">
@@ -170,16 +51,13 @@ const ProductReviews: React.FC<ProductReviewsProps> = ({ productId, productName 
               {renderStars(Math.round(rating.averageRating), 'lg')}
               <p className="text-sm text-muted-foreground mt-2">{rating.totalReviews} avaliações</p>
             </div>
-            
             <div className="flex-1 space-y-2">
               {[5, 4, 3, 2, 1].map((star) => (
                 <div key={star} className="flex items-center gap-3">
                   <span className="text-sm font-medium w-12">{star} {renderStars(star, 'sm')}</span>
                   <div className="flex-1 h-2 bg-secondary rounded-full overflow-hidden">
-                    <div 
-                      className="h-full bg-gold"
-                      style={{ width: `${(rating.ratings[star as keyof typeof rating.ratings] / rating.totalReviews) * 100}%` }}
-                    />
+                    <div className="h-full bg-gold"
+                      style={{ width: `${(rating.ratings[star as keyof typeof rating.ratings] / rating.totalReviews) * 100}%` }} />
                   </div>
                   <span className="text-sm text-muted-foreground w-8">{rating.ratings[star as keyof typeof rating.ratings]}</span>
                 </div>
@@ -189,125 +67,23 @@ const ProductReviews: React.FC<ProductReviewsProps> = ({ productId, productName 
         </div>
       )}
 
-      {/* Write Review Button */}
-      {canReview && !showForm && (
-        <Button onClick={() => setShowForm(true)} className="w-full">
-          Escrever Avaliação
-        </Button>
-      )}
+      {/* Aviso: avaliação é feita pelo histórico de pedidos */}
+      <div className="flex items-start gap-3 bg-secondary/40 border border-border rounded-xl p-4">
+        <ShoppingBag className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+        <p className="text-sm text-muted-foreground">
+          As avaliações são feitas por quem comprou o produto.{' '}
+          {isAuthenticated ? (
+            <>Avalie pelos seus pedidos em <Link to="/perfil" className="text-primary font-semibold hover:underline">Meu Perfil → Histórico de Compras</Link>.</>
+          ) : (
+            <>Faça login e avalie pelo seu histórico de compras.</>
+          )}
+        </p>
+      </div>
 
-      {/* Review Form */}
-      {showForm && (
-        <div className="bg-card rounded-xl border border-border p-6 space-y-4">
-          <h3 className="font-semibold text-lg">Avaliar {productName}</h3>
-
-          {/* Banner de pontos */}
-          <div className="flex items-start gap-3 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-xl p-3">
-            <Gift className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
-            <div className="text-xs text-amber-900 leading-relaxed">
-              <p className="font-bold mb-0.5">Ganhe pontos de fidelidade!</p>
-              Avaliar = <b>+{POINTS.perReview} ponto</b> · vídeo de review = <b>+{POINTS.perVideoMinute} pts por minuto</b> (1 min = 5, 2 min = 10), liberado após validação do time. 1 avaliação e 1 vídeo por produto.
-            </div>
-          </div>
-
-          {/* Star Rating */}
-          <div>
-            <label className="block text-sm font-medium mb-2">Sua Avaliação</label>
-            <div className="flex gap-2">
-              {[1, 2, 3, 4, 5].map((star) => (
-                <button
-                  key={star}
-                  type="button"
-                  onClick={() => setSelectedRating(star)}
-                  onMouseEnter={() => setHoverRating(star)}
-                  onMouseLeave={() => setHoverRating(0)}
-                >
-                  <Star
-                    className={cn(
-                      'w-8 h-8 transition-colors',
-                      star <= (hoverRating || selectedRating)
-                        ? 'fill-gold text-gold'
-                        : 'text-gray-300 hover:text-gold'
-                    )}
-                  />
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Comment */}
-          <div>
-            <label className="block text-sm font-medium mb-2">Seu Comentário</label>
-            <Textarea
-              value={comment}
-              onChange={(e) => setComment(e.target.value)}
-              placeholder="Compartilhe sua experiência com este produto..."
-              rows={4}
-            />
-          </div>
-
-          {/* Images */}
-          <div>
-            <label className="block text-sm font-medium mb-2">Adicionar Fotos (opcional)</label>
-            <div className="space-y-3">
-              <div className="flex flex-wrap gap-2">
-                {images.map((img, index) => (
-                  <div key={index} className="relative">
-                    <img src={img} alt="" loading="lazy" className="w-20 h-20 object-cover rounded-lg" />
-                    <button
-                      onClick={() => setImages(prev => prev.filter((_, i) => i !== index))}
-                      className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  </div>
-                ))}
-                {images.length < 5 && (
-                  <label className="w-20 h-20 border-2 border-dashed border-border rounded-lg flex items-center justify-center cursor-pointer hover:border-primary">
-                    <Camera className="w-6 h-6 text-muted-foreground" />
-                    <input
-                      type="file"
-                      accept="image/*"
-                      multiple
-                      className="hidden"
-                      onChange={handleImageUpload}
-                    />
-                  </label>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Video de unboxing (link) */}
-          <div>
-            <label className="block text-sm font-medium mb-2 flex items-center gap-1.5">
-              <Video className="w-4 h-4" /> Vídeo de review <span className="text-amber-600 font-bold">(+{POINTS.perVideoMinute} pts/min, após validação)</span>
-            </label>
-            <input
-              type="url"
-              value={videoUrl}
-              onChange={(e) => setVideoUrl(e.target.value)}
-              disabled={alreadyHasVideo}
-              placeholder={alreadyHasVideo ? 'Você já enviou um vídeo deste produto' : 'Cole o link do seu vídeo (YouTube, Instagram, TikTok)'}
-              className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm disabled:opacity-60"
-            />
-            <p className="text-xs text-muted-foreground mt-1">Grave seu review, publique no YouTube/Insta e cole o link. O time confere e libera os pontos (5 por minuto). 1 vídeo por produto.</p>
-          </div>
-
-          {/* Actions */}
-          <div className="flex gap-3">
-            <Button onClick={handleSubmit} className="flex-1">Enviar Avaliação</Button>
-            <Button variant="outline" onClick={() => setShowForm(false)}>Cancelar</Button>
-          </div>
-        </div>
-      )}
-
-      {/* Reviews List */}
+      {/* Lista de avaliações */}
       <div className="space-y-4">
         {reviews.length === 0 ? (
-          <p className="text-center text-muted-foreground py-8">
-            Seja o primeiro a avaliar este produto!
-          </p>
+          <p className="text-center text-muted-foreground py-8">Este produto ainda não tem avaliações.</p>
         ) : (
           reviews.map((review) => (
             <div key={review.id} className="bg-card rounded-xl border border-border p-6">
@@ -316,31 +92,22 @@ const ProductReviews: React.FC<ProductReviewsProps> = ({ productId, productName 
                   <div className="flex items-center gap-2 mb-1">
                     <span className="font-semibold">{review.userName}</span>
                     {review.verified && (
-                      <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">
-                        ✓ Compra Verificada
-                      </span>
+                      <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">✓ Compra Verificada</span>
                     )}
                   </div>
                   {renderStars(review.rating)}
                 </div>
-                <span className="text-sm text-muted-foreground">
-                  {new Date(review.date).toLocaleDateString('pt-BR')}
-                </span>
+                <span className="text-sm text-muted-foreground">{new Date(review.date).toLocaleDateString('pt-BR')}</span>
               </div>
-              
+
               <p className="text-foreground mb-3">{review.comment}</p>
-              
+
               {review.images && review.images.length > 0 && (
                 <div className="flex gap-2 mb-3 flex-wrap">
                   {review.images.map((img, index) => (
-                    <img
-                      key={index}
-                      src={img}
-                      alt=""
-                      loading="lazy"
+                    <img key={index} src={img} alt="" loading="lazy"
                       className="w-24 h-24 object-cover rounded-lg cursor-pointer hover:opacity-80"
-                      onClick={() => window.open(img, '_blank')}
-                    />
+                      onClick={() => window.open(img, '_blank')} />
                   ))}
                 </div>
               )}
@@ -349,22 +116,15 @@ const ProductReviews: React.FC<ProductReviewsProps> = ({ productId, productName 
                 <div className="mb-3">
                   {getYouTubeEmbed(review.videoUrl) ? (
                     <div className="relative w-full max-w-md aspect-video rounded-lg overflow-hidden border border-border">
-                      <iframe
-                        src={getYouTubeEmbed(review.videoUrl)!}
-                        title="Vídeo de unboxing"
+                      <iframe src={getYouTubeEmbed(review.videoUrl)!} title="Vídeo de review"
                         className="absolute inset-0 w-full h-full"
                         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                        allowFullScreen
-                      />
+                        allowFullScreen />
                     </div>
                   ) : (
-                    <a
-                      href={review.videoUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline"
-                    >
-                      <PlayCircle className="w-5 h-5" /> Ver vídeo de unboxing
+                    <a href={review.videoUrl} target="_blank" rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline">
+                      <PlayCircle className="w-5 h-5" /> Ver vídeo de review
                     </a>
                   )}
                 </div>
@@ -372,7 +132,7 @@ const ProductReviews: React.FC<ProductReviewsProps> = ({ productId, productName 
 
               {review.videoUrl && (
                 <span className="inline-flex items-center gap-1 text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">
-                  <Video className="w-3 h-3" /> Vídeo de unboxing
+                  <Video className="w-3 h-3" /> Vídeo de review
                 </span>
               )}
             </div>

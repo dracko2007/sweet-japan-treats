@@ -13,6 +13,9 @@ import { addAddressHints } from '@/utils/romanize';
 import { useProducts } from '@/context/ProductsContext';
 import { isValidEmail, isValidPhone, isNonEmpty, maskPhone } from '@/utils/validation';
 import { affiliateService } from '@/services/affiliateService';
+import { reviewService } from '@/services/reviewService';
+import ReviewModal from '@/components/products/ReviewModal';
+import { Star } from 'lucide-react';
 
 const Profile: React.FC = () => {
   const { user, isAuthenticated, coupons, orders, updateProfile, logout } = useUser();
@@ -22,6 +25,11 @@ const Profile: React.FC = () => {
   const { toast } = useToast();
   const [isEditing, setIsEditing] = useState(false);
   const [editedUser, setEditedUser] = useState<Partial<UserProfile>>(user || {});
+
+  // Avaliação a partir do histórico de pedidos
+  const [reviewTarget, setReviewTarget] = useState<{ id: string; name: string } | null>(null);
+  const [reviewBump, setReviewBump] = useState(0); // força recálculo de "já avaliou"
+  const findProductId = (name: string) => products.find((p) => p.name === name)?.id;
 
   // Mostra o atalho do painel de afiliado só se a conta for de um influencer
   const [isAffiliate, setIsAffiliate] = useState(false);
@@ -670,14 +678,33 @@ const Profile: React.FC = () => {
                       })()}
 
                       <div className="space-y-2">
-                        {order.items.map((item, idx) => (
-                          <div key={idx} className="flex justify-between text-sm">
-                            <span className="text-muted-foreground">
-                              {item.productName} ({item.size}) × {item.quantity}
-                            </span>
-                            <span className="font-medium">¥{(item.price * item.quantity).toLocaleString()}</span>
-                          </div>
-                        ))}
+                        {order.items.map((item, idx) => {
+                          const pid = findProductId(item.productName);
+                          const reviewed = pid && user ? !reviewService.canUserReview(user.id, pid) : false;
+                          void reviewBump; // dependência p/ recalcular após avaliar
+                          return (
+                            <div key={idx} className="flex justify-between items-center gap-2 text-sm">
+                              <span className="text-muted-foreground flex-1 min-w-0">
+                                {item.productName} ({item.size}) × {item.quantity}
+                              </span>
+                              {pid && (
+                                reviewed ? (
+                                  <span className="text-[11px] text-green-600 font-semibold flex items-center gap-1 shrink-0">
+                                    <Star className="w-3.5 h-3.5 fill-green-600" /> Avaliado
+                                  </span>
+                                ) : (
+                                  <button
+                                    onClick={() => setReviewTarget({ id: pid, name: item.productName })}
+                                    className="text-[11px] font-semibold text-primary border border-primary/30 rounded-full px-2.5 py-1 hover:bg-primary/5 flex items-center gap-1 shrink-0"
+                                  >
+                                    <Star className="w-3.5 h-3.5" /> Avaliar
+                                  </button>
+                                )
+                              )}
+                              <span className="font-medium shrink-0">¥{(item.price * item.quantity).toLocaleString()}</span>
+                            </div>
+                          );
+                        })}
                       </div>
 
                       {/* Order breakdown: subtotal, coupon, shipping, total */}
@@ -774,6 +801,15 @@ const Profile: React.FC = () => {
           </div>
         </div>
       </section>
+
+      {reviewTarget && (
+        <ReviewModal
+          productId={reviewTarget.id}
+          productName={reviewTarget.name}
+          onClose={() => setReviewTarget(null)}
+          onDone={() => setReviewBump((n) => n + 1)}
+        />
+      )}
     </Layout>
   );
 };
