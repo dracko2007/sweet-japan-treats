@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils';
 import { useLanguage } from '@/context/LanguageContext';
 import { getTranslatedProductName, getTranslatedProductDesc, getTranslatedProductFlavor } from '@/data/translations';
 import { formatPrice } from '@/utils/currency';
+import { effectiveYen, baseYen, hasDiscount } from '@/utils/pricing';
 
 interface ProductCardProps {
   product: Product;
@@ -41,14 +42,16 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
   const isEuro = ['Portugal', 'França', 'Itália', 'Espanha'].includes(selectedCountry);
   const currency = selectedCountry === 'Japão' ? 'JPY' : (isEuro ? 'EUR' : 'BRL');
 
-  const getDisplayPrice = (size: 'small' | 'large') => {
-    const basePrice = size === 'small' ? product.prices.small : product.prices.large;
-    if (selectedCountry === 'Japão') return basePrice;
-    if (isEuro) return (basePrice / 28) * 0.16;
-    return basePrice / 28;
+  const convertYen = (yen: number) => {
+    if (selectedCountry === 'Japão') return yen;
+    if (isEuro) return (yen / 28) * 0.16;
+    return yen / 28;
   };
+  const getDisplayPrice = (size: 'small' | 'large') => convertYen(effectiveYen(product, size));
 
   const currentPrice = getDisplayPrice(selectedSize);
+  const promoActive = hasDiscount(product);
+  const originalPrice = convertYen(baseYen(product, selectedSize));
 
   const handleAddToCart = () => {
     addToCart(product, selectedSize, quantity);
@@ -149,13 +152,25 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
           </div>
         )}
         
+        {/* Tag de desconto (promoção) */}
+        {promoActive && (
+          <div className="absolute top-4 left-4 z-20">
+            <span className="px-3 py-1.5 rounded-full text-xs font-extrabold bg-red-600 text-white shadow-md animate-pulse">
+              -{product.discountPercent}% OFF
+            </span>
+          </div>
+        )}
+
         {/* Category Badge */}
-        <div className="absolute top-4 left-4 z-10">
+        <div className={cn('absolute left-4 z-10', promoActive ? 'top-14' : 'top-4')}>
           <span className="px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wide bg-primary text-primary-foreground shadow-sm">
-            {product.category === 'cosmeticos' ? 'Cosméticos 🧴' : 
-             product.category === 'acessorios' ? 'Acessórios 🎮' : 
-             product.category === 'doces' ? 'Doces & Chás 🍵' : 
-             product.category === 'papelaria' ? 'Papelaria ✏️' : 'Importado 🌸'}
+            {product.category === 'cosmeticos' ? 'Cosméticos 🧴' :
+             product.category === 'acessorios' ? 'Acessórios 🎮' :
+             product.category === 'doces' ? 'Doces & Chás 🍵' :
+             product.category === 'papelaria' ? 'Papelaria ✏️' :
+             product.category === 'eletronicos' ? 'Eletrônicos 📱' :
+             product.category === 'masculino' ? 'Masculino 👔' :
+             product.category === 'vestuario' ? 'Vestuário 👕' : 'Importado 🌸'}
           </span>
         </div>
 
@@ -208,9 +223,16 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
         {/* Price display */}
         <div className="mt-auto mb-4 flex items-center justify-between border-b pb-3 border-border/50">
           <span className="text-sm font-semibold text-muted-foreground">Valor:</span>
-          <span className="text-xl font-bold text-primary">
-            {formatPrice(currentPrice, currency)}
-          </span>
+          <div className="flex flex-col items-end leading-tight">
+            {promoActive && (
+              <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 line-through decoration-2">
+                {formatPrice(originalPrice, currency)}
+              </span>
+            )}
+            <span className={cn('text-xl font-bold', promoActive ? 'text-red-600' : 'text-primary')}>
+              {formatPrice(currentPrice, currency)}
+            </span>
+          </div>
         </div>
 
         {/* Quantity & Add to Cart */}

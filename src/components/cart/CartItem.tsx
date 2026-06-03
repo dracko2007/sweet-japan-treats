@@ -5,6 +5,7 @@ import { useCart } from '@/context/CartContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { getTranslatedProductName, getTranslatedProductFlavor } from '@/data/translations';
 import { formatPrice } from '@/utils/currency';
+import { effectiveYen } from '@/utils/pricing';
 
 interface CartItemProps {
   item: CartItemType;
@@ -13,7 +14,7 @@ interface CartItemProps {
 const CartItemComponent: React.FC<CartItemProps> = ({ item }) => {
   const { updateQuantity, removeFromCart } = useCart();
   const { t, selectedCountry } = useLanguage();
-  const basePrice = item.size === 'small' ? item.product.prices.small : item.product.prices.large;
+  const basePrice = effectiveYen(item.product, item.size);
 
   // Compute translated values
   const productName = getTranslatedProductName(item.product.id, t);

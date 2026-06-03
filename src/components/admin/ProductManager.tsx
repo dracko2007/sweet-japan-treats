@@ -12,6 +12,9 @@ const CATEGORIES = [
   { id: 'doces', label: 'Doces & Chás', icon: '🍵' },
   { id: 'acessorios', label: 'Acessórios', icon: '🎮' },
   { id: 'papelaria', label: 'Papelaria', icon: '✏️' },
+  { id: 'eletronicos', label: 'Eletrônicos', icon: '📱' },
+  { id: 'masculino', label: 'Masculino', icon: '👔' },
+  { id: 'vestuario', label: 'Vestuário', icon: '👕' },
 ];
 
 const categoryLabel = (id: string) => CATEGORIES.find((c) => c.id === id)?.label || id;
@@ -191,8 +194,8 @@ const ProductManager: React.FC = () => {
             ) : (
               <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {group.items.map((p) => (
-                  <div key={p.id} className="bg-card border border-border rounded-xl overflow-hidden flex shadow-sm">
-                    <div className="w-24 h-24 bg-secondary/40 flex-shrink-0">
+                  <div key={p.id} className={`bg-card border rounded-xl overflow-hidden flex shadow-sm ${p.hidden ? 'border-dashed border-gray-300 opacity-70' : 'border-border'}`}>
+                    <div className="w-24 h-24 bg-secondary/40 flex-shrink-0 relative">
                       {p.image ? (
                         <img src={p.image} alt={p.name} className="w-full h-full object-cover" />
                       ) : (
@@ -200,10 +203,23 @@ const ProductManager: React.FC = () => {
                           <ImageIcon className="w-6 h-6" />
                         </div>
                       )}
+                      {p.discountPercent ? (
+                        <span className="absolute top-0 left-0 bg-red-600 text-white text-[9px] font-extrabold px-1.5 py-0.5 rounded-br">-{p.discountPercent}%</span>
+                      ) : null}
                     </div>
                     <div className="p-3 flex-1 min-w-0 flex flex-col">
-                      <p className="font-semibold text-sm leading-tight line-clamp-2">{p.name}</p>
-                      <p className="text-xs text-primary font-bold mt-1">¥ {p.prices.small.toLocaleString()}</p>
+                      <p className="font-semibold text-sm leading-tight line-clamp-2 flex items-center gap-1">
+                        {p.hidden && <span className="text-[9px] font-bold bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 px-1.5 py-0.5 rounded shrink-0">OCULTO</span>}
+                        {p.name}
+                      </p>
+                      {p.discountPercent ? (
+                        <p className="text-xs mt-1">
+                          <s className="text-gray-400">¥{p.prices.small.toLocaleString()}</s>{' '}
+                          <span className="text-red-600 font-bold">¥{Math.round(p.prices.small * (1 - p.discountPercent / 100)).toLocaleString()}</span>
+                        </p>
+                      ) : (
+                        <p className="text-xs text-primary font-bold mt-1">¥ {p.prices.small.toLocaleString()}</p>
+                      )}
                       <div className="mt-auto flex gap-1 pt-2">
                         <button onClick={() => openEdit(p)} className="flex-1 text-xs py-1.5 rounded-lg bg-secondary hover:bg-secondary/70 flex items-center justify-center gap-1">
                           <Pencil className="w-3.5 h-3.5" /> Editar
@@ -298,6 +314,52 @@ const ProductManager: React.FC = () => {
               <p className="text-xs text-muted-foreground -mt-2">
                 {canPrice ? 'Preços em ienes (¥). O site converte automático para R$/€ conforme o país.' : '🔒 Preço/custo só podem ser alterados por admin nível 3.'}
               </p>
+
+              {/* Desconto promocional + Ocultar */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900 rounded-lg p-3">
+                  <label className="text-sm font-semibold block mb-1 flex items-center gap-1.5">🏷️ Desconto (%)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={99}
+                    value={editing.discountPercent || ''}
+                    onChange={(e) => {
+                      const v = Math.max(0, Math.min(99, Number(e.target.value) || 0));
+                      setEditing({ ...editing, discountPercent: v });
+                    }}
+                    placeholder="0 = sem promoção"
+                    disabled={!canPrice}
+                    className="w-full px-3 py-2 rounded-lg border border-red-300 bg-background disabled:opacity-60 disabled:cursor-not-allowed"
+                  />
+                  {editing.discountPercent ? (
+                    <p className="text-xs text-red-700 dark:text-red-300 mt-1.5">
+                      De <s>¥{editing.prices.small.toLocaleString()}</s> por <strong>¥{Math.round(editing.prices.small * (1 - editing.discountPercent / 100)).toLocaleString()}</strong> (pequeno)
+                    </p>
+                  ) : (
+                    <p className="text-[11px] text-red-600/70 mt-1.5">Mostra a tag de promoção no produto.</p>
+                  )}
+                </div>
+
+                <div className="bg-secondary/40 border border-border rounded-lg p-3 flex flex-col justify-center">
+                  <label className="text-sm font-semibold block mb-2 flex items-center gap-1.5">👁️ Publicação</label>
+                  <button
+                    type="button"
+                    onClick={() => setEditing({ ...editing, hidden: !editing.hidden })}
+                    className={`flex items-center justify-between gap-2 px-3 py-2 rounded-lg border text-sm font-semibold transition-colors ${
+                      editing.hidden
+                        ? 'bg-gray-200 dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-300'
+                        : 'bg-green-100 dark:bg-green-950/30 text-green-700 dark:text-green-300 border-green-300'
+                    }`}
+                  >
+                    <span>{editing.hidden ? '🙈 Oculto (não aparece)' : '✅ Publicado na loja'}</span>
+                    <span className={`w-9 h-5 rounded-full relative transition-colors ${editing.hidden ? 'bg-gray-400' : 'bg-green-500'}`}>
+                      <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-all ${editing.hidden ? 'left-0.5' : 'left-4'}`} />
+                    </span>
+                  </button>
+                  <p className="text-[11px] text-muted-foreground mt-1.5">Oculto = fica registrado, mas o cliente não vê.</p>
+                </div>
+              </div>
 
               {/* Custo de aquisição — SÓ ADMIN, não aparece para o cliente */}
               <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3">

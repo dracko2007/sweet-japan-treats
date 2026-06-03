@@ -13,6 +13,8 @@ export interface Product {
   video?: string; // Vídeo do produto (opcional)
   flavor: string;
   deliveryRestrict?: 'Japão';
+  hidden?: boolean;          // Registrado mas não publicado na loja (oculto do cliente)
+  discountPercent?: number;  // Desconto promocional em % (0–100). >0 ativa a promoção.
 }
 
 export interface CartItem {

@@ -17,6 +17,7 @@ import { useToast } from '@/hooks/use-toast';
 import { usePostalCodeLookup } from '@/hooks/usePostalCodeLookup';
 import { useLanguage, CountryType } from '@/context/LanguageContext';
 import { formatPrice } from '@/utils/currency';
+import { effectiveYen } from '@/utils/pricing';
 import { getTranslatedProductName } from '@/data/translations';
 import { isValidEmail, isValidCPF, isValidPhone, isNonEmpty, maskPhone, runValidations, FieldErrors } from '@/utils/validation';
 import DemoBanner from '@/components/DemoBanner';
@@ -48,7 +49,7 @@ const Checkout: React.FC = () => {
   const currency = formData.country === 'Japão' ? 'JPY' : (isEuro ? 'EUR' : 'BRL');
 
   const baseTotalPrice = items.reduce((sum, item) => {
-    const basePrice = item.size === 'small' ? item.product.prices.small : item.product.prices.large;
+    const basePrice = effectiveYen(item.product, item.size);
     let unitPrice = basePrice;
     if (formData.country === 'Japão') {
       unitPrice = basePrice;
@@ -698,7 +699,7 @@ const Checkout: React.FC = () => {
 
                 <div className="space-y-4">
                   {items.map((item) => {
-                    const basePrice = item.size === 'small' ? item.product.prices.small : item.product.prices.large;
+                    const basePrice = effectiveYen(item.product, item.size);
                     let displayUnitPrice = basePrice;
                     if (formData.country === 'Japão') {
                       displayUnitPrice = basePrice;

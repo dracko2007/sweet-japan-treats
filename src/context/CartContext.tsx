@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { CartItem, Product } from '@/types';
 import { safeStorage } from '@/utils/storage';
+import { effectiveYen } from '@/utils/pricing';
 
 const CART_STORAGE_KEY = 'sakura_cart';
 
@@ -81,7 +82,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
 
   const totalPrice = items.reduce((sum, item) => {
-    const price = item.size === 'small' ? item.product.prices.small : item.product.prices.large;
+    const price = effectiveYen(item.product, item.size);
     return sum + price * item.quantity;
   }, 0);
 

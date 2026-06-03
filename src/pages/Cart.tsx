@@ -9,6 +9,7 @@ import { useLanguage } from '@/context/LanguageContext';
 import { useUser, Coupon } from '@/context/UserContext';
 import { useNavigate } from 'react-router-dom';
 import { formatPrice } from '@/utils/currency';
+import { effectiveYen } from '@/utils/pricing';
 import { affiliateService, Affiliate } from '@/services/affiliateService';
 import { safeStorage } from '@/utils/storage';
 
@@ -114,7 +115,7 @@ const Cart: React.FC = () => {
   const currency = selectedCountry === 'Japão' ? 'JPY' : (isEuro ? 'EUR' : 'BRL');
   
   const baseTotalPrice = items.reduce((sum, item) => {
-    const basePrice = item.size === 'small' ? item.product.prices.small : item.product.prices.large;
+    const basePrice = effectiveYen(item.product, item.size);
     let unitPrice = basePrice;
     if (selectedCountry === 'Japão') {
       unitPrice = basePrice;

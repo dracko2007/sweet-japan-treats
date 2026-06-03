@@ -16,6 +16,7 @@ import { cn } from '@/lib/utils';
 import { useLanguage } from '@/context/LanguageContext';
 import { getTranslatedProductName, getTranslatedProductDesc, getTranslatedProductFlavor } from '@/data/translations';
 import { formatPrice } from '@/utils/currency';
+import { effectiveYen, baseYen, hasDiscount } from '@/utils/pricing';
 
 const ProductDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -71,14 +72,16 @@ const ProductDetail: React.FC = () => {
   const isEuro = ['Portugal', 'França', 'Itália', 'Espanha'].includes(selectedCountry);
   const currency = selectedCountry === 'Japão' ? 'JPY' : (isEuro ? 'EUR' : 'BRL');
   
-  const getDisplayPrice = (size: 'small' | 'large') => {
-    const basePrice = size === 'small' ? product.prices.small : product.prices.large;
-    if (selectedCountry === 'Japão') return basePrice;
-    if (isEuro) return (basePrice / 28) * 0.16;
-    return basePrice / 28;
+  const convertYen = (yen: number) => {
+    if (selectedCountry === 'Japão') return yen;
+    if (isEuro) return (yen / 28) * 0.16;
+    return yen / 28;
   };
+  const getDisplayPrice = (size: 'small' | 'large') => convertYen(effectiveYen(product, size));
 
   const currentPrice = getDisplayPrice(selectedSize);
+  const promoActive = hasDiscount(product);
+  const originalPrice = convertYen(baseYen(product, selectedSize));
   const productRating = reviewService.getProductRating(product.id);
   const images = product.gallery && product.gallery.length > 0 ? product.gallery : [product.image];
 
@@ -206,9 +209,21 @@ const ProductDetail: React.FC = () => {
 
                 <div className="mb-6 border-b pb-4 border-border/50">
                   <span className="block text-sm font-semibold text-muted-foreground mb-1">Preço Unitário</span>
-                  <div className="text-3xl font-black text-primary">
-                    {formatPrice(currentPrice, currency)}
-                  </div>
+                  {promoActive ? (
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <span className="text-3xl font-black text-primary">{formatPrice(currentPrice, currency)}</span>
+                      <span className="text-lg font-semibold text-gray-500 dark:text-gray-400 line-through decoration-2">
+                        {formatPrice(originalPrice, currency)}
+                      </span>
+                      <span className="px-2.5 py-1 rounded-full bg-red-600 text-white text-xs font-extrabold shadow-sm">
+                        -{product.discountPercent}% OFF
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="text-3xl font-black text-primary">
+                      {formatPrice(currentPrice, currency)}
+                    </div>
+                  )}
                 </div>
 
                 <div className="mb-6">

@@ -6,11 +6,13 @@ import { useProducts } from '@/context/ProductsContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { getTranslatedProductName, getTranslatedProductDesc } from '@/data/translations';
 import { formatPrice } from '@/utils/currency';
+import { effectiveYen, hasDiscount } from '@/utils/pricing';
+import { cn } from '@/lib/utils';
 
 const FeaturedProducts: React.FC = () => {
   const { t, selectedCountry } = useLanguage();
   const { products } = useProducts();
-  const featuredProducts = products.slice(0, 4);
+  const featuredProducts = products.filter(p => !p.hidden).slice(0, 4);
 
   const isEuro = ['Portugal', 'França', 'Itália', 'Espanha'].includes(selectedCountry);
   const currency = selectedCountry === 'Japão' ? 'JPY' : isEuro ? 'EUR' : 'BRL';
@@ -40,7 +42,9 @@ const FeaturedProducts: React.FC = () => {
         {/* Products Grid */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 mb-12">
           {featuredProducts.map((product) => {
-            const smallPrice = getDisplayPrice(product.prices.small);
+            const promo = hasDiscount(product);
+            const smallPrice = getDisplayPrice(effectiveYen(product, 'small'));
+            const smallOriginal = getDisplayPrice(product.prices.small);
 
             return (
               <Link
@@ -56,6 +60,14 @@ const FeaturedProducts: React.FC = () => {
                     loading="lazy"
                     className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                   />
+
+                  {promo && (
+                    <div className="absolute top-2 right-2">
+                      <span className="bg-red-600 text-white font-black text-[10px] px-2 py-0.5 rounded-full shadow-sm">
+                        -{product.discountPercent}%
+                      </span>
+                    </div>
+                  )}
 
                   {/* Origin Tag (real, não fake) */}
                   <div className="absolute top-2 left-2">
@@ -83,8 +95,15 @@ const FeaturedProducts: React.FC = () => {
                   </div>
 
                   <div className="mt-4 flex items-baseline justify-between">
-                    <span className="text-lg md:text-xl font-bold text-primary">
-                      {formatPrice(smallPrice, currency)}
+                    <span className="flex items-baseline gap-1.5">
+                      <span className={cn('text-lg md:text-xl font-bold', promo ? 'text-red-600' : 'text-primary')}>
+                        {formatPrice(smallPrice, currency)}
+                      </span>
+                      {promo && (
+                        <span className="text-[11px] font-semibold text-gray-500 line-through">
+                          {formatPrice(smallOriginal, currency)}
+                        </span>
+                      )}
                     </span>
                     <span className="text-[11px] font-medium text-primary group-hover:underline">
                       Ver detalhes
