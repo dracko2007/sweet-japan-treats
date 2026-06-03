@@ -8,6 +8,7 @@ import { useProducts } from '@/context/ProductsContext';
 import { Product } from '@/types';
 import { safeStorage } from '@/utils/storage';
 import { formatPrice, getCurrencyByCountry } from '@/utils/currency';
+import { askQwen, qwenEnabled, QwenMsg } from '@/services/qwenService';
 import { toast } from 'sonner';
 
 interface ShippingOption {
@@ -527,14 +528,32 @@ const KimiClawAssistant: React.FC = () => {
     let responseText = '';
     if (query.includes('oi') || query.includes('ola') || query.includes('hello')) {
       responseText = 'Olá! Sou o KimiClaw AI. Posso buscar produtos, adicionar itens ao carrinho, mudar o idioma, calcular o frete ou inscrever você em novidades. O que deseja?';
-    } else {
-      const suggestions = language === 'pt'
-        ? 'Não encontrei isso. Minhas habilidades: 🔍 **buscar** produtos (ex: "kitkat", "calbee") | 📦 **calcular** frete | 🎟️ **cupom** | 📱 **novidades** | 🗑️ **limpar carrinho**'
-        : language === 'ja'
-          ? '機能: 🔍 商品検索 | 📦 送料計算 | 🎟️ クーポン | 📱 お知らせ | 🗑️ カート削除'
-          : "Didn't find that. My skills: 🔍 **search** products | 📦 **calculate** shipping | 🎟️ **coupon** | 📱 **news** | 🗑️ **clear cart**";
-      responseText = suggestions;
+      await addKimiMessageWithTyping(responseText);
+      return;
     }
+
+    // 9.5 IA (Qwen) — se houver chave configurada, responde de forma conversacional
+    if (qwenEnabled()) {
+      setIsTyping(true);
+      const history: QwenMsg[] = messages
+        .slice(-6)
+        .map((m) => ({ role: m.sender === 'kimi' ? 'assistant' : 'user', content: m.text } as QwenMsg));
+      history.push({ role: 'user', content: text });
+      const ai = await askQwen(history);
+      setIsTyping(false);
+      if (ai) {
+        await addKimiMessageWithTyping(ai);
+        return;
+      }
+    }
+
+    // Fallback por regras
+    const suggestions = language === 'pt'
+      ? 'Não encontrei isso. Minhas habilidades: 🔍 **buscar** produtos (ex: "kitkat", "calbee") | 📦 **calcular** frete | 🎟️ **cupom** | 📱 **novidades** | 🗑️ **limpar carrinho**'
+      : language === 'ja'
+        ? '機能: 🔍 商品検索 | 📦 送料計算 | 🎟️ クーポン | 📱 お知らせ | 🗑️ カート削除'
+        : "Didn't find that. My skills: 🔍 **search** products | 📦 **calculate** shipping | 🎟️ **coupon** | 📱 **news** | 🗑️ **clear cart**";
+    responseText = suggestions;
     await addKimiMessageWithTyping(responseText);
   };
 
