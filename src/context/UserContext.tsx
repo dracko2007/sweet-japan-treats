@@ -85,7 +85,10 @@ export interface Order {
 interface UserContextType {
   user: UserProfile | null;
   isAuthenticated: boolean;
-  isAdmin: boolean;
+  isAdmin: boolean;          // agindo como admin (conta admin E modo != cliente)
+  isAdminAccount: boolean;   // a conta É admin (independente do modo escolhido)
+  loginAs: 'admin' | 'user' | null;
+  setLoginAs: (mode: 'admin' | 'user') => void;
   coupons: Coupon[];
   orders: Order[];
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string; code?: string; needsVerification?: boolean }>;
@@ -122,6 +125,15 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  // Modo da sessão para contas admin: 'admin' (painel) ou 'user' (cliente).
+  // Escolhido no login; separa o admin do cliente para as telas não se misturarem.
+  const [loginAs, setLoginAsState] = useState<'admin' | 'user' | null>(
+    () => (safeStorage.getItem('loginAs') as 'admin' | 'user' | null) || null
+  );
+  const setLoginAs = (mode: 'admin' | 'user') => {
+    setLoginAsState(mode);
+    safeStorage.setItem('loginAs', mode);
+  };
 
   const normalizeEmail = (email: string) => email.trim().toLowerCase();
 
@@ -714,9 +726,11 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     setIsAuthenticated(false);
     setCoupons([]);
     setOrders([]);
-    
+    setLoginAsState(null);
+
     // Remove only current session, keep users database intact
     safeStorage.removeItem('user');
+    safeStorage.removeItem('loginAs');
     console.log('User logged out successfully');
   };
 
@@ -907,7 +921,12 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
   const value: UserContextType = {
     user,
     isAuthenticated,
-    isAdmin: user?.id === ADMIN_USER_ID || isAdminEmail(user?.email),
+    // É admin a conta? (super-admin por e-mail/id)
+    isAdminAccount: user?.id === ADMIN_USER_ID || isAdminEmail(user?.email),
+    // Está AGINDO como admin? Só se a conta é admin E não escolheu modo cliente.
+    isAdmin: (user?.id === ADMIN_USER_ID || isAdminEmail(user?.email)) && loginAs !== 'user',
+    loginAs,
+    setLoginAs,
     coupons,
     orders,
     login,
