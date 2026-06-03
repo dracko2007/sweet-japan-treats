@@ -18,6 +18,7 @@ import Register from "./pages/Register";
 import Login from "./pages/Login";
 import Profile from "./pages/Profile";
 import Shipping from "./pages/Shipping";
+import HowItWorks from "./pages/HowItWorks";
 import About from "./pages/About";
 import Vlog from "./pages/Vlog";
 import Admin from "./pages/Admin";
@@ -68,6 +69,7 @@ const App = () => (
                 <Route path="/login" element={<Login />} />
                 <Route path="/perfil" element={<Profile />} />
                 <Route path="/frete" element={<Shipping />} />
+                <Route path="/como-funciona" element={<HowItWorks />} />
                 <Route path="/sobre" element={<About />} />
                 <Route path="/vlog" element={<Vlog />} />
                 <Route path="/admin" element={<RequireAdmin><Admin /></RequireAdmin>} />
