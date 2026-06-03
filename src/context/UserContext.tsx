@@ -13,6 +13,7 @@ export interface UserProfile {
   phone: string;
   password?: string; // Stored for demo purposes - in production, use backend authentication
   birthdate?: string;
+  adminRole?: number;         // nível de admin (1/2/3) quando é sessão de admin
   personType?: 'PF' | 'PJ';   // Pessoa Física ou Jurídica
   cnpj?: string;              // se PJ
   razaoSocial?: string;       // se PJ
@@ -137,15 +138,8 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     setLoginAsState(mode);
     safeStorage.setItem('loginAs', mode);
   };
-  // Nível do admin (0=não admin, 1/2/3). Super-admin = 3 imediato; demais via Firestore.
-  const [adminRole, setAdminRole] = useState(0);
-  useEffect(() => {
-    if (!user?.email) { setAdminRole(0); return; }
-    if (isAdminEmail(user.email)) { setAdminRole(3); return; }
-    let active = true;
-    adminService.getRole(user.email).then((r) => { if (active) setAdminRole(r); });
-    return () => { active = false; };
-  }, [user?.email]);
+  // Nível do admin vem da própria sessão de admin (login por usuário/nome).
+  const adminRole = (user?.id === ADMIN_USER_ID ? (user?.adminRole || 0) : 0);
 
   const normalizeEmail = (email: string) => email.trim().toLowerCase();
 
@@ -339,6 +333,13 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     const unsubscribe = firebaseSyncService.onAuthChange(async (firebaseUser) => {
       if (firebaseUser) {
         console.log('🔥 [FIREBASE] Auth state changed - user logged in:', firebaseUser.uid);
+
+        // Sessão de ADMIN (login por usuário/nome): o Firebase está autenticado só para
+        // liberar escrita. NÃO sobrescrever com o perfil de cliente do Firestore.
+        try {
+          const stored = safeStorage.getItem('user');
+          if (stored && JSON.parse(stored)?.id === ADMIN_USER_ID) return;
+        } catch { /* ignore */ }
         
         // Block unverified users (except admin)
         if (!firebaseUser.emailVerified && firebaseUser.email !== 'dracko2007@gmail.com') {
@@ -444,43 +445,36 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
 
   const login = async (email: string, password: string): Promise<{ success: boolean; error?: string; code?: string; needsVerification?: boolean }> => {
     const normalizedEmail = normalizeEmail(email);
-    // Admin default - credenciais vêm de @/config/admin (env var com fallback)
-    if (isAdminEmail(email) && password === ADMIN_PASSWORD) {
+    // 1) LOGIN DE ADMIN por usuário/nome ("Administrador" ou nome cadastrado) + senha.
+    //    Separado dos e-mails de cliente — não mistura com a conta de cliente.
+    const admin = await adminService.authenticate(email, password);
+    if (admin) {
       const adminUser: UserProfile = {
         id: ADMIN_USER_ID,
-        name: 'Administrador',
-        email: ADMIN_EMAIL,
-        phone: '070-1367-1679',
+        name: admin.name,
+        email: ADMIN_EMAIL, // e-mail interno só p/ autenticar no Firebase (escrita no painel)
+        phone: '',
         password: ADMIN_PASSWORD,
-        address: {
-          postalCode: '000-0000',
-          prefecture: 'Tokyo',
-          city: 'Tokyo',
-          address: 'Admin',
-        },
-        createdAt: '2024-01-01T00:00:00.000Z',
+        adminRole: admin.role,
+        address: { postalCode: '', prefecture: '', city: '', address: '' },
+        createdAt: new Date().toISOString(),
       };
-      
+
       setUser(adminUser);
       setIsAuthenticated(true);
+      setCoupons([]);
+      setOrders([]);
+      safeStorage.setItem('user', JSON.stringify(adminUser));
 
-      const userCoupons = getUserCoupons(adminUser.id);
-      const userOrders = getUserOrders(adminUser.id);
-
-      setCoupons(userCoupons);
-      setOrders(userOrders);
-
-      // Também autentica no Firebase para liberar escrita no painel (produtos, etc.)
+      // Autentica no Firebase (conta admin compartilhada) p/ liberar escrita no painel
       if (auth) {
         try {
           await signInWithEmailAndPassword(auth, ADMIN_EMAIL, ADMIN_PASSWORD);
-          console.log('✅ Admin autenticado no Firebase (permissões de escrita ativas)');
         } catch (err) {
           console.warn('⚠️ Admin local OK, mas Firebase Auth falhou:', err);
         }
       }
-
-      console.log('✅ Admin logged in successfully');
+      console.log(`✅ Admin "${admin.name}" (nível ${admin.role}) logado`);
       return { success: true };
     }
     
@@ -937,9 +931,9 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
   const value: UserContextType = {
     user,
     isAuthenticated,
-    // Conta admin → sempre admin (sem modo cliente). Conta usuário → sempre usuário.
-    isAdminAccount: adminRole > 0 || isAdminEmail(user?.email),
-    isAdmin: adminRole > 0 || isAdminEmail(user?.email),
+    // Admin = logou pela sessão de admin (usuário/nome). Cliente = login por e-mail.
+    isAdminAccount: user?.id === ADMIN_USER_ID && adminRole > 0,
+    isAdmin: user?.id === ADMIN_USER_ID && adminRole > 0,
     adminRole,
     permissions: {
       canDelete: adminRole >= 2,

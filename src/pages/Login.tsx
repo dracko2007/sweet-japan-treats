@@ -186,18 +186,19 @@ const Login: React.FC = () => {
                     <div className="space-y-2">
                       <Label htmlFor="email" className="flex items-center gap-2">
                         <Mail className="w-4 h-4" />
-                        {t('auth.login.email')}
+                        E-mail ou usuário admin
                       </Label>
                       <Input
                         id="email"
                         name="email"
-                        type="email"
-                        placeholder="exemplo@email.com"
+                        type="text"
+                        placeholder="seu@email.com  ou  Administrador"
                         value={formData.email}
                         onChange={handleInputChange}
                         required
                         disabled={isLoading}
                       />
+                      <p className="text-[11px] text-muted-foreground">Cliente entra com e-mail. Admin entra com o nome de usuário (ex: <strong>Administrador</strong>).</p>
                     </div>
 
                     <div className="space-y-2">

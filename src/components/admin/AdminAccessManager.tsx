@@ -5,7 +5,6 @@ import { adminService, AdminEntry, AdminRole } from '@/services/adminService';
 import { useUser } from '@/context/UserContext';
 import { useToast } from '@/hooks/use-toast';
 import { requireAdminPassword } from '@/utils/adminGuard';
-import { isValidEmail } from '@/utils/validation';
 
 const ROLE_LABEL: Record<number, string> = {
   1: 'Nível 1 — vê e gerencia (sem deletar, sem financeiro)',
@@ -23,7 +22,8 @@ const AdminAccessManager: React.FC = () => {
   const { toast } = useToast();
   const [list, setList] = useState<AdminEntry[]>([]);
   const [loading, setLoading] = useState(true);
-  const [email, setEmail] = useState('');
+  const [name, setName] = useState('');
+  const [password, setPassword] = useState('');
   const [role, setRole] = useState<AdminRole>(1);
   const [saving, setSaving] = useState(false);
 
@@ -44,26 +44,26 @@ const AdminAccessManager: React.FC = () => {
   }
 
   const add = async () => {
-    if (!isValidEmail(email)) { toast({ title: 'E-mail inválido', variant: 'destructive' }); return; }
-    if (!requireAdminPassword(`adicionar o admin ${email}`)) return;
+    if (!name.trim()) { toast({ title: 'Informe o nome de usuário do admin', variant: 'destructive' }); return; }
+    if (password.length < 4) { toast({ title: 'Senha muito curta', description: 'Mínimo 4 caracteres.', variant: 'destructive' }); return; }
+    if (!requireAdminPassword(`adicionar o admin ${name}`)) return;
     setSaving(true);
-    const ok = await adminService.addAdmin(email.trim(), role, user?.email || '');
+    const res = await adminService.addAdmin(name, password, role, user?.name || '');
     setSaving(false);
-    if (ok) {
-      toast({ title: '✅ Admin adicionado', description: `${email} (nível ${role})` });
-      setEmail('');
-      setRole(1);
+    if (res.ok) {
+      toast({ title: '✅ Admin adicionado', description: `${name} (nível ${role})` });
+      setName(''); setPassword(''); setRole(1);
       load();
     } else {
-      toast({ title: 'Não foi possível adicionar', description: 'Verifique permissões/regras do Firestore.', variant: 'destructive' });
+      toast({ title: 'Não foi possível adicionar', description: res.error || 'Verifique as regras do Firestore.', variant: 'destructive' });
     }
   };
 
-  const remove = async (e: string) => {
-    if (!confirm(`Remover o acesso admin de ${e}?`)) return;
-    if (!requireAdminPassword(`remover o admin ${e}`)) return;
-    const ok = await adminService.removeAdmin(e);
-    if (ok) { toast({ title: 'Admin removido', description: e }); load(); }
+  const remove = async (username: string, displayName: string) => {
+    if (!confirm(`Remover o acesso admin de "${displayName}"?`)) return;
+    if (!requireAdminPassword(`remover o admin ${displayName}`)) return;
+    const ok = await adminService.removeAdmin(username);
+    if (ok) { toast({ title: 'Admin removido', description: displayName }); load(); }
     else toast({ title: 'Não foi possível remover', variant: 'destructive' });
   };
 
@@ -73,29 +73,27 @@ const AdminAccessManager: React.FC = () => {
         <h2 className="font-display text-2xl font-bold text-foreground flex items-center gap-2">
           <ShieldCheck className="w-6 h-6 text-primary" /> Administradores
         </h2>
-        <p className="text-sm text-muted-foreground">Gerencie quem tem acesso ao painel e o nível de cada um.</p>
+        <p className="text-sm text-muted-foreground">Quem acessa o painel e em qual nível. Cada admin loga com <strong>nome + senha</strong> (não usa e-mail de cliente).</p>
       </div>
 
       {/* Adicionar admin */}
       <div className="bg-card rounded-2xl border border-border p-5 mb-6">
         <h3 className="font-semibold mb-3 flex items-center gap-2"><Plus className="w-4 h-4" /> Adicionar admin</h3>
-        <div className="grid sm:grid-cols-[1fr_auto_auto] gap-3 items-end">
+        <div className="grid sm:grid-cols-[1fr_1fr_auto_auto] gap-3 items-end">
           <div>
-            <label className="text-xs font-semibold block mb-1">E-mail</label>
-            <input
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="pessoa@email.com"
-              className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm"
-            />
+            <label className="text-xs font-semibold block mb-1">Nome de usuário</label>
+            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex: João"
+              className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm" />
+          </div>
+          <div>
+            <label className="text-xs font-semibold block mb-1">Senha</label>
+            <input value={password} onChange={(e) => setPassword(e.target.value)} placeholder="senha do admin" type="text"
+              className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm" />
           </div>
           <div>
             <label className="text-xs font-semibold block mb-1">Nível</label>
-            <select
-              value={role}
-              onChange={(e) => setRole(Number(e.target.value) as AdminRole)}
-              className="px-3 py-2 rounded-lg border border-border bg-background text-sm"
-            >
+            <select value={role} onChange={(e) => setRole(Number(e.target.value) as AdminRole)}
+              className="px-3 py-2 rounded-lg border border-border bg-background text-sm">
               <option value={1}>Nível 1</option>
               <option value={2}>Nível 2</option>
               <option value={3}>Nível 3</option>
@@ -107,7 +105,7 @@ const AdminAccessManager: React.FC = () => {
         </div>
         <p className="text-[11px] text-muted-foreground mt-2">{ROLE_LABEL[role]}</p>
         <p className="text-[11px] text-amber-700 mt-1">
-          ℹ️ A pessoa precisa ter (ou criar) uma conta de cliente com este e-mail. Ao logar, ela escolhe entrar como Admin ou Cliente.
+          ℹ️ A pessoa loga na tela de login digitando esse <strong>nome</strong> (no lugar do e-mail) + a senha. Depois pode trocar a senha com você.
         </p>
       </div>
 
@@ -117,13 +115,13 @@ const AdminAccessManager: React.FC = () => {
       ) : (
         <div className="space-y-2">
           {list.map((a) => {
-            const isSuper = adminService.isSuperAdmin(a.email);
+            const isSuper = adminService.isSuper(a.username);
             return (
-              <div key={a.email} className="bg-card rounded-xl border border-border p-4 flex items-center justify-between gap-3">
+              <div key={a.username} className="bg-card rounded-xl border border-border p-4 flex items-center justify-between gap-3">
                 <div className="min-w-0">
                   <p className="font-semibold text-foreground flex items-center gap-1.5 truncate">
                     {isSuper && <Crown className="w-4 h-4 text-amber-500 shrink-0" />}
-                    {a.email}
+                    {a.name}
                   </p>
                   <span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-[11px] font-semibold ${ROLE_BADGE[a.role]}`}>
                     {ROLE_LABEL[a.role]}
@@ -132,7 +130,7 @@ const AdminAccessManager: React.FC = () => {
                 {isSuper ? (
                   <span className="text-xs text-muted-foreground shrink-0">fixo</span>
                 ) : (
-                  <Button onClick={() => remove(a.email)} variant="outline" size="sm" className="gap-1.5 text-red-600 shrink-0">
+                  <Button onClick={() => remove(a.username, a.name)} variant="outline" size="sm" className="gap-1.5 text-red-600 shrink-0">
                     <Trash2 className="w-4 h-4" /> Remover
                   </Button>
                 )}

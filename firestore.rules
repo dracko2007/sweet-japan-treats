@@ -80,9 +80,11 @@ service cloud.firestore {
     }
 
     // ---------- Administradores e níveis ----------
-    match /admins/{adminEmail} {
-      allow read: if request.auth != null;   // app lê o nível do admin logado
-      allow write: if isAdmin();              // só o super-admin adiciona/remove
+    // Login do admin é por usuário/nome + senha → a consulta acontece ANTES de
+    // autenticar, então a leitura precisa ser pública. (Demo: senha em texto.)
+    match /admins/{adminId} {
+      allow read: if true;
+      allow write: if isAdmin();   // só o super-admin (Firebase) cria/remove
     }
 
     // ---------- Settings (manutenção, config) ----------

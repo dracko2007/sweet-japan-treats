@@ -1,95 +1,100 @@
-// Gestão de administradores e níveis de acesso.
-// Nível 1: vê tudo, muda status, edita conteúdo — NÃO deleta, NÃO financeiro, NÃO add admin.
-// Nível 2: tudo do 1 + DELETAR (menos financeiro) — ainda NÃO add admin.
-// Nível 3: completo (financeiro + add/remover admins).
+// Administradores: login por USUÁRIO/NOME + senha (separado dos e-mails de cliente).
+// Super-admin: usuário "Administrador" + senha do config. Demais ficam no Firestore.
+// Nível 1: vê/gerencia (sem deletar, sem financeiro, sem add admin).
+// Nível 2: + deletar (sem financeiro/admin).  Nível 3: completo.
 import { db } from '@/config/firebase';
 import { collection, doc, getDoc, getDocs, setDoc, deleteDoc } from 'firebase/firestore';
 import { ensureAdminAuth } from '@/utils/adminAuth';
-import { ADMIN_EMAIL } from '@/config/admin';
+import { ADMIN_PASSWORD } from '@/config/admin';
 
 export type AdminRole = 1 | 2 | 3;
 
 export interface AdminEntry {
-  email: string;
+  username: string;   // identificador de login (normalizado)
+  name: string;       // nome exibido
   role: AdminRole;
-  name?: string;
   addedAt?: string;
   addedBy?: string;
 }
 
 const COL = 'admins';
-const norm = (e: string) => e.trim().toLowerCase();
-const SUPER_ADMIN = norm(ADMIN_EMAIL);
+// Normaliza nome/usuário para virar o id do login (minúsculo, sem acento/espaços extras)
+const slug = (s: string) =>
+  s.normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase().replace(/\s+/g, ' ');
+
+const SUPER = 'administrador';
 
 export const adminService = {
-  // Nível do e-mail. Super-admin sempre 3. Demais vêm do Firestore. 0 = não é admin.
-  async getRole(email?: string | null): Promise<number> {
-    if (!email) return 0;
-    const e = norm(email);
-    if (e === SUPER_ADMIN) return 3;
-    if (!db) return 0;
-    try {
-      const snap = await getDoc(doc(db, COL, e));
-      return snap.exists() ? Number((snap.data() as any).role) || 0 : 0;
-    } catch (err) {
-      console.warn('[admin] getRole falhou:', err);
-      return 0;
+  // Confere usuário/nome + senha. Retorna o admin (com role) ou null.
+  async authenticate(identifier: string, password: string): Promise<AdminEntry | null> {
+    const id = slug(identifier);
+    if (id === SUPER) {
+      return password === ADMIN_PASSWORD ? { username: SUPER, name: 'Administrador', role: 3 } : null;
     }
+    if (!db) return null;
+    try {
+      const snap = await getDoc(doc(db, COL, id));
+      if (snap.exists()) {
+        const d = snap.data() as any;
+        if (d.password === password) return { username: id, name: d.name || identifier, role: d.role };
+      }
+    } catch (e) {
+      console.warn('[admin] authenticate falhou:', e);
+    }
+    return null;
   },
 
   async getAdmins(): Promise<AdminEntry[]> {
-    const list: AdminEntry[] = [
-      { email: SUPER_ADMIN, role: 3, name: 'Super Admin', addedBy: 'sistema' },
-    ];
+    const list: AdminEntry[] = [{ username: SUPER, name: 'Administrador', role: 3, addedBy: 'sistema' }];
     if (!db) return list;
     try {
       await ensureAdminAuth();
       const snap = await getDocs(collection(db, COL));
       snap.forEach((d) => {
         const data = d.data() as any;
-        if (norm(d.id) !== SUPER_ADMIN) {
-          list.push({ email: d.id, role: data.role, name: data.name, addedAt: data.addedAt, addedBy: data.addedBy });
-        }
+        if (d.id !== SUPER) list.push({ username: d.id, name: data.name, role: data.role, addedAt: data.addedAt, addedBy: data.addedBy });
       });
-    } catch (err) {
-      console.warn('[admin] getAdmins falhou:', err);
+    } catch (e) {
+      console.warn('[admin] getAdmins falhou:', e);
     }
-    return list.sort((a, b) => b.role - a.role || a.email.localeCompare(b.email));
+    return list.sort((a, b) => b.role - a.role || a.name.localeCompare(b.name));
   },
 
-  async addAdmin(email: string, role: AdminRole, addedBy?: string, name?: string): Promise<boolean> {
-    if (!db) return false;
-    const e = norm(email);
-    if (e === SUPER_ADMIN) return false; // super-admin é fixo
+  async addAdmin(name: string, password: string, role: AdminRole, addedBy?: string): Promise<{ ok: boolean; error?: string }> {
+    if (!db) return { ok: false, error: 'Firebase indisponível' };
+    const id = slug(name);
+    if (!id) return { ok: false, error: 'Nome inválido' };
+    if (id === SUPER) return { ok: false, error: 'Nome reservado' };
+    if (!password || password.length < 4) return { ok: false, error: 'Senha muito curta (mín. 4)' };
     try {
       await ensureAdminAuth();
-      await setDoc(doc(db, COL, e), {
-        email: e,
+      await setDoc(doc(db, COL, id), {
+        name: name.trim(),
+        password,
         role,
-        name: name || '',
         addedAt: new Date().toISOString(),
         addedBy: addedBy || '',
       });
-      return true;
-    } catch (err) {
-      console.error('[admin] addAdmin falhou:', err);
-      return false;
+      return { ok: true };
+    } catch (e: any) {
+      console.error('[admin] addAdmin falhou:', e);
+      return { ok: false, error: e?.message };
     }
   },
 
-  async removeAdmin(email: string): Promise<boolean> {
+  async removeAdmin(username: string): Promise<boolean> {
     if (!db) return false;
-    const e = norm(email);
-    if (e === SUPER_ADMIN) return false; // não dá pra remover o super-admin
+    const id = slug(username);
+    if (id === SUPER) return false;
     try {
       await ensureAdminAuth();
-      await deleteDoc(doc(db, COL, e));
+      await deleteDoc(doc(db, COL, id));
       return true;
-    } catch (err) {
-      console.error('[admin] removeAdmin falhou:', err);
+    } catch (e) {
+      console.error('[admin] removeAdmin falhou:', e);
       return false;
     }
   },
 
-  isSuperAdmin: (email?: string | null) => !!email && norm(email) === SUPER_ADMIN,
+  isSuper: (username?: string) => !!username && slug(username) === SUPER,
 };
