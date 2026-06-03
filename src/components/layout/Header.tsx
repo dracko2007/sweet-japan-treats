@@ -52,8 +52,8 @@ const Header: React.FC = () => {
             </div>
           </Link>
 
-          {/* Desktop Navigation */}
-          <nav className="hidden xl:flex items-center gap-6">
+          {/* Desktop Navigation (escondida no painel admin) */}
+          <nav className={cn("items-center gap-6", isAdminPage ? "hidden" : "hidden xl:flex")}>
             {navItems.map((item) => (
               <div key={item.label} className="relative group">
                 {item.submenu ? (
@@ -115,10 +115,12 @@ const Header: React.FC = () => {
 
           {/* Cart, Language & Mobile Menu */}
           <div className="flex items-center gap-3">
-            {/* Country Switcher */}
-            <div className="hidden md:block">
-              <CountrySwitcher />
-            </div>
+            {/* Country Switcher (escondido no admin) */}
+            {!isAdminPage && (
+              <div className="hidden md:block">
+                <CountrySwitcher />
+              </div>
+            )}
 
             {/* Language Switcher (escondido no admin — só português lá) */}
             {!isAdminPage && (
@@ -127,7 +129,7 @@ const Header: React.FC = () => {
               </div>
             )}
 
-            {/* Admin Link - visível apenas para administradores */}
+            {/* Admin: no painel mostra "Ver Loja"; na loja mostra "Painel Admin" */}
             {isAdmin && (
               <Button
                 asChild
@@ -135,10 +137,17 @@ const Header: React.FC = () => {
                 size="sm"
                 className="hidden lg:flex items-center gap-2 text-orange-600 hover:text-orange-700"
               >
-                <Link to="/admin">
-                  <UserCircle className="w-5 h-5 text-primary animate-pulse" />
-                  <span>{t('nav.admin')}</span>
-                </Link>
+                {isAdminPage ? (
+                  <Link to="/">
+                    <ShoppingCart className="w-5 h-5 text-primary" />
+                    <span>Ver Loja</span>
+                  </Link>
+                ) : (
+                  <Link to="/admin">
+                    <UserCircle className="w-5 h-5 text-primary animate-pulse" />
+                    <span>{t('nav.admin')}</span>
+                  </Link>
+                )}
               </Button>
             )}
             
@@ -154,10 +163,10 @@ const Header: React.FC = () => {
               </Link>
             </Button>
 
-            {/* Wishlist Button */}
-            {isAuthenticated && (
-              <Link 
-                to="/favoritos" 
+            {/* Wishlist Button (escondido no admin) */}
+            {isAuthenticated && !isAdminPage && (
+              <Link
+                to="/favoritos"
                 className="relative p-2 rounded-full hover:bg-secondary/50 transition-colors hidden lg:block"
                 title={t('nav.favorites')}
               >
@@ -165,17 +174,20 @@ const Header: React.FC = () => {
               </Link>
             )}
 
-            <Link 
-              to="/carrinho" 
-              className="relative p-2 rounded-full hover:bg-secondary/50 transition-colors"
-            >
-              <ShoppingCart className="w-6 h-6 text-foreground" />
-              {totalItems > 0 && (
-                <span className="absolute -top-1 -right-1 w-5 h-5 bg-primary text-primary-foreground text-xs font-bold rounded-full flex items-center justify-center">
-                  {totalItems}
-                </span>
-              )}
-            </Link>
+            {/* Carrinho (escondido no admin) */}
+            {!isAdminPage && (
+              <Link
+                to="/carrinho"
+                className="relative p-2 rounded-full hover:bg-secondary/50 transition-colors"
+              >
+                <ShoppingCart className="w-6 h-6 text-foreground" />
+                {totalItems > 0 && (
+                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-primary text-primary-foreground text-xs font-bold rounded-full flex items-center justify-center">
+                    {totalItems}
+                  </span>
+                )}
+              </Link>
+            )}
 
             <button
               className="xl:hidden p-2 rounded-full hover:bg-secondary/50 transition-colors"
@@ -189,13 +201,15 @@ const Header: React.FC = () => {
         {/* Mobile Navigation */}
         {isMenuOpen && (
           <nav className="xl:hidden py-4 border-t border-border animate-fade-up">
-            {/* Mobile Language & Country Switcher */}
-            <div className="flex flex-col items-center gap-3 pb-4 mb-4 border-b border-border">
-              <CountrySwitcher />
-              {!isAdminPage && <LanguageSwitcher />}
-            </div>
+            {/* Switchers (escondidos no admin) */}
+            {!isAdminPage && (
+              <div className="flex flex-col items-center gap-3 pb-4 mb-4 border-b border-border">
+                <CountrySwitcher />
+                <LanguageSwitcher />
+              </div>
+            )}
 
-            {navItems.map((item) => (
+            {!isAdminPage && navItems.map((item) => (
               <div key={item.label}>
                 <Link
                   to={item.href}
@@ -233,11 +247,11 @@ const Header: React.FC = () => {
                 {isAuthenticated ? (user?.name?.split(' ')[0] || t('nav.profile')) : t('nav.register')}
               </Link>
             </Button>
-            {/* Wishlist Mobile */}
-            {isAuthenticated && (
-              <Button 
+            {/* Wishlist Mobile (escondido no admin) */}
+            {isAuthenticated && !isAdminPage && (
+              <Button
                 asChild
-                variant="ghost" 
+                variant="ghost"
                 className="w-full justify-start text-base font-medium"
               >
                 <Link to="/favoritos" onClick={() => setIsMenuOpen(false)}>
@@ -246,17 +260,24 @@ const Header: React.FC = () => {
                 </Link>
               </Button>
             )}
-            {/* Admin Mobile - Visible for testing convenience */}
+            {/* Admin/Loja Mobile */}
             {isAdmin && (
               <Button
                 asChild
                 variant="ghost"
                 className="w-full justify-start text-base font-medium text-orange-600 hover:text-orange-700"
               >
-                <Link to="/admin" onClick={() => setIsMenuOpen(false)}>
-                  <UserCircle className="w-5 h-5 mr-2 text-primary animate-pulse" />
-                  {t('nav.admin')}
-                </Link>
+                {isAdminPage ? (
+                  <Link to="/" onClick={() => setIsMenuOpen(false)}>
+                    <ShoppingCart className="w-5 h-5 mr-2 text-primary" />
+                    Ver Loja
+                  </Link>
+                ) : (
+                  <Link to="/admin" onClick={() => setIsMenuOpen(false)}>
+                    <UserCircle className="w-5 h-5 mr-2 text-primary animate-pulse" />
+                    {t('nav.admin')}
+                  </Link>
+                )}
               </Button>
             )}
           </nav>
