@@ -11,7 +11,10 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useToast } from '@/hooks/use-toast';
 import { useLanguage } from '@/context/LanguageContext';
 import { formatPrice } from '@/utils/currency';
+import { effectiveYen } from '@/utils/pricing';
+import { pointsForSpendYen, POINTS } from '@/services/pointsService';
 import { getTranslatedProductName } from '@/data/translations';
+import { Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { firebaseSyncService } from '@/services/firebaseSyncService';
 import { paymentSettingsService } from '@/services/paymentSettingsService';
@@ -19,7 +22,8 @@ import { Wallet } from 'lucide-react';
 
 const OrderReview: React.FC = () => {
   const { items, clearCart } = useCart();
-  const { consumeCouponByCode, user } = useUser();
+  const { consumeCouponByCode, user, addPoints } = useUser();
+  const [pointsToUse, setPointsToUse] = useState(0);
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
@@ -58,23 +62,29 @@ const OrderReview: React.FC = () => {
   const isEurope = ['Portugal', 'França', 'Itália', 'Espanha'].includes(formData.country);
   const currency = isJapan ? 'JPY' : (isEurope ? 'EUR' : 'BRL');
 
+  const convertYen = (yen: number) => isJapan ? yen : isEurope ? (yen / 28) * 0.16 : yen / 28;
+
+  // Subtotal dos produtos em ¥ (já com desconto promocional, sem frete) — base dos pontos
+  const productSubtotalYen = items.reduce(
+    (sum, item) => sum + effectiveYen(item.product, item.size) * item.quantity, 0
+  );
+
   // Base Total Price (subtotal before discounts/taxes) in target currency
-  const baseTotalPrice = items.reduce((sum, item) => {
-    const basePrice = item.size === 'small' ? item.product.prices.small : item.product.prices.large;
-    let unitPrice = basePrice;
-    if (isJapan) {
-      unitPrice = basePrice;
-    } else if (isEurope) {
-      unitPrice = (basePrice / 28) * 0.16;
-    } else {
-      unitPrice = basePrice / 28; // BRL
-    }
-    return sum + unitPrice * item.quantity;
-  }, 0);
+  const baseTotalPrice = items.reduce(
+    (sum, item) => sum + convertYen(effectiveYen(item.product, item.size)) * item.quantity, 0
+  );
+
+  // Resgate de pontos (1 ponto = ¥1). Não pode passar do valor dos produtos.
+  const availablePoints = user?.points || 0;
+  const maxRedeemable = Math.min(availablePoints, Math.floor(productSubtotalYen / POINTS.yenPerPoint));
+  const redeemPoints = Math.max(0, Math.min(pointsToUse, maxRedeemable));
+  const pointsDiscount = convertYen(redeemPoints * POINTS.yenPerPoint); // desconto na moeda exibida
+  // Pontos ganhos pelo gasto em produtos (descontando o que foi pago com pontos)
+  const earnedPoints = pointsForSpendYen(Math.max(0, productSubtotalYen - redeemPoints * POINTS.yenPerPoint));
 
   // PIX gets 5% additional discount (Temu high conversion strategy) - ONLY for Brazil
   const isPix = paymentMethod === 'pix';
-  const subtotalWithCoupon = baseTotalPrice - couponDiscount;
+  const subtotalWithCoupon = Math.max(0, baseTotalPrice - couponDiscount - pointsDiscount);
   const pixDiscount = (formData.country === 'Brasil' && isPix) ? subtotalWithCoupon * 0.05 : 0;
   const priceAfterPix = subtotalWithCoupon - pixDiscount;
   
@@ -150,15 +160,7 @@ const OrderReview: React.FC = () => {
       trackingCode: trackingCode,
       date: new Date().toLocaleDateString('pt-BR'),
       items: items.map(item => {
-        const basePrice = item.size === 'small' ? item.product.prices.small : item.product.prices.large;
-        let finalUnitPrice = basePrice;
-        if (isJapan) {
-          finalUnitPrice = basePrice;
-        } else if (isEurope) {
-          finalUnitPrice = (basePrice / 28) * 0.16;
-        } else {
-          finalUnitPrice = basePrice / 28; // BRL
-        }
+        const finalUnitPrice = convertYen(effectiveYen(item.product, item.size));
         return {
           id: item.product.id,
           name: getTranslatedProductName(item.product.id, t),
@@ -252,14 +254,29 @@ const OrderReview: React.FC = () => {
       consumeCouponByCode(appliedCoupon.code);
     }
 
+    // 🎁 Pontos de fidelidade: deduz o resgate e credita o ganho pelo gasto.
+    if (user) {
+      const net = earnedPoints - redeemPoints;
+      if (net !== 0) addPoints(net);
+      if (redeemPoints > 0 || earnedPoints > 0) {
+        toast({
+          title: '🎁 Pontos atualizados',
+          description: [
+            redeemPoints > 0 ? `-${redeemPoints} usados como desconto` : '',
+            earnedPoints > 0 ? `+${earnedPoints} ganhos nesta compra` : '',
+          ].filter(Boolean).join(' · '),
+        });
+      }
+    }
+
     // Clear cart upon final purchase order creation
     clearCart();
 
     // Navigate to confirmation page
-    navigate('/order-confirmation', { 
-      state: { 
+    navigate('/order-confirmation', {
+      state: {
         order: mockOrder
-      } 
+      }
     });
   };
 
@@ -306,15 +323,7 @@ const OrderReview: React.FC = () => {
 
               <div className="space-y-4">
                 {items.map((item) => {
-                  const basePrice = item.size === 'small' ? item.product.prices.small : item.product.prices.large;
-                  let displayUnitPrice = basePrice;
-                  if (isJapan) {
-                    displayUnitPrice = basePrice;
-                  } else if (isEurope) {
-                    displayUnitPrice = (basePrice / 28) * 0.16;
-                  } else {
-                    displayUnitPrice = basePrice / 28; // BRL
-                  }
+                  const displayUnitPrice = convertYen(effectiveYen(item.product, item.size));
                   const displayItemPrice = displayUnitPrice * item.quantity;
                   const productName = getTranslatedProductName(item.product.id, t);
                   return (
@@ -359,10 +368,51 @@ const OrderReview: React.FC = () => {
                     </div>
                   )}
 
+                  {/* Resgate de pontos de fidelidade */}
+                  {user && availablePoints > 0 && (
+                    <div className="bg-purple-50 dark:bg-purple-950/20 border border-dashed border-purple-300 rounded-lg p-3 print:hidden">
+                      <div className="flex items-center justify-between gap-2 mb-2">
+                        <span className="text-sm font-bold text-purple-800 dark:text-purple-300 flex items-center gap-1.5">
+                          <Sparkles className="w-4 h-4" /> Usar pontos ({availablePoints} disponíveis)
+                        </span>
+                        <span className="text-[11px] text-purple-700">1 ponto = ¥1</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="number" min={0} max={maxRedeemable}
+                          value={pointsToUse || ''}
+                          onChange={(e) => setPointsToUse(Math.max(0, Math.min(maxRedeemable, Number(e.target.value) || 0)))}
+                          placeholder="0"
+                          className="w-24 px-2 py-1.5 rounded-lg border border-purple-300 bg-background text-sm"
+                        />
+                        <button type="button" onClick={() => setPointsToUse(maxRedeemable)}
+                          className="text-xs font-semibold text-purple-700 hover:underline">Usar máx. ({maxRedeemable})</button>
+                        {redeemPoints > 0 && (
+                          <button type="button" onClick={() => setPointsToUse(0)}
+                            className="text-xs text-muted-foreground hover:underline ml-auto">limpar</button>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {pointsDiscount > 0 && (
+                    <div className="flex justify-between text-purple-700 font-bold bg-purple-50/60 p-2 rounded border border-dashed border-purple-200">
+                      <span>Desconto em pontos ({redeemPoints} pts)</span>
+                      <span>-{formatPrice(pointsDiscount, currency)}</span>
+                    </div>
+                  )}
+
                   {pixDiscount > 0 && (
                     <div className="flex justify-between text-orange-600 font-bold bg-orange-50 p-2 rounded border border-dashed border-orange-200">
                       <span>Desconto Extra de 5% (Pagamento via PIX)</span>
                       <span>-{formatPrice(pixDiscount, 'BRL')}</span>
+                    </div>
+                  )}
+
+                  {user && earnedPoints > 0 && (
+                    <div className="flex justify-between text-green-700 text-xs bg-green-50/60 p-2 rounded">
+                      <span className="flex items-center gap-1"><Sparkles className="w-3.5 h-3.5" /> Você ganhará nesta compra</span>
+                      <span className="font-bold">+{earnedPoints} pts</span>
                     </div>
                   )}
 

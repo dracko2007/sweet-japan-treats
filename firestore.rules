@@ -107,6 +107,14 @@ service cloud.firestore {
       allow read, update, delete: if request.auth != null;
     }
 
+    // ---------- Vídeos de review (pontos liberados após validação) ----------
+    match /video_reviews/{id} {
+      // Cliente (sem login Firebase) envia o vídeo como 'pending'
+      allow create: if request.resource.data.status == 'pending';
+      allow read: if true;                 // lookup "já enviei?" + leitura do admin
+      allow update, delete: if isAdmin();  // só o admin valida/aprova/rejeita
+    }
+
     // ---------- Coleção de teste ----------
     match /test/{docId} {
       allow read, write: if request.auth != null;

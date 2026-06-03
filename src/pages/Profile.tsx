@@ -214,7 +214,7 @@ const Profile: React.FC = () => {
               <div>
                 <p className="text-sm font-semibold uppercase tracking-wide text-white/90">Pontos de Fidelidade</p>
                 <p className="font-display text-5xl font-extrabold mt-1">{user?.points || 0} <span className="text-2xl font-bold">pts</span></p>
-                <p className="text-sm text-white/90 mt-1">Avalie produtos e envie vídeos de unboxing para ganhar pontos!</p>
+                <p className="text-sm text-white/90 mt-1">Avaliação +1 · vídeo de review +5/min (após validação) · 1 ponto a cada ¥100 em compras · 1000 no aniversário. Use como desconto (1 pt = ¥1)!</p>
               </div>
               <div className="text-7xl opacity-80">🎁</div>
             </div>

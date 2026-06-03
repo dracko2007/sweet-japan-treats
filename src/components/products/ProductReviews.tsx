@@ -4,7 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { useUser } from '@/context/UserContext';
 import { reviewService } from '@/services/reviewService';
-import { Review, ProductRating, calculateReviewPoints, REVIEW_POINTS } from '@/types/review';
+import { Review, ProductRating } from '@/types/review';
+import { pointsService, POINTS } from '@/services/pointsService';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
@@ -33,6 +34,7 @@ const ProductReviews: React.FC<ProductReviewsProps> = ({ productId, productName 
   const [comment, setComment] = useState('');
   const [images, setImages] = useState<string[]>([]);
   const [videoUrl, setVideoUrl] = useState('');
+  const [alreadyHasVideo, setAlreadyHasVideo] = useState(false);
 
   useEffect(() => {
     loadReviews();
@@ -41,6 +43,7 @@ const ProductReviews: React.FC<ProductReviewsProps> = ({ productId, productName 
   useEffect(() => {
     if (user) {
       setCanReview(reviewService.canUserReview(user.id, productId));
+      pointsService.hasVideoForProduct(user.id, productId).then(setAlreadyHasVideo);
     }
   }, [user, productId, reviews]);
 
@@ -93,12 +96,8 @@ const ProductReviews: React.FC<ProductReviewsProps> = ({ productId, productName 
     }
 
     const trimmedVideo = videoUrl.trim();
-    const points = calculateReviewPoints({
-      hasComment: comment.trim().length >= 10,
-      hasPhoto: images.length > 0,
-      hasVideo: trimmedVideo.length > 0,
-    });
 
+    // 1 ponto pela avaliação (qualquer nota), 1 por produto
     reviewService.addReview({
       productId,
       userId: user.id,
@@ -107,16 +106,31 @@ const ProductReviews: React.FC<ProductReviewsProps> = ({ productId, productName 
       comment: comment.trim(),
       images: images.length > 0 ? images : undefined,
       videoUrl: trimmedVideo || undefined,
-      pointsAwarded: points,
+      pointsAwarded: POINTS.perReview,
       verified: reviewService.hasPurchased(user.id, productName)
     });
+    addPoints(POINTS.perReview);
 
-    // Concede os pontos ao usuário
-    if (points > 0) addPoints(points);
+    // Vídeo de review → vai para validação do admin (pontos só depois de aprovado)
+    let videoMsg = '';
+    if (trimmedVideo && !alreadyHasVideo) {
+      pointsService.submitVideo({
+        userId: user.id,
+        userName: user.name,
+        userEmail: user.email,
+        productId,
+        productName,
+        videoUrl: trimmedVideo,
+      });
+      setAlreadyHasVideo(true);
+      videoMsg = ' Seu vídeo foi enviado para validação — os pontos do vídeo entram após a aprovação do time.';
+    } else if (trimmedVideo && alreadyHasVideo) {
+      videoMsg = ' (Você já tinha enviado um vídeo deste produto.)';
+    }
 
     toast({
-      title: `🎉 Avaliação enviada! +${points} pontos`,
-      description: `Você agora tem ${(user.points || 0) + points} pontos de fidelidade.`,
+      title: `🎉 Avaliação enviada! +${POINTS.perReview} ponto`,
+      description: `Você agora tem ${(user.points || 0) + POINTS.perReview} pontos.` + videoMsg,
     });
 
     // Reset form
@@ -192,7 +206,7 @@ const ProductReviews: React.FC<ProductReviewsProps> = ({ productId, productName 
             <Gift className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
             <div className="text-xs text-amber-900 leading-relaxed">
               <p className="font-bold mb-0.5">Ganhe pontos de fidelidade!</p>
-              Avaliação + foto = <b>{REVIEW_POINTS.withPhoto} pts</b> · só avaliação ou só foto = <b>{REVIEW_POINTS.textOrPhotoOnly} pts</b> · vídeo de unboxing = <b>+{REVIEW_POINTS.unboxingVideo} pts</b>
+              Avaliar = <b>+{POINTS.perReview} ponto</b> · vídeo de review = <b>+{POINTS.perVideoMinute} pts por minuto</b> (1 min = 5, 2 min = 10), liberado após validação do time. 1 avaliação e 1 vídeo por produto.
             </div>
           </div>
 
@@ -267,16 +281,17 @@ const ProductReviews: React.FC<ProductReviewsProps> = ({ productId, productName 
           {/* Video de unboxing (link) */}
           <div>
             <label className="block text-sm font-medium mb-2 flex items-center gap-1.5">
-              <Video className="w-4 h-4" /> Vídeo de unboxing <span className="text-amber-600 font-bold">(+{REVIEW_POINTS.unboxingVideo} pts)</span>
+              <Video className="w-4 h-4" /> Vídeo de review <span className="text-amber-600 font-bold">(+{POINTS.perVideoMinute} pts/min, após validação)</span>
             </label>
             <input
               type="url"
               value={videoUrl}
               onChange={(e) => setVideoUrl(e.target.value)}
-              placeholder="Cole o link do seu vídeo (YouTube, Instagram, TikTok)"
-              className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm"
+              disabled={alreadyHasVideo}
+              placeholder={alreadyHasVideo ? 'Você já enviou um vídeo deste produto' : 'Cole o link do seu vídeo (YouTube, Instagram, TikTok)'}
+              className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm disabled:opacity-60"
             />
-            <p className="text-xs text-muted-foreground mt-1">Grave seu unboxing/review, publique no YouTube/Insta e cole o link aqui.</p>
+            <p className="text-xs text-muted-foreground mt-1">Grave seu review, publique no YouTube/Insta e cole o link. O time confere e libera os pontos (5 por minuto). 1 vídeo por produto.</p>
           </div>
 
           {/* Actions */}

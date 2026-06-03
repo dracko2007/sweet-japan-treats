@@ -14,6 +14,7 @@ export const translations: Record<Language, Record<string, string>> = {
     "nav.products.eletronicos": "Eletrônicos",
     "nav.products.masculino": "Masculino",
     "nav.products.vestuario": "Vestuário",
+    "nav.products.higiene": "Higiene & Saúde",
     "nav.products.docedeleite": "Doce de Leite (Japão 🇯🇵)",
     "nav.vlog": "Vlog",
     "nav.shipping": "Frete",

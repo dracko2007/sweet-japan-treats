@@ -20,6 +20,7 @@ import VlogManager from '@/components/admin/VlogManager';
 import CustomRequestManager from '@/components/admin/CustomRequestManager';
 import B2BRequestManager from '@/components/admin/B2BRequestManager';
 import AdminAccessManager from '@/components/admin/AdminAccessManager';
+import VideoReviewManager from '@/components/admin/VideoReviewManager';
 import TrackingModal from '@/components/admin/TrackingModal';
 import { orderService } from '@/services/orderService';
 import { customerService } from '@/services/customerService';
@@ -29,7 +30,7 @@ import Pagination from '@/components/Pagination';
 
 type AdminTab =
   | 'orders' | 'coupons' | 'dashboard' | 'customers' | 'products'
-  | 'home' | 'vlog' | 'affiliates' | 'requests' | 'b2b' | 'admins';
+  | 'home' | 'vlog' | 'affiliates' | 'requests' | 'b2b' | 'admins' | 'videos';
 
 interface AdminTabItem {
   id: AdminTab;
@@ -411,6 +412,7 @@ _This is an automated test message_
     { title: 'Solicitações', items: [
       { id: 'requests', label: 'Personalizados', icon: Sparkles },
       { id: 'b2b', label: 'Empresas', icon: Building2 },
+      { id: 'videos', label: 'Vídeos de review', icon: Video },
     ] },
     { title: 'Conteúdo', items: [
       { id: 'home', label: 'Início', icon: Video },
@@ -799,6 +801,8 @@ _This is an automated test message_
               <CustomRequestManager />
             ) : activeTab === 'b2b' ? (
               <B2BRequestManager />
+            ) : activeTab === 'videos' ? (
+              <VideoReviewManager />
             ) : activeTab === 'admins' ? (
               <AdminAccessManager />
             ) : (

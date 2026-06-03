@@ -19,6 +19,7 @@ export interface UserProfile {
   razaoSocial?: string;       // se PJ
   whatsappMarketing?: boolean;
   points?: number; // Pontos de fidelidade (reviews, vídeos)
+  birthdayBonusYear?: number; // Ano em que já recebeu os 1000 pts de aniversário
   address: {
     postalCode: string;
     prefecture: string;
@@ -787,8 +788,8 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
   };
 
   const addPoints = (amount: number) => {
-    if (!user || amount <= 0) return;
-    const newTotal = (user.points || 0) + amount;
+    if (!user || amount === 0) return;
+    const newTotal = Math.max(0, (user.points || 0) + amount); // amount<0 = resgate
     const updatedUser: UserProfile = { ...user, points: newTotal };
     setUser(updatedUser);
 

@@ -170,7 +170,8 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
              product.category === 'papelaria' ? 'Papelaria ✏️' :
              product.category === 'eletronicos' ? 'Eletrônicos 📱' :
              product.category === 'masculino' ? 'Masculino 👔' :
-             product.category === 'vestuario' ? 'Vestuário 👕' : 'Importado 🌸'}
+             product.category === 'vestuario' ? 'Vestuário 👕' :
+             product.category === 'higiene' ? 'Higiene & Saúde 🧼' : 'Importado 🌸'}
           </span>
         </div>
 

@@ -50,6 +50,7 @@ const Products: React.FC = () => {
     { id: 'eletronicos', label: t('nav.products.eletronicos'), href: '/produtos/eletronicos' },
     { id: 'masculino', label: t('nav.products.masculino'), href: '/produtos/masculino' },
     { id: 'vestuario', label: t('nav.products.vestuario'), href: '/produtos/vestuario' },
+    { id: 'higiene', label: t('nav.products.higiene'), href: '/produtos/higiene' },
   ];
   const categories = [
     { id: 'all', label: t('productsPage.all') || 'Todos', href: '/produtos' },
@@ -127,7 +128,8 @@ const Products: React.FC = () => {
                    category === 'papelaria' ? '✏️' :
                    category === 'eletronicos' ? '📱' :
                    category === 'masculino' ? '👔' :
-                   category === 'vestuario' ? '👕' : '🌸'}
+                   category === 'vestuario' ? '👕' :
+                   category === 'higiene' ? '🧼' : '🌸'}
                 </div>
                 <div>
                   <h2 className="font-display text-2xl font-bold text-foreground">
@@ -137,7 +139,8 @@ const Products: React.FC = () => {
                      category === 'papelaria' ? t('nav.products.papelaria') :
                      category === 'eletronicos' ? t('nav.products.eletronicos') :
                      category === 'masculino' ? t('nav.products.masculino') :
-                     category === 'vestuario' ? t('nav.products.vestuario') : category}
+                     category === 'vestuario' ? t('nav.products.vestuario') :
+                     category === 'higiene' ? t('nav.products.higiene') : category}
                   </h2>
                   <p className="text-muted-foreground">
                     {category === 'cosmeticos' ? 'Os cosméticos, protetores solares e produtos de skin care mais famosos e tecnológicos do Japão.' : 
@@ -147,6 +150,7 @@ const Products: React.FC = () => {
                      category === 'eletronicos' ? 'Gadgets, acessórios e eletrônicos japoneses com a qualidade e a tecnologia de ponta do Japão.' :
                      category === 'masculino' ? 'Produtos e cuidados pensados para o público masculino, com estilo e qualidade japonesa.' :
                      category === 'vestuario' ? 'Roupas e peças de vestuário com design e conforto japonês.' :
+                     category === 'higiene' ? 'Produtos de higiene pessoal, cuidados e saúde com a qualidade japonesa.' :
                      'Confira nossa seleção exclusiva direto de Tóquio.'}
                   </p>
                 </div>

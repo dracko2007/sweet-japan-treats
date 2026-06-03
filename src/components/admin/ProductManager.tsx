@@ -15,6 +15,7 @@ const CATEGORIES = [
   { id: 'eletronicos', label: 'Eletrônicos', icon: '📱' },
   { id: 'masculino', label: 'Masculino', icon: '👔' },
   { id: 'vestuario', label: 'Vestuário', icon: '👕' },
+  { id: 'higiene', label: 'Higiene & Saúde', icon: '🧼' },
 ];
 
 const categoryLabel = (id: string) => CATEGORIES.find((c) => c.id === id)?.label || id;
