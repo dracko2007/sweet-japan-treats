@@ -4,6 +4,7 @@ import {
   Package, CreditCard, ChefHat, Plane, Landmark, Truck, Home,
   Smartphone, Search, QrCode, Wallet, Globe2, Copy, Check,
   ArrowRight, MapPin, Bell, Percent, ShieldCheck, Clock,
+  Building2, ChevronDown, FileText, BadgeCheck, Briefcase,
 } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
@@ -449,6 +450,71 @@ const CorreiosTracking: React.FC = () => {
   );
 };
 
+// ---------- 4b. IMPORTAÇÃO PARA EMPRESAS (banner expansível) ----------
+const BIZ_STEPS = [
+  { ic: BadgeCheck, t: 'Habilitação no Radar / Siscomex', d: 'A empresa precisa do Radar (Registro e Rastreamento da Atuação dos Intervenientes Aduaneiros) habilitado na Receita Federal para operar no Siscomex — o sistema oficial de comércio exterior.' },
+  { ic: Briefcase, t: 'Despachante aduaneiro', d: 'Um despachante registra a operação e cuida da documentação. Para grandes volumes/valores, é praticamente obrigatório.' },
+  { ic: FileText, t: 'Declaração de Importação (DI)', d: 'A importação formal é registrada via DI no Siscomex, com a classificação fiscal (NCM) de cada produto e o valor aduaneiro.' },
+  { ic: Percent, t: 'Tributação completa', d: 'Em vez do regime simplificado, incidem II + IPI + PIS/COFINS-Importação + ICMS, conforme a NCM. Pode somar bem mais que os 60% do regime de pessoa física.' },
+];
+
+const BusinessImport: React.FC = () => {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="rounded-2xl border-2 border-dashed border-primary/40 bg-primary/5 overflow-hidden">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="w-full flex items-center gap-4 p-5 text-left hover:bg-primary/5 transition-colors"
+      >
+        <span className="w-12 h-12 rounded-xl bg-primary/15 flex items-center justify-center shrink-0">
+          <Building2 className="w-6 h-6 text-primary" />
+        </span>
+        <div className="flex-1">
+          <h3 className="font-bold text-foreground">Você é empresa? Importação em grande volume</h3>
+          <p className="text-xs text-muted-foreground">
+            Acima de US$ 3.000 por remessa, ou compras para revenda, seguem outro caminho — clique para entender.
+          </p>
+        </div>
+        <ChevronDown className={cn('w-5 h-5 text-primary shrink-0 transition-transform', open && 'rotate-180')} />
+      </button>
+
+      <div className={cn('transition-all duration-500 overflow-hidden', open ? 'max-h-[700px]' : 'max-h-0')}>
+        <div className="px-5 pb-5 space-y-4">
+          <p className="text-sm text-muted-foreground leading-relaxed bg-background/60 rounded-xl p-3 border border-border">
+            O regime simplificado (Remessa Conforme — app dos Correios) vale para pessoa física, até <strong>US$ 3.000</strong> por remessa.
+            Acima disso, ou para mercadoria de revenda, a operação é uma <strong>importação formal</strong> com regras próprias:
+          </p>
+
+          <div className="grid sm:grid-cols-2 gap-3">
+            {BIZ_STEPS.map((s) => (
+              <div key={s.t} className="bg-background rounded-xl border border-border p-4">
+                <div className="flex items-center gap-2 mb-1.5">
+                  <s.ic className="w-4 h-4 text-primary shrink-0" />
+                  <h4 className="font-bold text-sm text-foreground">{s.t}</h4>
+                </div>
+                <p className="text-xs text-muted-foreground leading-relaxed">{s.d}</p>
+              </div>
+            ))}
+          </div>
+
+          <p className="text-[11px] text-muted-foreground leading-relaxed">
+            ⚠️ A notificação e o pagamento <strong>não</strong> chegam pelo app dos Correios como nas compras comuns — tudo passa pelo Siscomex e pelo despachante. Os prazos e custos também são diferentes.
+          </p>
+
+          <div className="flex flex-col sm:flex-row gap-2">
+            <Button asChild className="btn-primary gap-2">
+              <Link to="/empresas"><Building2 className="w-4 h-4" /> Falar sobre pedido empresarial</Link>
+            </Button>
+            <Button asChild variant="outline" className="gap-2">
+              <Link to="/faca-seu-pedido">Solicitar cotação personalizada</Link>
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ---------- 5. COMO RETIRAR / RECEBER ----------
 const PICKUP = [
   { ic: Home, color: '#22c55e', t: 'Entrega em casa', d: 'Depois de liberado (e do imposto pago online, se houver), o carteiro entrega no endereço do pedido. O pagamento de tributos é sempre feito antes, pelo app — nunca em dinheiro na porta.' },
@@ -507,6 +573,9 @@ const HowItWorks: React.FC = () => {
             <p className="text-center text-xs text-muted-foreground mt-3">
               Quer simular o valor exato? Use a <Link to="/frete" className="text-primary font-semibold hover:underline">página de Frete</Link>.
             </p>
+            <div className="mt-5">
+              <BusinessImport />
+            </div>
           </div>
 
           {/* 4. Como retirar */}
