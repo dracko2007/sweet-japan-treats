@@ -13,7 +13,7 @@ import LanguageSwitcher from '@/components/LanguageSwitcher';
 const Login: React.FC = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { login, isAuthenticated, sendPasswordReset, isAdminAccount, loginAs, setLoginAs } = useUser();
+  const { login, isAuthenticated, sendPasswordReset, isAdminAccount } = useUser();
   const { t } = useLanguage();
 
   const [formData, setFormData] = useState({
@@ -26,22 +26,11 @@ const Login: React.FC = () => {
   const [isSendingReset, setIsSendingReset] = useState(false);
   const [needsVerification, setNeedsVerification] = useState(false);
 
-  // Conta admin logada que ainda não escolheu o modo → mostra a tela de escolha
-  const needsRoleChoice = isAuthenticated && isAdminAccount && !loginAs;
-
+  // Conta admin → painel; conta usuário → loja. Sem escolha/troca.
   React.useEffect(() => {
     if (!isAuthenticated) return;
-    if (needsRoleChoice) return; // aguardando escolher Admin ou Cliente
-    if (isAdminAccount) {
-      navigate(loginAs === 'admin' ? '/admin' : '/');
-    } else {
-      navigate('/perfil');
-    }
-  }, [isAuthenticated, needsRoleChoice, isAdminAccount, loginAs, navigate]);
-
-  // Só define o modo; o efeito acima cuida do redirecionamento
-  const chooseAdmin = () => setLoginAs('admin');
-  const chooseUser = () => setLoginAs('user');
+    navigate(isAdminAccount ? '/admin' : '/perfil');
+  }, [isAuthenticated, isAdminAccount, navigate]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -130,40 +119,7 @@ const Login: React.FC = () => {
                 <LanguageSwitcher />
               </div>
 
-              {needsRoleChoice ? (
-                <div className="text-center">
-                  <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-3">
-                    <UserCircle className="w-6 h-6 text-primary" />
-                  </div>
-                  <h2 className="font-display text-2xl font-bold text-foreground mb-1">Como deseja entrar?</h2>
-                  <p className="text-sm text-muted-foreground mb-6">
-                    Sua conta tem acesso de administrador. Escolha como quer usar o site agora.
-                    <br />Para trocar depois, é só sair e entrar de novo.
-                  </p>
-                  <div className="space-y-3">
-                    <button
-                      onClick={chooseAdmin}
-                      className="w-full flex items-center gap-3 p-4 rounded-xl border-2 border-primary bg-primary/5 hover:bg-primary/10 transition-colors text-left"
-                    >
-                      <div className="w-10 h-10 rounded-lg bg-primary text-primary-foreground flex items-center justify-center shrink-0">🔐</div>
-                      <div>
-                        <p className="font-bold text-foreground">Administrador</p>
-                        <p className="text-xs text-muted-foreground">Painel de gestão (pedidos, produtos, etc.)</p>
-                      </div>
-                    </button>
-                    <button
-                      onClick={chooseUser}
-                      className="w-full flex items-center gap-3 p-4 rounded-xl border-2 border-border hover:border-gray-300 hover:bg-secondary/40 transition-colors text-left"
-                    >
-                      <div className="w-10 h-10 rounded-lg bg-secondary text-foreground flex items-center justify-center shrink-0">🛍️</div>
-                      <div>
-                        <p className="font-bold text-foreground">Cliente</p>
-                        <p className="text-xs text-muted-foreground">Navegar e comprar como um cliente normal</p>
-                      </div>
-                    </button>
-                  </div>
-                </div>
-              ) : showForgotPassword ? (
+              {showForgotPassword ? (
                 <>
                   <div className="flex items-center gap-3 mb-6">
                     <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">

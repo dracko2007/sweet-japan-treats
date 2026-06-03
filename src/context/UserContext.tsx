@@ -933,10 +933,9 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
   const value: UserContextType = {
     user,
     isAuthenticated,
-    // É admin a conta? (super-admin OU nível carregado do Firestore)
+    // Conta admin → sempre admin (sem modo cliente). Conta usuário → sempre usuário.
     isAdminAccount: adminRole > 0 || isAdminEmail(user?.email),
-    // Está AGINDO como admin? Só se a conta é admin E não escolheu modo cliente.
-    isAdmin: (adminRole > 0 || isAdminEmail(user?.email)) && loginAs !== 'user',
+    isAdmin: adminRole > 0 || isAdminEmail(user?.email),
     adminRole,
     permissions: {
       canDelete: adminRole >= 2,
