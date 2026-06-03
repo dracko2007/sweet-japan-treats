@@ -1,0 +1,77 @@
+// Cotações B2B / atacado (Pessoa Jurídica). Empresa envia (mesmo sem login);
+// admin lê e negocia frete/valores (inclui envio por container).
+import { db } from '@/config/firebase';
+import { collection, doc, getDocs, setDoc, deleteDoc, updateDoc } from 'firebase/firestore';
+import { ensureAdminAuth } from '@/utils/adminAuth';
+
+export type B2BShipping = 'aereo' | 'maritimo' | 'container' | 'combinar';
+
+export interface B2BRequest {
+  id: string;
+  razaoSocial: string;
+  cnpj: string;
+  responsavel: string;   // nome do responsável
+  contact: string;       // WhatsApp / e-mail
+  email?: string;
+  country?: string;
+  productDesc: string;   // o que querem comprar
+  estimatedQty: string;  // quantidade/volume estimado
+  shipping: B2BShipping;  // preferência de envio
+  notes?: string;
+  status: 'new' | 'negotiating' | 'closed';
+  createdAt: string;
+}
+
+const COL = 'b2b_requests';
+
+export const b2bRequestService = {
+  async create(data: Omit<B2BRequest, 'id' | 'status' | 'createdAt'>): Promise<boolean> {
+    if (!db) return false;
+    try {
+      const id = `b2b-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+      await setDoc(doc(db, COL, id), { ...data, id, status: 'new', createdAt: new Date().toISOString() });
+      return true;
+    } catch (e) {
+      console.error('[b2b] create falhou:', e);
+      return false;
+    }
+  },
+
+  async getAll(): Promise<B2BRequest[]> {
+    if (!db) return [];
+    try {
+      await ensureAdminAuth();
+      const snap = await getDocs(collection(db, COL));
+      const list: B2BRequest[] = [];
+      snap.forEach((d) => list.push({ id: d.id, ...(d.data() as any) }));
+      return list.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+    } catch (e) {
+      console.error('[b2b] getAll falhou:', e);
+      return [];
+    }
+  },
+
+  async updateStatus(id: string, status: B2BRequest['status']): Promise<boolean> {
+    if (!db) return false;
+    try {
+      await ensureAdminAuth();
+      await updateDoc(doc(db, COL, id), { status, updatedAt: new Date().toISOString() });
+      return true;
+    } catch (e) {
+      console.error('[b2b] updateStatus falhou:', e);
+      return false;
+    }
+  },
+
+  async remove(id: string): Promise<boolean> {
+    if (!db) return false;
+    try {
+      await ensureAdminAuth();
+      await deleteDoc(doc(db, COL, id));
+      return true;
+    } catch (e) {
+      console.error('[b2b] remove falhou:', e);
+      return false;
+    }
+  },
+};

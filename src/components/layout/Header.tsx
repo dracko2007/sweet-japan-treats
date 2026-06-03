@@ -31,6 +31,7 @@ const Header: React.FC = () => {
     { label: t('nav.vlog'), href: '/vlog' },
     { label: t('nav.shipping'), href: '/frete' },
     { label: '✨ Faça seu Pedido', href: '/faca-seu-pedido' },
+    { label: '🏢 Empresas', href: '/empresas' },
     { label: t('nav.about'), href: '/sobre' },
   ];
 

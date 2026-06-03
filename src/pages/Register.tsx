@@ -9,7 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useUser } from '@/context/UserContext';
 import { useLanguage } from '@/context/LanguageContext';
 import LanguageSwitcher from '@/components/LanguageSwitcher';
-import { isValidEmail, isNonEmpty, runValidations, FieldErrors, COUNTRY_DIAL_CODES } from '@/utils/validation';
+import { isValidEmail, isNonEmpty, runValidations, FieldErrors, COUNTRY_DIAL_CODES, isValidCNPJ, maskCNPJ } from '@/utils/validation';
 
 const Register: React.FC = () => {
   const navigate = useNavigate();
@@ -23,6 +23,9 @@ const Register: React.FC = () => {
     phone: '',
     password: '',
     confirmPassword: '',
+    personType: 'PF' as 'PF' | 'PJ',
+    cnpj: '',
+    razaoSocial: '',
   });
   // Código do país (DDI), default pelo país selecionado na loja
   const [dialCode, setDialCode] = useState<string>(() => {
@@ -63,6 +66,7 @@ const Register: React.FC = () => {
 
   const validateForm = (): boolean => {
     const phoneDigits = formData.phone.replace(/\D/g, '');
+    const isPJ = formData.personType === 'PJ';
     const fieldErrors = runValidations({
       name: () => (isNonEmpty(formData.name, 2) ? null : 'Informe seu nome completo.'),
       email: () => (isValidEmail(formData.email) ? null : 'E-mail inválido.'),
@@ -73,6 +77,8 @@ const Register: React.FC = () => {
       password: () => (formData.password.length >= 6 ? null : 'A senha deve ter ao menos 6 caracteres.'),
       confirmPassword: () =>
         formData.password === formData.confirmPassword ? null : 'As senhas não coincidem.',
+      razaoSocial: () => (!isPJ || isNonEmpty(formData.razaoSocial, 2) ? null : 'Informe a razão social.'),
+      cnpj: () => (!isPJ || isValidCNPJ(formData.cnpj) ? null : 'CNPJ inválido.'),
     });
     setErrors(fieldErrors);
     return Object.keys(fieldErrors).length === 0;
@@ -98,6 +104,10 @@ const Register: React.FC = () => {
         email: formData.email,
         phone: fullPhone(), // inclui o código do país (ex: "+351 912345678")
         password: formData.password,
+        personType: formData.personType,
+        ...(formData.personType === 'PJ'
+          ? { cnpj: formData.cnpj, razaoSocial: formData.razaoSocial }
+          : {}),
         address: {
           postalCode: '',
           prefecture: '',
@@ -194,6 +204,45 @@ const Register: React.FC = () => {
               </div>
 
               <form onSubmit={handleSubmit} className="space-y-4">
+                {/* Tipo de cadastro: Pessoa Física ou Jurídica */}
+                <div className="space-y-2">
+                  <Label>Tipo de cadastro</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button type="button" onClick={() => setFormData((p) => ({ ...p, personType: 'PF' }))}
+                      className={`py-2.5 rounded-lg border-2 text-sm font-semibold transition-colors ${formData.personType === 'PF' ? 'border-primary bg-primary/5 text-primary' : 'border-border text-muted-foreground hover:border-gray-300'}`}>
+                      👤 Pessoa Física
+                    </button>
+                    <button type="button" onClick={() => setFormData((p) => ({ ...p, personType: 'PJ' }))}
+                      className={`py-2.5 rounded-lg border-2 text-sm font-semibold transition-colors ${formData.personType === 'PJ' ? 'border-primary bg-primary/5 text-primary' : 'border-border text-muted-foreground hover:border-gray-300'}`}>
+                      🏢 Empresa (PJ)
+                    </button>
+                  </div>
+                </div>
+
+                {formData.personType === 'PJ' && (
+                  <>
+                    <div className="space-y-2">
+                      <Label htmlFor="razaoSocial">Razão Social</Label>
+                      <Input id="razaoSocial" name="razaoSocial" value={formData.razaoSocial}
+                        onChange={(e) => setFormData((p) => ({ ...p, razaoSocial: e.target.value }))}
+                        placeholder="Nome da empresa" aria-invalid={!!errors.razaoSocial}
+                        className={errors.razaoSocial ? 'border-destructive' : ''} />
+                      {errors.razaoSocial && <p className="text-xs text-destructive">{errors.razaoSocial}</p>}
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="cnpj">CNPJ</Label>
+                      <Input id="cnpj" name="cnpj" value={formData.cnpj} inputMode="numeric"
+                        onChange={(e) => setFormData((p) => ({ ...p, cnpj: maskCNPJ(e.target.value) }))}
+                        placeholder="00.000.000/0000-00" aria-invalid={!!errors.cnpj}
+                        className={`font-mono ${errors.cnpj ? 'border-destructive' : ''}`} />
+                      {errors.cnpj && <p className="text-xs text-destructive">{errors.cnpj}</p>}
+                      <p className="text-xs text-muted-foreground">
+                        Compras em atacado/volume? Conheça a página <Link to="/empresas" className="text-primary font-semibold hover:underline">Empresas</Link>.
+                      </p>
+                    </div>
+                  </>
+                )}
+
                 <div className="space-y-2">
                   <Label htmlFor="name" className="flex items-center gap-2">
                     <UserCircle className="w-4 h-4" />

@@ -12,6 +12,9 @@ export interface UserProfile {
   phone: string;
   password?: string; // Stored for demo purposes - in production, use backend authentication
   birthdate?: string;
+  personType?: 'PF' | 'PJ';   // Pessoa Física ou Jurídica
+  cnpj?: string;              // se PJ
+  razaoSocial?: string;       // se PJ
   whatsappMarketing?: boolean;
   points?: number; // Pontos de fidelidade (reviews, vídeos)
   address: {

@@ -26,6 +26,7 @@ import TrackOrder from "./pages/TrackOrder";
 import ProductDetail from "./pages/ProductDetail";
 import AffiliatePage from "./pages/Affiliate";
 import CustomRequest from "./pages/CustomRequest";
+import Business from "./pages/Business";
 import NotFound from "./pages/NotFound";
 import FirebaseSync from "./pages/FirebaseSync";
 import SyncData from "./pages/SyncData";
@@ -73,6 +74,7 @@ const App = () => (
                 <Route path="/favoritos" element={<Wishlist />} />
                 <Route path="/afiliado" element={<AffiliatePage />} />
                 <Route path="/faca-seu-pedido" element={<CustomRequest />} />
+                <Route path="/empresas" element={<Business />} />
                 <Route path="/rastrear" element={<TrackOrder />} />
                 <Route path="/firebase-sync" element={<RequireAdmin><FirebaseSync /></RequireAdmin>} />
                 <Route path="/sync-data" element={<RequireAdmin><SyncData /></RequireAdmin>} />

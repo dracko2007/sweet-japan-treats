@@ -1,7 +1,7 @@
 import { safeStorage } from '@/utils/storage';
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Package, Printer, ShoppingBag, User, MapPin, Phone, Mail, Calendar, TestTube, Tag, Truck, CheckCircle, XCircle, Trash2, BarChart3, Users, PackagePlus, Video, Megaphone, Clapperboard } from 'lucide-react';
+import { Package, Printer, ShoppingBag, User, MapPin, Phone, Mail, Calendar, TestTube, Tag, Truck, CheckCircle, XCircle, Trash2, BarChart3, Users, PackagePlus, Video, Megaphone, Clapperboard, Building2 } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { useUser } from '@/context/UserContext';
@@ -18,6 +18,7 @@ import ProductManager from '@/components/admin/ProductManager';
 import HomeContentManager from '@/components/admin/HomeContentManager';
 import VlogManager from '@/components/admin/VlogManager';
 import CustomRequestManager from '@/components/admin/CustomRequestManager';
+import B2BRequestManager from '@/components/admin/B2BRequestManager';
 import TrackingModal from '@/components/admin/TrackingModal';
 import { orderService } from '@/services/orderService';
 import { customerService } from '@/services/customerService';
@@ -42,7 +43,7 @@ const Admin: React.FC = () => {
   const [customerCount, setCustomerCount] = useState(0);
   const [newCustomers, setNewCustomers] = useState(0);
   const [isTesting, setIsTesting] = useState(false);
-  const [activeTab, setActiveTab] = useState<'orders' | 'coupons' | 'dashboard' | 'customers' | 'products' | 'home' | 'vlog' | 'affiliates' | 'requests'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'orders' | 'coupons' | 'dashboard' | 'customers' | 'products' | 'home' | 'vlog' | 'affiliates' | 'requests' | 'b2b'>('dashboard');
   const [trackingModalOpen, setTrackingModalOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
 
@@ -512,6 +513,17 @@ _This is an automated test message_
                     <PackagePlus className="w-4 h-4 flex-shrink-0" />
                     <span>Personalizados</span>
                   </button>
+                  <button
+                    onClick={() => setActiveTab('b2b')}
+                    className={`py-3 sm:py-4 px-3 sm:px-1 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap flex items-center gap-1.5 ${
+                      activeTab === 'b2b'
+                        ? 'border-primary text-primary'
+                        : 'border-transparent text-muted-foreground hover:text-foreground hover:border-gray-300'
+                    }`}
+                  >
+                    <Building2 className="w-4 h-4 flex-shrink-0" />
+                    <span>Empresas</span>
+                  </button>
                 </nav>
               </div>
             </div>
@@ -810,6 +822,8 @@ _This is an automated test message_
               <AffiliateManager />
             ) : activeTab === 'requests' ? (
               <CustomRequestManager />
+            ) : activeTab === 'b2b' ? (
+              <B2BRequestManager />
             ) : (
               <CustomerList />
             )}
