@@ -34,7 +34,7 @@ const JOURNEY = [
   },
   {
     icon: Landmark, color: '#ef4444', title: 'Alfândega & impostos',
-    desc: 'Na chegada, o pacote pode passar pela alfândega. Se houver imposto de importação, ele é cobrado aí (pago por você na retirada).',
+    desc: 'Na chegada, a Receita Federal fiscaliza o pacote. Se houver imposto, você recebe a notificação e paga online (app/site dos Correios) ANTES da liberação — nunca em dinheiro ao carteiro.',
   },
   {
     icon: Truck, color: '#22c55e', title: 'Correios entrega',
@@ -48,12 +48,16 @@ const JOURNEY = [
 
 const JourneyStepper: React.FC = () => {
   const [active, setActive] = useState(0);
+  const [paused, setPaused] = useState(false);
 
-  // Avança sozinho para dar vida ao desenho (pausa ao interagir já fica no clique)
+  // Avança sozinho devagar; ao clicar num passo, para para a pessoa ler com calma.
   useEffect(() => {
-    const id = setInterval(() => setActive((a) => (a + 1) % JOURNEY.length), 3500);
+    if (paused) return;
+    const id = setInterval(() => setActive((a) => (a + 1) % JOURNEY.length), 6000);
     return () => clearInterval(id);
-  }, []);
+  }, [paused]);
+
+  const pick = (i: number) => { setActive(i); setPaused(true); };
 
   const Cur = JOURNEY[active];
   const pct = (active / (JOURNEY.length - 1)) * 100;
@@ -88,7 +92,7 @@ const JourneyStepper: React.FC = () => {
             return (
               <button
                 key={i}
-                onClick={() => setActive(i)}
+                onClick={() => pick(i)}
                 className="flex flex-col items-center gap-2 group"
                 style={{ width: `${100 / JOURNEY.length}%` }}
               >
@@ -132,7 +136,15 @@ const JourneyStepper: React.FC = () => {
           <p className="text-sm text-muted-foreground leading-relaxed">{Cur.desc}</p>
         </div>
       </div>
-      <p className="text-center text-[11px] text-muted-foreground mt-3">👆 Toque em cada etapa para ver os detalhes</p>
+      <div className="text-center mt-3">
+        {paused ? (
+          <button onClick={() => setPaused(false)} className="text-[11px] font-semibold text-primary hover:underline">
+            ⏸️ Pausado — toque para voltar a avançar automaticamente
+          </button>
+        ) : (
+          <p className="text-[11px] text-muted-foreground">👆 Toque em uma etapa para pausar e ler com calma</p>
+        )}
+      </div>
     </div>
   );
 };
@@ -223,12 +235,12 @@ const PaymentMethods: React.FC = () => {
 const TAX = {
   Brasil: {
     flag: '🇧🇷', tone: '#f59e0b',
-    headline: 'Pode ter imposto de importação na chegada',
+    headline: 'Quem cobra é a Receita Federal (Remessa Conforme)',
     rows: [
-      ['Até R$ 250 (US$ 50)', '20% Federal + 17% ICMS'],
-      ['Acima de R$ 250', '60% Federal (− R$62,50) + 17% ICMS'],
+      ['Compras até US$ 50', '20% Imposto de Importação + 17% ICMS'],
+      ['De US$ 50 a US$ 3.000', '60% (− US$ 20 de desconto) + 17% ICMS'],
     ],
-    note: 'O imposto NÃO é cobrado no site — mostramos só a estimativa. Você paga na retirada, se a alfândega tributar.',
+    note: 'Os Correios apenas entregam — quem tributa é a Receita Federal. Você é avisado pelo app/e-mail/SMS dos Correios e paga online (Pix, cartão ou boleto) ANTES da liberação. Nunca se paga em dinheiro ao carteiro. ⚠️ Cuidado com links falsos: confirme sempre no app oficial ou em correios.com.br.',
   },
   Europa: {
     flag: '🇪🇺', tone: '#3b82f6',
@@ -278,8 +290,8 @@ const TaxExplainer: React.FC = () => {
       <div className="flex items-center justify-between gap-2 mb-5">
         {[
           { ic: Package, lb: 'Produto + frete', sub: 'pago no site' },
-          { ic: Landmark, lb: 'Alfândega', sub: 'avalia o pacote' },
-          { ic: Home, lb: 'Você', sub: 'paga imposto na retirada' },
+          { ic: Landmark, lb: 'Receita Federal', sub: 'fiscaliza e calcula' },
+          { ic: Smartphone, lb: 'Você', sub: 'paga online p/ liberar' },
         ].map((s, i, arr) => (
           <React.Fragment key={i}>
             <div className="flex flex-col items-center text-center gap-1.5 flex-1">
@@ -325,13 +337,15 @@ const TRACK_STATES = [
 
 const CorreiosTracking: React.FC = () => {
   const [step, setStep] = useState(0);
+  const [paused, setPaused] = useState(false);
   const [copied, setCopied] = useState(false);
   const fakeCode = 'LB123456789JP';
 
   useEffect(() => {
-    const id = setInterval(() => setStep((s) => (s + 1) % (TRACK_STATES.length + 1)), 2000);
+    if (paused) return;
+    const id = setInterval(() => setStep((s) => (s + 1) % (TRACK_STATES.length + 1)), 3500);
     return () => clearInterval(id);
-  }, []);
+  }, [paused]);
 
   const copy = () => {
     navigator.clipboard?.writeText(fakeCode);
@@ -342,8 +356,11 @@ const CorreiosTracking: React.FC = () => {
   return (
     <div className="grid lg:grid-cols-2 gap-6 items-center">
       {/* Mockup de celular */}
-      <div className="flex justify-center">
-        <div className="w-[270px] rounded-[2.2rem] border-[10px] border-foreground/90 bg-background shadow-2xl overflow-hidden">
+      <div className="flex flex-col items-center">
+        <div
+          onClick={() => setPaused((p) => !p)}
+          title="Toque para pausar/continuar"
+          className="w-[270px] rounded-[2.2rem] border-[10px] border-foreground/90 bg-background shadow-2xl overflow-hidden cursor-pointer select-none">
           {/* notch */}
           <div className="h-6 bg-foreground/90 flex items-center justify-center">
             <div className="w-16 h-1.5 bg-background/40 rounded-full" />
@@ -387,6 +404,9 @@ const CorreiosTracking: React.FC = () => {
             </div>
           </div>
         </div>
+        <button onClick={() => setPaused((p) => !p)} className="text-[11px] font-semibold text-primary hover:underline mt-3">
+          {paused ? '⏸️ Pausado — toque para continuar' : '👆 Toque no celular para pausar'}
+        </button>
       </div>
 
       {/* Instruções */}
@@ -431,8 +451,8 @@ const CorreiosTracking: React.FC = () => {
 
 // ---------- 5. COMO RETIRAR / RECEBER ----------
 const PICKUP = [
-  { ic: Home, color: '#22c55e', t: 'Entrega em casa', d: 'O carteiro entrega no endereço do pedido. Tenha um documento à mão se houver imposto a pagar na retirada.' },
-  { ic: MapPin, color: '#3b82f6', t: 'Retirar na agência', d: 'Se ninguém estiver em casa ou o pacote for tributado, ele fica numa agência dos Correios perto de você para retirada.' },
+  { ic: Home, color: '#22c55e', t: 'Entrega em casa', d: 'Depois de liberado (e do imposto pago online, se houver), o carteiro entrega no endereço do pedido. O pagamento de tributos é sempre feito antes, pelo app — nunca em dinheiro na porta.' },
+  { ic: MapPin, color: '#3b82f6', t: 'Retirar na agência', d: 'Se ninguém estiver em casa, o pacote fica numa agência dos Correios perto de você para retirada com documento.' },
   { ic: ShieldCheck, color: '#8b5cf6', t: 'Confira e assine', d: 'Confira a embalagem na entrega. Em caso de avaria, registre e nos avise — ajudamos com a transportadora.' },
 ];
 
