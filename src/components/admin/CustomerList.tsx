@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Users, ShoppingBag, DollarSign, TrendingUp, Package, Calendar, Mail, Phone, Trash2, AlertTriangle, Gift, X } from 'lucide-react';
+import { Users, ShoppingBag, DollarSign, TrendingUp, Package, Calendar, Mail, Phone, Trash2, AlertTriangle, Gift, X, Sparkles } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { customerService, CustomerStats } from '@/services/customerService';
@@ -71,6 +71,26 @@ const CustomerList: React.FC = () => {
       }
     } finally {
       setGranting(false);
+    }
+  };
+
+  // Conceder/ajustar pontos de fidelidade de um cliente
+  const handleGrantPoints = async (email: string, name: string) => {
+    const input = window.prompt(`Quantos pontos somar a "${name}"?\n(use número negativo para descontar)`, '1000');
+    if (input === null) return;
+    const amount = Math.trunc(Number(input));
+    if (!amount || isNaN(amount)) {
+      toast({ title: 'Valor inválido', variant: 'destructive' });
+      return;
+    }
+    if (!requireAdminPassword(`ajustar pontos de ${name}`)) return;
+    await ensureAdminAuth();
+    const res = await firebaseSyncService.addPointsToUserByEmail(email, amount);
+    if (res.success) {
+      toast({ title: `✨ ${amount > 0 ? '+' : ''}${amount} pontos`, description: `${name} agora tem ${res.total} pontos.` });
+      loadCustomers();
+    } else {
+      toast({ title: 'Não foi possível ajustar', description: res.error, variant: 'destructive' });
     }
   };
 
@@ -367,6 +387,15 @@ const CustomerList: React.FC = () => {
                     >
                       <Gift className="w-3 h-3 mr-1" />
                       Dar cupom
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-xs flex-1 text-purple-700 border-purple-300 hover:bg-purple-50"
+                      onClick={() => handleGrantPoints(customer.email, customer.name)}
+                    >
+                      <Sparkles className="w-3 h-3 mr-1" />
+                      Dar pontos
                     </Button>
                     <Button
                       size="sm"

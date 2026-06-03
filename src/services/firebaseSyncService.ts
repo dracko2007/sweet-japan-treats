@@ -118,6 +118,23 @@ export const firebaseSyncService = {
   },
 
   /**
+   * Soma (ou subtrai) pontos de fidelidade de um cliente pelo e-mail.
+   */
+  async addPointsToUserByEmail(email: string, amount: number): Promise<{ success: boolean; total?: number; error?: string }> {
+    try {
+      ensureFirebaseReady();
+      const u: any = await this.getUserByEmail(email);
+      if (!u?.id) return { success: false, error: 'Cliente não encontrado no Firestore' };
+      const total = Math.max(0, (Number(u.points) || 0) + amount);
+      await updateDoc(doc(db, 'users', u.id), { points: total });
+      return { success: true, total };
+    } catch (error: any) {
+      console.error('❌ [FIREBASE] addPointsToUserByEmail:', error);
+      return { success: false, error: error?.message };
+    }
+  },
+
+  /**
    * Sincroniza pedido para Firestore
    */
   async syncOrderToFirestore(userId: string, order: any) {
