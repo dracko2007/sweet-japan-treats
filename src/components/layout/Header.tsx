@@ -30,8 +30,8 @@ const Header: React.FC = () => {
     },
     { label: t('nav.vlog'), href: '/vlog' },
     { label: t('nav.shipping'), href: '/frete' },
-    { label: '✨ Faça seu Pedido', href: '/faca-seu-pedido' },
-    { label: '🏢 Empresas', href: '/empresas' },
+    { label: 'Faça seu Pedido', href: '/faca-seu-pedido' },
+    { label: 'Empresas', href: '/empresas' },
     { label: t('nav.about'), href: '/sobre' },
   ];
 
@@ -51,13 +51,13 @@ const Header: React.FC = () => {
           </Link>
 
           {/* Desktop Navigation */}
-          <nav className="hidden lg:flex items-center gap-8">
+          <nav className="hidden xl:flex items-center gap-6">
             {navItems.map((item) => (
               <div key={item.label} className="relative group">
                 {item.submenu ? (
                   <button
                     className={cn(
-                      "flex items-center gap-1 text-sm font-medium transition-colors py-2",
+                      "flex items-center gap-1 text-sm font-medium transition-colors py-2 whitespace-nowrap",
                       isActive(item.href) ? "text-primary" : "text-muted-foreground hover:text-foreground"
                     )}
                     onMouseEnter={() => setIsProductsOpen(true)}
@@ -70,7 +70,7 @@ const Header: React.FC = () => {
                   <Link
                     to={item.href}
                     className={cn(
-                      "text-sm font-medium transition-colors py-2",
+                      "text-sm font-medium transition-colors py-2 whitespace-nowrap",
                       isActive(item.href) ? "text-primary" : "text-muted-foreground hover:text-foreground"
                     )}
                   >
@@ -174,7 +174,7 @@ const Header: React.FC = () => {
             </Link>
 
             <button
-              className="lg:hidden p-2 rounded-full hover:bg-secondary/50 transition-colors"
+              className="xl:hidden p-2 rounded-full hover:bg-secondary/50 transition-colors"
               onClick={() => setIsMenuOpen(!isMenuOpen)}
             >
               {isMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
@@ -184,7 +184,7 @@ const Header: React.FC = () => {
 
         {/* Mobile Navigation */}
         {isMenuOpen && (
-          <nav className="lg:hidden py-4 border-t border-border animate-fade-up">
+          <nav className="xl:hidden py-4 border-t border-border animate-fade-up">
             {/* Mobile Language & Country Switcher */}
             <div className="flex flex-col items-center gap-3 pb-4 mb-4 border-b border-border">
               <CountrySwitcher />
