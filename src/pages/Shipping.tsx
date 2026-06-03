@@ -578,7 +578,7 @@ const Shipping: React.FC = () => {
                       ✓ <strong>Envio Nacional Local (Isento de Taxas de Importação)</strong>
                     </div>
                     <p>
-                      Como o envio é doméstico (despachado de nossa cozinha em Hiroshima), não há nenhum trâmite alfandegário ou cobrança de impostos de importação internacional.
+                      Como o envio é doméstico (despachado de nossa loja em Hiroshima), não há nenhum trâmite alfandegário ou cobrança de impostos de importação internacional.
                     </p>
                     <div className="border-t border-primary/10 pt-2.5 space-y-2">
                       <div className="flex justify-between font-bold text-foreground">

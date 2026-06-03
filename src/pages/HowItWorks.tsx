@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  Package, CreditCard, ChefHat, Plane, Landmark, Truck, Home,
+  Package, CreditCard, Plane, Landmark, Truck, Home,
   Smartphone, Search, QrCode, Wallet, Globe2, Copy, Check,
   ArrowRight, MapPin, Bell, Percent, ShieldCheck, Clock,
   Building2, ChevronDown, FileText, BadgeCheck, Briefcase,
@@ -26,8 +26,8 @@ const JOURNEY = [
     desc: 'Você paga por PIX (Brasil), PayPay (Japão) ou Wise (internacional). Só preparamos o pacote depois do pagamento confirmado.',
   },
   {
-    icon: ChefHat, color: '#8b5cf6', title: 'Preparo em Hiroshima',
-    desc: 'Separamos e embalamos tudo com carinho na nossa cozinha/loja no Japão, com proteção extra para a viagem.',
+    icon: Package, color: '#8b5cf6', title: 'Preparo em Hiroshima',
+    desc: 'Separamos e embalamos tudo com carinho na nossa loja no Japão, com proteção extra para a viagem.',
   },
   {
     icon: Plane, color: '#3b82f6', title: 'Envio aéreo / marítimo',
@@ -432,13 +432,13 @@ const CorreiosTracking: React.FC = () => {
           ))}
         </ol>
 
-        <div className="flex flex-col sm:flex-row gap-2 mb-4">
-          <Button onClick={copy} variant="outline" className="gap-2 justify-start">
-            {copied ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
-            {copied ? 'Código copiado!' : `Copiar exemplo (${fakeCode})`}
+        <div className="flex flex-col sm:flex-row flex-wrap gap-2 mb-4">
+          <Button onClick={copy} variant="outline" className="gap-2 justify-center min-w-0 flex-1 sm:flex-none">
+            {copied ? <Check className="w-4 h-4 text-green-600 shrink-0" /> : <Copy className="w-4 h-4 shrink-0" />}
+            <span className="truncate">{copied ? 'Código copiado!' : 'Copiar código de exemplo'}</span>
           </Button>
-          <Button asChild className="btn-primary gap-2">
-            <Link to="/rastrear"><MapPin className="w-4 h-4" /> Rastrear meu pedido aqui</Link>
+          <Button asChild className="btn-primary gap-2 justify-center min-w-0 flex-1 sm:flex-none">
+            <Link to="/rastrear"><MapPin className="w-4 h-4 shrink-0" /> <span className="truncate">Rastrear meu pedido</span></Link>
           </Button>
         </div>
         <p className="text-xs text-muted-foreground flex items-start gap-1.5 bg-secondary/40 rounded-lg p-3">
