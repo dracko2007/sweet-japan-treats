@@ -48,7 +48,8 @@ export default async function handler(req, res) {
     });
 
     if (!r.ok) {
-      res.status(502).json({ error: 'upstream', status: r.status });
+      const detail = await r.text().catch(() => '');
+      res.status(502).json({ error: 'upstream', status: r.status, detail: detail.slice(0, 500) });
       return;
     }
     const data = await r.json();
