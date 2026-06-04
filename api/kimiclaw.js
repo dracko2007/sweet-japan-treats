@@ -1,7 +1,11 @@
 // Função serverless (Vercel) — "cérebro" do KimiClaw via Groq (tier grátis, rápido).
 // A chave fica SÓ no servidor (process.env.GROQ_API_KEY) e nunca vai pro navegador.
 // Sem a chave, retorna 503 e o KimiClaw responde pelas regras (fallback).
-const GROQ_MODEL = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
+// Modelos do Groq em ordem de preferência (mais inteligente primeiro), com fallback.
+// Kimi K2 é um modelo gigante (MoE ~1T) e muito capaz; cai para gpt-oss-120b e llama-70b.
+const GROQ_MODELS = process.env.GROQ_MODEL
+  ? [process.env.GROQ_MODEL]
+  : ['moonshotai/kimi-k2-instruct', 'openai/gpt-oss-120b', 'llama-3.3-70b-versatile'];
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -51,30 +55,30 @@ export default async function handler(req, res) {
       systemContent += `\n\nCATÁLOGO ATUAL DA LOJA (${catalog.length} itens — use SOMENTE isto para dizer o que existe):\n${lines}`;
     }
 
-    const payload = {
-      model: GROQ_MODEL,
-      max_tokens: 400,
-      temperature: 0.5,
-      messages: [{ role: 'system', content: systemContent }, ...history],
-    };
+    const baseMessages = [{ role: 'system', content: systemContent }, ...history];
 
     let r;
-    for (let attempt = 0; attempt < 2; attempt++) {
-      r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${key}`,
-        },
-        body: JSON.stringify(payload),
-      });
-      if (r.status !== 429) break;
-      if (attempt === 0) await sleep(1200);
+    let lastDetail = '';
+    // Tenta cada modelo em ordem; pula para o próximo em 404 (modelo indisponível)
+    // ou 429 persistente (rate-limit). Mantém o último erro para diagnóstico.
+    for (const model of GROQ_MODELS) {
+      let ok = false;
+      for (let attempt = 0; attempt < 2; attempt++) {
+        r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+          body: JSON.stringify({ model, max_tokens: 450, temperature: 0.5, messages: baseMessages }),
+        });
+        if (r.ok) { ok = true; break; }
+        lastDetail = await r.text().catch(() => '');
+        if (r.status === 429 && attempt === 0) { await sleep(1000); continue; }
+        break; // 404/400/etc → tenta próximo modelo
+      }
+      if (ok) break;
     }
 
-    if (!r.ok) {
-      const detail = await r.text().catch(() => '');
-      res.status(502).json({ error: 'upstream', status: r.status, detail: detail.slice(0, 300) });
+    if (!r || !r.ok) {
+      res.status(502).json({ error: 'upstream', status: r?.status, detail: lastDetail.slice(0, 300) });
       return;
     }
     const data = await r.json();

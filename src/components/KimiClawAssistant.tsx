@@ -301,6 +301,19 @@ const KimiClawAssistant: React.FC = () => {
     ]);
   };
 
+  // Pergunta à IA (Groq) com o histórico recente + catálogo publicado. Retorna texto ou null.
+  const aiAnswer = async (userText: string): Promise<string | null> => {
+    if (!qwenEnabled()) return null;
+    const history: QwenMsg[] = messages
+      .slice(-6)
+      .map((m) => ({ role: m.sender === 'kimi' ? 'assistant' : 'user', content: m.text } as QwenMsg));
+    history.push({ role: 'user', content: userText });
+    const catalog = products
+      .filter((p) => !p.hidden)
+      .map((p) => ({ name: p.name, category: p.category, priceYen: p.prices?.small || 0, discount: p.discountPercent || 0 }));
+    return askQwen(history, catalog);
+  };
+
   const handleCommandExecution = async (text: string) => {
     const query = text.toLowerCase().trim();
 
@@ -364,7 +377,12 @@ const KimiClawAssistant: React.FC = () => {
       const results = searchProducts(query, { requireStrong: true });
 
       if (results.length === 0) {
+        // Sem match direto → deixa a IA responder de forma completa (vê o catálogo).
+        setIsTyping(true);
+        const ai = await aiAnswer(text);
+        setIsTyping(false);
         await addKimiMessageWithTyping(
+          ai ||
           `Não encontrei **"${text.trim()}"** no nosso catálogo. 😕 Mas você pode encomendar pelo **"Faça seu Pedido"** no menu do topo — a equipe consegue trazer do Japão pra você! 🎌`
         );
         return;
@@ -544,18 +562,10 @@ const KimiClawAssistant: React.FC = () => {
       return;
     }
 
-    // 9.5 IA (Qwen) — se houver chave configurada, responde de forma conversacional
+    // 9.5 IA — responde de forma conversacional (com o catálogo em contexto)
     if (qwenEnabled()) {
       setIsTyping(true);
-      const history: QwenMsg[] = messages
-        .slice(-6)
-        .map((m) => ({ role: m.sender === 'kimi' ? 'assistant' : 'user', content: m.text } as QwenMsg));
-      history.push({ role: 'user', content: text });
-      // Envia o catálogo publicado para a IA "ver" o estoque real
-      const catalog = products
-        .filter((p) => !p.hidden)
-        .map((p) => ({ name: p.name, category: p.category, priceYen: p.prices?.small || 0, discount: p.discountPercent || 0 }));
-      const ai = await askQwen(history, catalog);
+      const ai = await aiAnswer(text);
       setIsTyping(false);
       if (ai) {
         await addKimiMessageWithTyping(ai);
