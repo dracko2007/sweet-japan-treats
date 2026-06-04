@@ -3,9 +3,11 @@
 // Sem a chave, retorna 503 e o KimiClaw responde pelas regras (fallback).
 // Modelos do Groq em ordem de preferência (mais inteligente primeiro), com fallback.
 // Kimi K2 é um modelo gigante (MoE ~1T) e muito capaz; cai para gpt-oss-120b e llama-70b.
+// Evitamos modelos de "raciocínio" (gpt-oss) que consomem os tokens pensando e
+// devolvem conteúdo vazio. Kimi K2 (forte) com fallback para llama-70b.
 const GROQ_MODELS = process.env.GROQ_MODEL
   ? [process.env.GROQ_MODEL]
-  : ['moonshotai/kimi-k2-instruct', 'openai/gpt-oss-120b', 'llama-3.3-70b-versatile'];
+  : ['moonshotai/kimi-k2-instruct', 'llama-3.3-70b-versatile'];
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -76,32 +78,35 @@ apenas uma média, não o valor exato. Nunca apresente o número como preço fin
 
     const baseMessages = [{ role: 'system', content: systemContent }, ...history];
 
-    let r;
+    let text = null;
+    let lastStatus = 0;
     let lastDetail = '';
-    // Tenta cada modelo em ordem; pula para o próximo em 404 (modelo indisponível)
-    // ou 429 persistente (rate-limit). Mantém o último erro para diagnóstico.
+    // Tenta cada modelo em ordem; pula para o próximo em erro OU resposta vazia.
     for (const model of GROQ_MODELS) {
-      let ok = false;
+      let r;
       for (let attempt = 0; attempt < 2; attempt++) {
         r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
-          body: JSON.stringify({ model, max_tokens: 450, temperature: 0.5, messages: baseMessages }),
+          body: JSON.stringify({ model, max_tokens: 600, temperature: 0.5, messages: baseMessages }),
         });
-        if (r.ok) { ok = true; break; }
+        if (r.ok) break;
+        lastStatus = r.status;
         lastDetail = await r.text().catch(() => '');
         if (r.status === 429 && attempt === 0) { await sleep(1000); continue; }
-        break; // 404/400/etc → tenta próximo modelo
+        break; // 404/400/etc → próximo modelo
       }
-      if (ok) break;
+      if (r && r.ok) {
+        const data = await r.json().catch(() => null);
+        const t = data?.choices?.[0]?.message?.content?.trim();
+        if (t) { text = t; break; } // só aceita resposta não-vazia
+      }
     }
 
-    if (!r || !r.ok) {
-      res.status(502).json({ error: 'upstream', status: r?.status, detail: lastDetail.slice(0, 300) });
+    if (!text) {
+      res.status(502).json({ error: 'upstream-or-empty', status: lastStatus, detail: lastDetail.slice(0, 300) });
       return;
     }
-    const data = await r.json();
-    const text = data?.choices?.[0]?.message?.content?.trim() || null;
     res.status(200).json({ text });
   } catch (e) {
     res.status(500).json({ error: String(e?.message || e) });
