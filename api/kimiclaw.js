@@ -55,17 +55,17 @@ Use SEMPRE o símbolo **${locale.currencySymbol}** (${locale.currencyCode}) nos 
 Conversão usada pela loja a partir do preço em ienes (¥): Brasil → R$ = ¥ ÷ 28; Europa (Portugal/França/Itália/Espanha) → € = (¥ ÷ 28) × 0,16; Japão → mantém ¥.
 
 ESTIMATIVA DE PREÇO: se o cliente perguntar "quanto custa", "qual o preço", "quanto fica/sai" de um produto que NÃO está no
-catálogo, você é OBRIGADO a fornecer a estimativa completa — NÃO responda apenas "não temos". Faça SEMPRE este cálculo e
-mostre o resultado:
-1) estime o preço de varejo típico em IENES no Japão (com base no seu conhecimento — você NÃO acessa a internet em tempo real);
-2) acrescente 40% sobre esse valor;
-3) converta para ${locale.currencySymbol} pela taxa acima (Brasil: ¥÷28);
-4) some uma estimativa de frete internacional;
-5) apresente o TOTAL aproximado em ${locale.currencySymbol}, mostrando rapidamente as parcelas (produto+40% e frete).
-Depois mencione que o item não está no catálogo e pode ser pedido pelo "Faça seu Pedido".
-OBRIGATÓRIO em toda estimativa: deixe MUITO claro que é apenas uma MÉDIA aproximada, propositalmente ACIMA do valor real, que
-NÃO é o preço correto, e que para o valor real é preciso falar com um vendedor/administrador. Você é programado para mostrar
-apenas uma média, não o valor exato. Nunca apresente o número como preço final.`;
+catálogo, você é OBRIGADO a dar a estimativa — NÃO responda apenas "não temos". Calcule INTERNAMENTE (sem mostrar as contas):
+a) preço de varejo típico em ienes no Japão (seu conhecimento; você NÃO acessa a internet); b) acrescente 40%;
+c) converta para ${locale.currencySymbol} (Brasil: ¥÷28); d) some uma estimativa de frete internacional.
+
+REGRA DE APRESENTAÇÃO (MUITO IMPORTANTE): mostre APENAS o valor final aproximado em ${locale.currencySymbol} (pode dar uma
+faixa, ex.: "em torno de ${locale.currencySymbol} X" ou "${locale.currencySymbol} X a Y", já com o frete incluído).
+NUNCA revele nem mencione: o preço em ienes, a margem/acréscimo, os "40%", "personal shopper", nem o passo a passo do cálculo.
+Não detalhe "produto + frete"; entregue só o total estimado.
+Sempre acompanhe do aviso: é apenas uma estimativa para fácil elucidação, aproximada e ACIMA do valor real, NÃO é o preço
+correto, e para o valor real é preciso falar com um vendedor/administrador. Depois diga que o item não está no catálogo e
+pode ser pedido pelo "Faça seu Pedido". Nunca apresente o número como preço final/garantido.`;
     if (catalog.length) {
       const lines = catalog
         .map((p) => {
