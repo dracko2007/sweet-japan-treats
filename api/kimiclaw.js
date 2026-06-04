@@ -1,9 +1,7 @@
-// Função serverless (Vercel) — "cérebro" do KimiClaw via Qwen (OpenRouter).
-// A chave fica SÓ no servidor (process.env.OPENROUTER_API_KEY) e nunca vai pro navegador.
-// Lista de modelos grátis (OpenRouter tenta na ordem; ajuda a furar o rate-limit).
-const QWEN_MODELS = (process.env.QWEN_MODEL
-  ? [process.env.QWEN_MODEL]
-  : ['qwen/qwen3-next-80b-a3b-instruct:free', 'qwen/qwen3-coder:free']);
+// Função serverless (Vercel) — "cérebro" do KimiClaw via Groq (tier grátis, rápido).
+// A chave fica SÓ no servidor (process.env.GROQ_API_KEY) e nunca vai pro navegador.
+// Sem a chave, retorna 503 e o KimiClaw responde pelas regras (fallback).
+const GROQ_MODEL = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -27,7 +25,7 @@ export default async function handler(req, res) {
     res.status(405).json({ error: 'Method not allowed' });
     return;
   }
-  const key = process.env.OPENROUTER_API_KEY;
+  const key = process.env.GROQ_API_KEY;
   if (!key) {
     res.status(503).json({ error: 'AI not configured' });
     return;
@@ -37,22 +35,19 @@ export default async function handler(req, res) {
     const history = Array.isArray(body.messages) ? body.messages.slice(-6) : [];
 
     const payload = {
-      models: QWEN_MODELS,
+      model: GROQ_MODEL,
       max_tokens: 400,
       temperature: 0.6,
       messages: [{ role: 'system', content: SYSTEM_PROMPT }, ...history],
     };
 
     let r;
-    // Até 2 tentativas: o modelo grátis às vezes responde 429 momentâneo.
     for (let attempt = 0; attempt < 2; attempt++) {
-      r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${key}`,
-          'HTTP-Referer': 'https://japan-express.vercel.app',
-          'X-Title': 'Japan Express KimiClaw',
         },
         body: JSON.stringify(payload),
       });
