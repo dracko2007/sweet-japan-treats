@@ -349,14 +349,23 @@ const KimiClawAssistant: React.FC = () => {
       if (showCategory(detectedCat)) return;
     }
 
+    // 0a. ENCOMENDA / PEDIDO PERSONALIZADO — produto que a loja não tem em estoque
+    if (/encomend|sob encomenda|personalizad|fazer um pedido|faca seu pedido|importar (pra|para) mim|conseguir (trazer|comprar)|tem como (trazer|conseguir|pedir)/.test(normalizeText(query))) {
+      await addKimiMessageWithTyping(
+        'Não achou na loja? Sem problema! 🎌 Você pode encomendar **qualquer produto japonês** pelo **"Faça seu Pedido"** no menu do topo — é só mandar o link/foto do que você quer que a equipe cota pra você. Vou te levar até lá! 📝'
+      );
+      setTimeout(() => navigate('/faca-seu-pedido'), 600);
+      return;
+    }
+
     // 0. SEARCH PRODUCTS SKILL
     if (query.includes('buscar') || query.includes('procurar') || query.includes('pesquisar') || query.includes('search') || query.includes('find') || query.includes('tem ') || query.includes('quero ') || query.includes('mostrar') || query.includes('achar') || query.includes('encontrar')) {
-      // O searchProducts já ignora palavras de ligação/comando ("procurar por kitkat" → kitkat)
-      const results = searchProducts(query);
+      // Busca exige match FORTE (nome/categoria/marca) — evita resultados aleatórios
+      const results = searchProducts(query, { requireStrong: true });
 
       if (results.length === 0) {
         await addKimiMessageWithTyping(
-          t('kimiclaw.search.no_results').replace('{query}', text.trim())
+          `Não encontrei **"${text.trim()}"** no nosso catálogo. 😕 Mas você pode encomendar pelo **"Faça seu Pedido"** no menu do topo — a equipe consegue trazer do Japão pra você! 🎌`
         );
         return;
       }

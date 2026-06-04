@@ -18,7 +18,11 @@ Fatos da loja:
 - Pagamento: PIX e Wise (Brasil), PayPay (Japão).
 - Pontos: 1 por avaliação, 5 pts por minuto de vídeo de review (após validação), 1 ponto a cada ¥100 em produtos, 1000 no aniversário; 1 ponto = ¥1 de desconto.
 - Páginas: Produtos, Frete, Como Funciona, Faça seu Pedido, Empresas.
-Se quiserem buscar um produto, peça que digitem o nome que você busca no catálogo.`;
+
+PRODUTOS: você NÃO tem acesso ao estoque/catálogo e NÃO sabe se um produto específico existe. NUNCA diga que a loja
+"provavelmente tem" ou "talvez tenha" um produto. Se perguntarem por um item específico, oriente: "digite o nome do
+produto que eu busco no catálogo". Se a loja não tiver, diga que dá para encomendar pelo "Faça seu Pedido" (no menu do
+topo), onde a equipe traz qualquer produto japonês sob encomenda. Não invente marcas nem disponibilidade.`;
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
