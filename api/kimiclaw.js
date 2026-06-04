@@ -1,6 +1,6 @@
 // Função serverless (Vercel) — "cérebro" do KimiClaw via Qwen (OpenRouter).
 // A chave fica SÓ no servidor (process.env.OPENROUTER_API_KEY) e nunca vai pro navegador.
-const QWEN_MODEL = process.env.QWEN_MODEL || 'qwen/qwen-2.5-7b-instruct:free';
+const QWEN_MODEL = process.env.QWEN_MODEL || 'qwen/qwen3-next-80b-a3b-instruct:free';
 
 const SYSTEM_PROMPT = `Você é o KimiClaw, o assistente virtual simpático da loja "Japan Express" (japan-express.vercel.app),
 que importa produtos do Japão (cosméticos, doces e chás, snacks, papelaria, eletrônicos, vestuário, higiene & saúde).
