@@ -484,8 +484,10 @@ const KimiClawAssistant: React.FC = () => {
       return;
     }
 
-    // 7. CALCULATE SHIPPING INLINE
-    if (query.includes('calcular') || query.includes('frete') || query.includes('shipping') || query.includes('estimativa') || query.includes('quanto custa')) {
+    // 7. CALCULATE SHIPPING INLINE — só quando fala explicitamente de FRETE/ENVIO.
+    // "quanto custa <produto>" NÃO é frete → segue para a IA (estimativa com 40%).
+    if (query.includes('frete') || query.includes('shipping') || query.includes('envio') ||
+        (query.includes('calcular') && /(frete|envio|entrega)/.test(query))) {
       // Try to extract country from query
       let detectedCountry = '';
       if (query.includes('brasil') || query.includes('br')) detectedCountry = 'Brasil';
