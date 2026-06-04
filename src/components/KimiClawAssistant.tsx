@@ -551,7 +551,11 @@ const KimiClawAssistant: React.FC = () => {
         .slice(-6)
         .map((m) => ({ role: m.sender === 'kimi' ? 'assistant' : 'user', content: m.text } as QwenMsg));
       history.push({ role: 'user', content: text });
-      const ai = await askQwen(history);
+      // Envia o catálogo publicado para a IA "ver" o estoque real
+      const catalog = products
+        .filter((p) => !p.hidden)
+        .map((p) => ({ name: p.name, category: p.category, priceYen: p.prices?.small || 0, discount: p.discountPercent || 0 }));
+      const ai = await askQwen(history, catalog);
       setIsTyping(false);
       if (ai) {
         await addKimiMessageWithTyping(ai);

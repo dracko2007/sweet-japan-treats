@@ -19,10 +19,11 @@ Fatos da loja:
 - Pontos: 1 por avaliação, 5 pts por minuto de vídeo de review (após validação), 1 ponto a cada ¥100 em produtos, 1000 no aniversário; 1 ponto = ¥1 de desconto.
 - Páginas: Produtos, Frete, Como Funciona, Faça seu Pedido, Empresas.
 
-PRODUTOS: você NÃO tem acesso ao estoque/catálogo e NÃO sabe se um produto específico existe. NUNCA diga que a loja
-"provavelmente tem" ou "talvez tenha" um produto. Se perguntarem por um item específico, oriente: "digite o nome do
-produto que eu busco no catálogo". Se a loja não tiver, diga que dá para encomendar pelo "Faça seu Pedido" (no menu do
-topo), onde a equipe traz qualquer produto japonês sob encomenda. Não invente marcas nem disponibilidade.`;
+PRODUTOS / ESTOQUE: o catálogo atual da loja é enviado abaixo (quando disponível). Responda sobre disponibilidade
+SOMENTE com base nessa lista — é o estoque real publicado. Se o item pedido ESTÁ na lista, confirme citando o nome e o
+preço (em ¥) e lembre que o site converte para R$/€. Se NÃO estiver na lista, diga claramente que não temos no momento e
+que dá para encomendar pelo "Faça seu Pedido" (no menu do topo). NUNCA invente produtos, marcas ou disponibilidade que
+não estejam na lista. Se a lista não vier, peça para a pessoa digitar o nome que o catálogo é pesquisado.`;
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -37,12 +38,24 @@ export default async function handler(req, res) {
   try {
     const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
     const history = Array.isArray(body.messages) ? body.messages.slice(-6) : [];
+    const catalog = Array.isArray(body.catalog) ? body.catalog.slice(0, 120) : [];
+
+    let systemContent = SYSTEM_PROMPT;
+    if (catalog.length) {
+      const lines = catalog
+        .map((p) => {
+          const promo = p.discount ? ` (-${p.discount}%)` : '';
+          return `- ${p.name} [${p.category}] ¥${p.priceYen}${promo}`;
+        })
+        .join('\n');
+      systemContent += `\n\nCATÁLOGO ATUAL DA LOJA (${catalog.length} itens — use SOMENTE isto para dizer o que existe):\n${lines}`;
+    }
 
     const payload = {
       model: GROQ_MODEL,
       max_tokens: 400,
-      temperature: 0.6,
-      messages: [{ role: 'system', content: SYSTEM_PROMPT }, ...history],
+      temperature: 0.5,
+      messages: [{ role: 'system', content: systemContent }, ...history],
     };
 
     let r;
