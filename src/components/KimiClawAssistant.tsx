@@ -160,7 +160,7 @@ const KimiClawAssistant: React.FC = () => {
       .filter((t) => t.length >= 2 && !STOP_WORDS.has(t));
 
   // Search for products based on query (pontua por palavra → bem mais tolerante)
-  const searchProducts = (query: string): Product[] => {
+  const searchProducts = (query: string, opts?: { requireStrong?: boolean }): Product[] => {
     const tokens = tokenize(query);
     if (tokens.length === 0) return [];
 
@@ -173,6 +173,7 @@ const KimiClawAssistant: React.FC = () => {
 
     const scored = products.map((product) => {
       let score = 0;
+      let strong = 0; // só nome/id/categoria/marca/sabor (sinal forte de produto)
       const nId = normalizeText(product.id);
       const nName = normalizeText(product.name);
       const nDesc = normalizeText(product.description);
@@ -182,19 +183,20 @@ const KimiClawAssistant: React.FC = () => {
 
       tokens.forEach((tok) => {
         const t = tok.replace(/\s+/g, '');
-        if (nName.includes(tok)) score += 5;
-        if (nId.includes(tok)) score += 5;
-        if (nFlavor.includes(tok)) score += 3;
-        if (nCat.includes(tok)) score += 4;
-        if (nDesc.includes(tok)) score += 2;
-        if (aliases.some((a) => a.includes(t) || t.includes(a))) score += 4;
+        if (tok.length < 3) return; // ignora tokens curtos ("e", "de", "pix"≥3 ok)
+        if (nName.includes(tok)) { score += 5; strong += 5; }
+        if (nId.includes(tok)) { score += 5; strong += 5; }
+        if (nFlavor.includes(tok)) { score += 3; strong += 3; }
+        if (nCat.includes(tok)) { score += 4; strong += 4; }
+        if (aliases.some((a) => a.length >= 3 && (a.includes(t) || t.includes(a)))) { score += 4; strong += 4; }
+        if (nDesc.includes(tok)) score += 2; // descrição = sinal fraco (não conta como "strong")
       });
 
-      return { product, score };
+      return { product, score, strong };
     });
 
     return scored
-      .filter((item) => item.score > 0)
+      .filter((item) => (opts?.requireStrong ? item.strong > 0 : item.score > 0))
       .sort((a, b) => b.score - a.score)
       .slice(0, 5)
       .map((item) => item.product);
@@ -506,9 +508,10 @@ const KimiClawAssistant: React.FC = () => {
       return;
     }
 
-    // 8.5 BUSCA AUTOMÁTICA — se o texto bate com algum produto, mostra (ex: "kitkat", "calbee")
+    // 8.5 BUSCA AUTOMÁTICA — só se houver match FORTE (nome/categoria/marca).
+    // Frases conversacionais ("qual a diferença entre pix e wise") não casam → vão pra IA.
     if (!query.includes('oi') && !query.includes('ola') && !query.includes('hello')) {
-      const autoResults = searchProducts(query);
+      const autoResults = searchProducts(query, { requireStrong: true });
       if (autoResults.length > 0) {
         setMessages(prev => [
           ...prev,
