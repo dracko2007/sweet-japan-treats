@@ -1,6 +1,11 @@
 // Função serverless (Vercel) — "cérebro" do KimiClaw via Qwen (OpenRouter).
 // A chave fica SÓ no servidor (process.env.OPENROUTER_API_KEY) e nunca vai pro navegador.
-const QWEN_MODEL = process.env.QWEN_MODEL || 'qwen/qwen3-next-80b-a3b-instruct:free';
+// Lista de modelos grátis (OpenRouter tenta na ordem; ajuda a furar o rate-limit).
+const QWEN_MODELS = (process.env.QWEN_MODEL
+  ? [process.env.QWEN_MODEL]
+  : ['qwen/qwen3-next-80b-a3b-instruct:free', 'qwen/qwen3-coder:free']);
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const SYSTEM_PROMPT = `Você é o KimiClaw, o assistente virtual simpático da loja "Japan Express" (japan-express.vercel.app),
 que importa produtos do Japão (cosméticos, doces e chás, snacks, papelaria, eletrônicos, vestuário, higiene & saúde).
@@ -31,25 +36,33 @@ export default async function handler(req, res) {
     const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
     const history = Array.isArray(body.messages) ? body.messages.slice(-6) : [];
 
-    const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${key}`,
-        'HTTP-Referer': 'https://japan-express.vercel.app',
-        'X-Title': 'Japan Express KimiClaw',
-      },
-      body: JSON.stringify({
-        model: QWEN_MODEL,
-        max_tokens: 400,
-        temperature: 0.6,
-        messages: [{ role: 'system', content: SYSTEM_PROMPT }, ...history],
-      }),
-    });
+    const payload = {
+      models: QWEN_MODELS,
+      max_tokens: 400,
+      temperature: 0.6,
+      messages: [{ role: 'system', content: SYSTEM_PROMPT }, ...history],
+    };
+
+    let r;
+    // Até 2 tentativas: o modelo grátis às vezes responde 429 momentâneo.
+    for (let attempt = 0; attempt < 2; attempt++) {
+      r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${key}`,
+          'HTTP-Referer': 'https://japan-express.vercel.app',
+          'X-Title': 'Japan Express KimiClaw',
+        },
+        body: JSON.stringify(payload),
+      });
+      if (r.status !== 429) break;
+      if (attempt === 0) await sleep(1200);
+    }
 
     if (!r.ok) {
       const detail = await r.text().catch(() => '');
-      res.status(502).json({ error: 'upstream', status: r.status, detail: detail.slice(0, 500) });
+      res.status(502).json({ error: 'upstream', status: r.status, detail: detail.slice(0, 300) });
       return;
     }
     const data = await r.json();
