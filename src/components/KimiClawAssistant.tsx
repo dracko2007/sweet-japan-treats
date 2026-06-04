@@ -311,7 +311,10 @@ const KimiClawAssistant: React.FC = () => {
     const catalog = products
       .filter((p) => !p.hidden)
       .map((p) => ({ name: p.name, category: p.category, priceYen: p.prices?.small || 0, discount: p.discountPercent || 0 }));
-    return askQwen(history, catalog);
+    const code = getCurrencyByCountry(selectedCountry);
+    const symbol = code === 'JPY' ? '¥' : code === 'EUR' ? '€' : 'R$';
+    const locale = { country: selectedCountry, currencyCode: code, currencySymbol: symbol };
+    return askQwen(history, catalog, locale);
   };
 
   const handleCommandExecution = async (text: string) => {

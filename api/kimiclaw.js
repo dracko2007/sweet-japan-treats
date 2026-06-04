@@ -43,8 +43,24 @@ export default async function handler(req, res) {
     const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
     const history = Array.isArray(body.messages) ? body.messages.slice(-6) : [];
     const catalog = Array.isArray(body.catalog) ? body.catalog.slice(0, 120) : [];
+    const locale = body.locale || { country: 'Brasil', currencyCode: 'BRL', currencySymbol: 'R$' };
 
     let systemContent = SYSTEM_PROMPT;
+
+    // Moeda do destino + regras de estimativa de preço
+    systemContent += `\n\nMOEDA E PAÍS DE ENVIO: o cliente está comprando para **${locale.country}**.
+Use SEMPRE o símbolo **${locale.currencySymbol}** (${locale.currencyCode}) nos valores — NÃO use ¥ a menos que o país seja o Japão.
+Conversão usada pela loja a partir do preço em ienes (¥): Brasil → R$ = ¥ ÷ 28; Europa (Portugal/França/Itália/Espanha) → € = (¥ ÷ 28) × 0,16; Japão → mantém ¥.
+
+ESTIMATIVA DE PREÇO de produto que NÃO está no catálogo (só quando o cliente perguntar quanto custaria):
+1) estime o preço de varejo típico em IENES no Japão (com base no seu conhecimento — você NÃO acessa a internet em tempo real);
+2) acrescente 40% sobre esse valor;
+3) converta para ${locale.currencySymbol} pela taxa acima;
+4) some uma estimativa de frete internacional;
+5) informe o total aproximado em ${locale.currencySymbol}.
+OBRIGATÓRIO: deixe MUITO claro que é apenas uma MÉDIA aproximada, propositalmente ACIMA do valor real, que NÃO é o preço correto,
+e que para saber o valor real é preciso entrar em contato com um vendedor/administrador. Você é programado para mostrar apenas
+uma média, não o valor exato. Nunca apresente o número como preço final.`;
     if (catalog.length) {
       const lines = catalog
         .map((p) => {
