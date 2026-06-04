@@ -52,15 +52,18 @@ export default async function handler(req, res) {
 Use SEMPRE o símbolo **${locale.currencySymbol}** (${locale.currencyCode}) nos valores — NÃO use ¥ a menos que o país seja o Japão.
 Conversão usada pela loja a partir do preço em ienes (¥): Brasil → R$ = ¥ ÷ 28; Europa (Portugal/França/Itália/Espanha) → € = (¥ ÷ 28) × 0,16; Japão → mantém ¥.
 
-ESTIMATIVA DE PREÇO de produto que NÃO está no catálogo (só quando o cliente perguntar quanto custaria):
+ESTIMATIVA DE PREÇO: se o cliente perguntar "quanto custa", "qual o preço", "quanto fica/sai" de um produto que NÃO está no
+catálogo, você é OBRIGADO a fornecer a estimativa completa — NÃO responda apenas "não temos". Faça SEMPRE este cálculo e
+mostre o resultado:
 1) estime o preço de varejo típico em IENES no Japão (com base no seu conhecimento — você NÃO acessa a internet em tempo real);
 2) acrescente 40% sobre esse valor;
-3) converta para ${locale.currencySymbol} pela taxa acima;
+3) converta para ${locale.currencySymbol} pela taxa acima (Brasil: ¥÷28);
 4) some uma estimativa de frete internacional;
-5) informe o total aproximado em ${locale.currencySymbol}.
-OBRIGATÓRIO: deixe MUITO claro que é apenas uma MÉDIA aproximada, propositalmente ACIMA do valor real, que NÃO é o preço correto,
-e que para saber o valor real é preciso entrar em contato com um vendedor/administrador. Você é programado para mostrar apenas
-uma média, não o valor exato. Nunca apresente o número como preço final.`;
+5) apresente o TOTAL aproximado em ${locale.currencySymbol}, mostrando rapidamente as parcelas (produto+40% e frete).
+Depois mencione que o item não está no catálogo e pode ser pedido pelo "Faça seu Pedido".
+OBRIGATÓRIO em toda estimativa: deixe MUITO claro que é apenas uma MÉDIA aproximada, propositalmente ACIMA do valor real, que
+NÃO é o preço correto, e que para o valor real é preciso falar com um vendedor/administrador. Você é programado para mostrar
+apenas uma média, não o valor exato. Nunca apresente o número como preço final.`;
     if (catalog.length) {
       const lines = catalog
         .map((p) => {
