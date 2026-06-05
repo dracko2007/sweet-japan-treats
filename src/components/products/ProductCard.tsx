@@ -11,7 +11,7 @@ import { cn } from '@/lib/utils';
 import { useLanguage } from '@/context/LanguageContext';
 import { getTranslatedProductName, getTranslatedProductDesc, getTranslatedProductFlavor } from '@/data/translations';
 import { formatPrice } from '@/utils/currency';
-import { effectiveYen, baseYen, hasDiscount } from '@/utils/pricing';
+import { effectiveYen, baseYen, hasDiscount, getVariants } from '@/utils/pricing';
 
 interface ProductCardProps {
   product: Product;
@@ -19,7 +19,10 @@ interface ProductCardProps {
 
 const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
   const navigate = useNavigate();
-  const [selectedSize, setSelectedSize] = useState<'small' | 'large'>('small');
+  const variants = getVariants(product);
+  // Mais barata primeiro (para "a partir de" e o que vai ao carrinho pelo card)
+  const firstVariant = [...variants].sort((a, b) => a.price - b.price)[0];
+  const [selectedSize] = useState<string>(firstVariant?.id || 'small');
   const [quantity, setQuantity] = useState(1);
   const [added, setAdded] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
@@ -47,14 +50,15 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
     if (isEuro) return (yen / 28) * 0.16;
     return yen / 28;
   };
-  const getDisplayPrice = (size: 'small' | 'large') => convertYen(effectiveYen(product, size));
+  const getDisplayPrice = (size: string) => convertYen(effectiveYen(product, size));
 
+  const multiVariant = variants.length > 1;
   const currentPrice = getDisplayPrice(selectedSize);
   const promoActive = hasDiscount(product);
   const originalPrice = convertYen(baseYen(product, selectedSize));
 
   const handleAddToCart = () => {
-    addToCart(product, selectedSize, quantity);
+    addToCart(product, selectedSize, quantity, firstVariant?.label);
     setAdded(true);
     setTimeout(() => setAdded(false), 2000);
     setQuantity(1);
@@ -223,7 +227,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
 
         {/* Price display */}
         <div className="mt-auto mb-4 flex items-center justify-between border-b pb-3 border-border/50">
-          <span className="text-sm font-semibold text-muted-foreground">Valor:</span>
+          <span className="text-sm font-semibold text-muted-foreground">{multiVariant ? 'A partir de:' : 'Valor:'}</span>
           <div className="flex flex-col items-end leading-tight">
             {promoActive && (
               <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 line-through decoration-2">

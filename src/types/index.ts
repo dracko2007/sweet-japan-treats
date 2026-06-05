@@ -1,3 +1,11 @@
+// Variante de preço de um produto (Pequeno, Médio, Grande, Kit...). O `id` é
+// usado como "size" no carrinho. Produtos antigos sem `variants` usam prices.small/large.
+export interface ProductVariant {
+  id: string;      // estável (ex: 'small', 'kit-3', 'var-abc')
+  label: string;   // exibido ao cliente (ex: 'Pequeno', 'Kit 3 unidades')
+  price: number;   // em ¥
+}
+
 export interface Product {
   id: string;
   name: string;
@@ -7,6 +15,7 @@ export interface Product {
     small: number; // 280g
     large: number; // 800g
   };
+  variants?: ProductVariant[]; // se presente, substitui prices (vários tamanhos/kits)
   cost?: number; // Custo de aquisição em ¥ (só admin — NÃO aparece para o cliente)
   image: string;
   gallery?: string[]; // Múltiplas imagens do produto
@@ -19,7 +28,8 @@ export interface Product {
 
 export interface CartItem {
   product: Product;
-  size: 'small' | 'large';
+  size: string;          // id da variante ('small'/'large' nos antigos, ou id custom)
+  variantLabel?: string; // rótulo exibido (Pequeno, Kit...) — opcional p/ compatibilidade
   quantity: number;
 }
 

@@ -18,9 +18,9 @@ const loadCart = (): CartItem[] => {
 
 interface CartContextType {
   items: CartItem[];
-  addToCart: (product: Product, size: 'small' | 'large', quantity?: number) => void;
-  removeFromCart: (productId: string, size: 'small' | 'large') => void;
-  updateQuantity: (productId: string, size: 'small' | 'large', quantity: number) => void;
+  addToCart: (product: Product, size: string, quantity?: number, variantLabel?: string) => void;
+  removeFromCart: (productId: string, size: string) => void;
+  updateQuantity: (productId: string, size: string, quantity: number) => void;
   clearCart: () => void;
   totalItems: number;
   totalPrice: number;
@@ -37,7 +37,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     safeStorage.setItem(CART_STORAGE_KEY, JSON.stringify(items));
   }, [items]);
 
-  const addToCart = useCallback((product: Product, size: 'small' | 'large', quantity = 1) => {
+  const addToCart = useCallback((product: Product, size: string, quantity = 1, variantLabel?: string) => {
     setItems(prev => {
       const existingIndex = prev.findIndex(
         item => item.product.id === product.id && item.size === size
@@ -52,17 +52,17 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return updated;
       }
 
-      return [...prev, { product, size, quantity }];
+      return [...prev, { product, size, quantity, variantLabel }];
     });
   }, []);
 
-  const removeFromCart = useCallback((productId: string, size: 'small' | 'large') => {
+  const removeFromCart = useCallback((productId: string, size: string) => {
     setItems(prev => prev.filter(
       item => !(item.product.id === productId && item.size === size)
     ));
   }, []);
 
-  const updateQuantity = useCallback((productId: string, size: 'small' | 'large', quantity: number) => {
+  const updateQuantity = useCallback((productId: string, size: string, quantity: number) => {
     if (quantity <= 0) {
       removeFromCart(productId, size);
       return;

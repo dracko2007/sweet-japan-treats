@@ -1,7 +1,10 @@
 import React, { useState, useRef } from 'react';
 import { Plus, Pencil, Trash2, X, Save, Image as ImageIcon, Loader2, PackageOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Product } from '@/types';
+import { Product, ProductVariant } from '@/types';
+import { getVariants } from '@/utils/pricing';
+
+const VARIANT_PRESETS = ['Pequeno', 'Médio', 'Grande', 'Kit'];
 import { useProducts } from '@/context/ProductsContext';
 import { productService } from '@/services/productService';
 import { useToast } from '@/hooks/use-toast';
@@ -67,6 +70,7 @@ const emptyForm = (): Product => ({
   description: '',
   category: 'cosmeticos',
   prices: { small: 0, large: 0 },
+  variants: [{ id: 'small', label: 'Pequeno', price: 0 }],
   image: '',
   gallery: [],
   flavor: '',
@@ -93,9 +97,17 @@ const ProductManager: React.FC = () => {
     setIsNew(true);
   };
   const openEdit = (p: Product) => {
-    setEditing({ ...p, gallery: p.gallery ? [...p.gallery] : [p.image] });
+    setEditing({ ...p, gallery: p.gallery ? [...p.gallery] : [p.image], variants: getVariants(p) });
     setIsNew(false);
   };
+
+  // Helpers das variantes de preço
+  const variants = (): ProductVariant[] => editing?.variants || [];
+  const setVariants = (vs: ProductVariant[]) => editing && setEditing({ ...editing, variants: vs });
+  const addVariant = () => setVariants([...variants(), { id: `var-${Date.now().toString(36)}`, label: 'Médio', price: 0 }]);
+  const updateVariant = (id: string, patch: Partial<ProductVariant>) =>
+    setVariants(variants().map((v) => (v.id === id ? { ...v, ...patch } : v)));
+  const removeVariant = (id: string) => setVariants(variants().filter((v) => v.id !== id));
   const close = () => {
     setEditing(null);
     setIsNew(false);
@@ -136,16 +148,22 @@ const ProductManager: React.FC = () => {
     try {
       const id = isNew ? slugify(editing.name) + '-' + Date.now().toString(36).slice(-4) : editing.id;
       const gallery = editing.gallery && editing.gallery.length > 0 ? editing.gallery : [editing.image].filter(Boolean);
+      // Variantes válidas (com label e preço > 0)
+      const cleanVariants: ProductVariant[] = (editing.variants || [])
+        .filter((v) => v.label.trim() && Number(v.price) > 0)
+        .map((v) => ({ id: v.id, label: v.label.trim(), price: Number(v.price) }));
+      // Legado: prices.small = menor, prices.large = maior (mantém compatibilidade)
+      const priceVals = cleanVariants.map((v) => v.price);
+      const small = priceVals.length ? Math.min(...priceVals) : Number(editing.prices?.small) || 0;
+      const large = priceVals.length ? Math.max(...priceVals) : Number(editing.prices?.large) || small;
       const product: Product = {
         ...editing,
         id,
         image: gallery[0] || editing.image || '',
         gallery,
         cost: Number(editing.cost) || 0,
-        prices: {
-          small: Number(editing.prices.small) || 0,
-          large: Number(editing.prices.large) || Number(editing.prices.small) || 0,
-        },
+        variants: cleanVariants.length ? cleanVariants : undefined,
+        prices: { small, large },
       };
       await productService.save(product);
       await refresh();
@@ -287,34 +305,55 @@ const ProductManager: React.FC = () => {
                 </div>
               </div>
 
-              {/* Preços */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-sm font-semibold block mb-1">Preço pequeno (¥)</label>
-                  <input
-                    type="number"
-                    value={editing.prices.small || ''}
-                    onChange={(e) => setEditing({ ...editing, prices: { ...editing.prices, small: Number(e.target.value) } })}
-                    placeholder="980"
-                    disabled={!canPrice}
-                    className="w-full px-3 py-2 rounded-lg border border-border bg-background disabled:opacity-60 disabled:cursor-not-allowed"
-                  />
+              {/* Variantes de preço (Pequeno/Médio/Grande/Kit) */}
+              <div>
+                <label className="text-sm font-semibold block mb-2">Tamanhos & preços (¥)</label>
+                <div className="space-y-2">
+                  {variants().map((v) => (
+                    <div key={v.id} className="flex items-center gap-2">
+                      <select
+                        value={VARIANT_PRESETS.includes(v.label) ? v.label : 'custom'}
+                        onChange={(e) => updateVariant(v.id, { label: e.target.value === 'custom' ? '' : e.target.value })}
+                        disabled={!canPrice}
+                        className="px-2 py-2 rounded-lg border border-border bg-background text-sm disabled:opacity-60"
+                      >
+                        {VARIANT_PRESETS.map((p) => <option key={p} value={p}>{p}</option>)}
+                        <option value="custom">Outro…</option>
+                      </select>
+                      {!VARIANT_PRESETS.includes(v.label) && (
+                        <input
+                          value={v.label}
+                          onChange={(e) => updateVariant(v.id, { label: e.target.value })}
+                          placeholder="Ex: Kit 3 unidades"
+                          disabled={!canPrice}
+                          className="w-36 px-2 py-2 rounded-lg border border-border bg-background text-sm disabled:opacity-60"
+                        />
+                      )}
+                      <input
+                        type="number"
+                        value={v.price || ''}
+                        onChange={(e) => updateVariant(v.id, { price: Number(e.target.value) })}
+                        placeholder="¥ preço"
+                        disabled={!canPrice}
+                        className="flex-1 px-3 py-2 rounded-lg border border-border bg-background text-sm disabled:opacity-60"
+                      />
+                      {variants().length > 1 && canPrice && (
+                        <button onClick={() => removeVariant(v.id)} className="p-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 shrink-0">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
                 </div>
-                <div>
-                  <label className="text-sm font-semibold block mb-1">Preço grande (¥)</label>
-                  <input
-                    type="number"
-                    value={editing.prices.large || ''}
-                    onChange={(e) => setEditing({ ...editing, prices: { ...editing.prices, large: Number(e.target.value) } })}
-                    placeholder="2400"
-                    disabled={!canPrice}
-                    className="w-full px-3 py-2 rounded-lg border border-border bg-background disabled:opacity-60 disabled:cursor-not-allowed"
-                  />
-                </div>
+                {canPrice && (
+                  <button onClick={addVariant} className="mt-2 inline-flex items-center gap-1.5 text-sm font-semibold text-primary hover:underline">
+                    <Plus className="w-4 h-4" /> Adicionar tamanho/kit
+                  </button>
+                )}
+                <p className="text-xs text-muted-foreground mt-2">
+                  {canPrice ? 'Preços em ienes (¥). O site converte automático para R$/€. O cliente escolhe o tamanho na página do produto.' : '🔒 Preço/custo só podem ser alterados por admin nível 3.'}
+                </p>
               </div>
-              <p className="text-xs text-muted-foreground -mt-2">
-                {canPrice ? 'Preços em ienes (¥). O site converte automático para R$/€ conforme o país.' : '🔒 Preço/custo só podem ser alterados por admin nível 3.'}
-              </p>
 
               {/* Desconto promocional + Ocultar */}
               <div className="grid grid-cols-2 gap-3">
@@ -333,9 +372,9 @@ const ProductManager: React.FC = () => {
                     disabled={!canPrice}
                     className="w-full px-3 py-2 rounded-lg border border-red-300 bg-background disabled:opacity-60 disabled:cursor-not-allowed"
                   />
-                  {editing.discountPercent ? (
+                  {editing.discountPercent && variants()[0]?.price ? (
                     <p className="text-xs text-red-700 dark:text-red-300 mt-1.5">
-                      De <s>¥{editing.prices.small.toLocaleString()}</s> por <strong>¥{Math.round(editing.prices.small * (1 - editing.discountPercent / 100)).toLocaleString()}</strong> (pequeno)
+                      De <s>¥{variants()[0].price.toLocaleString()}</s> por <strong>¥{Math.round(variants()[0].price * (1 - editing.discountPercent / 100)).toLocaleString()}</strong> ({variants()[0].label})
                     </p>
                   ) : (
                     <p className="text-[11px] text-red-600/70 mt-1.5">Mostra a tag de promoção no produto.</p>
@@ -375,10 +414,10 @@ const ProductManager: React.FC = () => {
                   disabled={!canPrice}
                   className="w-full px-3 py-2 rounded-lg border border-amber-300 bg-background disabled:opacity-60 disabled:cursor-not-allowed"
                 />
-                {editing.cost && editing.prices.small ? (
+                {editing.cost && variants()[0]?.price ? (
                   <p className="text-xs text-amber-800 dark:text-amber-300 mt-1.5">
-                    Margem (pequeno): <strong>¥{(editing.prices.small - editing.cost).toLocaleString()}</strong>
-                    {editing.prices.small > 0 && ` (${Math.round(((editing.prices.small - editing.cost) / editing.prices.small) * 100)}%)`}
+                    Margem ({variants()[0].label}): <strong>¥{(variants()[0].price - editing.cost).toLocaleString()}</strong>
+                    {` (${Math.round(((variants()[0].price - editing.cost) / variants()[0].price) * 100)}%)`}
                   </p>
                 ) : (
                   <p className="text-xs text-amber-700/80 dark:text-amber-400/80 mt-1.5">Para calcular lucro real no dashboard. O cliente NUNCA vê este valor.</p>

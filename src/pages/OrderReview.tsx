@@ -169,7 +169,7 @@ const OrderReview: React.FC = () => {
           name: getTranslatedProductName(item.product.id, t),
           image: item.product.image,
           quantity: item.quantity,
-          size: item.size === 'small' ? 'Padrão' : 'Deluxe',
+          size: item.variantLabel || (item.size === 'small' ? 'Pequeno' : 'Grande'),
           price: finalUnitPrice,
           cost: item.product.cost || 0, // custo de aquisição em ¥ (admin)
         };
@@ -238,7 +238,7 @@ const OrderReview: React.FC = () => {
     // quando o admin confirmar a entrega do pedido)
     if (appliedCoupon?.affiliateCode) {
       const netYenBase = items.reduce((sum, item) => {
-        const p = item.size === 'small' ? item.product.prices.small : item.product.prices.large;
+        const p = effectiveYen(item.product, item.size);
         return sum + p * item.quantity;
       }, 0);
       const fraction = appliedCoupon.discountType === 'percentage' ? appliedCoupon.discount / 100 : 0;
@@ -343,7 +343,7 @@ const OrderReview: React.FC = () => {
                       <div className="flex-1 min-w-0">
                         <p className="font-bold text-sm text-foreground truncate">{productName}</p>
                         <p className="text-xs text-muted-foreground mt-0.5">
-                          Opção: {item.size === 'small' ? 'Padrão' : 'Deluxe'} • Quantidade: {item.quantity}x
+                          Opção: {item.variantLabel || (item.size === 'small' ? 'Pequeno' : 'Grande')} • Quantidade: {item.quantity}x
                         </p>
                         <p className="text-xs text-gray-400">
                           Preço unitário: {formatPrice(displayUnitPrice, currency)}

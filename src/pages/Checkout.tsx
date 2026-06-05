@@ -724,7 +724,7 @@ const Checkout: React.FC = () => {
                         <div className="flex-1 min-w-0">
                           <p className="font-bold text-xs text-gray-800 truncate">{productName}</p>
                           <p className="text-[10px] text-gray-400 font-semibold mt-0.5">
-                            {item.size === 'small' ? 'Padrão' : 'Deluxe'} • {item.quantity}x
+                            {item.variantLabel || (item.size === 'small' ? 'Pequeno' : 'Grande')} • {item.quantity}x
                           </p>
                         </div>
                         <p className="font-bold text-xs text-gray-800">

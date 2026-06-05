@@ -16,7 +16,7 @@ import { cn } from '@/lib/utils';
 import { useLanguage } from '@/context/LanguageContext';
 import { getTranslatedProductName, getTranslatedProductDesc, getTranslatedProductFlavor } from '@/data/translations';
 import { formatPrice } from '@/utils/currency';
-import { effectiveYen, baseYen, hasDiscount } from '@/utils/pricing';
+import { effectiveYen, baseYen, hasDiscount, getVariants } from '@/utils/pricing';
 
 const ProductDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -28,7 +28,9 @@ const ProductDetail: React.FC = () => {
   const { products, loading: productsLoading } = useProducts();
 
   const product = products.find(p => p.id === id);
-  const [selectedSize, setSelectedSize] = useState<'small' | 'large'>('small');
+  const productVariants = product ? getVariants(product) : [];
+  const [selectedSize, setSelectedSize] = useState<string>('small');
+  const selectedVariant = productVariants.find((v) => v.id === selectedSize) || productVariants[0];
   const [quantity, setQuantity] = useState(1);
   const [isFavorite, setIsFavorite] = useState(
     user?.email ? wishlistService.isInWishlist(user.email, id || '') : false
@@ -39,6 +41,8 @@ const ProductDetail: React.FC = () => {
   useEffect(() => {
     if (product) {
       registrarEvento('viu_produto', product.id, product.category);
+      const vs = getVariants(product);
+      if (vs.length && !vs.some((v) => v.id === selectedSize)) setSelectedSize(vs[0].id);
     }
   }, [product?.id]);
 
@@ -77,7 +81,7 @@ const ProductDetail: React.FC = () => {
     if (isEuro) return (yen / 28) * 0.16;
     return yen / 28;
   };
-  const getDisplayPrice = (size: 'small' | 'large') => convertYen(effectiveYen(product, size));
+  const getDisplayPrice = (size: string) => convertYen(effectiveYen(product, size));
 
   const currentPrice = getDisplayPrice(selectedSize);
   const promoActive = hasDiscount(product);
@@ -86,10 +90,10 @@ const ProductDetail: React.FC = () => {
   const images = product.gallery && product.gallery.length > 0 ? product.gallery : [product.image];
 
   const handleAddToCart = () => {
-    addToCart(product, selectedSize, quantity);
+    addToCart(product, selectedSize, quantity, selectedVariant?.label);
     toast({
       title: t('productDetail.added'),
-      description: `${translatedName} (${selectedSize === 'small' ? 'Padrão' : 'Deluxe'}) x${quantity}`,
+      description: `${translatedName} (${selectedVariant?.label || ''}) x${quantity}`,
     });
   };
 
@@ -206,6 +210,33 @@ const ProductDetail: React.FC = () => {
                   <p className="text-sm text-muted-foreground mb-1">{t('productDetail.flavor')}</p>
                   <p className="font-semibold">{translatedFlavor}</p>
                 </div>
+
+                {/* Seletor de tamanho/variante */}
+                {productVariants.length > 1 && (
+                  <div className="mb-6">
+                    <span className="block text-sm font-semibold text-muted-foreground mb-2">Escolha o tamanho</span>
+                    <div className="flex flex-wrap gap-2">
+                      {productVariants.map((v) => {
+                        const active = v.id === selectedSize;
+                        return (
+                          <button
+                            key={v.id}
+                            onClick={() => setSelectedSize(v.id)}
+                            className={cn(
+                              'px-4 py-2 rounded-xl border-2 text-sm font-semibold transition-all',
+                              active ? 'border-primary bg-primary/10 text-primary' : 'border-border text-foreground hover:border-primary/50'
+                            )}
+                          >
+                            {v.label}
+                            <span className="block text-[11px] font-normal text-muted-foreground">
+                              {formatPrice(convertYen(effectiveYen(product, v.id)), currency)}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
 
                 <div className="mb-6 border-b pb-4 border-border/50">
                   <span className="block text-sm font-semibold text-muted-foreground mb-1">Preço Unitário</span>
