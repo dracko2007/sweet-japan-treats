@@ -25,6 +25,9 @@ export interface Product {
   hidden?: boolean;          // Registrado mas não publicado na loja (oculto do cliente)
   discountPercent?: number;  // Desconto promocional em % (0–100). >0 ativa a promoção.
   weightGrams?: number;      // Peso real da embalagem em g (para cálculo de frete); se ausente, estimado por categoria.
+  tags?: string[];           // Tipos/subcategorias para filtro inteligente (ex: 'shampoo', 'filtro solar')
+  isNew?: boolean;           // Marca como lançamento (aparece em destaque no filtro "Lançamento")
+  salesCount?: number;       // Quantidade vendida (usado no filtro "Mais Vendidos"); atualizado manualmente pelo admin
 }
 
 export interface CartItem {
