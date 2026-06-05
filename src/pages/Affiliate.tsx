@@ -8,7 +8,7 @@ import { useProducts } from '@/context/ProductsContext';
 import { useToast } from '@/hooks/use-toast';
 import { affiliateService, Affiliate } from '@/services/affiliateService';
 
-const SITE_URL = 'https://japan-express.vercel.app';
+const SITE_URL = 'https://japanexpress-store.com';
 
 const AffiliatePage: React.FC = () => {
   const { user, isAuthenticated } = useUser();

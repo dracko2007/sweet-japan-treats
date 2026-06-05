@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { affiliateService, Affiliate, PendingCommission } from '@/services/affiliateService';
 
-const SITE_URL = 'https://japan-express.vercel.app';
+const SITE_URL = 'https://japanexpress-store.com';
 
 const AffiliateManager: React.FC = () => {
   const { toast } = useToast();
@@ -218,6 +218,12 @@ const AffiliateManager: React.FC = () => {
                       </span>
                     </div>
                     <p className="text-sm text-muted-foreground">{aff.ownerName} · {aff.ownerEmail}</p>
+                    {/* Link de indicação visível (para o admin copiar/enviar ao afiliado) */}
+                    <div className="mt-3 flex items-center gap-2 bg-secondary/40 rounded-lg p-2">
+                      <Link2 className="w-3.5 h-3.5 text-primary shrink-0" />
+                      <code className="text-xs text-foreground truncate flex-1">{`${SITE_URL}/?ref=${aff.code}`}</code>
+                      <button onClick={() => copyLink(aff.code)} className="text-xs font-semibold text-primary hover:underline shrink-0">copiar</button>
+                    </div>
                     <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm mt-4">
                       <div><p className="text-muted-foreground text-xs">Desconto</p><p className="font-semibold">{aff.discountPercent}%</p></div>
                       <div><p className="text-muted-foreground text-xs">Comissão</p><p className="font-semibold">{aff.commissionPercent}%</p></div>
