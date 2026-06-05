@@ -96,8 +96,9 @@ const VlogManager: React.FC = () => {
   useEffect(() => {
     siteContentService.getVlog().then((c) => {
       const isEmpty = !c.featured?.url && (!c.videos || c.videos.length === 0);
-      if (isEmpty) {
-        // Nada salvo ainda → carrega os vídeos atuais (padrão) para poder editar/excluir
+      // Só pré-carrega os padrões se NUNCA foi salvo. Se o admin já salvou (mesmo
+      // vazio), respeita o que ele deixou — assim dá pra deletar de verdade.
+      if (isEmpty && !c.saved) {
         setContent(JSON.parse(JSON.stringify(DEFAULT_VLOG_CONTENT)));
         setUsingDefaults(true);
       } else {

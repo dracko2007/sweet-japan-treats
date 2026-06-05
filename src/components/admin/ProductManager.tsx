@@ -240,9 +240,9 @@ const ProductManager: React.FC = () => {
 
       {/* Modal de edição */}
       {editing && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
-          <div className="bg-card rounded-2xl w-full max-w-2xl my-8 shadow-elevated border border-border">
-            <div className="flex items-center justify-between p-5 border-b border-border sticky top-0 bg-card rounded-t-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-card rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-elevated border border-border">
+            <div className="flex items-center justify-between p-5 border-b border-border shrink-0 bg-card rounded-t-2xl">
               <h3 className="font-display text-xl font-bold flex items-center gap-2">
                 {isNew ? <Plus className="w-5 h-5" /> : <Pencil className="w-5 h-5" />}
                 {isNew ? 'Novo Produto' : 'Editar Produto'}
@@ -250,7 +250,7 @@ const ProductManager: React.FC = () => {
               <button onClick={close} className="p-2 rounded-full hover:bg-secondary"><X className="w-5 h-5" /></button>
             </div>
 
-            <div className="p-5 space-y-4">
+            <div className="p-5 space-y-4 overflow-y-auto flex-1">
               {/* Nome */}
               <div>
                 <label className="text-sm font-semibold block mb-1">Nome do produto</label>
@@ -430,7 +430,7 @@ const ProductManager: React.FC = () => {
               </div>
             </div>
 
-            <div className="p-5 border-t border-border flex justify-end gap-3 sticky bottom-0 bg-card rounded-b-2xl">
+            <div className="p-5 border-t border-border flex justify-end gap-3 shrink-0 bg-card rounded-b-2xl">
               <Button variant="outline" onClick={close} className="rounded-xl">Cancelar</Button>
               <Button onClick={save} disabled={saving} className="btn-primary rounded-xl gap-2">
                 {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}

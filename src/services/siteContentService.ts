@@ -39,6 +39,7 @@ export interface VlogContent {
   subtitle?: string;
   featured?: VlogVideo | null; // vídeo principal (destaque)
   videos: VlogVideo[]; // vídeos secundários
+  saved?: boolean; // true quando o admin já salvou (mesmo vazio) → não recarrega padrões
 }
 
 const DEFAULT_VLOG: VlogContent = { featured: null, videos: [] };
@@ -95,7 +96,7 @@ export const siteContentService = {
       const snap = await getDoc(doc(db, 'siteContent', 'vlog'));
       if (!snap.exists()) return DEFAULT_VLOG;
       const data = snap.data() as Partial<VlogContent>;
-      return { ...DEFAULT_VLOG, ...data, videos: data.videos || [] };
+      return { ...DEFAULT_VLOG, ...data, videos: data.videos || [], saved: true };
     } catch (e) {
       console.warn('siteContentService.getVlog falhou:', e);
       return DEFAULT_VLOG;
@@ -107,7 +108,7 @@ export const siteContentService = {
     await ensureAdminAuth();
     await setDoc(
       doc(db, 'siteContent', 'vlog'),
-      { ...content, featured: content.featured || null, updatedAt: serverTimestamp() },
+      { ...content, featured: content.featured || null, saved: true, updatedAt: serverTimestamp() },
       { merge: true }
     );
   },
