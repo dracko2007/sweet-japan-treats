@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Users, ShoppingBag, DollarSign, TrendingUp, Package, Calendar, Mail, Phone, Trash2, AlertTriangle, Gift, X, Sparkles } from 'lucide-react';
+import { Users, ShoppingBag, DollarSign, TrendingUp, Package, Calendar, Mail, Phone, Trash2, AlertTriangle, Gift, X, Sparkles, Megaphone } from 'lucide-react';
+import { affiliateService, AffiliateRequest } from '@/services/affiliateService';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { customerService, CustomerStats } from '@/services/customerService';
@@ -24,6 +25,33 @@ const CustomerList: React.FC = () => {
   // Concessão de cupom (admin → perfil do cliente)
   const [grantTarget, setGrantTarget] = useState<{ email: string; name: string } | 'ALL' | null>(null);
   const [granting, setGranting] = useState(false);
+
+  // Solicitações de afiliado pendentes
+  const [affRequests, setAffRequests] = useState<AffiliateRequest[]>([]);
+  const loadAffRequests = () => affiliateService.getRequests('pending').then(setAffRequests);
+  useEffect(() => { loadAffRequests(); }, []);
+
+  const suggestCode = (name: string) =>
+    (name || 'AFILIADO').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^A-Z0-9]/g, '').slice(0, 8) + '10';
+
+  const approveAff = async (req: AffiliateRequest) => {
+    const code = window.prompt(`Código do afiliado para "${req.name}" (o que o cliente divulga):`, suggestCode(req.name));
+    if (!code) return;
+    const disc = Number(window.prompt('Desconto que o cupom dá ao comprador (%):', '10')) || 10;
+    const comm = Number(window.prompt('Comissão do afiliado por venda (%):', '10')) || 10;
+    if (!requireAdminPassword(`aprovar o afiliado ${req.name}`)) return;
+    const res = await affiliateService.approveRequest(req, { code, discountPercent: disc, commissionPercent: comm });
+    if (res.ok) { toast({ title: '✅ Afiliado aprovado', description: `${req.name} · código ${code.toUpperCase()}` }); loadAffRequests(); }
+    else toast({ title: 'Erro ao aprovar', description: res.error, variant: 'destructive' });
+  };
+
+  const rejectAff = async (req: AffiliateRequest) => {
+    if (!confirm(`Recusar a solicitação de afiliado de "${req.name}"?`)) return;
+    if (!requireAdminPassword(`recusar o afiliado ${req.name}`)) return;
+    const ok = await affiliateService.rejectRequest(req.email);
+    if (ok) { toast({ title: 'Solicitação recusada', description: req.name }); loadAffRequests(); }
+    else toast({ title: 'Erro ao recusar', variant: 'destructive' });
+  };
   const [grantForm, setGrantForm] = useState({
     code: '',
     description: '',
@@ -237,6 +265,34 @@ const CustomerList: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      {/* Solicitações de afiliado pendentes */}
+      {affRequests.length > 0 && (
+        <div className="bg-primary/5 border border-primary/30 rounded-lg p-4">
+          <h3 className="font-semibold text-foreground flex items-center gap-2 mb-3">
+            <Megaphone className="w-5 h-5 text-primary" />
+            Solicitações de afiliado ({affRequests.length})
+          </h3>
+          <div className="space-y-2">
+            {affRequests.map((r) => (
+              <div key={r.email} className="bg-card border border-border rounded-xl p-3 flex flex-wrap items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="font-semibold text-sm text-foreground truncate">{r.name || r.email}</p>
+                  <p className="text-xs text-muted-foreground truncate">{r.email} · {new Date(r.requestedAt).toLocaleDateString('pt-BR')}</p>
+                </div>
+                <div className="flex gap-2">
+                  <Button onClick={() => approveAff(r)} size="sm" className="btn-primary gap-1.5">
+                    <Megaphone className="w-4 h-4" /> Aprovar
+                  </Button>
+                  <Button onClick={() => rejectAff(r)} size="sm" variant="outline" className="gap-1.5 text-red-600">
+                    <X className="w-4 h-4" /> Recusar
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Botões de Ação em Massa */}
       <div className="bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/50 rounded-lg p-4">
         <div className="flex items-start justify-between gap-4">

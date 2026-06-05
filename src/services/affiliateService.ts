@@ -11,6 +11,7 @@ import {
   getDoc,
   getDocs,
   setDoc,
+  updateDoc,
   deleteDoc,
   query,
   where,
@@ -19,6 +20,16 @@ import { ensureAdminAuth } from '@/utils/adminAuth';
 
 const COL = 'affiliates';
 const PENDING_COL = 'affiliate_pending';
+const REQ_COL = 'affiliate_requests';
+
+export interface AffiliateRequest {
+  email: string;
+  name: string;
+  status: 'pending' | 'approved' | 'rejected';
+  requestedAt: string;
+  code?: string;     // preenchido quando aprovado
+  message?: string;  // texto opcional do cliente (rede social, etc.)
+}
 
 export interface PendingCommission {
   id: string;
@@ -89,6 +100,83 @@ export const affiliateService = {
       console.warn('affiliateService.validate falhou:', e);
       return { valid: false, error: 'Erro ao validar código.' };
     }
+  },
+
+  /* ---------- Solicitações para virar afiliado ---------- */
+
+  /** Cliente solicita virar afiliado (1 por e-mail). */
+  async requestAffiliate(name: string, email: string, message?: string): Promise<{ ok: boolean; error?: string }> {
+    if (!db) return { ok: false, error: 'Indisponível' };
+    const id = email.trim().toLowerCase();
+    if (!id) return { ok: false, error: 'E-mail inválido' };
+    try {
+      await setDoc(doc(db, REQ_COL, id), {
+        email: id,
+        name: name || '',
+        status: 'pending',
+        requestedAt: new Date().toISOString(),
+        message: message || '',
+      });
+      return { ok: true };
+    } catch (e: any) {
+      console.warn('requestAffiliate falhou:', e);
+      return { ok: false, error: e?.message };
+    }
+  },
+
+  /** Status da solicitação de um cliente (ou null). */
+  async getMyRequest(email: string): Promise<AffiliateRequest | null> {
+    if (!db || !email) return null;
+    try {
+      const snap = await getDoc(doc(db, REQ_COL, email.trim().toLowerCase()));
+      return snap.exists() ? (snap.data() as AffiliateRequest) : null;
+    } catch { return null; }
+  },
+
+  /** Lista solicitações (admin), por padrão as pendentes. */
+  async getRequests(status: 'pending' | 'approved' | 'rejected' = 'pending'): Promise<AffiliateRequest[]> {
+    if (!db) return [];
+    try {
+      const q = query(collection(db, REQ_COL), where('status', '==', status));
+      const snap = await getDocs(q);
+      return snap.docs.map((d) => d.data() as AffiliateRequest)
+        .sort((a, b) => (a.requestedAt < b.requestedAt ? 1 : -1));
+    } catch (e) {
+      console.warn('getRequests falhou:', e);
+      return [];
+    }
+  },
+
+  /** Admin aprova: cria o afiliado e marca a solicitação como aprovada. */
+  async approveRequest(req: AffiliateRequest, opts: { code: string; discountPercent: number; commissionPercent: number; validityDays?: number }): Promise<{ ok: boolean; error?: string }> {
+    if (!db) return { ok: false, error: 'Indisponível' };
+    try {
+      await ensureAdminAuth();
+      const ok = await this.save({
+        code: opts.code,
+        ownerName: req.name,
+        ownerEmail: req.email,
+        discountPercent: opts.discountPercent,
+        commissionPercent: opts.commissionPercent,
+        active: true,
+        expiresAt: new Date(Date.now() + (opts.validityDays || 365) * 86400000).toISOString(),
+      });
+      if (!ok) return { ok: false, error: 'Falha ao criar afiliado' };
+      await updateDoc(doc(db, REQ_COL, req.email), { status: 'approved', code: opts.code.trim().toUpperCase() });
+      return { ok: true };
+    } catch (e: any) {
+      return { ok: false, error: e?.message };
+    }
+  },
+
+  /** Admin recusa a solicitação. */
+  async rejectRequest(email: string): Promise<boolean> {
+    if (!db) return false;
+    try {
+      await ensureAdminAuth();
+      await updateDoc(doc(db, REQ_COL, email.trim().toLowerCase()), { status: 'rejected' });
+      return true;
+    } catch { return false; }
   },
 
   /** Cria ou atualiza um afiliado (admin). */

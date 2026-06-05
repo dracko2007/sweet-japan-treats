@@ -12,7 +12,7 @@ import { prefectures } from '@/data/prefectures';
 import { addAddressHints } from '@/utils/romanize';
 import { useProducts } from '@/context/ProductsContext';
 import { isValidEmail, isValidPhone, isNonEmpty, maskPhone } from '@/utils/validation';
-import { affiliateService } from '@/services/affiliateService';
+import { affiliateService, AffiliateRequest } from '@/services/affiliateService';
 import { reviewService } from '@/services/reviewService';
 import ReviewModal from '@/components/products/ReviewModal';
 import { Star } from 'lucide-react';
@@ -33,11 +33,27 @@ const Profile: React.FC = () => {
 
   // Mostra o atalho do painel de afiliado só se a conta for de um influencer
   const [isAffiliate, setIsAffiliate] = useState(false);
+  const [affRequest, setAffRequest] = useState<AffiliateRequest | null>(null);
+  const [requesting, setRequesting] = useState(false);
   useEffect(() => {
     if (user?.email) {
       affiliateService.getByOwnerEmail(user.email).then((list) => setIsAffiliate(list.length > 0));
+      affiliateService.getMyRequest(user.email).then(setAffRequest);
     }
   }, [user?.email]);
+
+  const handleBecomeAffiliate = async () => {
+    if (!user?.email) return;
+    setRequesting(true);
+    const res = await affiliateService.requestAffiliate(user.name || '', user.email);
+    setRequesting(false);
+    if (res.ok) {
+      toast({ title: '✅ Solicitação enviada!', description: 'Nossa equipe vai analisar e te avisar. Obrigado pelo interesse! 🎉' });
+      setAffRequest({ email: user.email.toLowerCase(), name: user.name || '', status: 'pending', requestedAt: new Date().toISOString() });
+    } else {
+      toast({ title: 'Não foi possível enviar', description: res.error, variant: 'destructive' });
+    }
+  };
 
   // Função para recomprar um pedido
   const handleReorder = (order: any) => {
@@ -483,6 +499,37 @@ const Profile: React.FC = () => {
                   <ArrowRight className="w-5 h-5 text-primary flex-shrink-0" />
                 </div>
               </Link>
+            )}
+
+            {/* Tornar afiliado (quando ainda não é) */}
+            {!isAffiliate && (
+              <div className="bg-gradient-to-r from-primary/10 to-accent/10 rounded-2xl border border-primary/30 p-6">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-12 h-12 rounded-full bg-primary/15 flex items-center justify-center shrink-0">
+                    <Megaphone className="w-6 h-6 text-primary" />
+                  </div>
+                  <div>
+                    <h2 className="font-display text-lg font-bold text-foreground">Seja um afiliado 🎁</h2>
+                    <p className="text-sm text-muted-foreground">Divulgue a Japan Express, dê desconto aos seus seguidores e ganhe comissão por venda.</p>
+                  </div>
+                </div>
+                {affRequest?.status === 'pending' ? (
+                  <p className="text-sm font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                    ⏳ Sua solicitação está <strong>em análise</strong>. A equipe vai te avisar quando aprovar.
+                  </p>
+                ) : affRequest?.status === 'rejected' ? (
+                  <div className="space-y-2">
+                    <p className="text-sm text-muted-foreground">Sua solicitação anterior não foi aprovada desta vez.</p>
+                    <Button onClick={handleBecomeAffiliate} disabled={requesting} className="btn-primary gap-2">
+                      <Megaphone className="w-4 h-4" /> Solicitar novamente
+                    </Button>
+                  </div>
+                ) : (
+                  <Button onClick={handleBecomeAffiliate} disabled={requesting} className="btn-primary gap-2">
+                    <Megaphone className="w-4 h-4" /> {requesting ? 'Enviando...' : 'Quero ser afiliado'}
+                  </Button>
+                )}
+              </div>
             )}
 
             {/* Coupons */}

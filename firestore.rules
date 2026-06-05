@@ -71,6 +71,13 @@ service cloud.firestore {
       allow write: if request.auth != null;   // admin cria/edita; comprador credita comissão
     }
 
+    // Solicitações para virar afiliado (cliente pede, admin aprova/recusa)
+    match /affiliate_requests/{email} {
+      allow read: if true;                                    // cliente vê o status do próprio pedido
+      allow create: if request.resource.data.status == 'pending';
+      allow update, delete: if isAdmin();                     // só admin aprova/recusa
+    }
+
     // Comissões pendentes (liberadas pelo admin ao confirmar a entrega)
     match /affiliate_pending/{id} {
       // Qualquer comprador (mesmo convidado) registra a comissão como 'pending'
