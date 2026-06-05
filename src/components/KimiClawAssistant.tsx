@@ -8,7 +8,7 @@ import { useProducts } from '@/context/ProductsContext';
 import { Product } from '@/types';
 import { safeStorage } from '@/utils/storage';
 import { formatPrice, getCurrencyByCountry } from '@/utils/currency';
-import { askQwen, qwenEnabled, QwenMsg } from '@/services/qwenService';
+import { askQwen, qwenEnabled, QwenMsg, AdminCatalogItem } from '@/services/qwenService';
 import { toast } from 'sonner';
 
 interface ShippingOption {
@@ -43,6 +43,15 @@ const ClawIcon = ({ className }: { className?: string }) => (
   </svg>
 );
 
+// Peso estimado (g) por categoria e variante — usado quando o produto não tem weightGrams.
+const WEIGHT_BY_CATEGORY: Record<string, { small: number; large: number }> = {
+  doces:      { small: 280, large: 800 },
+  cosmeticos: { small: 200, large: 500 },
+  papelaria:  { small: 150, large: 400 },
+  acessorios: { small: 300, large: 800 },
+};
+const DEFAULT_WEIGHT = { small: 300, large: 800 };
+
 const KimiClawAssistant: React.FC = () => {
   const { addToCart, clearCart } = useCart();
   const { language, setLanguage, t, selectedCountry } = useLanguage();
@@ -69,6 +78,9 @@ const KimiClawAssistant: React.FC = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   // Garante que a mensagem de confirmação do pedido é mostrada só UMA vez por pedido
   const promptedOrderRef = useRef<string | null>(null);
+
+  // Admin: adminRole está definido no perfil do usuário quando a sessão é de admin
+  const isAdmin = !!user?.adminRole;
 
   // Auto-scroll to bottom of chat
   const scrollToBottom = () => {
@@ -301,20 +313,51 @@ const KimiClawAssistant: React.FC = () => {
     ]);
   };
 
-  // Pergunta à IA (Groq) com o histórico recente + catálogo publicado. Retorna texto ou null.
+  // Pergunta à IA (Groq) com o histórico recente + catálogo. Admin recebe catálogo completo com pesos/custos.
   const aiAnswer = async (userText: string): Promise<string | null> => {
     if (!qwenEnabled()) return null;
     const history: QwenMsg[] = messages
       .slice(-6)
       .map((m) => ({ role: m.sender === 'kimi' ? 'assistant' : 'user', content: m.text } as QwenMsg));
     history.push({ role: 'user', content: userText });
-    const catalog = products
-      .filter((p) => !p.hidden)
-      .map((p) => ({ name: p.name, category: p.category, priceYen: p.prices?.small || 0, discount: p.discountPercent || 0 }));
+
     const code = getCurrencyByCountry(selectedCountry);
     const symbol = code === 'JPY' ? '¥' : code === 'EUR' ? '€' : 'R$';
     const locale = { country: selectedCountry, currencyCode: code, currencySymbol: symbol };
+
+    // Catálogo público (produtos visíveis) — enviado sempre
+    const catalog = products
+      .filter((p) => !p.hidden)
+      .map((p) => ({ name: p.name, category: p.category, priceYen: p.prices?.small || 0, discount: p.discountPercent || 0 }));
+
+    if (isAdmin) {
+      // Admin recebe TODOS os produtos (incluindo ocultos), com custo e peso estimado
+      const adminCatalog: AdminCatalogItem[] = products.map((p) => {
+        const wt = WEIGHT_BY_CATEGORY[p.category] || DEFAULT_WEIGHT;
+        return {
+          id: p.id,
+          name: p.name,
+          category: p.category,
+          priceYen: p.prices?.small || 0,
+          discount: p.discountPercent || 0,
+          costYen: p.cost,
+          weightGrams: p.weightGrams
+            ? { small: p.weightGrams, large: p.weightGrams }
+            : wt,
+          hidden: p.hidden,
+        };
+      });
+      return askQwen(history, catalog, locale, { isAdmin: true, adminCatalog });
+    }
+
     return askQwen(history, catalog, locale);
+  };
+
+  // Calcula o peso total de um produto para uma variante/tamanho específico
+  const getProductWeight = (product: Product, size: string): number => {
+    if (product.weightGrams) return product.weightGrams;
+    const wt = WEIGHT_BY_CATEGORY[product.category] || DEFAULT_WEIGHT;
+    return size === 'large' ? wt.large : wt.small;
   };
 
   const handleCommandExecution = async (text: string) => {
@@ -482,6 +525,41 @@ const KimiClawAssistant: React.FC = () => {
       toast.success('Carrinho limpo!');
       await addKimiMessageWithTyping('Pronto! Seu carrinho foi esvaziado.', ['🗑️ Limpando carrinho...']);
       return;
+    }
+
+    // 7A. ADMIN: frete de produto específico pelo catálogo (com peso real/estimado)
+    if (isAdmin && (query.includes('frete') || query.includes('shipping') || query.includes('envio'))) {
+      const productMatch = searchProducts(query, { requireStrong: true });
+      if (productMatch.length > 0) {
+        const prod = productMatch[0];
+        const sizeHint = query.includes('grande') || query.includes('large') ? 'large' : 'small';
+        const weightG = getProductWeight(prod, sizeHint);
+        const weightKg = weightG / 1000;
+
+        let detectedCountry = '';
+        if (query.includes('brasil') || query.includes('brazil') || query.includes('br')) detectedCountry = 'Brasil';
+        else if (query.includes('japao') || query.includes('japan')) detectedCountry = 'Japão';
+        else if (query.includes('portugal')) detectedCountry = 'Portugal';
+        else if (query.includes('franca') || query.includes('france')) detectedCountry = 'França';
+        else if (query.includes('italia') || query.includes('italy')) detectedCountry = 'Itália';
+        else if (query.includes('espanha') || query.includes('spain')) detectedCountry = 'Espanha';
+        else detectedCountry = selectedCountry || 'Brasil';
+
+        const results = calculateShipping(detectedCountry, weightKg);
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: Math.random().toString(36).substring(7),
+            sender: 'kimi',
+            text: `📦 **${prod.name}** — ${sizeHint === 'large' ? 'tamanho Grande' : 'tamanho Pequeno'} (~${weightG}g)\nFrete estimado para **${detectedCountry}**:`,
+            timestamp: new Date(),
+            shippingResults: results,
+            shippingCountry: detectedCountry,
+            shippingWeight: weightKg,
+          },
+        ]);
+        return;
+      }
     }
 
     // 7. CALCULATE SHIPPING INLINE — só quando fala explicitamente de FRETE/ENVIO.
@@ -702,10 +780,19 @@ const KimiClawAssistant: React.FC = () => {
                 <h3 className="font-bold text-sm text-foreground flex items-center gap-1.5">
                   {t('kimiclaw.title')}
                   <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/15 text-primary-dark dark:text-primary font-mono font-medium">
-                    v1.4
+                    v1.5
                   </span>
+                  {isAdmin && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-700 dark:text-amber-400 font-bold border border-amber-500/30">
+                      ADMIN
+                    </span>
+                  )}
                 </h3>
-                <p className="text-[11px] text-muted-foreground">{t('kimiclaw.subtitle')}</p>
+                <p className="text-[11px] text-muted-foreground">
+                  {isAdmin
+                    ? (language === 'pt' ? 'Modo Admin — catálogo completo + frete real' : 'Admin Mode — full catalog + real shipping')
+                    : t('kimiclaw.subtitle')}
+                </p>
               </div>
             </div>
             <button
@@ -856,7 +943,9 @@ const KimiClawAssistant: React.FC = () => {
             <div className="px-4 py-2 border-t border-border bg-muted/30">
               <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 flex items-center gap-1">
                 <Command className="w-3 h-3" />
-                {language === 'pt' ? 'Habilidades Rápidas' : 'Quick Agent Skills'}
+                {isAdmin
+                  ? (language === 'pt' ? '⚡ Modo Admin' : '⚡ Admin Mode')
+                  : (language === 'pt' ? 'Habilidades Rápidas' : 'Quick Agent Skills')}
               </p>
               <div className="flex flex-wrap gap-1.5 max-h-[85px] overflow-y-auto scrollbar-hide py-0.5">
                 <button
@@ -865,25 +954,56 @@ const KimiClawAssistant: React.FC = () => {
                 >
                   🔍 {language === 'pt' ? 'Buscar Produtos' : 'Search Products'}
                 </button>
-                <button
-                  onClick={() => handleSuggestionClick(t('kimiclaw.skill.calc_shipping'), 'calcular frete')}
-                  className="text-[11px] bg-primary/10 hover:bg-primary/20 border border-primary/20 rounded-full px-2.5 py-1 text-primary-dark dark:text-primary font-bold flex items-center gap-1 transition-all duration-200"
-                >
-                  📦 {language === 'pt' ? 'Calcular Frete' : 'Calc. Shipping'}
-                </button>
-                <button
-                  onClick={() => handleSuggestionClick(t('kimiclaw.skill.apply_coupon'), 'cupom')}
-                  className="text-[11px] bg-card hover:bg-primary/10 border border-border hover:border-primary/30 rounded-full px-2.5 py-1 text-foreground transition-all duration-200"
-                >
-                  {t('kimiclaw.skill.apply_coupon')}
-                </button>
-                <button
-                  onClick={() => handleSuggestionClick('📱 Receber novidades no WhatsApp', 'enviar whatsapp')}
-                  className="text-[11px] bg-card hover:bg-primary/10 border border-border hover:border-primary/30 rounded-full px-2.5 py-1 text-foreground flex items-center gap-1 transition-all duration-200"
-                >
-                  <Smartphone className="w-3 h-3" />
-                  {language === 'pt' ? 'WhatsApp' : 'WhatsApp'}
-                </button>
+                {isAdmin ? (
+                  <>
+                    <button
+                      onClick={() => handleSuggestionClick('Calcular frete do biore para Brasil', 'frete biore brasil')}
+                      className="text-[11px] bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 rounded-full px-2.5 py-1 text-amber-700 dark:text-amber-400 font-bold flex items-center gap-1 transition-all duration-200"
+                    >
+                      ⚖️ {language === 'pt' ? 'Frete por Produto' : 'Product Shipping'}
+                    </button>
+                    <button
+                      onClick={() => handleSuggestionClick('Mostrar todos os produtos incluindo ocultos', 'mostrar produtos ocultos')}
+                      className="text-[11px] bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 rounded-full px-2.5 py-1 text-amber-700 dark:text-amber-400 font-medium transition-all duration-200"
+                    >
+                      👁️ {language === 'pt' ? 'Ver Catálogo Completo' : 'Full Catalog'}
+                    </button>
+                    <button
+                      onClick={() => handleSuggestionClick('Qual a margem do produto biore?', 'margem lucro produto')}
+                      className="text-[11px] bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 rounded-full px-2.5 py-1 text-amber-700 dark:text-amber-400 font-medium transition-all duration-200"
+                    >
+                      📊 {language === 'pt' ? 'Margem/Custo' : 'Margin/Cost'}
+                    </button>
+                    <button
+                      onClick={() => handleSuggestionClick(t('kimiclaw.skill.calc_shipping'), 'calcular frete')}
+                      className="text-[11px] bg-card hover:bg-primary/10 border border-border hover:border-primary/30 rounded-full px-2.5 py-1 text-foreground transition-all duration-200"
+                    >
+                      📦 {language === 'pt' ? 'Frete Manual' : 'Manual Shipping'}
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      onClick={() => handleSuggestionClick(t('kimiclaw.skill.calc_shipping'), 'calcular frete')}
+                      className="text-[11px] bg-primary/10 hover:bg-primary/20 border border-primary/20 rounded-full px-2.5 py-1 text-primary-dark dark:text-primary font-bold flex items-center gap-1 transition-all duration-200"
+                    >
+                      📦 {language === 'pt' ? 'Calcular Frete' : 'Calc. Shipping'}
+                    </button>
+                    <button
+                      onClick={() => handleSuggestionClick(t('kimiclaw.skill.apply_coupon'), 'cupom')}
+                      className="text-[11px] bg-card hover:bg-primary/10 border border-border hover:border-primary/30 rounded-full px-2.5 py-1 text-foreground transition-all duration-200"
+                    >
+                      {t('kimiclaw.skill.apply_coupon')}
+                    </button>
+                    <button
+                      onClick={() => handleSuggestionClick('📱 Receber novidades no WhatsApp', 'enviar whatsapp')}
+                      className="text-[11px] bg-card hover:bg-primary/10 border border-border hover:border-primary/30 rounded-full px-2.5 py-1 text-foreground flex items-center gap-1 transition-all duration-200"
+                    >
+                      <Smartphone className="w-3 h-3" />
+                      {language === 'pt' ? 'WhatsApp' : 'WhatsApp'}
+                    </button>
+                  </>
+                )}
                 <button
                   onClick={() => handleSuggestionClick(t('kimiclaw.skill.clear_cart'), 'limpar carrinho')}
                   className="text-[11px] bg-card hover:bg-destructive/10 border border-border hover:border-destructive/30 rounded-full px-2.5 py-1 text-destructive font-medium transition-all duration-200"

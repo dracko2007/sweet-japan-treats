@@ -28,6 +28,12 @@ import { requireAdminPassword } from '@/utils/adminGuard';
 import { usePagination } from '@/hooks/usePagination';
 import Pagination from '@/components/Pagination';
 
+const isDev = import.meta.env.DEV;
+const devLog = isDev ? console.log.bind(console) : () => {};
+const devWarn = isDev ? console.warn.bind(console) : () => {};
+const devError = isDev ? console.error.bind(console) : () => {};
+
+
 type AdminTab =
   | 'orders' | 'coupons' | 'dashboard' | 'customers' | 'products'
   | 'home' | 'vlog' | 'affiliates' | 'requests' | 'b2b' | 'admins' | 'videos';
@@ -102,7 +108,7 @@ const Admin: React.FC = () => {
         setNewCustomers(Math.max(0, total - seen));
       }
     } catch (e) {
-      console.warn('[admin] contagem de clientes falhou:', e);
+      devWarn('[admin] contagem de clientes falhou:', e);
     }
   };
 
@@ -191,17 +197,17 @@ const Admin: React.FC = () => {
   // Test notification services
   const testNotifications = async () => {
     setIsTesting(true);
-    console.log('🧪 Starting notification tests...');
+    devLog('🧪 Starting notification tests...');
     
     try {
       // Test Email
-      console.log('📧 Testing email service...');
+      devLog('📧 Testing email service...');
       
       let emailResult = false;
       
       // Try Resend first
       if (import.meta.env.VITE_RESEND_API_KEY) {
-        console.log('📧 Testing Resend...');
+        devLog('📧 Testing Resend...');
         const testEmailHTML = `
           <!DOCTYPE html>
           <html>
@@ -226,7 +232,7 @@ const Admin: React.FC = () => {
         });
       } else {
         // Try EmailJS
-        console.log('📧 Testing EmailJS...');
+        devLog('📧 Testing EmailJS...');
         emailResult = await emailServiceSimple.sendOrderConfirmation({
           formData: {
             name: 'Test User',
@@ -245,13 +251,13 @@ const Admin: React.FC = () => {
         });
       }
       
-      console.log('📧 Email test result:', emailResult);
+      devLog('📧 Email test result:', emailResult);
       
       // Wait a bit before WhatsApp test
       await new Promise(resolve => setTimeout(resolve, 2000));
       
       // Test WhatsApp
-      console.log('📱 Testing WhatsApp service...');
+      devLog('📱 Testing WhatsApp service...');
       const testMessage = `
 🧪 *Test Message*
 
@@ -268,14 +274,14 @@ _This is an automated test message_
       
       // Try Twilio first
       if (import.meta.env.VITE_TWILIO_ACCOUNT_SID && import.meta.env.VITE_TWILIO_AUTH_TOKEN) {
-        console.log('📱 Testing Twilio...');
+        devLog('📱 Testing Twilio...');
         whatsappResult = await whatsappService.sendMessage({
           to: '+8107013671679',
           message: testMessage
         });
       } else {
         // Use simple WhatsApp (always works)
-        console.log('📱 Testing Simple WhatsApp (opens directly)...');
+        devLog('📱 Testing Simple WhatsApp (opens directly)...');
         whatsappServiceSimple.sendMessage({
           to: '8107013671679',
           message: testMessage
@@ -283,7 +289,7 @@ _This is an automated test message_
         whatsappResult = true; // It opened, so consider it a success
       }
       
-      console.log('📱 WhatsApp test result:', whatsappResult);
+      devLog('📱 WhatsApp test result:', whatsappResult);
       
       toast({
         title: "🧪 Testes Concluídos!",
@@ -291,7 +297,7 @@ _This is an automated test message_
       });
       
     } catch (error) {
-      console.error('❌ Test error:', error);
+      devError('❌ Test error:', error);
       toast({
         title: "❌ Erro nos Testes",
         description: "Verifique o console (F12) para mais detalhes",

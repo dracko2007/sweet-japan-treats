@@ -6,6 +6,12 @@
 
 import type { EmailOrderData, CartItem, ShippingLabelData } from '@/types/order';
 
+const isDev = import.meta.env.DEV;
+const devLog = isDev ? console.log.bind(console) : () => {};
+const devWarn = isDev ? console.warn.bind(console) : () => {};
+const devError = isDev ? console.error.bind(console) : () => {};
+
+
 interface EmailData {
   to: string;
   subject: string;
@@ -25,20 +31,20 @@ export const emailService = {
    * Send order confirmation email using Resend
    */
   sendOrderConfirmation: async (data: EmailData): Promise<boolean> => {
-    console.log('📧 Email Service - Sending order confirmation email');
-    console.log('📧 API Key configured:', !!RESEND_API_KEY);
-    console.log('📧 From:', FROM_EMAIL);
-    console.log('📧 To:', data.to);
-    console.log('📧 Subject:', data.subject);
-    console.log('📧 Order Number:', data.orderNumber);
+    devLog('📧 Email Service - Sending order confirmation email');
+    devLog('📧 API Key configured:', !!RESEND_API_KEY);
+    devLog('📧 From:', FROM_EMAIL);
+    devLog('📧 To:', data.to);
+    devLog('📧 Subject:', data.subject);
+    devLog('📧 Order Number:', data.orderNumber);
     if (data.trackingNumber) {
-      console.log('🔢 Tracking Number:', data.trackingNumber);
+      devLog('🔢 Tracking Number:', data.trackingNumber);
     }
     
     // If no API key, fallback to console logging
     if (!RESEND_API_KEY) {
-      console.warn('⚠️ VITE_RESEND_API_KEY not configured - opening email preview');
-      console.log('💡 Configure VITE_RESEND_API_KEY in .env and Vercel to enable automatic emails');
+      devWarn('⚠️ VITE_RESEND_API_KEY not configured - opening email preview');
+      devLog('💡 Configure VITE_RESEND_API_KEY in .env and Vercel to enable automatic emails');
       
       // Open email in new window for testing
       const emailWindow = window.open('', '_blank');
@@ -51,9 +57,9 @@ export const emailService = {
     }
     
     try {
-      console.log('📤 Sending request to Resend API...');
-      console.log('📤 API Key configured:', !!RESEND_API_KEY, RESEND_API_KEY?.substring(0, 10) + '...');
-      console.log('📤 Request body:', {
+      devLog('📤 Sending request to Resend API...');
+      devLog('📤 API Key configured:', !!RESEND_API_KEY, RESEND_API_KEY?.substring(0, 10) + '...');
+      devLog('📤 Request body:', {
         from: FROM_EMAIL,
         to: data.to,
         subject: data.subject,
@@ -67,7 +73,7 @@ export const emailService = {
         html: data.html
       };
       
-      console.log('📤 Making fetch request...');
+      devLog('📤 Making fetch request...');
       
       const response = await fetch('https://api.resend.com/emails', {
         method: 'POST',
@@ -78,25 +84,25 @@ export const emailService = {
         body: JSON.stringify(requestBody)
       });
 
-      console.log('📥 Response received!');
-      console.log('📥 Response status:', response.status, response.statusText);
-      console.log('📥 Response headers:', Object.fromEntries(response.headers.entries()));
+      devLog('📥 Response received!');
+      devLog('📥 Response status:', response.status, response.statusText);
+      devLog('📥 Response headers:', Object.fromEntries(response.headers.entries()));
 
       const responseText = await response.text();
-      console.log('📥 Response body (raw):', responseText);
+      devLog('📥 Response body (raw):', responseText);
       
       let result;
       try {
         result = JSON.parse(responseText);
       } catch (e) {
-        console.error('❌ Failed to parse response as JSON:', e);
+        devError('❌ Failed to parse response as JSON:', e);
         result = { error: responseText };
       }
       
-      console.log('📥 Response data (parsed):', result);
+      devLog('📥 Response data (parsed):', result);
 
       if (!response.ok) {
-        console.error('❌ Resend API error:', {
+        devError('❌ Resend API error:', {
           status: response.status,
           statusText: response.statusText,
           error: result
@@ -109,12 +115,12 @@ export const emailService = {
         return false;
       }
 
-      console.log('✅ Email sent successfully via Resend!');
-      console.log('📧 Email ID:', result.id);
+      devLog('✅ Email sent successfully via Resend!');
+      devLog('📧 Email ID:', result.id);
       return true;
     } catch (error) {
-      console.error('❌ Error sending email:', error);
-      console.error('❌ Error details:', {
+      devError('❌ Error sending email:', error);
+      devError('❌ Error details:', {
         name: (error as Error).name,
         message: (error as Error).message,
         stack: (error as Error).stack

@@ -4,6 +4,12 @@ import { Button } from '@/components/ui/button';
 import { db as firebaseDb, auth as firebaseAuth } from '@/config/firebase';
 import { collection, doc, setDoc, getDocs } from 'firebase/firestore';
 
+const isDev = import.meta.env.DEV;
+const devLog = isDev ? console.log.bind(console) : () => {};
+const devWarn = isDev ? console.warn.bind(console) : () => {};
+const devError = isDev ? console.error.bind(console) : () => {};
+
+
 export default function FirebaseSync() {
   const [logs, setLogs] = useState<Array<{ time: string; message: string; color: string }>>([]);
   const [status, setStatus] = useState<{ message: string; type: 'success' | 'error' | 'info' | 'warning' } | null>(null);
@@ -131,7 +137,7 @@ export default function FirebaseSync() {
     } catch (error: any) {
       addLog('❌ Erro na migração: ' + error.message, '#ef4444');
       showStatus('❌ Erro na migração: ' + error.message, 'error');
-      console.error(error);
+      devError(error);
     }
   };
 

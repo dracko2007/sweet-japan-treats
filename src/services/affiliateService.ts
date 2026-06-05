@@ -15,8 +15,14 @@ import {
   deleteDoc,
   query,
   where,
+  runTransaction,
 } from 'firebase/firestore';
 import { ensureAdminAuth } from '@/utils/adminAuth';
+
+const isDev = import.meta.env.DEV;
+const devLog = isDev ? console.log.bind(console) : () => {};
+const devWarn = isDev ? console.warn.bind(console) : () => {};
+const devError = isDev ? console.error.bind(console) : () => {};
 
 const COL = 'affiliates';
 const PENDING_COL = 'affiliate_pending';
@@ -67,7 +73,7 @@ export const affiliateService = {
       const snap = await getDocs(collection(db, COL));
       return snap.docs.map((d) => d.data() as Affiliate);
     } catch (e) {
-      console.warn('affiliateService.getAll falhou:', e);
+      devWarn('affiliateService.getAll falhou:', e);
       return [];
     }
   },
@@ -80,7 +86,7 @@ export const affiliateService = {
       const snap = await getDocs(q);
       return snap.docs.map((d) => d.data() as Affiliate);
     } catch (e) {
-      console.warn('affiliateService.getByOwnerEmail falhou:', e);
+      devWarn('affiliateService.getByOwnerEmail falhou:', e);
       return [];
     }
   },
@@ -97,7 +103,7 @@ export const affiliateService = {
       if (new Date(aff.expiresAt) <= new Date()) return { valid: false, error: 'Código expirado.' };
       return { valid: true, affiliate: aff };
     } catch (e) {
-      console.warn('affiliateService.validate falhou:', e);
+      devWarn('affiliateService.validate falhou:', e);
       return { valid: false, error: 'Erro ao validar código.' };
     }
   },
@@ -119,7 +125,7 @@ export const affiliateService = {
       });
       return { ok: true };
     } catch (e: any) {
-      console.warn('requestAffiliate falhou:', e);
+      devWarn('requestAffiliate falhou:', e);
       return { ok: false, error: e?.message };
     }
   },
@@ -142,7 +148,7 @@ export const affiliateService = {
       return snap.docs.map((d) => d.data() as AffiliateRequest)
         .sort((a, b) => (a.requestedAt < b.requestedAt ? 1 : -1));
     } catch (e) {
-      console.warn('getRequests falhou:', e);
+      devWarn('getRequests falhou:', e);
       return [];
     }
   },
@@ -209,7 +215,7 @@ export const affiliateService = {
       await setDoc(ref, affiliate);
       return true;
     } catch (e) {
-      console.error('affiliateService.save falhou:', e);
+      devError('affiliateService.save falhou:', e);
       return false;
     }
   },
@@ -222,7 +228,7 @@ export const affiliateService = {
       await deleteDoc(doc(db, COL, normalize(code)));
       return true;
     } catch (e) {
-      console.error('affiliateService.remove falhou:', e);
+      devError('affiliateService.remove falhou:', e);
       return false;
     }
   },
@@ -233,23 +239,22 @@ export const affiliateService = {
    */
   async creditSale(code: string, netValue: number): Promise<void> {
     if (!db || !code) return;
+    const firestore = db;
     try {
-      const ref = doc(db, COL, normalize(code));
-      const snap = await getDoc(ref);
-      if (!snap.exists()) return;
-      const aff = snap.data() as Affiliate;
-      const earning = Math.round((netValue * (aff.commissionPercent || 0)) / 100);
-      await setDoc(
-        ref,
-        {
+      const ref = doc(firestore, COL, normalize(code));
+      await runTransaction(firestore, async (tx) => {
+        const snap = await tx.get(ref);
+        if (!snap.exists()) return;
+        const aff = snap.data() as Affiliate;
+        const earning = Math.round((netValue * (aff.commissionPercent || 0)) / 100);
+        tx.update(ref, {
           totalOrders: (aff.totalOrders || 0) + 1,
           totalRevenue: (aff.totalRevenue || 0) + netValue,
           totalEarnings: (aff.totalEarnings || 0) + earning,
-        },
-        { merge: true }
-      );
+        });
+      });
     } catch (e) {
-      console.warn('affiliateService.creditSale falhou:', e);
+      devWarn('affiliateService.creditSale falhou:', e);
     }
   },
 
@@ -281,7 +286,7 @@ export const affiliateService = {
       };
       await setDoc(doc(db, PENDING_COL, id), record);
     } catch (e) {
-      console.warn('affiliateService.addPendingCommission falhou:', e);
+      devWarn('affiliateService.addPendingCommission falhou:', e);
     }
   },
 
@@ -293,7 +298,7 @@ export const affiliateService = {
       const snap = await getDocs(q);
       return snap.docs.map((d) => d.data() as PendingCommission);
     } catch (e) {
-      console.warn('affiliateService.getPendingCommissions falhou:', e);
+      devWarn('affiliateService.getPendingCommissions falhou:', e);
       return [];
     }
   },
@@ -310,7 +315,7 @@ export const affiliateService = {
       const snap = await getDocs(q);
       return snap.docs.map((d) => d.data() as PendingCommission);
     } catch (e) {
-      console.warn('affiliateService.getPendingByCode falhou:', e);
+      devWarn('affiliateService.getPendingByCode falhou:', e);
       return [];
     }
   },
@@ -329,7 +334,7 @@ export const affiliateService = {
       await setDoc(ref, { status: 'confirmed' }, { merge: true });
       return true;
     } catch (e) {
-      console.error('affiliateService.confirmPendingCommission falhou:', e);
+      devError('affiliateService.confirmPendingCommission falhou:', e);
       return false;
     }
   },
@@ -342,7 +347,7 @@ export const affiliateService = {
       await deleteDoc(doc(db, PENDING_COL, id));
       return true;
     } catch (e) {
-      console.error('affiliateService.cancelPendingCommission falhou:', e);
+      devError('affiliateService.cancelPendingCommission falhou:', e);
       return false;
     }
   },

@@ -1,16 +1,54 @@
 // Função serverless (Vercel) — "cérebro" do KimiClaw via Groq (tier grátis, rápido).
 // A chave fica SÓ no servidor (process.env.GROQ_API_KEY) e nunca vai pro navegador.
 // Sem a chave, retorna 503 e o KimiClaw responde pelas regras (fallback).
-// Modelos do Groq em ordem de preferência (mais inteligente primeiro), com fallback.
-// Kimi K2 é um modelo gigante (MoE ~1T) e muito capaz; cai para gpt-oss-120b e llama-70b.
-// Evitamos modelos de "raciocínio" (gpt-oss) que consomem os tokens pensando e
-// devolvem conteúdo vazio. Kimi K2 (forte) com fallback para llama-70b.
 const GROQ_MODELS = process.env.GROQ_MODEL
   ? [process.env.GROQ_MODEL]
   : ['moonshotai/kimi-k2-instruct', 'llama-3.3-70b-versatile'];
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// ---------- Rate limiting simples em memória (por IP, reseta ao cold start) ----------
+// Suficiente para barrar bots no tier gratuito; em produção de alta escala usar Upstash/Redis.
+const RATE_WINDOW_MS = 60_000; // 1 minuto
+const RATE_MAX = 15;           // máximo de requisições por IP por janela
+const ipMap = new Map();       // ip → { count, resetAt }
+
+function checkRateLimit(ip) {
+  const now = Date.now();
+  const entry = ipMap.get(ip);
+  if (!entry || now > entry.resetAt) {
+    ipMap.set(ip, { count: 1, resetAt: now + RATE_WINDOW_MS });
+    return true;
+  }
+  if (entry.count >= RATE_MAX) return false;
+  entry.count++;
+  return true;
+}
+
+// Limpa entradas expiradas periodicamente para não vazar memória
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, entry] of ipMap) {
+    if (now > entry.resetAt) ipMap.delete(ip);
+  }
+}, RATE_WINDOW_MS * 2);
+
+// ---------- Domínios autorizados ----------
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || '')
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean);
+
+// Adiciona os domínios padrão da loja se não configurado
+const DEFAULT_ORIGINS = [
+  'https://japanexpress-store.com',
+  'https://www.japanexpress-store.com',
+  'http://localhost:8080',
+  'http://localhost:5173',
+];
+const VALID_ORIGINS = ALLOWED_ORIGINS.length ? ALLOWED_ORIGINS : DEFAULT_ORIGINS;
+
+// ---------- System prompts ----------
 const SYSTEM_PROMPT = `Você é o KimiClaw, o assistente virtual simpático da loja "Japan Express" (japanexpress-store.com),
 que importa produtos do Japão (cosméticos, doces e chás, snacks, papelaria, eletrônicos, vestuário, higiene & saúde).
 Contato para falar com um vendedor/administrador: WhatsApp +81 70-1367-1679 (wa.me/817013671679) e e-mail contato@japanexpress-store.com.
@@ -33,28 +71,121 @@ preço (em ¥) e lembre que o site converte para R$/€. Se NÃO estiver na list
 que dá para encomendar pelo "Faça seu Pedido" (no menu do topo). NUNCA invente produtos, marcas ou disponibilidade que
 não estejam na lista. Se a lista não vier, peça para a pessoa digitar o nome que o catálogo é pesquisado.`;
 
+// Seção extra inserida APENAS para sessões admin
+const ADMIN_PROMPT_SECTION = `
+
+=== MODO ADMINISTRADOR ===
+Você está conversando com um ADMINISTRADOR da loja. Pode fornecer informações completas e técnicas:
+- Mostrar custos de aquisição (¥), margens e dados financeiros
+- Calcular fretes com precisão usando os pesos reais dos produtos
+- Mostrar produtos ocultos (marcados como [OCULTO] no catálogo abaixo)
+- NÃO use a ressalva "confirme com um vendedor" — o admin é o vendedor
+
+CÁLCULO DE FRETE — TARIFAS ATUAIS (origem Japão/Hiroshima):
+
+BRASIL:
+  PAC (Correios econômico):  base R$ 120 + R$ 35 por kg | prazo ~5-7 dias úteis
+  EMS (Correios prioritário): base R$ 220 + R$ 60 por kg | prazo ~2-4 dias úteis
+  Expresso (courier):         base R$ 350 + R$ 85 por kg | prazo ~1-3 dias úteis
+
+JAPÃO (entrega doméstica):
+  Japan Post ゆうパック:  base ¥ 700 + ¥ 150 por kg | prazo 1-2 dias
+  Yamato ヤマト宅急便:   base ¥ 800 + ¥ 180 por kg | prazo 1-3 dias
+
+EUROPA (Portugal, França, Itália, Espanha):
+  Correio local EMS:  base € 20 + € 6 por kg  | prazo ~5-7 dias
+  DHL/FedEx Express:  base € 35 + € 10 por kg | prazo ~2-4 dias
+
+COMO CALCULAR:
+  1. Identifique o produto no catálogo admin (campo "Peso" indica gramas por variante)
+  2. Converta para kg: peso_g ÷ 1000
+  3. Frete = base + (taxa_por_kg × peso_kg)
+  4. Para múltiplos itens, some os pesos antes de calcular
+  5. Apresente as opções de transportadora com valor e prazo
+
+MARGEM E CUSTO:
+  Margem bruta (%) = ((preço_venda_¥ - custo_¥) / preço_venda_¥) × 100
+  Conversão para R$: preço_¥ ÷ 28 (taxa usada pela loja)
+  Conversão para €:  (preço_¥ ÷ 28) × 0,16
+  O campo "Custo" no catálogo abaixo é o preço de aquisição no Japão (¥).
+
+Responda de forma direta, técnica e completa. Pode usar mais de 4 frases quando a pergunta for complexa.`;
+
 export default async function handler(req, res) {
+  // ---------- Verificação de origem ----------
+  const origin = req.headers['origin'] || '';
+  const isAllowedOrigin = VALID_ORIGINS.some((o) => origin.startsWith(o));
+
+  if (origin && !isAllowedOrigin) {
+    res.status(403).json({ error: 'Origem não autorizada' });
+    return;
+  }
+
+  // CORS para origens válidas
+  if (isAllowedOrigin) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  }
+
+  if (req.method === 'OPTIONS') {
+    res.status(204).end();
+    return;
+  }
+
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed' });
     return;
   }
+
+  // ---------- Rate limiting por IP ----------
+  const ip =
+    req.headers['x-forwarded-for']?.split(',')[0]?.trim() ||
+    req.socket?.remoteAddress ||
+    'unknown';
+
+  if (!checkRateLimit(ip)) {
+    res.status(429).json({ error: 'Muitas requisições. Aguarde um momento.' });
+    return;
+  }
+
+  // ---------- Chave Groq ----------
   const key = process.env.GROQ_API_KEY;
   if (!key) {
     res.status(503).json({ error: 'AI not configured' });
     return;
   }
+
   try {
     const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
+
+    // Limita histórico e catálogo para controlar uso de tokens
     const history = Array.isArray(body.messages) ? body.messages.slice(-6) : [];
     const catalog = Array.isArray(body.catalog) ? body.catalog.slice(0, 120) : [];
     const locale = body.locale || { country: 'Brasil', currencyCode: 'BRL', currencySymbol: 'R$' };
+    const isAdmin = body.isAdmin === true;
+    const adminCatalog = isAdmin && Array.isArray(body.adminCatalog) ? body.adminCatalog.slice(0, 200) : [];
+
+    // Sanitiza textos de entrada (remove tags HTML para evitar prompt injection)
+    const sanitize = (s) => typeof s === 'string' ? s.replace(/<[^>]*>/g, '').slice(0, 500) : '';
+    const safeHistory = history.map((m) => ({
+      role: m.role === 'assistant' ? 'assistant' : 'user',
+      content: sanitize(m.content),
+    }));
 
     let systemContent = SYSTEM_PROMPT;
 
-    // Moeda do destino + regras de estimativa de preço
-    systemContent += `\n\nMOEDA E PAÍS DE ENVIO: o cliente está comprando para **${locale.country}**.
+    if (isAdmin) {
+      // Admin recebe seção especial com tarifas de frete e permissão para dados completos
+      systemContent += ADMIN_PROMPT_SECTION;
+    }
+
+    systemContent += `\n\nMOEDA E PAÍS DE ENVIO: ${isAdmin ? 'o administrador está consultando para' : 'o cliente está comprando para'} **${locale.country}**.
 Use SEMPRE o símbolo **${locale.currencySymbol}** (${locale.currencyCode}) nos valores — NÃO use ¥ a menos que o país seja o Japão.
-Conversão usada pela loja a partir do preço em ienes (¥): Brasil → R$ = ¥ ÷ 28; Europa (Portugal/França/Itália/Espanha) → € = (¥ ÷ 28) × 0,16; Japão → mantém ¥.
+Conversão usada pela loja a partir do preço em ienes (¥): Brasil → R$ = ¥ ÷ 28; Europa (Portugal/França/Itália/Espanha) → € = (¥ ÷ 28) × 0,16; Japão → mantém ¥.`;
+
+    if (!isAdmin) {
+      systemContent += `
 
 ESTIMATIVA DE PREÇO: se o cliente perguntar "quanto custa", "qual o preço", "quanto fica/sai" de um produto que NÃO está no
 catálogo, você é OBRIGADO a dar a estimativa — NÃO responda apenas "não temos". Calcule INTERNAMENTE (sem mostrar as contas):
@@ -68,7 +199,23 @@ Não detalhe "produto + frete"; entregue só o total estimado.
 Sempre acompanhe do aviso: é apenas uma estimativa para fácil elucidação, aproximada e ACIMA do valor real, NÃO é o preço
 correto, e para o valor real é preciso falar com um vendedor/administrador. Depois diga que o item não está no catálogo e
 pode ser pedido pelo "Faça seu Pedido". Nunca apresente o número como preço final/garantido.`;
-    if (catalog.length) {
+    }
+
+    if (isAdmin && adminCatalog.length) {
+      // Admin: catálogo completo com custo, peso e status oculto
+      const lines = adminCatalog
+        .map((p) => {
+          const promo = p.discount ? ` (-${p.discount}%)` : '';
+          const cost = p.costYen ? ` | Custo: ¥${p.costYen}` : '';
+          const wt = p.weightGrams
+            ? ` | Peso: ${p.weightGrams.small}g (P) / ${p.weightGrams.large}g (G)`
+            : '';
+          const hidden = p.hidden ? ' [OCULTO]' : '';
+          return `- [${p.id}] ${p.name} [${p.category}] ¥${p.priceYen}${promo}${cost}${wt}${hidden}`;
+        })
+        .join('\n');
+      systemContent += `\n\nCATÁLOGO ADMIN COMPLETO (${adminCatalog.length} itens, inclui ocultos):\n${lines}`;
+    } else if (catalog.length) {
       const lines = catalog
         .map((p) => {
           const promo = p.discount ? ` (-${p.discount}%)` : '';
@@ -78,30 +225,30 @@ pode ser pedido pelo "Faça seu Pedido". Nunca apresente o número como preço f
       systemContent += `\n\nCATÁLOGO ATUAL DA LOJA (${catalog.length} itens — use SOMENTE isto para dizer o que existe):\n${lines}`;
     }
 
-    const baseMessages = [{ role: 'system', content: systemContent }, ...history];
+    const baseMessages = [{ role: 'system', content: systemContent }, ...safeHistory];
 
     let text = null;
     let lastStatus = 0;
     let lastDetail = '';
-    // Tenta cada modelo em ordem; pula para o próximo em erro OU resposta vazia.
+
     for (const model of GROQ_MODELS) {
       let r;
       for (let attempt = 0; attempt < 2; attempt++) {
         r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
-          body: JSON.stringify({ model, max_tokens: 600, temperature: 0.5, messages: baseMessages }),
+          body: JSON.stringify({ model, max_tokens: isAdmin ? 900 : 600, temperature: 0.5, messages: baseMessages }),
         });
         if (r.ok) break;
         lastStatus = r.status;
         lastDetail = await r.text().catch(() => '');
         if (r.status === 429 && attempt === 0) { await sleep(1000); continue; }
-        break; // 404/400/etc → próximo modelo
+        break;
       }
       if (r && r.ok) {
         const data = await r.json().catch(() => null);
         const t = data?.choices?.[0]?.message?.content?.trim();
-        if (t) { text = t; break; } // só aceita resposta não-vazia
+        if (t) { text = t; break; }
       }
     }
 

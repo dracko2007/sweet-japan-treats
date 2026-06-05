@@ -3,6 +3,12 @@ import { Product } from '@/types';
 import { products as defaultProducts } from '@/data/products';
 import { productService } from '@/services/productService';
 
+const isDev = import.meta.env.DEV;
+const devLog = isDev ? console.log.bind(console) : () => {};
+const devWarn = isDev ? console.warn.bind(console) : () => {};
+const devError = isDev ? console.error.bind(console) : () => {};
+
+
 interface ProductsContextValue {
   products: Product[];
   loading: boolean;
@@ -25,7 +31,7 @@ export const ProductsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       const merged = await productService.getMerged();
       if (merged.length > 0) setProducts(merged);
     } catch (e) {
-      console.warn('ProductsContext refresh falhou, usando defaults:', e);
+      devWarn('ProductsContext refresh falhou, usando defaults:', e);
     } finally {
       setLoading(false);
     }

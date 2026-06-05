@@ -1,6 +1,12 @@
 import { safeStorage } from '@/utils/storage';
 import type { Coupon } from '@/types';
 
+const isDev = import.meta.env.DEV;
+const devLog = isDev ? console.log.bind(console) : () => {};
+const devWarn = isDev ? console.warn.bind(console) : () => {};
+const devError = isDev ? console.error.bind(console) : () => {};
+
+
 const STORAGE_KEY = 'sweet-japan-coupons';
 const FIRESTORE_COUPONS = 'coupons';
 const FIRESTORE_USAGE = 'coupon_usage';
@@ -17,9 +23,9 @@ const syncCouponToFirestore = async (coupon: Coupon) => {
       ...coupon,
       updatedAt: new Date().toISOString(),
     });
-    console.log('✅ [COUPON] Synced to Firestore:', coupon.code);
+    devLog('✅ [COUPON] Synced to Firestore:', coupon.code);
   } catch (err) {
-    console.warn('⚠️ [COUPON] Failed to sync coupon to Firestore:', err);
+    devWarn('⚠️ [COUPON] Failed to sync coupon to Firestore:', err);
   }
 };
 
@@ -30,9 +36,9 @@ const deleteCouponFromFirestore = async (code: string) => {
     const { db } = await import('@/config/firebase');
     if (!db) return;
     await deleteDoc(doc(db, FIRESTORE_COUPONS, code));
-    console.log('✅ [COUPON] Deleted from Firestore:', code);
+    devLog('✅ [COUPON] Deleted from Firestore:', code);
   } catch (err) {
-    console.warn('⚠️ [COUPON] Failed to delete coupon from Firestore:', err);
+    devWarn('⚠️ [COUPON] Failed to delete coupon from Firestore:', err);
   }
 };
 
@@ -75,10 +81,10 @@ const loadCouponsFromFirestore = async (): Promise<Coupon[]> => {
     // Update safeStorage with merged data
     safeStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
     
-    console.log('✅ [COUPON] Loaded from Firestore:', firestoreCoupons.length, 'coupons');
+    devLog('✅ [COUPON] Loaded from Firestore:', firestoreCoupons.length, 'coupons');
     return merged;
   } catch (err) {
-    console.warn('⚠️ [COUPON] Failed to load coupons from Firestore:', err);
+    devWarn('⚠️ [COUPON] Failed to load coupons from Firestore:', err);
     return couponService.getAll();
   }
 };
@@ -97,10 +103,10 @@ const syncUsageToFirestore = async (couponCode: string, userEmail: string) => {
     if (!usedBy.includes(userEmail)) {
       usedBy.push(userEmail);
       await setDoc(usageRef, { usedBy, updatedAt: new Date().toISOString() });
-      console.log('✅ [COUPON] Usage synced to Firestore:', couponCode, userEmail);
+      devLog('✅ [COUPON] Usage synced to Firestore:', couponCode, userEmail);
     }
   } catch (err) {
-    console.warn('⚠️ [COUPON] Failed to sync usage to Firestore:', err);
+    devWarn('⚠️ [COUPON] Failed to sync usage to Firestore:', err);
   }
 };
 
@@ -119,7 +125,7 @@ const checkUsageFromFirestore = async (couponCode: string, userEmail: string): P
     }
     return false;
   } catch (err) {
-    console.warn('⚠️ [COUPON] Failed to check usage from Firestore:', err);
+    devWarn('⚠️ [COUPON] Failed to check usage from Firestore:', err);
     return false;
   }
 };
@@ -339,7 +345,7 @@ export const couponService = {
     for (const coupon of coupons) {
       await syncCouponToFirestore(coupon);
     }
-    console.log('✅ [COUPON] All local coupons synced to Firestore');
+    devLog('✅ [COUPON] All local coupons synced to Firestore');
   },
 
   // Load coupons from Firestore into safeStorage (for clients)

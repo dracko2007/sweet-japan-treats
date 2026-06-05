@@ -4,6 +4,12 @@
 
 import { db, auth } from '@/config/firebase';
 import {
+
+const isDev = import.meta.env.DEV;
+const devLog = isDev ? console.log.bind(console) : () => {};
+const devWarn = isDev ? console.warn.bind(console) : () => {};
+const devError = isDev ? console.error.bind(console) : () => {};
+
   collection,
   addDoc,
   serverTimestamp,
@@ -61,6 +67,6 @@ export async function registrarEvento(
   try {
     await addDoc(collection(db, 'eventos'), evento);
   } catch (erro) {
-    console.warn('Não foi possível registrar o evento:', erro);
+    devWarn('Não foi possível registrar o evento:', erro);
   }
 }

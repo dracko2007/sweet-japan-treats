@@ -10,6 +10,12 @@ import { cn } from '@/lib/utils';
 import { firebaseSyncService } from '@/services/firebaseSyncService';
 import { formatPrice } from '@/utils/currency';
 
+const isDev = import.meta.env.DEV;
+const devLog = isDev ? console.log.bind(console) : () => {};
+const devWarn = isDev ? console.warn.bind(console) : () => {};
+const devError = isDev ? console.error.bind(console) : () => {};
+
+
 interface OrderStatus {
   status: 'pending' | 'processing' | 'confirmed' | 'shipped' | 'delivered' | 'cancelled';
   label: string;
@@ -77,7 +83,7 @@ const TrackOrder: React.FC = () => {
         const firestoreOrders = await firebaseSyncService.getAllOrdersFromFirestore();
         order = firestoreOrders.find((o: any) => o.orderNumber === orderNumber.toUpperCase());
       } catch (err) {
-        console.error('Error searching Firestore:', err);
+        devError('Error searching Firestore:', err);
       }
     }
 

@@ -7,6 +7,12 @@ import { collection, doc, getDoc, getDocs, setDoc, deleteDoc } from 'firebase/fi
 import { ensureAdminAuth } from '@/utils/adminAuth';
 import { ADMIN_PASSWORD } from '@/config/admin';
 
+const isDev = import.meta.env.DEV;
+const devLog = isDev ? console.log.bind(console) : () => {};
+const devWarn = isDev ? console.warn.bind(console) : () => {};
+const devError = isDev ? console.error.bind(console) : () => {};
+
+
 export type AdminRole = 1 | 2 | 3;
 
 export interface AdminEntry {
@@ -20,7 +26,7 @@ export interface AdminEntry {
 const COL = 'admins';
 // Normaliza nome/usuário para virar o id do login (minúsculo, sem acento/espaços extras)
 const slug = (s: string) =>
-  s.normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase().replace(/\s+/g, ' ');
+  s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase().replace(/\s+/g, ' ');
 
 const SUPER = 'administrador';
 
@@ -39,7 +45,7 @@ export const adminService = {
         if (d.password === password) return { username: id, name: d.name || identifier, role: d.role };
       }
     } catch (e) {
-      console.warn('[admin] authenticate falhou:', e);
+      devWarn('[admin] authenticate falhou:', e);
     }
     return null;
   },
@@ -55,7 +61,7 @@ export const adminService = {
         if (d.id !== SUPER) list.push({ username: d.id, name: data.name, role: data.role, addedAt: data.addedAt, addedBy: data.addedBy });
       });
     } catch (e) {
-      console.warn('[admin] getAdmins falhou:', e);
+      devWarn('[admin] getAdmins falhou:', e);
     }
     return list.sort((a, b) => b.role - a.role || a.name.localeCompare(b.name));
   },
@@ -65,7 +71,7 @@ export const adminService = {
     const id = slug(name);
     if (!id) return { ok: false, error: 'Nome inválido' };
     if (id === SUPER) return { ok: false, error: 'Nome reservado' };
-    if (!password || password.length < 4) return { ok: false, error: 'Senha muito curta (mín. 4)' };
+    if (!password || password.length < 8) return { ok: false, error: 'Senha muito curta (mín. 8 caracteres)' };
     try {
       await ensureAdminAuth();
       await setDoc(doc(db, COL, id), {
@@ -77,7 +83,7 @@ export const adminService = {
       });
       return { ok: true };
     } catch (e: any) {
-      console.error('[admin] addAdmin falhou:', e);
+      devError('[admin] addAdmin falhou:', e);
       return { ok: false, error: e?.message };
     }
   },
@@ -91,7 +97,7 @@ export const adminService = {
       await deleteDoc(doc(db, COL, id));
       return true;
     } catch (e) {
-      console.error('[admin] removeAdmin falhou:', e);
+      devError('[admin] removeAdmin falhou:', e);
       return false;
     }
   },

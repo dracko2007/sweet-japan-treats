@@ -1,4 +1,10 @@
 import { safeStorage } from '@/utils/storage';
+
+const isDev = import.meta.env.DEV;
+const devLog = isDev ? console.log.bind(console) : () => {};
+const devWarn = isDev ? console.warn.bind(console) : () => {};
+const devError = isDev ? console.error.bind(console) : () => {};
+
 /**
  * Wishlist Service
  * Gerencia lista de desejos do usuário no safeStorage
@@ -21,7 +27,7 @@ export const wishlistService = {
       const wishlistData = safeStorage.getItem(`${STORAGE_KEY}_${userEmail}`);
       return wishlistData ? JSON.parse(wishlistData) : [];
     } catch (error) {
-      console.error('Error loading wishlist:', error);
+      devError('Error loading wishlist:', error);
       return [];
     }
   },
@@ -45,7 +51,7 @@ export const wishlistService = {
       safeStorage.setItem(`${STORAGE_KEY}_${userEmail}`, JSON.stringify(wishlist));
       return true;
     } catch (error) {
-      console.error('Error adding to wishlist:', error);
+      devError('Error adding to wishlist:', error);
       return false;
     }
   },
@@ -59,7 +65,7 @@ export const wishlistService = {
       safeStorage.setItem(`${STORAGE_KEY}_${userEmail}`, JSON.stringify(filtered));
       return true;
     } catch (error) {
-      console.error('Error removing from wishlist:', error);
+      devError('Error removing from wishlist:', error);
       return false;
     }
   },
@@ -76,7 +82,7 @@ export const wishlistService = {
       safeStorage.removeItem(`${STORAGE_KEY}_${userEmail}`);
       return true;
     } catch (error) {
-      console.error('Error clearing wishlist:', error);
+      devError('Error clearing wishlist:', error);
       return false;
     }
   },

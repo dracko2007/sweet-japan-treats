@@ -1,4 +1,10 @@
 /**
+
+const isDev = import.meta.env.DEV;
+const devLog = isDev ? console.log.bind(console) : () => {};
+const devWarn = isDev ? console.warn.bind(console) : () => {};
+const devError = isDev ? console.error.bind(console) : () => {};
+
  * EmailJS Configuration
  * Fallback quando variáveis de ambiente não estão disponíveis
  */
@@ -11,7 +17,7 @@ export const emailJsConfig = {
 };
 
 // Log para debug
-console.log('📧 EmailJS Config:', {
+devLog('📧 EmailJS Config:', {
   serviceId: emailJsConfig.serviceId,
   templateCustomer: emailJsConfig.templateIdCustomer,
   templateStore: emailJsConfig.templateIdStore,

@@ -8,6 +8,11 @@ import { firebaseSyncService } from '@/services/firebaseSyncService';
 import { ensureAdminAuth } from '@/utils/adminAuth';
 import type { Order, OrderStatistics, MonthlyDataPoint } from '@/types';
 
+const isDev = import.meta.env.DEV;
+const devLog = isDev ? console.log.bind(console) : () => {};
+const devWarn = isDev ? console.warn.bind(console) : () => {};
+const devError = isDev ? console.error.bind(console) : () => {};
+
 export interface OrderStatus {
   status: 'pending' | 'processing' | 'confirmed' | 'shipped' | 'delivered' | 'cancelled';
   updatedAt: string;
@@ -71,7 +76,7 @@ export const orderService = {
         new Date(b.orderDate || b.date).getTime() - new Date(a.orderDate || a.date).getTime()
       );
     } catch (error) {
-      console.error('❌ [ORDER SERVICE] Firestore fetch failed, using safeStorage:', error);
+      devError('❌ [ORDER SERVICE] Firestore fetch failed, using safeStorage:', error);
       return getLocalOrders();
     }
   },
@@ -86,7 +91,7 @@ export const orderService = {
       await firebaseSyncService.updateOrderStatus(orderNumber, status);
       updated = true;
     } catch (err) {
-      console.error('❌ [ORDER] Firestore status update failed:', err);
+      devError('❌ [ORDER] Firestore status update failed:', err);
     }
 
     // Also update in safeStorage
@@ -134,7 +139,7 @@ export const orderService = {
       await ensureAdminAuth();
       deletedRemote = await firebaseSyncService.deleteOrderFromFirestore(orderNumber);
     } catch (err) {
-      console.error('❌ [ORDER] Firestore delete failed:', err);
+      devError('❌ [ORDER] Firestore delete failed:', err);
     }
 
     return deletedLocal || deletedRemote;
@@ -158,7 +163,7 @@ export const orderService = {
         }
       }
     } catch (err) {
-      console.error('❌ [ORDER] clearAllOrders Firestore falhou:', err);
+      devError('❌ [ORDER] clearAllOrders Firestore falhou:', err);
     }
 
     // 2) localStorage — chaves orders_*, sakura_orders e .orders de cada usuário
@@ -176,7 +181,7 @@ export const orderService = {
       });
       safeStorage.setItem('sweet-japan-users', JSON.stringify(users));
     } catch (err) {
-      console.error('❌ [ORDER] clearAllOrders localStorage falhou:', err);
+      devError('❌ [ORDER] clearAllOrders localStorage falhou:', err);
     }
 
     return firestoreDeleted;
@@ -201,10 +206,10 @@ export const orderService = {
           updatedAt: new Date().toISOString()
         });
         updated = true;
-        console.log('✅ [ORDER] Tracking saved to Firestore:', orderNumber);
+        devLog('✅ [ORDER] Tracking saved to Firestore:', orderNumber);
       }
     } catch (err) {
-      console.error('❌ [ORDER] Firestore tracking update failed:', err);
+      devError('❌ [ORDER] Firestore tracking update failed:', err);
     }
 
     // Also update in safeStorage

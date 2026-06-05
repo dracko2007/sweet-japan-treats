@@ -20,6 +20,12 @@ import { firebaseSyncService } from '@/services/firebaseSyncService';
 import { paymentSettingsService } from '@/services/paymentSettingsService';
 import { Wallet } from 'lucide-react';
 
+const isDev = import.meta.env.DEV;
+const devLog = isDev ? console.log.bind(console) : () => {};
+const devWarn = isDev ? console.warn.bind(console) : () => {};
+const devError = isDev ? console.error.bind(console) : () => {};
+
+
 const OrderReview: React.FC = () => {
   const { items, clearCart } = useCart();
   const { consumeCouponByCode, user, addPoints } = useUser();
@@ -231,8 +237,8 @@ const OrderReview: React.FC = () => {
     // Fire-and-forget: não trava a confirmação para o comprador
     firebaseSyncService
       .syncOrderToFirestore(user?.id || formData.email || 'guest', firestoreOrder)
-      .then((ok) => console.log(ok ? '✅ Pedido salvo no Firestore' : '⚠️ Falha ao salvar pedido no Firestore'))
-      .catch((e) => console.error('❌ Erro ao salvar pedido no Firestore:', e));
+      .then((ok) => devLog(ok ? '✅ Pedido salvo no Firestore' : '⚠️ Falha ao salvar pedido no Firestore'))
+      .catch((e) => devError('❌ Erro ao salvar pedido no Firestore:', e));
 
     // Cupom de afiliado/influencer → registra comissão PENDENTE (liberada só
     // quando o admin confirmar a entrega do pedido)

@@ -4,6 +4,12 @@ import { db } from '@/config/firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { ensureAdminAuth } from '@/utils/adminAuth';
 
+const isDev = import.meta.env.DEV;
+const devLog = isDev ? console.log.bind(console) : () => {};
+const devWarn = isDev ? console.warn.bind(console) : () => {};
+const devError = isDev ? console.error.bind(console) : () => {};
+
+
 export interface PaymentSettings {
   wiseLink: string;     // link de cobrança Wise ou Wisetag (ex: https://wise.com/pay/me/...)
   wiseEnabled: boolean; // mostra a opção Wise no checkout
@@ -19,7 +25,7 @@ export const paymentSettingsService = {
       if (!snap.exists()) return DEFAULT;
       return { ...DEFAULT, ...(snap.data() as Partial<PaymentSettings>) };
     } catch (e) {
-      console.warn('[payments] get falhou:', e);
+      devWarn('[payments] get falhou:', e);
       return DEFAULT;
     }
   },

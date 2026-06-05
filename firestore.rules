@@ -4,7 +4,6 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // Admin identificado pelo e-mail autenticado no Firebase Auth.
-    // (As regras rodam no servidor — é seguro ter o e-mail aqui.)
     function isAdmin() {
       return request.auth != null
         && request.auth.token.email == 'dracko2007@gmail.com';
@@ -12,28 +11,30 @@ service cloud.firestore {
 
     // ---------- Clientes ----------
     match /users/{userId} {
-      // Admin lê tudo; usuário lê o próprio documento.
-      allow read: if isAdmin() || request.auth != null;
-      // Criar/atualizar: qualquer autenticado (cadastro/perfil).
-      allow create, update: if request.auth != null;
-      // Excluir: somente admin.
+      // Admin lê tudo; usuário lê/edita apenas o próprio documento.
+      allow read: if isAdmin() || (request.auth != null && userId == request.auth.uid);
+      allow create: if request.auth != null && userId == request.auth.uid;
+      allow update: if isAdmin() || (request.auth != null && userId == request.auth.uid);
       allow delete: if isAdmin();
     }
 
     // ---------- Pedidos ----------
     match /orders/{orderId} {
-      allow read: if request.auth != null;     // admin/autenticado lê
-      // Comprador (mesmo convidado, sem login) cria o pedido no checkout.
+      // Admin lê tudo; usuário lê apenas seus próprios pedidos (por uid ou e-mail).
+      allow read: if isAdmin()
+        || (request.auth != null && resource.data.userId == request.auth.uid)
+        || (request.auth != null && resource.data.customerEmail == request.auth.token.email);
+      // Qualquer pessoa (convidado) cria um pedido com status 'pending'.
       allow create: if request.resource.data.status == 'pending';
-      allow update: if request.auth != null;   // admin atualiza status/rastreio
-      // Excluir: somente admin.
+      // Admin atualiza status/rastreio; usuário autenticado não pode alterar pedidos de outros.
+      allow update: if isAdmin();
       allow delete: if isAdmin();
     }
 
     // ---------- Produtos ----------
     match /products/{productId} {
-      allow read: if true;               // catálogo público
-      allow write, delete: if isAdmin(); // só admin altera
+      allow read: if true;
+      allow write, delete: if isAdmin();
     }
 
     // ---------- Conteúdo do site (home) ----------
@@ -44,12 +45,14 @@ service cloud.firestore {
 
     // ---------- Cupons ----------
     match /coupons/{couponId} {
-      allow read: if true;               // cupons visíveis no checkout
+      allow read: if true;
       allow write, delete: if isAdmin();
     }
 
     match /coupon_usage/{usageId} {
-      allow read: if request.auth != null;
+      // Usuário lê apenas seus próprios registros de uso.
+      allow read: if isAdmin()
+        || (request.auth != null && resource.data.userId == request.auth.uid);
       allow create: if request.auth != null;
       allow update, delete: if isAdmin();
     }
@@ -67,59 +70,66 @@ service cloud.firestore {
 
     // ---------- Afiliados / Influencers ----------
     match /affiliates/{code} {
-      allow read: if true;                    // validar código no checkout (público)
-      allow write: if request.auth != null;   // admin cria/edita; comprador credita comissão
-    }
-
-    // Solicitações para virar afiliado (cliente pede, admin aprova/recusa)
-    match /affiliate_requests/{email} {
-      allow read: if true;                                    // cliente vê o status do próprio pedido
-      allow create: if request.resource.data.status == 'pending';
-      allow update, delete: if isAdmin();                     // só admin aprova/recusa
-    }
-
-    // Comissões pendentes (liberadas pelo admin ao confirmar a entrega)
-    match /affiliate_pending/{id} {
-      // Qualquer comprador (mesmo convidado) registra a comissão como 'pending'
-      allow create: if request.resource.data.status == 'pending';
-      // Só admin/autenticado lê, confirma (update) ou cancela (delete)
-      allow read, update, delete: if request.auth != null;
-    }
-
-    // ---------- Administradores e níveis ----------
-    // Login do admin é por usuário/nome + senha → a consulta acontece ANTES de
-    // autenticar, então a leitura precisa ser pública. (Demo: senha em texto.)
-    match /admins/{adminId} {
+      // Leitura pública para validar código no checkout.
       allow read: if true;
-      allow write: if isAdmin();   // só o super-admin (Firebase) cria/remove
+      // Criação e remoção: somente admin.
+      allow create, delete: if isAdmin();
+      // Update: admin ou o próprio dono do código (painel do influencer).
+      allow update: if isAdmin()
+        || (request.auth != null && resource.data.ownerEmail == request.auth.token.email);
+    }
+
+    // Comissões pendentes
+    match /affiliate_pending/{id} {
+      allow create: if request.resource.data.status == 'pending';
+      allow read, update, delete: if isAdmin()
+        || (request.auth != null && resource.data.buyerEmail == request.auth.token.email);
+    }
+
+    // Solicitações para virar afiliado
+    match /affiliate_requests/{id} {
+      allow create: if true;
+      allow read: if isAdmin()
+        || (request.auth != null && resource.data.email == request.auth.token.email);
+      allow update, delete: if isAdmin();
+    }
+
+    // ---------- Administradores ----------
+    // A leitura de um doc individual é necessária ANTES da autenticação Firebase
+    // (login por username + senha). 'get' permite isso; 'list' (listar todos) é
+    // restrito ao admin para evitar enumeração em massa.
+    match /admins/{adminId} {
+      allow get: if true;
+      allow list: if isAdmin();
+      allow write: if isAdmin();
     }
 
     // ---------- Settings (manutenção, config) ----------
     match /settings/{docId} {
-      allow read: if true;                // todos leem (saber se está em manutenção)
-      allow write: if isAdmin();          // só admin liga/desliga
+      allow read: if true;
+      allow write: if isAdmin();
     }
 
-    // ---------- Pedidos personalizados ("Faça seu Pedido") ----------
+    // ---------- Pedidos personalizados ----------
     match /custom_requests/{reqId} {
-      // Qualquer pessoa (mesmo sem login) envia um pedido com status 'new'
       allow create: if request.resource.data.status == 'new';
-      // Só admin/autenticado lê, atualiza status ou exclui
-      allow read, update, delete: if request.auth != null;
+      allow read, update, delete: if isAdmin();
     }
 
-    // ---------- Cotações B2B / atacado (empresas / PJ) ----------
+    // ---------- Cotações B2B ----------
     match /b2b_requests/{reqId} {
       allow create: if request.resource.data.status == 'new';
-      allow read, update, delete: if request.auth != null;
+      allow read, update, delete: if isAdmin();
     }
 
-    // ---------- Vídeos de review (pontos liberados após validação) ----------
+    // ---------- Vídeos de review ----------
     match /video_reviews/{id} {
-      // Cliente (sem login Firebase) envia o vídeo como 'pending'
       allow create: if request.resource.data.status == 'pending';
-      allow read: if true;                 // lookup "já enviei?" + leitura do admin
-      allow update, delete: if isAdmin();  // só o admin valida/aprova/rejeita
+      // Leitura: dono do vídeo ou admin.
+      allow read: if isAdmin()
+        || (request.auth != null && resource.data.userId == request.auth.uid)
+        || (request.auth != null && resource.data.userEmail == request.auth.token.email);
+      allow update, delete: if isAdmin();
     }
 
     // ---------- Coleção de teste ----------

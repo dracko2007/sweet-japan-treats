@@ -1,4 +1,10 @@
 class SafeStorage {
+
+const isDev = import.meta.env.DEV;
+const devLog = isDev ? console.log.bind(console) : () => {};
+const devWarn = isDev ? console.warn.bind(console) : () => {};
+const devError = isDev ? console.error.bind(console) : () => {};
+
   private isAvailable: boolean;
   private fallback: Record<string, string> = {};
 
@@ -10,7 +16,7 @@ class SafeStorage {
       this.isAvailable = true;
     } catch (e) {
       this.isAvailable = false;
-      console.warn('localStorage is not available. Using in-memory fallback.', e);
+      devWarn('localStorage is not available. Using in-memory fallback.', e);
     }
   }
 
@@ -19,7 +25,7 @@ class SafeStorage {
       try {
         return window.localStorage.getItem(key);
       } catch (e) {
-        console.error(`Error reading key "${key}" from localStorage:`, e);
+        devError(`Error reading key "${key}" from localStorage:`, e);
       }
     }
     return this.fallback[key] !== undefined ? this.fallback[key] : null;
@@ -31,7 +37,7 @@ class SafeStorage {
         window.localStorage.setItem(key, value);
         return;
       } catch (e) {
-        console.error(`Error writing key "${key}" to localStorage:`, e);
+        devError(`Error writing key "${key}" to localStorage:`, e);
       }
     }
     this.fallback[key] = value;
@@ -43,7 +49,7 @@ class SafeStorage {
         window.localStorage.removeItem(key);
         return;
       } catch (e) {
-        console.error(`Error removing key "${key}" from localStorage:`, e);
+        devError(`Error removing key "${key}" from localStorage:`, e);
       }
     }
     delete this.fallback[key];
@@ -55,7 +61,7 @@ class SafeStorage {
         window.localStorage.clear();
         return;
       } catch (e) {
-        console.error('Error clearing localStorage:', e);
+        devError('Error clearing localStorage:', e);
       }
     }
     this.fallback = {};
@@ -67,7 +73,7 @@ class SafeStorage {
       try {
         return Object.keys(window.localStorage);
       } catch (e) {
-        console.error('Error reading localStorage keys:', e);
+        devError('Error reading localStorage keys:', e);
       }
     }
     return Object.keys(this.fallback);

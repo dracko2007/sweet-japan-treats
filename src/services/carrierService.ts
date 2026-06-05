@@ -1,5 +1,11 @@
 import type { ShippingLabelData } from '@/types/order';
 
+const isDev = import.meta.env.DEV;
+const devLog = isDev ? console.log.bind(console) : () => {};
+const devWarn = isDev ? console.warn.bind(console) : () => {};
+const devError = isDev ? console.error.bind(console) : () => {};
+
+
 interface TrackingInfo {
   trackingNumber: string;
   carrier: string;
@@ -25,10 +31,10 @@ export const carrierService = {
    * Create shipping label with Japan Post
    */
   createJapanPostLabel: async (data: ShippingLabelData): Promise<TrackingInfo> => {
-    console.log('📮 Japan Post API - Creating shipping label');
-    console.log('Order:', data.orderNumber);
-    console.log('From:', data.sender.name, data.sender.postalCode);
-    console.log('To:', data.recipient.name, data.recipient.postalCode);
+    devLog('📮 Japan Post API - Creating shipping label');
+    devLog('Order:', data.orderNumber);
+    devLog('From:', data.sender.name, data.sender.postalCode);
+    devLog('To:', data.recipient.name, data.recipient.postalCode);
     
     // Mock API call
     try {
@@ -43,7 +49,7 @@ export const carrierService = {
       // const result = await response.json();
       // return result;
 
-      console.log('✅ Label created (backend integration required)');
+      devLog('✅ Label created (backend integration required)');
       return {
         trackingNumber: `JP${Date.now().toString().slice(-10)}`,
         carrier: 'Japan Post',
@@ -51,7 +57,7 @@ export const carrierService = {
         estimatedDelivery: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString()
       };
     } catch (error) {
-      console.error('❌ Error creating Japan Post label:', error);
+      devError('❌ Error creating Japan Post label:', error);
       throw error;
     }
   },
@@ -60,12 +66,12 @@ export const carrierService = {
    * Create shipping label with Yamato
    */
   createYamatoLabel: async (data: ShippingLabelData): Promise<TrackingInfo> => {
-    console.log('🐱 Yamato API - Creating shipping label');
-    console.log('Order:', data.orderNumber);
+    devLog('🐱 Yamato API - Creating shipping label');
+    devLog('Order:', data.orderNumber);
     
     // Mock API call
     try {
-      console.log('✅ Label created (backend integration required)');
+      devLog('✅ Label created (backend integration required)');
       return {
         trackingNumber: `YM${Date.now().toString().slice(-10)}`,
         carrier: 'Yamato',
@@ -73,7 +79,7 @@ export const carrierService = {
         estimatedDelivery: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString()
       };
     } catch (error) {
-      console.error('❌ Error creating Yamato label:', error);
+      devError('❌ Error creating Yamato label:', error);
       throw error;
     }
   },
@@ -82,12 +88,12 @@ export const carrierService = {
    * Create shipping label with Sagawa
    */
   createSagawaLabel: async (data: ShippingLabelData): Promise<TrackingInfo> => {
-    console.log('📦 Sagawa API - Creating shipping label');
-    console.log('Order:', data.orderNumber);
+    devLog('📦 Sagawa API - Creating shipping label');
+    devLog('Order:', data.orderNumber);
     
     // Mock API call
     try {
-      console.log('✅ Label created (backend integration required)');
+      devLog('✅ Label created (backend integration required)');
       return {
         trackingNumber: `SG${Date.now().toString().slice(-10)}`,
         carrier: 'Sagawa',
@@ -95,7 +101,7 @@ export const carrierService = {
         estimatedDelivery: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString()
       };
     } catch (error) {
-      console.error('❌ Error creating Sagawa label:', error);
+      devError('❌ Error creating Sagawa label:', error);
       throw error;
     }
   },
@@ -104,11 +110,11 @@ export const carrierService = {
    * Get tracking information
    */
   getTracking: async (trackingNumber: string, carrier: string): Promise<TrackingDetails> => {
-    console.log(`🔍 Tracking - ${carrier}: ${trackingNumber}`);
+    devLog(`🔍 Tracking - ${carrier}: ${trackingNumber}`);
     
     // Mock API call
     try {
-      console.log('✅ Tracking info retrieved (backend integration required)');
+      devLog('✅ Tracking info retrieved (backend integration required)');
       return {
         trackingNumber,
         carrier,
@@ -119,7 +125,7 @@ export const carrierService = {
         ]
       };
     } catch (error) {
-      console.error('❌ Error getting tracking info:', error);
+      devError('❌ Error getting tracking info:', error);
       throw error;
     }
   },

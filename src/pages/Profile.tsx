@@ -17,6 +17,12 @@ import { reviewService } from '@/services/reviewService';
 import ReviewModal from '@/components/products/ReviewModal';
 import { Star } from 'lucide-react';
 
+const isDev = import.meta.env.DEV;
+const devLog = isDev ? console.log.bind(console) : () => {};
+const devWarn = isDev ? console.warn.bind(console) : () => {};
+const devError = isDev ? console.error.bind(console) : () => {};
+
+
 const Profile: React.FC = () => {
   const { user, isAuthenticated, coupons, orders, updateProfile, logout } = useUser();
   const { products } = useProducts();
@@ -169,7 +175,7 @@ const Profile: React.FC = () => {
           });
         }
       } catch (error) {
-        console.error('Erro ao buscar CEP:', error);
+        devError('Erro ao buscar CEP:', error);
       }
     }
   };

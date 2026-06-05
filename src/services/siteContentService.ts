@@ -4,6 +4,12 @@ import { db } from '@/config/firebase';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { ensureAdminAuth } from '@/utils/adminAuth';
 
+const isDev = import.meta.env.DEV;
+const devLog = isDev ? console.log.bind(console) : () => {};
+const devWarn = isDev ? console.warn.bind(console) : () => {};
+const devError = isDev ? console.error.bind(console) : () => {};
+
+
 export interface HomeVideo {
   id: string;
   title: string;
@@ -75,7 +81,7 @@ export const siteContentService = {
       const data = snap.data() as Partial<HomeContent>;
       return { ...DEFAULT_HOME, ...data, videos: data.videos || [] };
     } catch (e) {
-      console.warn('siteContentService.getHome falhou:', e);
+      devWarn('siteContentService.getHome falhou:', e);
       return DEFAULT_HOME;
     }
   },
@@ -98,7 +104,7 @@ export const siteContentService = {
       const data = snap.data() as Partial<VlogContent>;
       return { ...DEFAULT_VLOG, ...data, videos: data.videos || [], saved: true };
     } catch (e) {
-      console.warn('siteContentService.getVlog falhou:', e);
+      devWarn('siteContentService.getVlog falhou:', e);
       return DEFAULT_VLOG;
     }
   },

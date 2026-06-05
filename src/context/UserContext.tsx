@@ -6,12 +6,17 @@ import { signInWithEmailAndPassword } from 'firebase/auth';
 import { ADMIN_EMAIL, ADMIN_PASSWORD, ADMIN_USER_ID, isAdminEmail } from '@/config/admin';
 import { adminService } from '@/services/adminService';
 
+const isDev = import.meta.env.DEV;
+const devLog = isDev ? console.log.bind(console) : () => {};
+const devWarn = isDev ? console.warn.bind(console) : () => {};
+const devError = isDev ? console.error.bind(console) : () => {};
+
 export interface UserProfile {
   id: string;
   name: string;
   email: string;
   phone: string;
-  password?: string; // Stored for demo purposes - in production, use backend authentication
+  password?: string; // apenas em memória para modo local-only; NUNCA persistir
   birthdate?: string;
   adminRole?: number;         // nível de admin (1/2/3) quando é sessão de admin
   personType?: 'PF' | 'PJ';   // Pessoa Física ou Jurídica
@@ -144,6 +149,12 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
 
   const normalizeEmail = (email: string) => email.trim().toLowerCase();
 
+  // Remove senha antes de qualquer persistência (localStorage ou Firestore).
+  const stripSensitive = (u: UserProfile): UserProfile => {
+    const { password: _pw, ...safe } = u;
+    return safe as UserProfile;
+  };
+
   // Helper functions for users database
   const getAllUsers = (): UserProfile[] => {
     const usersData = safeStorage.getItem('sweet-japan-users');
@@ -155,10 +166,9 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
   };
 
   const saveAllUsers = (users: UserProfile[]) => {
-    // Converte array para objeto com email como chave
     const usersObj: Record<string, UserProfile> = {};
-    users.forEach(user => {
-      usersObj[user.email] = user;
+    users.forEach(u => {
+      usersObj[u.email] = stripSensitive(u);
     });
     safeStorage.setItem('sweet-japan-users', JSON.stringify(usersObj));
   };
@@ -204,7 +214,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
   // Helper: sync local orders to Firestore for a user
   const syncLocalOrdersToFirestore = async (userId: string, email: string, localOrders: Order[]) => {
     if (localOrders.length === 0) return;
-    console.log(`🔄 [SYNC] Syncing ${localOrders.length} local orders to Firestore for ${email}...`);
+    devLog(`🔄 [SYNC] Syncing ${localOrders.length} local orders to Firestore for ${email}...`);
     for (const order of localOrders) {
       try {
         await firebaseSyncService.syncOrderToFirestore(userId, {
@@ -214,10 +224,10 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
           customerEmail: email,
         });
       } catch (err) {
-        console.warn('⚠️ [SYNC] Failed to sync order:', order.orderNumber, err);
+        devWarn('⚠️ [SYNC] Failed to sync order:', order.orderNumber, err);
       }
     }
-    console.log('✅ [SYNC] Local orders synced to Firestore');
+    devLog('✅ [SYNC] Local orders synced to Firestore');
   };
 
   // Helper: fix old tracking URLs to use the correct format (direct results)
@@ -277,7 +287,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
         return fixTrackingUrl(mapped);
       }) as Order[];
     } catch (err) {
-      console.warn('⚠️ [SYNC] Could not load orders from Firestore:', err);
+      devWarn('⚠️ [SYNC] Could not load orders from Firestore:', err);
       return [];
     }
   };
@@ -309,7 +319,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     if (storedUser) {
       try {
         const userData = JSON.parse(storedUser);
-        console.log('⚡ [INIT] Restoring user from safeStorage:', userData.email);
+        devLog('⚡ [INIT] Restoring user from safeStorage:', userData.email);
         setUser(userData);
         setIsAuthenticated(true);
         const userCoupons = resolveUserCoupons(userData);
@@ -322,18 +332,18 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
         const isAdminSession = userData.id === ADMIN_USER_ID || isAdminEmail(userData.email);
         if (isAdminSession && auth && !auth.currentUser) {
           signInWithEmailAndPassword(auth, ADMIN_EMAIL, ADMIN_PASSWORD)
-            .then(() => console.log('✅ Admin reautenticado no Firebase (sessão restaurada)'))
-            .catch((err) => console.warn('⚠️ Falha ao reautenticar admin no Firebase:', err?.code));
+            .then(() => devLog('✅ Admin reautenticado no Firebase (sessão restaurada)'))
+            .catch((err) => devWarn('⚠️ Falha ao reautenticar admin no Firebase:', err?.code));
         }
       } catch (e) {
-        console.error('❌ [INIT] Failed to parse stored user:', e);
+        devError('❌ [INIT] Failed to parse stored user:', e);
       }
     }
 
     // Listener do Firebase Auth (will update/enrich data when ready)
     const unsubscribe = firebaseSyncService.onAuthChange(async (firebaseUser) => {
       if (firebaseUser) {
-        console.log('🔥 [FIREBASE] Auth state changed - user logged in:', firebaseUser.uid);
+        devLog('🔥 [FIREBASE] Auth state changed - user logged in:', firebaseUser.uid);
 
         // Sessão de ADMIN (login por usuário/nome): o Firebase está autenticado só para
         // liberar escrita. NÃO sobrescrever com o perfil de cliente do Firestore.
@@ -344,7 +354,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
         
         // Block unverified users (except admin)
         if (!firebaseUser.emailVerified && firebaseUser.email !== 'dracko2007@gmail.com') {
-          console.log('🔥 [FIREBASE] User email not verified, signing out:', firebaseUser.email);
+          devLog('🔥 [FIREBASE] User email not verified, signing out:', firebaseUser.email);
           await firebaseSyncService.logoutUser();
           return;
         }
@@ -394,17 +404,17 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
             syncLocalOrdersToFirestore(firebaseUser.uid, (firestoreUser as any).email, localOnlyOrders);
           }
           
-          safeStorage.setItem('user', JSON.stringify(mergedUser));
+          safeStorage.setItem('user', JSON.stringify(stripSensitive(mergedUser)));
         }
       } else {
-        console.log('🔥 [FIREBASE] Auth state changed - no Firebase user');
+        devLog('🔥 [FIREBASE] Auth state changed - no Firebase user');
         // DON'T clear session - safeStorage user may be valid (e.g. admin login)
         // Only clear if there's no stored user either
         const storedUser = safeStorage.getItem('user');
         if (storedUser) {
           try {
             const userData = JSON.parse(storedUser);
-            console.log('🔥 [FIREBASE] Keeping safeStorage session for:', userData.email);
+            devLog('🔥 [FIREBASE] Keeping safeStorage session for:', userData.email);
             setUser(userData);
             setIsAuthenticated(true);
             const userCoupons = resolveUserCoupons(userData);
@@ -412,7 +422,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
             setCoupons(userCoupons);
             setOrders(userOrders);
           } catch (e) {
-            console.error('❌ Failed to parse stored user');
+            devError('❌ Failed to parse stored user');
           }
         }
       }
@@ -421,10 +431,10 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     return () => unsubscribe();
   }, []);
 
-  // Save current user session to safeStorage
+  // Save current user session to safeStorage (sem senha)
   useEffect(() => {
     if (user) {
-      safeStorage.setItem('user', JSON.stringify(user));
+      safeStorage.setItem('user', JSON.stringify(stripSensitive(user)));
     } else {
       safeStorage.removeItem('user');
     }
@@ -453,9 +463,8 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       const adminUser: UserProfile = {
         id: ADMIN_USER_ID,
         name: admin.name,
-        email: ADMIN_EMAIL, // e-mail interno só p/ autenticar no Firebase (escrita no painel)
+        email: ADMIN_EMAIL,
         phone: '',
-        password: ADMIN_PASSWORD,
         adminRole: admin.role,
         address: { postalCode: '', prefecture: '', city: '', address: '' },
         createdAt: new Date().toISOString(),
@@ -465,17 +474,17 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       setIsAuthenticated(true);
       setCoupons([]);
       setOrders([]);
-      safeStorage.setItem('user', JSON.stringify(adminUser));
+      safeStorage.setItem('user', JSON.stringify(stripSensitive(adminUser)));
 
       // Autentica no Firebase (conta admin compartilhada) p/ liberar escrita no painel
       if (auth) {
         try {
           await signInWithEmailAndPassword(auth, ADMIN_EMAIL, ADMIN_PASSWORD);
         } catch (err) {
-          console.warn('⚠️ Admin local OK, mas Firebase Auth falhou:', err);
+          devWarn('⚠️ Admin local OK, mas Firebase Auth falhou:', err);
         }
       }
-      console.log(`✅ Admin "${admin.name}" (nível ${admin.role}) logado`);
+      devLog(`✅ Admin "${admin.name}" (nível ${admin.role}) logado`);
       return { success: true };
     }
     
@@ -490,7 +499,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
         const userOrders = getUserOrders(foundUser.id);
         setCoupons(userCoupons);
         setOrders(userOrders);
-        safeStorage.setItem('user', JSON.stringify(foundUser));
+        safeStorage.setItem('user', JSON.stringify(stripSensitive(foundUser)));
         return { success: true };
       }
       return { success: false, error: 'Email ou senha incorretos. Cadastre-se primeiro caso não tenha uma conta.' };
@@ -498,7 +507,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
 
     try {
       // Login with Firebase Auth - STRICT: user must exist
-      console.log('🔥 [LOGIN] Attempting Firebase Auth login...');
+      devLog('🔥 [LOGIN] Attempting Firebase Auth login...');
       const firebaseUser = await firebaseSyncService.loginUser(normalizedEmail, password);
       
       // FIRST: Check if user actually registered (has profile in Firestore)
@@ -509,7 +518,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       
       if (!userProfile && !localUser) {
         // No profile in Firestore or safeStorage - user never properly registered
-        console.log('⚠️ [LOGIN] Ghost user detected (Auth exists but no profile):', normalizedEmail);
+        devLog('⚠️ [LOGIN] Ghost user detected (Auth exists but no profile):', normalizedEmail);
         await firebaseSyncService.logoutUser();
         return { 
           success: false, 
@@ -521,11 +530,11 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       // O usuário pode entrar logo após o cadastro. Para produção, reative o
       // bloqueio abaixo conferindo firebaseUser.emailVerified.
       if (!firebaseUser.emailVerified) {
-        console.log('ℹ️ [LOGIN] E-mail não verificado, mas login liberado (modo demo):', normalizedEmail);
+        devLog('ℹ️ [LOGIN] E-mail não verificado, mas login liberado (modo demo):', normalizedEmail);
       }
 
       // Get user data - we already have userProfile from above
-      console.log('🔥 [LOGIN] Fetching user data from Firestore...');
+      devLog('🔥 [LOGIN] Fetching user data from Firestore...');
       let userData = userProfile;
       
       if (!userData) {
@@ -557,13 +566,13 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
           syncLocalOrdersToFirestore(firebaseUser.uid, (userData as any).email, localOnlyOrders);
         }
         
-        safeStorage.setItem('user', JSON.stringify(userData));
-        
-        console.log('✅ User logged in successfully via Firebase:', { email: userData.email, id: userData.id });
+        safeStorage.setItem('user', JSON.stringify(stripSensitive(userData as UserProfile)));
+
+        devLog('✅ User logged in successfully via Firebase:', { email: userData.email, id: userData.id });
         return { success: true };
       }
     } catch (error: any) {
-      console.log('⚠️ [LOGIN] Firebase Auth failed:', error?.code);
+      devLog('⚠️ [LOGIN] Firebase Auth failed:', error?.code);
       
       const authCode = error?.code || '';
       
@@ -627,14 +636,14 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
   const register = async (userData: Omit<UserProfile, 'id' | 'createdAt' | 'password'> & { password: string }): Promise<{ success: boolean; error?: string }> => {
     try {
       const normalizedEmail = normalizeEmail(userData.email);
-      console.log('🔍 [DEBUG] ===== REGISTER START =====');
-      console.log('🔍 [DEBUG] Registration data:', { 
+      devLog('🔍 [DEBUG] ===== REGISTER START =====');
+      devLog('🔍 [DEBUG] Registration data:', { 
         email: normalizedEmail, 
         name: userData.name 
       });
 
       // Register user in Firebase Auth (with email verification)
-      console.log('🔥 [DEBUG] Registering user in Firebase Auth...');
+      devLog('🔥 [DEBUG] Registering user in Firebase Auth...');
       let firebaseUser;
       try {
         firebaseUser = await firebaseSyncService.registerUser(normalizedEmail, userData.password);
@@ -644,7 +653,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
         }
         if ((authError.code && authError.code.includes('email-already-in-use')) || (authError.message && authError.message.includes('email-already-in-use'))) {
           // Ghost user check: exists in Auth but maybe not in Firestore
-          console.log('⚠️ [REGISTER] Email already in Auth. Checking for ghost user...');
+          devLog('⚠️ [REGISTER] Email already in Auth. Checking for ghost user...');
           try {
             // Try to login with provided password to recover the ghost account
             const ghostUser = await firebaseSyncService.loginUser(normalizedEmail, userData.password);
@@ -660,22 +669,22 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
             
             // Ghost user confirmed: Auth exists but NO Firestore profile
             // Treat as new registration - create profile and send verification
-            console.log('👻 [REGISTER] Ghost user confirmed. Creating profile...');
+            devLog('👻 [REGISTER] Ghost user confirmed. Creating profile...');
             firebaseUser = ghostUser;
             
             // Resend verification email since they never verified
             if (!ghostUser.emailVerified) {
               try {
                 await firebaseSyncService.resendVerificationEmail();
-                console.log('📧 [REGISTER] Verification email resent for ghost user');
+                devLog('📧 [REGISTER] Verification email resent for ghost user');
               } catch (e) {
-                console.warn('⚠️ [REGISTER] Could not resend verification:', e);
+                devWarn('⚠️ [REGISTER] Could not resend verification:', e);
               }
             }
             // Fall through to profile creation below
           } catch (loginError: any) {
             // Can't login - wrong password for existing Auth account
-            console.log('❌ [REGISTER] Ghost user exists but password mismatch');
+            devLog('❌ [REGISTER] Ghost user exists but password mismatch');
             await firebaseSyncService.logoutUser().catch(() => {});
             return { success: false, error: 'Este email já existe com outra senha. Tente fazer login ou use "Esqueceu a senha?" para redefinir.' };
           }
@@ -692,12 +701,12 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       // Concede o cupom de boas-vindas no perfil (uso único, vinculado à conta)
       const welcomeCoupon = makeWelcomeCoupon();
 
+      const { password: _pw, ...safeUserData } = userData;
       const newUser: UserProfile = {
-        ...userData,
+        ...safeUserData,
         email: normalizedEmail,
         id: firebaseUser.uid,
         createdAt: new Date().toISOString(),
-        password: userData.password,
         coupons: [welcomeCoupon],
       };
 
@@ -713,16 +722,16 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       // no backup local; se a nuvem falhar, o perfil sincroniza no próximo login.
       const syncResult = await firebaseSyncService.syncUserToFirestore(newUser.id, newUser);
       if (!syncResult) {
-        console.warn('⚠️ [REGISTER] Falha ao sincronizar perfil na nuvem — seguindo com backup local. Sincroniza no próximo login.');
+        devWarn('⚠️ [REGISTER] Falha ao sincronizar perfil na nuvem — seguindo com backup local. Sincroniza no próximo login.');
       }
 
       // Encerra a sessão criada durante o cadastro (login é feito depois)
       await firebaseSyncService.logoutUser();
 
-      console.log('✅ [REGISTER] Cadastro concluído (sync nuvem:', syncResult, ')');
+      devLog('✅ [REGISTER] Cadastro concluído (sync nuvem:', syncResult, ')');
       return { success: true };
     } catch (error) {
-      console.error('❌ [DEBUG] Error registering user:', error);
+      devError('❌ [DEBUG] Error registering user:', error);
       return { success: false, error: 'Erro ao criar conta. Tente novamente.' };
     }
   };
@@ -742,7 +751,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     // Remove only current session, keep users database intact
     safeStorage.removeItem('user');
     safeStorage.removeItem('loginAs');
-    console.log('User logged out successfully');
+    devLog('User logged out successfully');
   };
 
   const updateProfile = (userData: Partial<UserProfile>) => {
@@ -774,12 +783,12 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
         birthdate: updatedUser.birthdate || null,
         address: updatedUser.address || {},
       }).then(() => {
-        console.log('✅ [SYNC] Profile synced to Firestore');
+        devLog('✅ [SYNC] Profile synced to Firestore');
       }).catch(err => {
-        console.warn('⚠️ [SYNC] Failed to sync profile to Firestore:', err);
+        devWarn('⚠️ [SYNC] Failed to sync profile to Firestore:', err);
       });
       
-      console.log('✅ User profile updated:', { 
+      devLog('✅ User profile updated:', { 
         id: updatedUser.id, 
         email: updatedUser.email,
         address: updatedUser.address 
@@ -801,7 +810,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     // Sincroniza com Firestore (fire-and-forget)
     firebaseSyncService.syncUserToFirestore(user.id, { points: newTotal }).catch(() => {});
 
-    console.log(`✅ +${amount} pontos (total: ${newTotal})`);
+    devLog(`✅ +${amount} pontos (total: ${newTotal})`);
   };
 
   // Persiste a lista de cupons do usuário no localStorage e no Firestore.
@@ -810,7 +819,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     saveUserCoupons(user.id, updated);
     firebaseSyncService
       .syncUserToFirestore(user.id, { coupons: updated })
-      .catch((e) => console.warn('⚠️ Falha ao sincronizar cupons:', e));
+      .catch((e) => devWarn('⚠️ Falha ao sincronizar cupons:', e));
   };
 
   const addCoupon = (coupon: Coupon) => {
@@ -879,9 +888,9 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
           customerName: user.name,
           customerPhone: user.phone,
         });
-        console.log('✅ [ORDER] Synced to Firestore:', newOrder.orderNumber);
+        devLog('✅ [ORDER] Synced to Firestore:', newOrder.orderNumber);
       } catch (err) {
-        console.error('❌ [ORDER] Failed to sync to Firestore:', err);
+        devError('❌ [ORDER] Failed to sync to Firestore:', err);
       }
     }
     

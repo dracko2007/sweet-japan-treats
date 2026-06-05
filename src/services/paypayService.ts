@@ -1,4 +1,10 @@
 /**
+
+const isDev = import.meta.env.DEV;
+const devLog = isDev ? console.log.bind(console) : () => {};
+const devWarn = isDev ? console.warn.bind(console) : () => {};
+const devError = isDev ? console.error.bind(console) : () => {};
+
  * PayPay Payment Service
  * 
  * This module handles PayPay payment integration.
@@ -54,11 +60,11 @@ export const paypayService = {
    * Create a PayPay payment
    */
   createPayment: async (data: PayPayPaymentData): Promise<PayPayResponse> => {
-    console.log('💳 PayPay Service - Creating payment');
-    console.log('Order Number:', data.orderNumber);
-    console.log('Amount:', data.amount, 'JPY');
-    console.log('Description:', data.description);
-    console.log('Customer:', data.customerEmail, data.customerPhone);
+    devLog('💳 PayPay Service - Creating payment');
+    devLog('Order Number:', data.orderNumber);
+    devLog('Amount:', data.amount, 'JPY');
+    devLog('Description:', data.description);
+    devLog('Customer:', data.customerEmail, data.customerPhone);
     
     // Mock API call - replace with real backend endpoint
     try {
@@ -80,8 +86,8 @@ export const paypayService = {
       // return result;
 
       // Simulate successful payment creation
-      console.log('✅ PayPay payment would be created (backend integration required)');
-      console.log('💡 In production, user would be redirected to PayPay app or shown QR code');
+      devLog('✅ PayPay payment would be created (backend integration required)');
+      devLog('💡 In production, user would be redirected to PayPay app or shown QR code');
       
       return {
         success: true,
@@ -90,7 +96,7 @@ export const paypayService = {
         paymentId: `PAYPAY-${data.orderNumber}`
       };
     } catch (error) {
-      console.error('❌ Error creating PayPay payment:', error);
+      devError('❌ Error creating PayPay payment:', error);
       return {
         success: false,
         error: 'Failed to create payment'
@@ -102,8 +108,8 @@ export const paypayService = {
    * Check payment status
    */
   checkPaymentStatus: async (paymentId: string): Promise<{ status: string; paid: boolean }> => {
-    console.log('🔍 PayPay Service - Checking payment status');
-    console.log('Payment ID:', paymentId);
+    devLog('🔍 PayPay Service - Checking payment status');
+    devLog('Payment ID:', paymentId);
     
     // Mock API call
     try {
@@ -111,13 +117,13 @@ export const paypayService = {
       // const result = await response.json();
       // return result;
 
-      console.log('✅ Payment status check (backend integration required)');
+      devLog('✅ Payment status check (backend integration required)');
       return {
         status: 'pending',
         paid: false
       };
     } catch (error) {
-      console.error('❌ Error checking payment status:', error);
+      devError('❌ Error checking payment status:', error);
       return {
         status: 'error',
         paid: false

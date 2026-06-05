@@ -28,6 +28,11 @@ import {
 
 import { auth, db, firebaseConfigReady } from '@/config/firebase';
 
+const isDev = import.meta.env.DEV;
+const devLog = isDev ? console.log.bind(console) : () => {};
+const devWarn = isDev ? console.warn.bind(console) : () => {};
+const devError = isDev ? console.error.bind(console) : () => {};
+
 const ensureFirebaseReady = () => {
   if (!firebaseConfigReady || !auth || !db) {
     const error: any = new Error('Firebase not configured');
@@ -61,18 +66,19 @@ export const firebaseSyncService = {
     try {
       ensureFirebaseReady();
       const userRef = doc(db, 'users', userId);
-      // Clean data before sending (Firestore doesn't like undefined)
-      const cleanData = sanitizeData(userData);
-      
+      // Remove senha antes de enviar ao Firestore (nunca persistir credencial).
+      const { password: _pw, ...safeData } = userData as any;
+      const cleanData = sanitizeData(safeData);
+
       await setDoc(userRef, {
         ...cleanData,
         lastSyncAt: new Date().toISOString()
       }, { merge: true });
       
-      console.log('✅ [FIREBASE] User synced:', userId);
+      devLog('✅ [FIREBASE] User synced:', userId);
       return true;
     } catch (error) {
-      console.error('❌ [FIREBASE] Error syncing user:', error);
+      devError('❌ [FIREBASE] Error syncing user:', error);
       return false;
     }
   },
@@ -91,7 +97,7 @@ export const firebaseSyncService = {
       }
       return null;
     } catch (error) {
-      console.error('❌ [FIREBASE] Error getting user:', error);
+      devError('❌ [FIREBASE] Error getting user:', error);
       return null;
     }
   },
@@ -112,7 +118,7 @@ export const firebaseSyncService = {
       }
       return null;
     } catch (error) {
-      console.error('❌ [FIREBASE] Error finding user:', error);
+      devError('❌ [FIREBASE] Error finding user:', error);
       return null;
     }
   },
@@ -129,7 +135,7 @@ export const firebaseSyncService = {
       await updateDoc(doc(db, 'users', u.id), { points: total });
       return { success: true, total };
     } catch (error: any) {
-      console.error('❌ [FIREBASE] addPointsToUserByEmail:', error);
+      devError('❌ [FIREBASE] addPointsToUserByEmail:', error);
       return { success: false, error: error?.message };
     }
   },
@@ -149,10 +155,10 @@ export const firebaseSyncService = {
         syncedAt: new Date().toISOString()
       });
       
-      console.log('✅ [FIREBASE] Order synced:', order.orderNumber);
+      devLog('✅ [FIREBASE] Order synced:', order.orderNumber);
       return true;
     } catch (error) {
-      console.error('❌ [FIREBASE] Error syncing order:', error);
+      devError('❌ [FIREBASE] Error syncing order:', error);
       return false;
     }
   },
@@ -174,7 +180,7 @@ export const firebaseSyncService = {
       
       return orders;
     } catch (error) {
-      console.error('❌ [FIREBASE] Error getting orders:', error);
+      devError('❌ [FIREBASE] Error getting orders:', error);
       return [];
     }
   },
@@ -195,7 +201,7 @@ export const firebaseSyncService = {
       
       return orders;
     } catch (error) {
-      console.error('❌ [FIREBASE] Error getting all orders:', error);
+      devError('❌ [FIREBASE] Error getting all orders:', error);
       return [];
     }
   },
@@ -212,10 +218,10 @@ export const firebaseSyncService = {
         updatedAt: new Date().toISOString()
       });
       
-      console.log('✅ [FIREBASE] Order status updated:', orderNumber, status);
+      devLog('✅ [FIREBASE] Order status updated:', orderNumber, status);
       return true;
     } catch (error) {
-      console.error('❌ [FIREBASE] Error updating order:', error);
+      devError('❌ [FIREBASE] Error updating order:', error);
       return false;
     }
   },
@@ -228,10 +234,10 @@ export const firebaseSyncService = {
     try {
       ensureFirebaseReady();
       await deleteDoc(doc(db, 'orders', orderNumber));
-      console.log('🗑️ [FIREBASE] Order deleted:', orderNumber);
+      devLog('🗑️ [FIREBASE] Order deleted:', orderNumber);
       return true;
     } catch (error) {
-      console.error('❌ [FIREBASE] Error deleting order:', error);
+      devError('❌ [FIREBASE] Error deleting order:', error);
       return false;
     }
   },
@@ -248,10 +254,10 @@ export const firebaseSyncService = {
       const snap = await getDocs(q);
       if (snap.empty) return true; // nada no Firestore, ok
       await Promise.all(snap.docs.map((d) => deleteDoc(doc(db, 'users', d.id))));
-      console.log('🗑️ [FIREBASE] User deleted:', email);
+      devLog('🗑️ [FIREBASE] User deleted:', email);
       return true;
     } catch (error) {
-      console.error('❌ [FIREBASE] Error deleting user:', error);
+      devError('❌ [FIREBASE] Error deleting user:', error);
       return false;
     }
   },
@@ -270,7 +276,7 @@ export const firebaseSyncService = {
       );
       return true;
     } catch (error) {
-      console.error('❌ [FIREBASE] Error clearing user orders:', error);
+      devError('❌ [FIREBASE] Error clearing user orders:', error);
       return false;
     }
   },
@@ -283,10 +289,10 @@ export const firebaseSyncService = {
       ensureFirebaseReady();
       const snap = await getDocs(collection(db, 'users'));
       await Promise.all(snap.docs.map((d) => deleteDoc(doc(db, 'users', d.id))));
-      console.log('🗑️ [FIREBASE] All users deleted:', snap.size);
+      devLog('🗑️ [FIREBASE] All users deleted:', snap.size);
       return true;
     } catch (error) {
-      console.error('❌ [FIREBASE] Error deleting all users:', error);
+      devError('❌ [FIREBASE] Error deleting all users:', error);
       return false;
     }
   },
@@ -299,10 +305,10 @@ export const firebaseSyncService = {
       ensureFirebaseReady();
       const snap = await getDocs(collection(db, 'orders'));
       await Promise.all(snap.docs.map((d) => deleteDoc(doc(db, 'orders', d.id))));
-      console.log('🗑️ [FIREBASE] All orders deleted:', snap.size);
+      devLog('🗑️ [FIREBASE] All orders deleted:', snap.size);
       return true;
     } catch (error) {
-      console.error('❌ [FIREBASE] Error deleting all orders:', error);
+      devError('❌ [FIREBASE] Error deleting all orders:', error);
       return false;
     }
   },
@@ -333,7 +339,7 @@ export const firebaseSyncService = {
       }
       return { success: true, granted };
     } catch (error) {
-      console.error('❌ [FIREBASE] Error granting coupon:', error);
+      devError('❌ [FIREBASE] Error granting coupon:', error);
       return { success: false, granted: 0, error: String(error) };
     }
   },
@@ -360,10 +366,10 @@ export const firebaseSyncService = {
           granted++;
         })
       );
-      console.log('🎟️ [FIREBASE] Coupon granted to all:', granted);
+      devLog('🎟️ [FIREBASE] Coupon granted to all:', granted);
       return { success: true, granted };
     } catch (error) {
-      console.error('❌ [FIREBASE] Error granting coupon to all:', error);
+      devError('❌ [FIREBASE] Error granting coupon to all:', error);
       return { success: false, granted: 0, error: String(error) };
     }
   },
@@ -375,19 +381,19 @@ export const firebaseSyncService = {
     try {
       ensureFirebaseReady();
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      console.log('✅ [FIREBASE AUTH] User registered:', userCredential.user.uid);
+      devLog('✅ [FIREBASE AUTH] User registered:', userCredential.user.uid);
       
       // Send email verification
       try {
         await sendEmailVerification(userCredential.user);
-        console.log('📧 [FIREBASE AUTH] Verification email sent to:', email);
+        devLog('📧 [FIREBASE AUTH] Verification email sent to:', email);
       } catch (verifyError) {
-        console.warn('⚠️ [FIREBASE AUTH] Could not send verification email:', verifyError);
+        devWarn('⚠️ [FIREBASE AUTH] Could not send verification email:', verifyError);
       }
       
       return userCredential.user;
     } catch (error: any) {
-      console.error('❌ [FIREBASE AUTH] Registration error:', error);
+      devError('❌ [FIREBASE AUTH] Registration error:', error);
       throw error;
     }
   },
@@ -401,12 +407,12 @@ export const firebaseSyncService = {
       const currentUser = auth.currentUser;
       if (currentUser) {
         await sendEmailVerification(currentUser);
-        console.log('📧 [FIREBASE AUTH] Verification email resent');
+        devLog('📧 [FIREBASE AUTH] Verification email resent');
         return true;
       }
       return false;
     } catch (error) {
-      console.error('❌ [FIREBASE AUTH] Resend verification error:', error);
+      devError('❌ [FIREBASE AUTH] Resend verification error:', error);
       return false;
     }
   },
@@ -418,10 +424,10 @@ export const firebaseSyncService = {
     try {
       ensureFirebaseReady();
       await sendPasswordResetEmail(auth, email);
-      console.log('📧 [FIREBASE AUTH] Password reset email sent to:', email);
+      devLog('📧 [FIREBASE AUTH] Password reset email sent to:', email);
       return true;
     } catch (error: any) {
-      console.error('❌ [FIREBASE AUTH] Password reset error:', error);
+      devError('❌ [FIREBASE AUTH] Password reset error:', error);
       throw error;
     }
   },
@@ -445,7 +451,7 @@ export const firebaseSyncService = {
       }
       return false;
     } catch (error) {
-      console.error('❌ [FIREBASE AUTH] Reload error:', error);
+      devError('❌ [FIREBASE AUTH] Reload error:', error);
       return false;
     }
   },
@@ -457,10 +463,10 @@ export const firebaseSyncService = {
     try {
       ensureFirebaseReady();
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      console.log('✅ [FIREBASE AUTH] User logged in:', userCredential.user.uid);
+      devLog('✅ [FIREBASE AUTH] User logged in:', userCredential.user.uid);
       return userCredential.user;
     } catch (error: any) {
-      console.error('❌ [FIREBASE AUTH] Login error:', error);
+      devError('❌ [FIREBASE AUTH] Login error:', error);
       throw error;
     }
   },
@@ -472,10 +478,10 @@ export const firebaseSyncService = {
     try {
       ensureFirebaseReady();
       await firebaseSignOut(auth);
-      console.log('✅ [FIREBASE AUTH] User logged out');
+      devLog('✅ [FIREBASE AUTH] User logged out');
       return true;
     } catch (error) {
-      console.error('❌ [FIREBASE AUTH] Logout error:', error);
+      devError('❌ [FIREBASE AUTH] Logout error:', error);
       return false;
     }
   },
@@ -485,7 +491,7 @@ export const firebaseSyncService = {
    */
   onAuthChange(callback: (user: any) => void) {
     if (!firebaseConfigReady || !auth) {
-      console.warn('⚠️ [FIREBASE AUTH] onAuthChange skipped: Firebase not configured');
+      devWarn('⚠️ [FIREBASE AUTH] onAuthChange skipped: Firebase not configured');
       return () => undefined;
     }
     return onAuthStateChanged(auth, callback);
@@ -496,11 +502,11 @@ export const firebaseSyncService = {
    */
   async migrateLocalStorageToFirestore() {
     try {
-      console.log('🔄 [FIREBASE] Starting migration from safeStorage...');
+      devLog('🔄 [FIREBASE] Starting migration from safeStorage...');
       
       const usersData = safeStorage.getItem('sweet-japan-users');
       if (!usersData) {
-        console.log('⚠️ [FIREBASE] No users in safeStorage to migrate');
+        devLog('⚠️ [FIREBASE] No users in safeStorage to migrate');
         return { success: true, migrated: 0 };
       }
       
@@ -527,10 +533,10 @@ export const firebaseSyncService = {
         migratedCount++;
       }
       
-      console.log(`✅ [FIREBASE] Migration complete! ${migratedCount} users migrated`);
+      devLog(`✅ [FIREBASE] Migration complete! ${migratedCount} users migrated`);
       return { success: true, migrated: migratedCount };
     } catch (error) {
-      console.error('❌ [FIREBASE] Migration error:', error);
+      devError('❌ [FIREBASE] Migration error:', error);
       return { success: false, error };
     }
   }

@@ -8,13 +8,16 @@ let debugOverlay: HTMLDivElement | null = null;
 let isEnabled = false;
 
 export const initMobileDebug = () => {
-  // Check if debug mode is enabled (via URL parameter or safeStorage)
+  // Debug overlay só funciona em modo de desenvolvimento para evitar
+  // exposição de logs com dados sensíveis em produção.
+  if (!import.meta.env.DEV) return;
+
   const urlParams = new URLSearchParams(window.location.search);
   const debugParam = urlParams.get('debug');
   const debugStorage = safeStorage.getItem('mobile-debug');
-  
+
   isEnabled = debugParam === 'true' || debugStorage === 'true';
-  
+
   if (!isEnabled) return;
   
   // Create overlay

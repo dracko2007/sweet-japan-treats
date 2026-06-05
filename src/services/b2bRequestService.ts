@@ -4,6 +4,12 @@ import { db } from '@/config/firebase';
 import { collection, doc, getDocs, setDoc, deleteDoc, updateDoc } from 'firebase/firestore';
 import { ensureAdminAuth } from '@/utils/adminAuth';
 
+const isDev = import.meta.env.DEV;
+const devLog = isDev ? console.log.bind(console) : () => {};
+const devWarn = isDev ? console.warn.bind(console) : () => {};
+const devError = isDev ? console.error.bind(console) : () => {};
+
+
 export type B2BShipping = 'aereo' | 'maritimo' | 'container' | 'combinar';
 
 export interface B2BRequest {
@@ -32,7 +38,7 @@ export const b2bRequestService = {
       await setDoc(doc(db, COL, id), { ...data, id, status: 'new', createdAt: new Date().toISOString() });
       return true;
     } catch (e) {
-      console.error('[b2b] create falhou:', e);
+      devError('[b2b] create falhou:', e);
       return false;
     }
   },
@@ -46,7 +52,7 @@ export const b2bRequestService = {
       snap.forEach((d) => list.push({ id: d.id, ...(d.data() as any) }));
       return list.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
     } catch (e) {
-      console.error('[b2b] getAll falhou:', e);
+      devError('[b2b] getAll falhou:', e);
       return [];
     }
   },
@@ -58,7 +64,7 @@ export const b2bRequestService = {
       await updateDoc(doc(db, COL, id), { status, updatedAt: new Date().toISOString() });
       return true;
     } catch (e) {
-      console.error('[b2b] updateStatus falhou:', e);
+      devError('[b2b] updateStatus falhou:', e);
       return false;
     }
   },
@@ -70,7 +76,7 @@ export const b2bRequestService = {
       await deleteDoc(doc(db, COL, id));
       return true;
     } catch (e) {
-      console.error('[b2b] remove falhou:', e);
+      devError('[b2b] remove falhou:', e);
       return false;
     }
   },

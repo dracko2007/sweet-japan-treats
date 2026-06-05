@@ -11,6 +11,12 @@ import { collection, doc, getDoc, getDocs, setDoc, deleteDoc, updateDoc } from '
 import { safeStorage } from '@/utils/storage';
 import { firebaseSyncService } from '@/services/firebaseSyncService';
 
+const isDev = import.meta.env.DEV;
+const devLog = isDev ? console.log.bind(console) : () => {};
+const devWarn = isDev ? console.warn.bind(console) : () => {};
+const devError = isDev ? console.error.bind(console) : () => {};
+
+
 export const POINTS = {
   perReview: 1,
   perVideoMinute: 5,
@@ -71,7 +77,7 @@ export const pointsService = {
       await setDoc(doc(db, COL, id), rec);
       return { ok: true };
     } catch (e: any) {
-      console.warn('[points] submitVideo falhou:', e);
+      devWarn('[points] submitVideo falhou:', e);
       return { ok: false, error: e?.message };
     }
   },
@@ -96,7 +102,7 @@ export const pointsService = {
       snap.forEach((d) => list.push(d.data() as VideoReview));
       return list.sort((a, b) => (a.submittedAt < b.submittedAt ? 1 : -1));
     } catch (e) {
-      console.warn('[points] getVideoReviews falhou:', e);
+      devWarn('[points] getVideoReviews falhou:', e);
       return readLocal();
     }
   },

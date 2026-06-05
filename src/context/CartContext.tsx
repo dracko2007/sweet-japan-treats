@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react';
 import { CartItem, Product } from '@/types';
 import { safeStorage } from '@/utils/storage';
 import { effectiveYen } from '@/utils/pricing';
@@ -79,31 +79,24 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setItems([]);
   }, []);
 
-  const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
+  const totalItems = useMemo(
+    () => items.reduce((sum, item) => sum + item.quantity, 0),
+    [items]
+  );
 
-  const totalPrice = items.reduce((sum, item) => {
-    const price = effectiveYen(item.product, item.size);
-    return sum + price * item.quantity;
-  }, 0);
+  const totalPrice = useMemo(
+    () => items.reduce((sum, item) => sum + effectiveYen(item.product, item.size) * item.quantity, 0),
+    [items]
+  );
 
-  // Calculate space used (1 large = 2 small)
   const getSpaceUsed = useCallback(() => {
     let small = 0;
     let large = 0;
-    
     items.forEach(item => {
-      if (item.size === 'small') {
-        small += item.quantity;
-      } else {
-        large += item.quantity;
-      }
+      if (item.size === 'small') small += item.quantity;
+      else large += item.quantity;
     });
-
-    return {
-      small,
-      large,
-      totalSmallEquivalent: small + (large * 2)
-    };
+    return { small, large, totalSmallEquivalent: small + large * 2 };
   }, [items]);
 
   return (

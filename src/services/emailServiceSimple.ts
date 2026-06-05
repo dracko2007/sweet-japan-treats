@@ -15,6 +15,12 @@
 import type { CartItem } from '@/types/order';
 import { emailJsConfig } from '@/config/emailjs';
 
+const isDev = import.meta.env.DEV;
+const devLog = isDev ? console.log.bind(console) : () => {};
+const devWarn = isDev ? console.warn.bind(console) : () => {};
+const devError = isDev ? console.error.bind(console) : () => {};
+
+
 const getEmailJS = () => (window as any).emailjs;
 
 const EMAILJS_SERVICE_ID = emailJsConfig.serviceId;
@@ -65,10 +71,10 @@ export const emailServiceSimple = {
    * Send order confirmation email to customer
    */
   sendOrderConfirmation: async (orderData: any): Promise<boolean> => {
-    console.log('📧 EmailJS - Sending order confirmation to customer');
+    devLog('📧 EmailJS - Sending order confirmation to customer');
     
     if (!EMAILJS_SERVICE_ID || !EMAILJS_TEMPLATE_ID_CUSTOMER || !EMAILJS_PUBLIC_KEY) {
-      console.error('❌ EmailJS NÃO configurado');
+      devError('❌ EmailJS NÃO configurado');
       return false;
     }
     
@@ -228,7 +234,7 @@ Enviado com carinho e rapidez.
         message: htmlContent,
       };
       
-      console.log('📤 Sending order confirmation email via EmailJS...');
+      devLog('📤 Sending order confirmation email via EmailJS...');
       
       const response = await getEmailJS().send(
         EMAILJS_SERVICE_ID,
@@ -236,12 +242,12 @@ Enviado com carinho e rapidez.
         emailParams
       );
       
-      console.log('✅ Email sent successfully!');
-      console.log('📧 Response:', response);
+      devLog('✅ Email sent successfully!');
+      devLog('📧 Response:', response);
       return true;
       
     } catch (error) {
-      console.error('❌ Error sending email:', error);
+      devError('❌ Error sending email:', error);
       return false;
     }
   },
@@ -250,13 +256,13 @@ Enviado com carinho e rapidez.
    * Send new order notification to store owner
    */
   sendStoreNotification: async (orderData: any): Promise<boolean> => {
-    console.log('🏪 EmailJS - Sending STORE notification');
-    console.log('🏪 Service ID:', EMAILJS_SERVICE_ID);
-    console.log('🏪 Template ID (STORE):', EMAILJS_TEMPLATE_ID_STORE, '(exists:', !!EMAILJS_TEMPLATE_ID_STORE, ')');
-    console.log('🏪 Public Key:', EMAILJS_PUBLIC_KEY, '(exists:', !!EMAILJS_PUBLIC_KEY, ')');
+    devLog('🏪 EmailJS - Sending STORE notification');
+    devLog('🏪 Service ID:', EMAILJS_SERVICE_ID);
+    devLog('🏪 Template ID (STORE):', EMAILJS_TEMPLATE_ID_STORE, '(exists:', !!EMAILJS_TEMPLATE_ID_STORE, ')');
+    devLog('🏪 Public Key:', EMAILJS_PUBLIC_KEY, '(exists:', !!EMAILJS_PUBLIC_KEY, ')');
     
     if (!EMAILJS_SERVICE_ID || !EMAILJS_TEMPLATE_ID_STORE || !EMAILJS_PUBLIC_KEY) {
-      console.error('❌ EmailJS store template not configured');
+      devError('❌ EmailJS store template not configured');
       return false;
     }
     
@@ -299,9 +305,9 @@ Tel: ${orderData.formData.phone}
         payment_method: orderData.paymentMethod === 'bank' ? 'Depósito Bancário' : 'PayPay'
       };
       
-      console.log('📤 Sending store notification...');
-      console.log('📤 Store Params:', storeParams);
-      console.log('📤 Using Template ID:', EMAILJS_TEMPLATE_ID_STORE);
+      devLog('📤 Sending store notification...');
+      devLog('📤 Store Params:', storeParams);
+      devLog('📤 Using Template ID:', EMAILJS_TEMPLATE_ID_STORE);
       
       const response = await getEmailJS().send(
         EMAILJS_SERVICE_ID,
@@ -309,12 +315,12 @@ Tel: ${orderData.formData.phone}
         storeParams
       );
       
-      console.log('✅ Store notification sent!');
-      console.log('📧 Store Response:', response);
+      devLog('✅ Store notification sent!');
+      devLog('📧 Store Response:', response);
       return true;
       
     } catch (error) {
-      console.error('❌ Error sending store notification:', error);
+      devError('❌ Error sending store notification:', error);
       return false;
     }
   },
@@ -334,12 +340,12 @@ Tel: ${orderData.formData.phone}
     shipping_address: string;
     html_content: string;
   }): Promise<boolean> => {
-    console.log('📧 EmailJS - Sending tracking notification to customer');
-    console.log('📧 To:', params.to_email);
-    console.log('📧 Tracking:', params.tracking_number);
+    devLog('📧 EmailJS - Sending tracking notification to customer');
+    devLog('📧 To:', params.to_email);
+    devLog('📧 Tracking:', params.tracking_number);
     
     if (!EMAILJS_SERVICE_ID || !EMAILJS_TEMPLATE_ID_CUSTOMER || !EMAILJS_PUBLIC_KEY) {
-      console.error('❌ EmailJS not configured');
+      devError('❌ EmailJS not configured');
       return false;
     }
     
@@ -354,9 +360,9 @@ Tel: ${orderData.formData.phone}
         message: params.html_content,
       };
       
-      console.log('📤 Sending tracking email via EmailJS...');
-      console.log('📤 Carrier:', params.carrier_name);
-      console.log('📤 Tracking URL:', params.tracking_url);
+      devLog('📤 Sending tracking email via EmailJS...');
+      devLog('📤 Carrier:', params.carrier_name);
+      devLog('📤 Tracking URL:', params.tracking_url);
       
       const response = await getEmailJS().send(
         EMAILJS_SERVICE_ID,
@@ -364,11 +370,11 @@ Tel: ${orderData.formData.phone}
         emailParams
       );
       
-      console.log('✅ Tracking email sent successfully!');
+      devLog('✅ Tracking email sent successfully!');
       return true;
       
     } catch (error) {
-      console.error('❌ Error sending tracking email:', error);
+      devError('❌ Error sending tracking email:', error);
       return false;
     }
   }

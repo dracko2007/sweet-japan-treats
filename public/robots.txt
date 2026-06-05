@@ -1,8 +1,25 @@
 User-agent: Googlebot
 Allow: /
+Disallow: /admin
+Disallow: /checkout
+Disallow: /order-review
+Disallow: /order-confirmation
+Disallow: /perfil
+Disallow: /firebase-sync
+Disallow: /sync-data
+Disallow: /limpar-dados.html
+Disallow: /firebase-sync.html
+Disallow: /clear-storage.html
 
 User-agent: Bingbot
 Allow: /
+Disallow: /admin
+Disallow: /checkout
+Disallow: /order-review
+Disallow: /order-confirmation
+Disallow: /perfil
+Disallow: /firebase-sync
+Disallow: /sync-data
 
 User-agent: Twitterbot
 Allow: /
@@ -12,3 +29,13 @@ Allow: /
 
 User-agent: *
 Allow: /
+Disallow: /admin
+Disallow: /checkout
+Disallow: /order-review
+Disallow: /order-confirmation
+Disallow: /perfil
+Disallow: /firebase-sync
+Disallow: /sync-data
+Disallow: /limpar-dados.html
+Disallow: /firebase-sync.html
+Disallow: /clear-storage.html

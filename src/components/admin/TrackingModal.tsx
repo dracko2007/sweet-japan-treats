@@ -9,6 +9,12 @@ import { emailServiceSimple } from '@/services/emailServiceSimple';
 import { whatsappService } from '@/services/whatsappService';
 import { useToast } from '@/hooks/use-toast';
 
+const isDev = import.meta.env.DEV;
+const devLog = isDev ? console.log.bind(console) : () => {};
+const devWarn = isDev ? console.warn.bind(console) : () => {};
+const devError = isDev ? console.error.bind(console) : () => {};
+
+
 interface TrackingModalProps {
   order: any;
   isOpen: boolean;
@@ -267,7 +273,7 @@ Obrigado por comprar na *Japan Express*! 🌸
             description: "Mensagem de rastreamento enviada via WhatsApp",
           });
         } catch (error) {
-          console.error('Error sending WhatsApp:', error);
+          devError('Error sending WhatsApp:', error);
           // Don't show error toast - email was sent successfully
         }
       }
@@ -275,7 +281,7 @@ Obrigado por comprar na *Japan Express*! 🌸
       onSuccess(trackingNumber, selectedCarrier || order.shipping?.carrier || '');
       onClose();
     } catch (error) {
-      console.error('Error sending email:', error);
+      devError('Error sending email:', error);
       toast({
         title: "Erro ao enviar email",
         description: "Mas o pedido foi marcado como enviado",

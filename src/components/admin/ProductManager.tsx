@@ -1,8 +1,9 @@
 import React, { useState, useRef } from 'react';
-import { Plus, Pencil, Trash2, X, Save, Image as ImageIcon, Loader2, PackageOpen } from 'lucide-react';
+import { Plus, Pencil, Trash2, X, Save, Image as ImageIcon, Loader2, PackageOpen, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Product, ProductVariant } from '@/types';
 import { getVariants } from '@/utils/pricing';
+import { useLanguage } from '@/context/LanguageContext';
 
 const VARIANT_PRESETS = ['Pequeno', 'Médio', 'Grande', 'Kit'];
 import { useProducts } from '@/context/ProductsContext';
@@ -80,11 +81,13 @@ const ProductManager: React.FC = () => {
   const { products, refresh } = useProducts();
   const { toast } = useToast();
   const { permissions } = useUser();
+  const { language } = useLanguage();
   const canPrice = permissions.canFinancial; // preço/custo só nível 3
   const [editing, setEditing] = useState<Product | null>(null);
   const [isNew, setIsNew] = useState(false);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [enriching, setEnriching] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const grouped = CATEGORIES.map((c) => ({
@@ -111,6 +114,75 @@ const ProductManager: React.FC = () => {
   const close = () => {
     setEditing(null);
     setIsNew(false);
+  };
+
+  // Chama /api/product-enrich para preencher automaticamente descrição, preços e fotos.
+  const handleEnrich = async () => {
+    if (!editing || !editing.name.trim()) {
+      toast({ title: 'Digite o nome do produto primeiro', variant: 'destructive' });
+      return;
+    }
+    setEnriching(true);
+    try {
+      const res = await fetch('/api/product-enrich', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          isAdmin: true,
+          productName: editing.name.trim(),
+          targetLang: language || 'pt',
+          markup: 1.5,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err?.error || `HTTP ${res.status}`);
+      }
+      const data = await res.json();
+
+      // Mescla os dados recebidos mantendo o que o admin já preencheu manualmente
+      const updatedEditing: Product = { ...editing };
+
+      if (data.description) updatedEditing.description = data.description;
+
+      // Nome sugerido pelo Rakuten (mais completo) — só substitui se o admin não editou
+      if (data.suggestName && data.suggestName !== editing.name && editing.name.trim().length < 30) {
+        updatedEditing.name = data.suggestName;
+      }
+
+      // Custo e preço de venda
+      if (data.costYen && canPrice) {
+        updatedEditing.cost = data.costYen;
+        // Preenche a primeira variante com o preço de venda se ainda estiver em 0
+        const vs = updatedEditing.variants || [];
+        if (vs.length > 0 && vs[0].price === 0 && data.sellingPriceYen) {
+          updatedEditing.variants = vs.map((v, i) =>
+            i === 0 ? { ...v, price: data.sellingPriceYen } : v
+          );
+        }
+      }
+
+      // Fotos do Rakuten — adiciona às existentes sem ultrapassar 5
+      if (Array.isArray(data.images) && data.images.length > 0) {
+        const existing = updatedEditing.gallery || (updatedEditing.image ? [updatedEditing.image] : []);
+        const merged   = [...existing, ...data.images].slice(0, 5);
+        updatedEditing.gallery = merged;
+        updatedEditing.image   = merged[0] || updatedEditing.image;
+      }
+
+      setEditing(updatedEditing);
+      const sourceLabel = data.source === 'rakuten' ? '🛒 Rakuten' : '🤖 IA';
+      toast({
+        title: `✨ Produto enriquecido! (${sourceLabel})`,
+        description: data.images?.length
+          ? `${data.images.length} foto(s) adicionada(s) · custo ¥${data.costYen?.toLocaleString() || '–'} · venda ¥${data.sellingPriceYen?.toLocaleString() || '–'}`
+          : `Descrição gerada · custo ¥${data.costYen?.toLocaleString() || '–'} · venda ¥${data.sellingPriceYen?.toLocaleString() || '–'}`,
+      });
+    } catch (e: any) {
+      toast({ title: 'Erro ao enriquecer produto', description: e?.message, variant: 'destructive' });
+    } finally {
+      setEnriching(false);
+    }
   };
 
   const handleFiles = async (files: FileList | null) => {
@@ -258,26 +330,44 @@ const ProductManager: React.FC = () => {
 
       {/* Modal de edição */}
       {editing && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="bg-card rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-elevated border border-border">
-            <div className="flex items-center justify-between p-5 border-b border-border shrink-0 bg-card rounded-t-2xl">
-              <h3 className="font-display text-xl font-bold flex items-center gap-2">
+        <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center bg-black/60 backdrop-blur-sm p-2 sm:p-4 overflow-y-auto">
+          <div className="bg-card rounded-2xl w-full max-w-2xl my-2 sm:my-0 sm:max-h-[92vh] flex flex-col shadow-elevated border border-border">
+            <div className="flex items-center justify-between p-4 sm:p-5 border-b border-border shrink-0 bg-card rounded-t-2xl">
+              <h3 className="font-display text-lg sm:text-xl font-bold flex items-center gap-2">
                 {isNew ? <Plus className="w-5 h-5" /> : <Pencil className="w-5 h-5" />}
                 {isNew ? 'Novo Produto' : 'Editar Produto'}
               </h3>
               <button onClick={close} className="p-2 rounded-full hover:bg-secondary"><X className="w-5 h-5" /></button>
             </div>
 
-            <div className="p-5 space-y-4 overflow-y-auto flex-1">
-              {/* Nome */}
+            <div className="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1 min-h-0">
+              {/* Nome + botão de enriquecimento */}
               <div>
                 <label className="text-sm font-semibold block mb-1">Nome do produto</label>
-                <input
-                  value={editing.name}
-                  onChange={(e) => setEditing({ ...editing, name: e.target.value })}
-                  placeholder="Ex: Bioré UV Aqua Rich SPF50+"
-                  className="w-full px-3 py-2 rounded-lg border border-border bg-background"
-                />
+                <div className="flex gap-2">
+                  <input
+                    value={editing.name}
+                    onChange={(e) => setEditing({ ...editing, name: e.target.value })}
+                    placeholder="Ex: Kit Kat Matcha, Bioré UV SPF50+"
+                    className="flex-1 px-3 py-2 rounded-lg border border-border bg-background"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleEnrich}
+                    disabled={enriching || !editing.name.trim()}
+                    title="Busca descrição, fotos e preço automaticamente no Rakuten + IA"
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-sm font-bold disabled:opacity-50 disabled:cursor-not-allowed transition-colors shrink-0"
+                  >
+                    {enriching
+                      ? <Loader2 className="w-4 h-4 animate-spin" />
+                      : <Sparkles className="w-4 h-4" />}
+                    <span className="hidden sm:inline">{enriching ? 'Buscando…' : 'Auto-preencher'}</span>
+                    <span className="sm:hidden">{enriching ? '…' : 'IA'}</span>
+                  </button>
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  ✨ <strong>Auto-preencher</strong>: busca descrição, preço (Rakuten/IA) e até 5 fotos automaticamente.
+                </p>
               </div>
 
               {/* Categoria + Sabor/tag */}
@@ -469,7 +559,7 @@ const ProductManager: React.FC = () => {
               </div>
             </div>
 
-            <div className="p-5 border-t border-border flex justify-end gap-3 shrink-0 bg-card rounded-b-2xl">
+            <div className="p-4 sm:p-5 border-t border-border flex justify-end gap-3 shrink-0 bg-card rounded-b-2xl">
               <Button variant="outline" onClick={close} className="rounded-xl">Cancelar</Button>
               <Button onClick={save} disabled={saving} className="btn-primary rounded-xl gap-2">
                 {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}

@@ -22,6 +22,12 @@ import { getTranslatedProductName } from '@/data/translations';
 import { isValidEmail, isValidCPF, isValidPhone, isNonEmpty, maskPhone, runValidations, FieldErrors } from '@/utils/validation';
 import DemoBanner from '@/components/DemoBanner';
 
+const isDev = import.meta.env.DEV;
+const devLog = isDev ? console.log.bind(console) : () => {};
+const devWarn = isDev ? console.warn.bind(console) : () => {};
+const devError = isDev ? console.error.bind(console) : () => {};
+
+
 const Checkout: React.FC = () => {
   const { items, totalPrice } = useCart();
   const { user, isAuthenticated } = useUser();
@@ -205,7 +211,7 @@ const Checkout: React.FC = () => {
             });
           }
         } catch (error) {
-          console.error('Erro ao buscar CEP japonês:', error);
+          devError('Erro ao buscar CEP japonês:', error);
         }
       }
     } else if (formData.country === 'Brasil') {
@@ -244,7 +250,7 @@ const Checkout: React.FC = () => {
             });
           }
         } catch (error) {
-          console.error('Erro ao buscar CEP:', error);
+          devError('Erro ao buscar CEP:', error);
         }
       }
     } else {

@@ -28,7 +28,7 @@ try {
   app = initializeApp(firebaseConfig);
   auth = getAuth(app);
   db = getFirestore(app);
-  console.log('✅ Firebase initialized successfully with project:', firebaseConfig.projectId);
+  if (import.meta.env.DEV) console.log('✅ Firebase initialized with project:', firebaseConfig.projectId);
 } catch (error) {
   console.error('❌ Firebase initialization failed:', error);
 }

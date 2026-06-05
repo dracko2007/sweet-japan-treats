@@ -6,6 +6,12 @@ import {
 } from 'firebase/firestore';
 import { ensureAdminAuth } from '@/utils/adminAuth';
 
+const isDev = import.meta.env.DEV;
+const devLog = isDev ? console.log.bind(console) : () => {};
+const devWarn = isDev ? console.warn.bind(console) : () => {};
+const devError = isDev ? console.error.bind(console) : () => {};
+
+
 export interface CustomRequest {
   id: string;
   name: string;
@@ -34,7 +40,7 @@ export const customRequestService = {
       });
       return true;
     } catch (e) {
-      console.error('[customRequest] create falhou:', e);
+      devError('[customRequest] create falhou:', e);
       return false;
     }
   },
@@ -53,7 +59,7 @@ export const customRequestService = {
       snap.forEach((d) => list.push({ id: d.id, ...(d.data() as any) }));
       return list.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
     } catch (e) {
-      console.error('[customRequest] getAll falhou:', e);
+      devError('[customRequest] getAll falhou:', e);
       return [];
     }
   },
@@ -69,7 +75,7 @@ export const customRequestService = {
       });
       return true;
     } catch (e) {
-      console.error('[customRequest] updateStatus falhou:', e);
+      devError('[customRequest] updateStatus falhou:', e);
       return false;
     }
   },
@@ -81,7 +87,7 @@ export const customRequestService = {
       await deleteDoc(doc(db, COL, id));
       return true;
     } catch (e) {
-      console.error('[customRequest] remove falhou:', e);
+      devError('[customRequest] remove falhou:', e);
       return false;
     }
   },

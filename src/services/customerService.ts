@@ -5,6 +5,12 @@ import { collection, getDocs } from 'firebase/firestore';
 import { db } from '@/config/firebase';
 import { ensureAdminAuth } from '@/utils/adminAuth';
 
+const isDev = import.meta.env.DEV;
+const devLog = isDev ? console.log.bind(console) : () => {};
+const devWarn = isDev ? console.warn.bind(console) : () => {};
+const devError = isDev ? console.error.bind(console) : () => {};
+
+
 export interface CustomerStats {
   email: string;
   name: string;
@@ -227,7 +233,7 @@ export const customerService = {
           }
         });
       } catch (err) {
-        console.warn('⚠️ [CUSTOMER] Could not fetch orders collection:', err);
+        devWarn('⚠️ [CUSTOMER] Could not fetch orders collection:', err);
       }
 
       // Add local-only customers not in Firestore
@@ -239,7 +245,7 @@ export const customerService = {
 
       return Array.from(customerMap.values()).sort((a, b) => b.totalSpent - a.totalSpent);
     } catch (error) {
-      console.error('❌ [CUSTOMER SERVICE] Firestore fetch failed, using safeStorage:', error);
+      devError('❌ [CUSTOMER SERVICE] Firestore fetch failed, using safeStorage:', error);
       return this.getAllCustomers();
     }
   },
@@ -283,7 +289,7 @@ export const customerService = {
         }
       }
     } catch (error) {
-      console.error('❌ Erro ao deletar cliente (local):', error);
+      devError('❌ Erro ao deletar cliente (local):', error);
     }
 
     // Remove também do Firestore (senão reaparece ao recarregar)
@@ -292,7 +298,7 @@ export const customerService = {
       await ensureAdminAuth();
       deletedRemote = await firebaseSyncService.deleteUserByEmail(email);
     } catch (error) {
-      console.error('❌ Erro ao deletar cliente (Firestore):', error);
+      devError('❌ Erro ao deletar cliente (Firestore):', error);
     }
 
     return deletedLocal || deletedRemote;
@@ -312,7 +318,7 @@ export const customerService = {
         }
       }
     } catch (error) {
-      console.error('❌ Erro ao deletar histórico (local):', error);
+      devError('❌ Erro ao deletar histórico (local):', error);
     }
 
     // Limpa também no Firestore
@@ -321,7 +327,7 @@ export const customerService = {
       await ensureAdminAuth();
       updatedRemote = await firebaseSyncService.clearUserOrdersByEmail(email);
     } catch (error) {
-      console.error('❌ Erro ao deletar histórico (Firestore):', error);
+      devError('❌ Erro ao deletar histórico (Firestore):', error);
     }
 
     return updatedLocal || updatedRemote;
@@ -332,13 +338,13 @@ export const customerService = {
     try {
       safeStorage.setItem('sweet-japan-users', JSON.stringify({}));
     } catch (error) {
-      console.error('❌ Erro ao deletar todos os clientes (local):', error);
+      devError('❌ Erro ao deletar todos os clientes (local):', error);
     }
     try {
       await ensureAdminAuth();
       await firebaseSyncService.deleteAllUsersFromFirestore();
     } catch (error) {
-      console.error('❌ Erro ao deletar todos os clientes (Firestore):', error);
+      devError('❌ Erro ao deletar todos os clientes (Firestore):', error);
     }
     return true;
   },
@@ -355,13 +361,13 @@ export const customerService = {
         safeStorage.setItem('sweet-japan-users', JSON.stringify(users));
       }
     } catch (error) {
-      console.error('❌ Erro ao deletar histórico (local):', error);
+      devError('❌ Erro ao deletar histórico (local):', error);
     }
     try {
       await ensureAdminAuth();
       await firebaseSyncService.deleteAllOrdersFromFirestore();
     } catch (error) {
-      console.error('❌ Erro ao deletar histórico (Firestore):', error);
+      devError('❌ Erro ao deletar histórico (Firestore):', error);
     }
     return true;
   },

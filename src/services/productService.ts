@@ -16,6 +16,12 @@ import { Product } from '@/types';
 import { products as defaultProducts } from '@/data/products';
 import { ensureAdminAuth } from '@/utils/adminAuth';
 
+const isDev = import.meta.env.DEV;
+const devLog = isDev ? console.log.bind(console) : () => {};
+const devWarn = isDev ? console.warn.bind(console) : () => {};
+const devError = isDev ? console.error.bind(console) : () => {};
+
+
 const COL = 'products';
 
 interface Overrides {
@@ -41,7 +47,7 @@ export const productService = {
       });
       return { items, deleted };
     } catch (e) {
-      console.warn('productService.getOverrides falhou:', e);
+      devWarn('productService.getOverrides falhou:', e);
       return { items: [], deleted: [] };
     }
   },
