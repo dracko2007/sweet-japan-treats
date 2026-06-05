@@ -330,8 +330,8 @@ const ProductManager: React.FC = () => {
 
       {/* Modal de edição */}
       {editing && (
-        <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center bg-black/60 backdrop-blur-sm p-2 sm:p-4 overflow-y-auto">
-          <div className="bg-card rounded-2xl w-full max-w-2xl my-2 sm:my-0 sm:max-h-[92vh] flex flex-col shadow-elevated border border-border">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-card rounded-2xl w-full max-w-2xl h-[min(90vh,780px)] flex flex-col shadow-elevated border border-border">
             <div className="flex items-center justify-between p-4 sm:p-5 border-b border-border shrink-0 bg-card rounded-t-2xl">
               <h3 className="font-display text-lg sm:text-xl font-bold flex items-center gap-2">
                 {isNew ? <Plus className="w-5 h-5" /> : <Pencil className="w-5 h-5" />}

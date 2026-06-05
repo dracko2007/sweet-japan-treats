@@ -742,7 +742,7 @@ const KimiClawAssistant: React.FC = () => {
   };
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 font-sans">
+    <div className="fixed bottom-6 right-6 z-[9999] font-sans">
       {/* ATTENTION BADGE */}
       {showAttentionBadge && !isOpen && (
         <div className="absolute bottom-16 right-2 bg-gradient-to-r from-primary to-accent text-white text-xs px-3 py-1.5 rounded-full shadow-elevated whitespace-nowrap animate-float border border-white/20 select-none">
