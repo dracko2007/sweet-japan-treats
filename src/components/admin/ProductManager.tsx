@@ -168,15 +168,17 @@ const ProductManager: React.FC = () => {
         updatedEditing.name = data.suggestName;
       }
 
-      // Custo e preço de venda
-      if (data.costYen && canPrice) {
-        updatedEditing.cost = data.costYen;
-        // Preenche a primeira variante com o preço de venda se ainda estiver em 0
-        const vs = updatedEditing.variants || [];
-        if (vs.length > 0 && vs[0].price === 0 && data.sellingPriceYen) {
+      // Custo e preço de venda — sempre atualiza quando a IA retorna valor
+      if (canPrice) {
+        if (data.costYen) updatedEditing.cost = data.costYen;
+        if (data.sellingPriceYen) {
+          const vs = (updatedEditing.variants || []).length > 0
+            ? updatedEditing.variants!
+            : [{ id: 'small', label: 'Pequeno', price: 0 }];
           updatedEditing.variants = vs.map((v, i) =>
             i === 0 ? { ...v, price: data.sellingPriceYen } : v
           );
+          updatedEditing.prices = { small: data.sellingPriceYen, large: data.sellingPriceYen };
         }
       }
 
