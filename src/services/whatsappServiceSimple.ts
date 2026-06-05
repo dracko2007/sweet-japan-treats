@@ -1,10 +1,9 @@
-/**
-
 const isDev = import.meta.env.DEV;
 const devLog = isDev ? console.log.bind(console) : () => {};
 const devWarn = isDev ? console.warn.bind(console) : () => {};
 const devError = isDev ? console.error.bind(console) : () => {};
 
+/**
  * Simple WhatsApp Service
  * Abre o WhatsApp Web ou app - APENAS para o admin testar
  * NÃO deve ser usado durante o checkout do cliente!

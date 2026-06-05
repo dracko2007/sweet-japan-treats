@@ -1,10 +1,9 @@
-/**
-
 const isDev = import.meta.env.DEV;
 const devLog = isDev ? console.log.bind(console) : () => {};
 const devWarn = isDev ? console.warn.bind(console) : () => {};
 const devError = isDev ? console.error.bind(console) : () => {};
 
+/**
  * PayPay Payment Service
  * 
  * This module handles PayPay payment integration.

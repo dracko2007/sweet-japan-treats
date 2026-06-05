@@ -1,10 +1,9 @@
-/**
-
 const isDev = import.meta.env.DEV;
 const devLog = isDev ? console.log.bind(console) : () => {};
 const devWarn = isDev ? console.warn.bind(console) : () => {};
 const devError = isDev ? console.error.bind(console) : () => {};
 
+/**
  * WhatsApp Service usando Twilio API
  * Permite envio automático de mensagens WhatsApp
  */
