@@ -1,10 +1,9 @@
-class SafeStorage {
-
 const isDev = import.meta.env.DEV;
 const devLog = isDev ? console.log.bind(console) : () => {};
 const devWarn = isDev ? console.warn.bind(console) : () => {};
 const devError = isDev ? console.error.bind(console) : () => {};
 
+class SafeStorage {
   private isAvailable: boolean;
   private fallback: Record<string, string> = {};
 
