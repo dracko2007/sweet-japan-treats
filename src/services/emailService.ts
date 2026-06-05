@@ -485,7 +485,7 @@ export const emailService = {
         <div class="footer">
           <p><strong>Japan Express</strong> - Importados do Japão 🌸</p>
           <p>📍 Hiroshima-ken, Japão</p>
-          <p>📞 070-1367-1679 | 📧 contato@japanexpress.jp</p>
+          <p>📞 070-1367-1679 | 📧 contato@japanexpress-store.com</p>
           <p style="margin-top: 15px; font-size: 12px; color: #999;">
             Se tiver dúvidas, entre em contato conosco via WhatsApp!
           </p>
@@ -638,7 +638,7 @@ export const emailService = {
         <div class="footer">
           <p><strong>Japan Express</strong> - Importados do Japão 🌸</p>
           <p>📍 Hiroshima-ken, Japão</p>
-          <p>📞 070-1367-1679 | 📧 contato@japanexpress.jp</p>
+          <p>📞 070-1367-1679 | 📧 contato@japanexpress-store.com</p>
           <p style="margin-top: 15px; font-size: 12px; color: #999;">
             Se tiver dúvidas, entre em contato conosco via WhatsApp!
           </p>

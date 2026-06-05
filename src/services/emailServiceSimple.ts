@@ -210,7 +210,7 @@ Enviado com carinho e rapidez.
 </p>
 <div style="margin:20px 0;">
 <a href="tel:070-1367-1679" style="display:inline-block;margin:0 10px;color:#FF69B4;text-decoration:none;font-size:14px;">📞 070-1367-1679</a>
-<a href="mailto:contato@japanexpress.jp" style="display:inline-block;margin:0 10px;color:#FF69B4;text-decoration:none;font-size:14px;">📧 contato@japanexpress.jp</a>
+<a href="mailto:contato@japanexpress-store.com" style="display:inline-block;margin:0 10px;color:#FF69B4;text-decoration:none;font-size:14px;">📧 contato@japanexpress-store.com</a>
 </div>
 <p style="margin:15px 0 0 0;color:#999999;font-size:12px;">© 2026 Japan Express. Todos os direitos reservados.</p>
 </td></tr>

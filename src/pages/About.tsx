@@ -1,5 +1,5 @@
 import React from 'react';
-import { Heart, Star, Users, Award } from 'lucide-react';
+import { Heart, Star, Users, Award, MessageCircle } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import { useLanguage } from '@/context/LanguageContext';
 import JapanExpressLogo from '@/components/JapanExpressLogo';
@@ -145,11 +145,19 @@ const About: React.FC = () => {
             >
               {t('aboutPage.ctaProducts')}
             </a>
-            <a 
-              href="mailto:contato@japanexpress.jp" 
+            <a
+              href="mailto:contato@japanexpress-store.com"
               className="px-8 py-3 border-2 border-primary-foreground rounded-full font-semibold hover:bg-primary-foreground/10 transition-colors"
             >
               {t('aboutPage.ctaContact')}
+            </a>
+            <a
+              href="https://wa.me/817013671679"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-8 py-3 bg-green-500 text-white rounded-full font-semibold hover:bg-green-600 transition-colors inline-flex items-center gap-2"
+            >
+              <MessageCircle className="w-5 h-5" /> WhatsApp
             </a>
           </div>
         </div>

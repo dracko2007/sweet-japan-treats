@@ -1,6 +1,10 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Instagram, Facebook, Mail, MapPin } from 'lucide-react';
+import { Instagram, Facebook, Mail, MapPin, MessageCircle } from 'lucide-react';
+
+const WHATSAPP_NUMBER = '817013671679'; // +81 70-1367-1679
+const WHATSAPP_LINK = `https://wa.me/${WHATSAPP_NUMBER}`;
+const CONTACT_EMAIL = 'contato@japanexpress-store.com';
 import { useLanguage } from '@/context/LanguageContext';
 import JapanExpressLogo from '@/components/JapanExpressLogo';
 
@@ -37,8 +41,17 @@ const Footer: React.FC = () => {
               <a href="#" className="p-2 rounded-full bg-primary/20 hover:bg-primary/30 transition-colors">
                 <Facebook className="w-5 h-5" />
               </a>
-              <a 
-                href="mailto:contato@japanexpress.jp" 
+              <a
+                href={WHATSAPP_LINK}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="WhatsApp"
+                className="p-2 rounded-full bg-green-500/80 hover:bg-green-500 transition-colors"
+              >
+                <MessageCircle className="w-5 h-5" />
+              </a>
+              <a
+                href={`mailto:${CONTACT_EMAIL}`}
                 className="p-2 rounded-full bg-primary/20 hover:bg-primary/30 transition-colors"
               >
                 <Mail className="w-5 h-5" />
@@ -88,12 +101,18 @@ const Footer: React.FC = () => {
                   Hiroshima Prefecture, Japan
                 </span>
               </div>
-              <div className="flex items-start gap-2">
+              <a href={`mailto:${CONTACT_EMAIL}`} className="flex items-start gap-2 group">
                 <Mail className="w-4 h-4 mt-0.5 text-primary" />
-                <span className="text-sm text-accent-foreground/80">
-                  contato@japanexpress.jp
+                <span className="text-sm text-accent-foreground/80 group-hover:text-accent-foreground transition-colors break-all">
+                  {CONTACT_EMAIL}
                 </span>
-              </div>
+              </a>
+              <a href={WHATSAPP_LINK} target="_blank" rel="noopener noreferrer" className="flex items-start gap-2 group">
+                <MessageCircle className="w-4 h-4 mt-0.5 text-green-400" />
+                <span className="text-sm text-accent-foreground/80 group-hover:text-accent-foreground transition-colors">
+                  WhatsApp: +81 70-1367-1679
+                </span>
+              </a>
             </div>
           </div>
         </div>
