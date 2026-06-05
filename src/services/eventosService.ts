@@ -4,18 +4,17 @@
 
 import { db, auth } from '@/config/firebase';
 import {
-
-const isDev = import.meta.env.DEV;
-const devLog = isDev ? console.log.bind(console) : () => {};
-const devWarn = isDev ? console.warn.bind(console) : () => {};
-const devError = isDev ? console.error.bind(console) : () => {};
-
   collection,
   addDoc,
   serverTimestamp,
   Timestamp,
   FieldValue,
 } from 'firebase/firestore';
+
+const isDev = import.meta.env.DEV;
+const devLog = isDev ? console.log.bind(console) : () => {};
+const devWarn = isDev ? console.warn.bind(console) : () => {};
+const devError = isDev ? console.error.bind(console) : () => {};
 
 // Os tipos de evento que sabemos registrar (por ora, só "viu um produto").
 // Usar um type assim evita erros de digitação tipo 'viu_produot'.
