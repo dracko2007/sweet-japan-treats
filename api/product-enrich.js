@@ -309,7 +309,7 @@ export default async function handler(req, res) {
       images:      rakuten?.images || [],
       suggestName: i18n?.[targetLang]?.name || rakuten?.suggestName || productName,
       source:      rakuten?.source || 'ai',
-      ...(body.debug === true ? { rakutenDebug: lastRakutenDebug, yahooDebug } : {}),
+      ...(body.debug === true ? { rakutenDebug: lastRakutenDebug, yahooDebug, searchTerm } : {}),
     });
   } catch (e) {
     res.status(500).json({ error: String(e?.message || e) });
