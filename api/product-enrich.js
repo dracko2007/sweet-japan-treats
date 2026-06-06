@@ -36,6 +36,17 @@ setInterval(() => {
   for (const [ip, entry] of ipMap) { if (now > entry.resetAt) ipMap.delete(ip); }
 }, RATE_WINDOW_MS * 2);
 
+async function fetchWithTimeout(url, options = {}, timeoutMs = 10000) {
+  let timer = null;
+  try {
+    const controller = new AbortController();
+    timer = setTimeout(() => controller.abort(), timeoutMs);
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 // ---- CORS ------------------------------------------------------------------
 const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || '')
   .split(',').map(s => s.trim()).filter(Boolean);
@@ -158,9 +169,10 @@ async function searchRakuten(productName) {
       availability:  '1',
       sort:          '-reviewCount',
     });
-    const r = await fetch(
+    const r = await fetchWithTimeout(
       `https://app.rakuten.co.jp/services/api/IchibaItem/Search/20220601?${params}`,
-      { headers: { Referer: 'https://japanexpress-store.com/', 'User-Agent': 'JapanExpress/1.0' } }
+      { headers: { Referer: 'https://japanexpress-store.com/', 'User-Agent': 'JapanExpress/1.0' } },
+      10000
     );
     lastRakutenDebug.status = r.status;
     if (!r.ok) {
@@ -176,6 +188,7 @@ async function searchRakuten(productName) {
     const item = rawItems[0];
     const priceYen    = Number(item.itemPrice) || 0;
     const descJa      = cleanDescription(item.itemCaption || item.itemDescription || '');
+    const descSource  = descJa ? 'rakuten-api-description' : 'none';
     const suggestName = (item.itemName || productName).slice(0, 120);
 
     // mediumImageUrls pode ser array de strings ou de objetos {imageUrl}
@@ -186,7 +199,7 @@ async function searchRakuten(productName) {
       .map(u => u.replace('?_ex=128x128', '')) // tenta versão maior
       .slice(0, 5);
 
-    return { priceYen, descJa, images, suggestName, source: 'rakuten' };
+    return { priceYen, descJa, descSource, images, suggestName, source: 'rakuten' };
   } catch (e) {
     lastRakutenDebug.error = String(e?.message || e);
     return null;
@@ -203,7 +216,7 @@ async function searchYahoo(productName) {
     const params = new URLSearchParams({ appid, query: productName, results: '5' });
     const url = `https://shopping.yahooapis.jp/ShoppingWebService/V3/itemSearch?${params}`;
     yahooDebug.qs = params.toString().replace(appid, 'APPID');
-    const r = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+    const r = await fetchWithTimeout(url, { headers: { 'User-Agent': 'Mozilla/5.0' } }, 10000);
     yahooDebug.status = r.status;
     if (!r.ok) { yahooDebug.body = (await r.text().catch(() => '')).slice(0, 400); return null; }
     const data = await r.json();
@@ -217,11 +230,15 @@ async function searchYahoo(productName) {
     const item = hits[0];
     const priceYen    = Number(item.price) || 0;
     let descJa        = cleanDescription(item.description || item.headLine || '');
+    let descSource    = item.description ? 'yahoo-api-description' : item.headLine ? 'yahoo-headline' : 'none';
     if (descJa.length < 80 && item.url) {
       const pageDesc = await fetchYahooPageDescription(item.url);
       yahooDebug.pageDescLen = pageDesc.length;
       yahooDebug.itemUrl = item.url;
-      if (pageDesc.length > descJa.length) descJa = pageDesc;
+      if (pageDesc.length > descJa.length) {
+        descJa = pageDesc;
+        descSource = 'yahoo-page-description';
+      }
     }
     const suggestName = (item.name || productName).slice(0, 120);
     // Prioriza a imagem ESTENDIDA (exImage = maior/HD). Só usa média se não houver HD.
@@ -230,7 +247,7 @@ async function searchYahoo(productName) {
     // Sobe a resolução das URLs do yimg para a maior versão (/i/z/ = HD)
     const upscale = (u) => u.replace(/\/i\/[a-z]\//, '/i/z/');
     const images = [...new Set((hd.length ? hd : med).map(upscale))].slice(0, 5);
-    return { priceYen, descJa, images, suggestName, source: 'yahoo' };
+    return { priceYen, descJa, descSource, images, suggestName, source: 'yahoo' };
   } catch (e) {
     yahooDebug.error = String(e?.message || e);
     return null;
@@ -244,8 +261,8 @@ async function buildDescription(productName, descJa, targetLang) {
   const langName = langMap[targetLang] || 'português do Brasil';
 
   const content = descJa
-    ? `Você é especialista em produtos japoneses. Traduza e adapte a descrição abaixo para ${langName}, tornando-a atraente e convincente para uma loja online de importados do Japão. Mantenha os detalhes técnicos relevantes. Responda SOMENTE com a descrição (3-4 parágrafos fluidos), sem título, sem introdução, sem comentários.\n\nDescrição original (japonês/inglês):\n${descJa}`
-    : `Você é especialista em produtos japoneses. Escreva uma descrição comercial em ${langName} para o produto "${productName}", vendido em uma loja de importados do Japão. Destaque: características, benefícios, qualidade japonesa, modo de uso se relevante. Responda SOMENTE com a descrição (3-4 parágrafos), sem título nem comentários.`;
+    ? `Você é especialista em produtos japoneses. Traduza fielmente a descrição real abaixo para ${langName}, com texto natural para loja online, mas SEM inventar características, benefícios, ingredientes, volume, modo de uso ou promessas que não estejam no texto original. Mantenha os detalhes técnicos relevantes. Responda SOMENTE com a descrição (2-3 parágrafos curtos), sem título, sem introdução, sem comentários.\n\nDescrição original (japonês/inglês, vinda do marketplace):\n${descJa}`
+    : `Você é especialista em produtos japoneses. Não foi encontrada descrição real no marketplace para "${productName}". Escreva uma descrição curta e genérica em ${langName}, sem inventar ingredientes, volume, promessas técnicas, modo de uso ou certificações. Responda SOMENTE com a descrição (1-2 parágrafos curtos), sem título nem comentários.`;
 
   for (const model of GROQ_MODELS) {
     try {
@@ -280,7 +297,8 @@ Tarefas:
 1) "name_en": o NOME do produto em INGLÊS, curto e comercial (marca + linha + tipo). NÃO use japonês, NÃO use português.
    Se o nome de referência estiver em japonês, traduza/romanize para o nome comercial em inglês.
    Exemplos: 肌ラボ 極潤 化粧水 -> Hada Labo Gokujyun Hyaluronic Acid Lotion; DHC ディープクレンジングオイル -> DHC Deep Cleansing Oil; ビオレUV アクアリッチ -> Biore UV Aqua Rich.
-2) Traduza/adapte a DESCRIÇÃO original acima (mantendo os fatos do produto) em 3 idiomas, 2-3 parágrafos, atraente para loja online.
+2) Se a DESCRIÇÃO original estiver preenchida, traduza fielmente essa descrição para 3 idiomas, em 2-3 parágrafos curtos, sem inventar fatos. Pode deixar o texto comercial, mas só com informações presentes no original.
+   Se estiver vazia, crie uma descrição curta e genérica, sem inventar ingredientes, volume, promessas técnicas, modo de uso ou certificações.
 
 Responda APENAS com JSON válido, sem markdown, exatamente neste formato:
 {"name_en":"","pt":{"description":""},"en":{"description":""},"ja":{"description":""}}
@@ -603,6 +621,10 @@ export default async function handler(req, res) {
     if (!i18n && description) {
       i18n = { [targetLang]: { description } };
     }
+    const descriptionBaseSource = rakuten?.descSource || (rakuten ? 'marketplace-empty-description' : 'no-marketplace-result');
+    const descriptionMethod = rakuten?.descJa
+      ? 'marketplace-description-translated-by-ai'
+      : 'ai-generated-without-real-description';
     // Nome final sempre em inglês. A conversão japonesa só é usada para buscar no Yahoo/Rakuten.
     const generatedNameEn = await buildEnglishName(productName, rakuten?.suggestName || '', rakuten?.descJa || '', enrich?.name_en || '');
     const nameEn = chooseEnglishName(enrich?.name_en, generatedNameEn, localEnglishName(productName, rakuten?.suggestName, rakuten?.descJa), productName, rakuten?.suggestName)
@@ -614,6 +636,8 @@ export default async function handler(req, res) {
 
     res.status(200).json({
       description,
+      descriptionBaseSource,       // origem do texto-base: yahoo/rakuten/site ou fallback
+      descriptionMethod,           // se foi tradução de texto real ou geração por IA
       i18n,                       // { pt:{description}, en:{description}, ja:{description} }
       costYen,                    // custo de aquisição (Rakuten ou estimado)
       sellingPriceYen,            // preço de venda final (custo × markup)

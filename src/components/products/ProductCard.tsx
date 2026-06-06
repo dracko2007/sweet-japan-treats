@@ -30,6 +30,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
   const [added, setAdded] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const [isFavorite, setIsFavorite] = useState(false);
+  const [showDescription, setShowDescription] = useState(false);
   const { addToCart } = useCart();
   const { user } = useUser();
   const { toast } = useToast();
@@ -39,6 +40,9 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
   const translatedName = productEnglishName(product);
   const translatedDesc = i18nDesc(product, language) || getTranslatedProductDesc(product.id, t);
   const translatedFlavor = getTranslatedProductFlavor(product.id, t);
+  const descriptionText = translatedDesc?.trim() || '';
+  const hasDescription = descriptionText.length > 0;
+  const shouldCollapseDescription = descriptionText.length > 120;
 
   useEffect(() => {
     if (user?.email) {
@@ -221,9 +225,32 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
         <h3 className="font-display text-sm sm:text-base font-bold text-foreground mb-1 line-clamp-2 leading-snug">
           {translatedName}
         </h3>
-        <p className="text-xs text-muted-foreground line-clamp-2 mb-3 hidden sm:block">
-          {translatedDesc}
-        </p>
+        {hasDescription && (
+          <div className="mb-3 hidden sm:block">
+            <p
+              className={cn(
+                "text-xs text-muted-foreground leading-relaxed transition-all",
+                showDescription
+                  ? "max-h-40 overflow-y-auto pr-1"
+                  : "max-h-10 overflow-hidden"
+              )}
+            >
+              {descriptionText}
+            </p>
+            {shouldCollapseDescription && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowDescription((v) => !v);
+                }}
+                className="mt-1 text-[11px] font-semibold text-primary hover:text-primary/80"
+              >
+                {showDescription ? 'Ocultar descrição' : 'Mostrar descrição'}
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Price */}
         <div className="mt-auto mb-2.5">

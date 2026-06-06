@@ -210,11 +210,17 @@ const ProductManager: React.FC = () => {
 
       setEditing(updatedEditing);
       const sourceLabel = data.source === 'yahoo' ? '🛒 Yahoo Shopping' : data.source === 'rakuten' ? '🛒 Rakuten' : '🤖 IA';
+      const descSourceLabel =
+        data.descriptionBaseSource === 'yahoo-page-description' ? 'descrição: página Yahoo + tradução IA'
+        : data.descriptionBaseSource === 'yahoo-api-description' ? 'descrição: Yahoo API + tradução IA'
+        : data.descriptionBaseSource === 'yahoo-headline' ? 'descrição: título/resumo Yahoo + tradução IA'
+        : data.descriptionBaseSource === 'rakuten-api-description' ? 'descrição: Rakuten API + tradução IA'
+        : 'descrição: gerada pela IA';
       toast({
         title: `✨ Produto enriquecido! (${sourceLabel})`,
         description: data.images?.length
-          ? `${data.images.length} foto(s) adicionada(s) · custo ¥${data.costYen?.toLocaleString() || '–'} · venda ¥${data.sellingPriceYen?.toLocaleString() || '–'}`
-          : `Descrição gerada · custo ¥${data.costYen?.toLocaleString() || '–'} · venda ¥${data.sellingPriceYen?.toLocaleString() || '–'}`,
+          ? `${data.images.length} foto(s) · ${descSourceLabel} · custo ¥${data.costYen?.toLocaleString() || '–'} · venda ¥${data.sellingPriceYen?.toLocaleString() || '–'}`
+          : `${descSourceLabel} · custo ¥${data.costYen?.toLocaleString() || '–'} · venda ¥${data.sellingPriceYen?.toLocaleString() || '–'}`,
       });
     } catch (e: any) {
       toast({ title: 'Erro ao enriquecer produto', description: e?.message, variant: 'destructive' });
