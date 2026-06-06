@@ -43,8 +43,11 @@ const DEFAULT_ORIGINS = [
 const VALID_ORIGINS = ALLOWED_ORIGINS.length ? ALLOWED_ORIGINS : DEFAULT_ORIGINS;
 
 // ---- Busca no Rakuten Ichiba -----------------------------------------------
+let lastRakutenDebug = null; // diagnóstico temporário
+
 async function searchRakuten(productName) {
-  if (!RAKUTEN_APP_ID) return null;
+  lastRakutenDebug = { hasAppId: !!RAKUTEN_APP_ID, appIdLen: (RAKUTEN_APP_ID || '').length };
+  if (!RAKUTEN_APP_ID) { lastRakutenDebug.reason = 'RAKUTEN_APP_ID ausente'; return null; }
   try {
     const params = new URLSearchParams({
       format:        'json',
@@ -58,8 +61,13 @@ async function searchRakuten(productName) {
     const r = await fetch(
       `https://app.rakuten.co.jp/services/api/IchibaItem/Search/20220601?${params}`
     );
-    if (!r.ok) return null;
+    lastRakutenDebug.status = r.status;
+    if (!r.ok) {
+      lastRakutenDebug.body = (await r.text().catch(() => '')).slice(0, 300);
+      return null;
+    }
     const data = await r.json();
+    lastRakutenDebug.count = (data?.Items || []).length;
     // A API envolve cada item em { Item: {...} } ou retorna direto
     const rawItems = (data?.Items || []).map(i => i?.Item || i).filter(Boolean);
     if (!rawItems.length) return null;
@@ -79,7 +87,8 @@ async function searchRakuten(productName) {
       .slice(0, 5);
 
     return { priceYen, descJa, images, suggestName, source: 'rakuten' };
-  } catch {
+  } catch (e) {
+    lastRakutenDebug.error = String(e?.message || e);
     return null;
   }
 }
@@ -233,6 +242,7 @@ export default async function handler(req, res) {
       images:      rakuten?.images || [],
       suggestName: i18n?.[targetLang]?.name || rakuten?.suggestName || productName,
       source:      rakuten ? 'rakuten' : 'ai',
+      ...(body.debug === true ? { rakutenDebug: lastRakutenDebug } : {}),
     });
   } catch (e) {
     res.status(500).json({ error: String(e?.message || e) });
