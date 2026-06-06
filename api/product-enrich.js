@@ -163,7 +163,9 @@ async function buildDescription(productName, descJa, targetLang) {
 // ---- Nome em INGLÊS + descrição traduzida (a partir da descrição real do Yahoo) ----
 // Regras do lojista: o NOME do produto fica em INGLÊS (não traduz). A DESCRIÇÃO
 // vem da descrição original (Yahoo, em japonês) e é traduzida por IA (pt/en/ja).
+let i18nDebug = null;
 async function buildI18n(productName, descJa) {
+  i18nDebug = { called: true };
   if (!GROQ_API_KEY) return null;
   const prompt = `Produto importado do Japão.
 Nome de referência (pode estar em inglês/japonês): "${productName}".
@@ -188,7 +190,7 @@ pt = português do Brasil, en = English, ja = 日本語.`;
           messages: [{ role: 'user', content: prompt }],
         }),
       });
-      if (!r.ok) continue;
+      if (!r.ok) { i18nDebug = { model, status: r.status, body: (await r.text().catch(()=> '')).slice(0,200) }; continue; }
       const data = await r.json();
       let text = data?.choices?.[0]?.message?.content?.trim();
       if (!text) continue;
@@ -331,7 +333,7 @@ export default async function handler(req, res) {
     const description = i18n?.[targetLang]?.description
       || await buildDescription(productName, rakuten?.descJa || '', targetLang);
     // Nome do produto em inglês (não traduz). Usa o do IA, senão o nome real do Yahoo, senão o digitado.
-    const nameEn = enrich?.name_en || rakuten?.suggestName || productName;
+    const nameEn = enrich?.name_en || productName || rakuten?.suggestName;
 
     // 4. Preço de venda = custo × markup
     const sellingPriceYen = costYen ? Math.round(costYen * markup) : 0;
@@ -344,7 +346,7 @@ export default async function handler(req, res) {
       images:      rakuten?.images || [],
       suggestName: nameEn,        // nome em inglês (não traduzido)
       source:      rakuten?.source || 'ai',
-      ...(body.debug === true ? { rakutenDebug: lastRakutenDebug, yahooDebug, searchTerm } : {}),
+      ...(body.debug === true ? { rakutenDebug: lastRakutenDebug, yahooDebug, searchTerm, i18nDebug } : {}),
     });
   } catch (e) {
     res.status(500).json({ error: String(e?.message || e) });
