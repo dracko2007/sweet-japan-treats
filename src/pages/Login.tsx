@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { Mail, Lock, ArrowRight, UserCircle, KeyRound, MailCheck } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
@@ -12,12 +12,14 @@ import LanguageSwitcher from '@/components/LanguageSwitcher';
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const registeredEmail = (location.state as { registeredEmail?: string } | null)?.registeredEmail || '';
   const { toast } = useToast();
   const { login, isAuthenticated, sendPasswordReset, isAdminAccount } = useUser();
   const { t } = useLanguage();
 
   const [formData, setFormData] = useState({
-    email: '',
+    email: registeredEmail,
     password: '',
   });
   const [isLoading, setIsLoading] = useState(false);

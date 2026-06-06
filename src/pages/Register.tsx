@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { UserCircle, Mail, Lock, Phone, ArrowRight, MailCheck } from 'lucide-react';
+import { UserCircle, Mail, Lock, Phone, ArrowRight } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -33,7 +33,6 @@ const Register: React.FC = () => {
     return match ? match.code : '+55';
   });
   const [isLoading, setIsLoading] = useState(false);
-  const [registrationComplete, setRegistrationComplete] = useState(false);
   const [errors, setErrors] = useState<FieldErrors>({});
 
   // Redirect if already authenticated
@@ -117,12 +116,11 @@ const Register: React.FC = () => {
       });
 
       if (result.success) {
-        setRegistrationComplete(true);
         toast({
           title: "Cadastro realizado!",
-          description: "Sua conta foi criada. Você já pode fazer login.",
+          description: "Sua conta foi criada. Entre com seu e-mail e senha.",
         });
-
+        navigate('/login', { replace: true, state: { registeredEmail: formData.email.trim() } });
       } else {
         toast({
           title: "Erro no cadastro",
@@ -147,12 +145,10 @@ const Register: React.FC = () => {
         <div className="container mx-auto px-4">
           <div className="text-center">
             <h1 className="font-display text-4xl lg:text-5xl font-bold text-foreground mb-4">
-              {registrationComplete ? t('auth.register.complete.title') : t('auth.register')}
+              {t('auth.register')}
             </h1>
             <p className="text-muted-foreground text-lg">
-              {registrationComplete 
-                ? t('auth.register.complete.subtitle')
-                : t('auth.register.subtitle')}
+              {t('auth.register.subtitle')}
             </p>
           </div>
         </div>
@@ -169,31 +165,6 @@ const Register: React.FC = () => {
                 <LanguageSwitcher />
               </div>
 
-              {/* Registration Complete - Email Verification Required */}
-              {registrationComplete ? (
-                <div className="text-center py-8">
-                  <div className="w-20 h-20 rounded-full bg-green-100 dark:bg-green-900 flex items-center justify-center mx-auto mb-6">
-                    <MailCheck className="w-10 h-10 text-green-600 dark:text-green-400" />
-                  </div>
-                  <h2 className="font-display text-2xl font-semibold text-foreground mb-3">
-                    {t('auth.register.complete.confirm')}
-                  </h2>
-                  <p className="text-muted-foreground mb-2">
-                    {t('auth.register.complete.sentTo')}
-                  </p>
-                  <p className="font-semibold text-primary text-lg mb-6">
-                    {formData.email}
-                  </p>
-                  <Button 
-                    className="w-full btn-primary rounded-xl py-6 text-lg font-semibold"
-                    onClick={() => navigate('/login')}
-                  >
-                    {t('auth.register.complete.goLogin')}
-                    <ArrowRight className="w-5 h-5 ml-2" />
-                  </Button>
-                </div>
-              ) : (
-                <>
               <div className="flex items-center gap-3 mb-6">
                 <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
                   <UserCircle className="w-5 h-5 text-primary" />
@@ -375,8 +346,6 @@ const Register: React.FC = () => {
                   </p>
                 </div>
               </form>
-                </>
-              )}
             </div>
           </div>
         </div>
