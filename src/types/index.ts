@@ -24,6 +24,8 @@ export interface Product {
   deliveryRestrict?: 'Japão';
   hidden?: boolean;          // Registrado mas não publicado na loja (oculto do cliente)
   discountPercent?: number;  // Desconto promocional em % (0–100). >0 ativa a promoção.
+  // Traduções por idioma (geradas via IA no cadastro). Mostra automático conforme o idioma do cliente.
+  i18n?: Record<string, { name?: string; description?: string }>;
   weightGrams?: number;      // Peso real da embalagem em g (para cálculo de frete); se ausente, estimado por categoria.
   tags?: string[];           // Tipos/subcategorias para filtro inteligente (ex: 'shampoo', 'filtro solar')
   isNew?: boolean;           // Marca como lançamento (aparece em destaque no filtro "Lançamento")

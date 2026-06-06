@@ -10,6 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { useLanguage } from '@/context/LanguageContext';
 import { getTranslatedProductName, getTranslatedProductDesc, getTranslatedProductFlavor } from '@/data/translations';
+import { i18nName, i18nDesc } from '@/utils/productI18n';
 import { formatPrice } from '@/utils/currency';
 import { effectiveYen, baseYen, hasDiscount, getVariants } from '@/utils/pricing';
 
@@ -30,10 +31,11 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
   const { addToCart } = useCart();
   const { user } = useUser();
   const { toast } = useToast();
-  const { t, selectedCountry } = useLanguage();
+  const { t, language, selectedCountry } = useLanguage();
 
-  const translatedName = getTranslatedProductName(product.id, t);
-  const translatedDesc = getTranslatedProductDesc(product.id, t);
+  // Prefere a tradução salva no produto (i18n); senão usa o dicionário/base.
+  const translatedName = i18nName(product, language) || getTranslatedProductName(product.id, t);
+  const translatedDesc = i18nDesc(product, language) || getTranslatedProductDesc(product.id, t);
   const translatedFlavor = getTranslatedProductFlavor(product.id, t);
 
   useEffect(() => {

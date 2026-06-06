@@ -111,6 +111,39 @@ async function buildDescription(productName, descJa, targetLang) {
   return '';
 }
 
+// ---- Tradução em TODOS os idiomas (pt/en/ja) em uma chamada (JSON) ----------
+async function buildI18n(productName, descJa) {
+  if (!GROQ_API_KEY) return null;
+  const prompt = `Produto importado do Japão. Nome (pode estar em japonês): "${productName}".
+Descrição original (japonês/inglês, pode estar vazia): ${descJa || '(vazia — crie uma descrição comercial atraente)'}
+
+Gere o NOME e uma DESCRIÇÃO comercial atraente (2-3 parágrafos) para uma loja online de importados do Japão, em 3 idiomas.
+Responda APENAS com JSON válido, sem texto antes/depois, exatamente neste formato:
+{"pt":{"name":"","description":""},"en":{"name":"","description":""},"ja":{"name":"","description":""}}
+pt = português do Brasil, en = English, ja = 日本語. Não use markdown.`;
+
+  for (const model of GROQ_MODELS) {
+    try {
+      const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${GROQ_API_KEY}` },
+        body: JSON.stringify({
+          model, max_tokens: 1600, temperature: 0.6,
+          response_format: { type: 'json_object' },
+          messages: [{ role: 'user', content: prompt }],
+        }),
+      });
+      if (!r.ok) continue;
+      const data = await r.json();
+      const text = data?.choices?.[0]?.message?.content?.trim();
+      if (!text) continue;
+      const parsed = JSON.parse(text);
+      if (parsed?.pt?.description || parsed?.en?.description || parsed?.ja?.description) return parsed;
+    } catch { /* tenta próximo modelo */ }
+  }
+  return null;
+}
+
 // ---- Estimativa de preço via IA (fallback sem Rakuten) ---------------------
 async function estimatePriceAI(productName) {
   if (!GROQ_API_KEY) return 0;
@@ -184,18 +217,21 @@ export default async function handler(req, res) {
     let costYen = rakuten?.priceYen || 0;
     if (!costYen) costYen = await estimatePriceAI(productName);
 
-    // 3. Descrição
-    const description = await buildDescription(productName, rakuten?.descJa || '', targetLang);
+    // 3. Traduções em todos os idiomas (pt/en/ja) + descrição do idioma atual
+    const i18n = await buildI18n(productName, rakuten?.descJa || '');
+    const description = i18n?.[targetLang]?.description
+      || await buildDescription(productName, rakuten?.descJa || '', targetLang);
 
     // 4. Preço de venda = custo × markup
     const sellingPriceYen = costYen ? Math.round(costYen * markup) : 0;
 
     res.status(200).json({
       description,
+      i18n,                       // { pt:{name,description}, en:{...}, ja:{...} }
       costYen,                    // custo de aquisição (Rakuten ou estimado)
       sellingPriceYen,            // preço de venda final (custo × markup)
       images:      rakuten?.images || [],
-      suggestName: rakuten?.suggestName || productName,
+      suggestName: i18n?.[targetLang]?.name || rakuten?.suggestName || productName,
       source:      rakuten ? 'rakuten' : 'ai',
     });
   } catch (e) {

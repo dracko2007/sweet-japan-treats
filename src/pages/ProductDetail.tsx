@@ -15,6 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { useLanguage } from '@/context/LanguageContext';
 import { getTranslatedProductName, getTranslatedProductDesc, getTranslatedProductFlavor } from '@/data/translations';
+import { i18nName, i18nDesc } from '@/utils/productI18n';
 import { formatPrice } from '@/utils/currency';
 import { effectiveYen, baseYen, hasDiscount, getVariants } from '@/utils/pricing';
 
@@ -24,7 +25,7 @@ const ProductDetail: React.FC = () => {
   const { addToCart } = useCart();
   const { user } = useUser();
   const { toast } = useToast();
-  const { t, selectedCountry } = useLanguage();
+  const { t, language, selectedCountry } = useLanguage();
   const { products, loading: productsLoading } = useProducts();
 
   const product = products.find(p => p.id === id);
@@ -69,8 +70,8 @@ const ProductDetail: React.FC = () => {
     );
   }
 
-  const translatedName = getTranslatedProductName(product.id, t);
-  const translatedDesc = getTranslatedProductDesc(product.id, t);
+  const translatedName = i18nName(product, language) || getTranslatedProductName(product.id, t);
+  const translatedDesc = i18nDesc(product, language) || getTranslatedProductDesc(product.id, t);
   const translatedFlavor = getTranslatedProductFlavor(product.id, t);
 
   const isEuro = ['Portugal', 'França', 'Itália', 'Espanha'].includes(selectedCountry);
