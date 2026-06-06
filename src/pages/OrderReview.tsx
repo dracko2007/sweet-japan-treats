@@ -14,7 +14,6 @@ import { formatPrice } from '@/utils/currency';
 import { effectiveYen } from '@/utils/pricing';
 import { convertYen as fxConvert } from '@/services/fxService';
 import { pointsForSpendYen, POINTS } from '@/services/pointsService';
-import { getTranslatedProductName } from '@/data/translations';
 import { Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { firebaseSyncService } from '@/services/firebaseSyncService';
@@ -173,7 +172,7 @@ const OrderReview: React.FC = () => {
         const finalUnitPrice = convertYen(effectiveYen(item.product, item.size));
         return {
           id: item.product.id,
-          name: getTranslatedProductName(item.product.id, t),
+          name: item.product.name,
           image: item.product.image,
           quantity: item.quantity,
           size: item.variantLabel || (item.size === 'small' ? 'Pequeno' : 'Grande'),
@@ -336,7 +335,7 @@ const OrderReview: React.FC = () => {
                 {items.map((item) => {
                   const displayUnitPrice = convertYen(effectiveYen(item.product, item.size));
                   const displayItemPrice = displayUnitPrice * item.quantity;
-                  const productName = getTranslatedProductName(item.product.id, t);
+                  const productName = item.product.name;
                   return (
                     <div 
                       key={`${item.product.id}-${item.size}`}

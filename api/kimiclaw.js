@@ -1,9 +1,23 @@
 // Função serverless (Vercel) — "cérebro" do KimiClaw via Groq (tier grátis, rápido).
 // A chave fica SÓ no servidor (process.env.GROQ_API_KEY) e nunca vai pro navegador.
 // Sem a chave, retorna 503 e o KimiClaw responde pelas regras (fallback).
-const GROQ_MODELS = process.env.GROQ_MODEL
-  ? [process.env.GROQ_MODEL]
-  : ['llama-3.3-70b-versatile', 'openai/gpt-oss-120b'];
+const DEFAULT_GROQ_MODELS = ['llama-3.3-70b-versatile', 'openai/gpt-oss-120b'];
+const DISABLED_GROQ_MODELS = new Set(['moonshotai/kimi-k2-instruct']);
+const uniqueNonEmpty = (values) => {
+  const seen = new Set();
+  const out = [];
+  for (const value of values) {
+    const s = String(value || '').trim();
+    if (!s || seen.has(s)) continue;
+    seen.add(s);
+    out.push(s);
+  }
+  return out;
+};
+const GROQ_MODELS = uniqueNonEmpty([
+  ...(process.env.GROQ_MODEL || '').split(','),
+  ...DEFAULT_GROQ_MODELS,
+]).filter((model) => !DISABLED_GROQ_MODELS.has(model));
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 

@@ -164,12 +164,24 @@ const ProductManager: React.FC = () => {
       const updatedEditing: Product = { ...editing };
 
       if (data.description) updatedEditing.description = data.description;
-      // Traduções por idioma (pt/en/ja) — mostra automático na loja conforme o idioma
+      // Traduções por idioma (pt/en/ja). Nome não entra no i18n: fica sempre em inglês.
       if (data.i18n && typeof data.i18n === 'object') {
-        updatedEditing.i18n = { ...(updatedEditing.i18n || {}), ...data.i18n };
+        const currentI18n = Object.fromEntries(
+          Object.entries(updatedEditing.i18n || {}).map(([lang, value]) => [
+            lang,
+            { description: value?.description || '' },
+          ])
+        ) as Product['i18n'];
+        const incomingI18n = Object.fromEntries(
+          Object.entries(data.i18n).map(([lang, value]: [string, any]) => [
+            lang,
+            { description: value?.description || '' },
+          ])
+        ) as Product['i18n'];
+        updatedEditing.i18n = { ...currentI18n, ...incomingI18n };
       }
 
-      // Nome sugerido pelo Rakuten (mais completo) — só substitui se o admin não editou
+      // Nome sugerido pela IA em inglês — só substitui se o admin não editou
       if (data.suggestName && data.suggestName !== editing.name && editing.name.trim().length < 30) {
         updatedEditing.name = data.suggestName;
       }

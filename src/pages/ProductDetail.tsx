@@ -14,8 +14,8 @@ import { registrarEvento } from '@/services/eventosService';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { useLanguage } from '@/context/LanguageContext';
-import { getTranslatedProductName, getTranslatedProductDesc, getTranslatedProductFlavor } from '@/data/translations';
-import { i18nName, i18nDesc } from '@/utils/productI18n';
+import { getTranslatedProductDesc, getTranslatedProductFlavor } from '@/data/translations';
+import { i18nDesc } from '@/utils/productI18n';
 import { formatPrice } from '@/utils/currency';
 import { effectiveYen, baseYen, hasDiscount, getVariants } from '@/utils/pricing';
 import { convertYen as fxConvert } from '@/services/fxService';
@@ -71,7 +71,7 @@ const ProductDetail: React.FC = () => {
     );
   }
 
-  const translatedName = i18nName(product, language) || getTranslatedProductName(product.id, t);
+  const translatedName = product.name;
   const translatedDesc = i18nDesc(product, language) || getTranslatedProductDesc(product.id, t);
   const translatedFlavor = getTranslatedProductFlavor(product.id, t);
 

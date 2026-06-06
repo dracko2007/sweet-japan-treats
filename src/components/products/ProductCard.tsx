@@ -9,8 +9,8 @@ import { wishlistService } from '@/services/wishlistService';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { useLanguage } from '@/context/LanguageContext';
-import { getTranslatedProductName, getTranslatedProductDesc, getTranslatedProductFlavor } from '@/data/translations';
-import { i18nName, i18nDesc } from '@/utils/productI18n';
+import { getTranslatedProductDesc, getTranslatedProductFlavor } from '@/data/translations';
+import { i18nDesc } from '@/utils/productI18n';
 import { formatPrice } from '@/utils/currency';
 import { effectiveYen, baseYen, hasDiscount, getVariants } from '@/utils/pricing';
 import { convertYen as fxConvert } from '@/services/fxService';
@@ -34,8 +34,8 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
   const { toast } = useToast();
   const { t, language, selectedCountry } = useLanguage();
 
-  // Prefere a tradução salva no produto (i18n); senão usa o dicionário/base.
-  const translatedName = i18nName(product, language) || getTranslatedProductName(product.id, t);
+  // Nome do produto fica no idioma original salvo (normalmente inglês). Só a descrição é traduzida.
+  const translatedName = product.name;
   const translatedDesc = i18nDesc(product, language) || getTranslatedProductDesc(product.id, t);
   const translatedFlavor = getTranslatedProductFlavor(product.id, t);
 

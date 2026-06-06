@@ -4,7 +4,7 @@ import { ArrowRight, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useProducts } from '@/context/ProductsContext';
 import { useLanguage } from '@/context/LanguageContext';
-import { getTranslatedProductName, getTranslatedProductDesc } from '@/data/translations';
+import { getTranslatedProductDesc } from '@/data/translations';
 import { formatPrice } from '@/utils/currency';
 import { effectiveYen, hasDiscount } from '@/utils/pricing';
 import { convertYen as fxConvert } from '@/services/fxService';
@@ -84,7 +84,7 @@ const FeaturedProducts: React.FC = () => {
                 <div className="p-3 md:p-4 flex-1 flex flex-col justify-between">
                   <div>
                     <h3 className="font-sans font-bold text-sm text-gray-800 line-clamp-1 group-hover:text-primary transition-colors">
-                      {getTranslatedProductName(product.id, t)}
+                      {product.name}
                     </h3>
                     <p className="text-xs text-muted-foreground mt-1 line-clamp-2 leading-relaxed">
                       {getTranslatedProductDesc(product.id, t)}

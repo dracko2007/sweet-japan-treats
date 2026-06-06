@@ -1065,18 +1065,9 @@ const productIdToKey: Record<string, string> = {
   'sencha-tea': 'chaverde',
 };
 
-export const getTranslatedProductName = (productId: string, t: (key: string) => string): string => {
-  const key = productIdToKey[productId];
-  if (!key) {
-    const prod = products.find(p => p.id === productId);
-    return prod ? prod.name : productId;
-  }
-  const translated = t("product." + key + ".name");
-  if (translated === "product." + key + ".name" || translated === key) {
-    const prod = products.find(p => p.id === productId);
-    return prod ? prod.name : productId;
-  }
-  return translated;
+export const getTranslatedProductName = (productId: string, _t: (key: string) => string): string => {
+  const prod = products.find(p => p.id === productId);
+  return prod ? prod.name : productId;
 };
 
 export const getTranslatedProductDesc = (productId: string, t: (key: string) => string): string => {

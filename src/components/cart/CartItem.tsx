@@ -3,7 +3,7 @@ import { Trash2, Plus, Minus } from 'lucide-react';
 import { CartItem as CartItemType } from '@/types';
 import { useCart } from '@/context/CartContext';
 import { useLanguage } from '@/context/LanguageContext';
-import { getTranslatedProductName, getTranslatedProductFlavor } from '@/data/translations';
+import { getTranslatedProductFlavor } from '@/data/translations';
 import { formatPrice } from '@/utils/currency';
 import { effectiveYen } from '@/utils/pricing';
 import { convertYen as fxConvert } from '@/services/fxService';
@@ -18,7 +18,7 @@ const CartItemComponent: React.FC<CartItemProps> = ({ item }) => {
   const basePrice = effectiveYen(item.product, item.size);
 
   // Compute translated values
-  const productName = getTranslatedProductName(item.product.id, t);
+  const productName = item.product.name;
   const productFlavor = getTranslatedProductFlavor(item.product.id, t) || item.product.flavor;
 
   // Determine display price and currency
