@@ -1,11 +1,13 @@
 import React, { useState, useRef } from 'react';
-import { Plus, Pencil, Trash2, X, Save, Image as ImageIcon, Loader2, PackageOpen, Sparkles } from 'lucide-react';
+import { Plus, Pencil, Trash2, X, Save, Image as ImageIcon, Loader2, PackageOpen, Sparkles, GripVertical } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Product, ProductVariant } from '@/types';
 import { getVariants } from '@/utils/pricing';
 import { useLanguage } from '@/context/LanguageContext';
 
 const VARIANT_PRESETS = ['Pequeno', 'Médio', 'Grande', 'Kit'];
+const MAX_PHOTOS = 9; // capa + até 8 fotos extras
 import { useProducts } from '@/context/ProductsContext';
 import { productService } from '@/services/productService';
 import { useToast } from '@/hooks/use-toast';
@@ -182,10 +184,10 @@ const ProductManager: React.FC = () => {
         }
       }
 
-      // Fotos do Rakuten — adiciona às existentes sem ultrapassar 5
+      // Fotos do Rakuten — adiciona às existentes sem ultrapassar o limite
       if (Array.isArray(data.images) && data.images.length > 0) {
         const existing = updatedEditing.gallery || (updatedEditing.image ? [updatedEditing.image] : []);
-        const merged   = [...existing, ...data.images].slice(0, 5);
+        const merged   = [...existing, ...data.images].slice(0, MAX_PHOTOS);
         updatedEditing.gallery = merged;
         updatedEditing.image   = merged[0] || updatedEditing.image;
       }
@@ -210,8 +212,8 @@ const ProductManager: React.FC = () => {
     setUploading(true);
     try {
       const current = editing.gallery ? [...editing.gallery] : [];
-      for (const file of Array.from(files).slice(0, 5)) {
-        if (current.length >= 5) break;
+      for (const file of Array.from(files).slice(0, MAX_PHOTOS)) {
+        if (current.length >= MAX_PHOTOS) break;
         const dataUrl = await fileToCompressedDataURL(file);
         current.push(dataUrl);
       }
@@ -228,6 +230,17 @@ const ProductManager: React.FC = () => {
     if (!editing) return;
     const gallery = (editing.gallery || []).filter((_, i) => i !== idx);
     setEditing({ ...editing, gallery, image: gallery[0] || '' });
+  };
+
+  // Reordenar fotos por arrastar (a primeira é sempre a capa)
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const moveImage = (from: number, to: number) => {
+    if (!editing || from === to || from < 0 || to < 0) return;
+    const g = [...(editing.gallery || [])];
+    if (from >= g.length || to >= g.length) return;
+    const [moved] = g.splice(from, 1);
+    g.splice(to, 0, moved);
+    setEditing({ ...editing, gallery: g, image: g[0] || '' });
   };
 
   const save = async () => {
@@ -620,14 +633,31 @@ const ProductManager: React.FC = () => {
 
               {/* Fotos */}
               <div>
-                <label className="text-sm font-semibold block mb-1">Fotos (até 5)</label>
+                <label className="text-sm font-semibold block mb-1">Fotos (até {MAX_PHOTOS}) — arraste para reordenar</label>
                 <div className="flex flex-wrap gap-3">
                   {(editing.gallery || []).map((img, idx) => (
-                    <div key={idx} className="relative w-20 h-20 rounded-lg overflow-hidden border border-border group">
-                      <img src={img} alt="" className="w-full h-full object-cover" />
-                      {idx === 0 && (
-                        <span className="absolute top-0 left-0 bg-primary text-primary-foreground text-[9px] px-1 rounded-br">Capa</span>
+                    <div
+                      key={idx}
+                      draggable
+                      onDragStart={() => setDragIndex(idx)}
+                      onDragOver={(e) => e.preventDefault()}
+                      onDrop={(e) => { e.preventDefault(); if (dragIndex !== null) moveImage(dragIndex, idx); setDragIndex(null); }}
+                      onDragEnd={() => setDragIndex(null)}
+                      className={cn(
+                        "relative w-20 h-20 rounded-lg overflow-hidden border-2 group cursor-grab active:cursor-grabbing transition-all",
+                        dragIndex === idx ? "border-primary opacity-50 scale-95" : "border-border"
                       )}
+                      title="Arraste para reordenar"
+                    >
+                      <img src={img} alt="" className="w-full h-full object-cover pointer-events-none" />
+                      {idx === 0 ? (
+                        <span className="absolute top-0 left-0 bg-primary text-primary-foreground text-[9px] px-1 rounded-br font-bold">Capa</span>
+                      ) : (
+                        <span className="absolute top-0 left-0 bg-black/50 text-white text-[9px] px-1 rounded-br">{idx + 1}</span>
+                      )}
+                      <span className="absolute bottom-0.5 left-0.5 bg-black/50 text-white rounded p-0.5 opacity-0 group-hover:opacity-100 transition">
+                        <GripVertical className="w-3 h-3" />
+                      </span>
                       <button
                         onClick={() => removeImage(idx)}
                         className="absolute top-0.5 right-0.5 bg-black/60 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition"
@@ -636,7 +666,7 @@ const ProductManager: React.FC = () => {
                       </button>
                     </div>
                   ))}
-                  {(editing.gallery?.length || 0) < 5 && (
+                  {(editing.gallery?.length || 0) < MAX_PHOTOS && (
                     <button
                       onClick={() => fileRef.current?.click()}
                       disabled={uploading}
@@ -647,7 +677,7 @@ const ProductManager: React.FC = () => {
                   )}
                 </div>
                 <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={(e) => handleFiles(e.target.files)} />
-                <p className="text-xs text-muted-foreground mt-1">A primeira foto é a capa. As imagens são reduzidas automaticamente.</p>
+                <p className="text-xs text-muted-foreground mt-1">🖱️ Arraste as fotos para mudar a ordem — a <strong>primeira é a capa</strong>. As imagens são reduzidas automaticamente.</p>
               </div>
             </div>
 
