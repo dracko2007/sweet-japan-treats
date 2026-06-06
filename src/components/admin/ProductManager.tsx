@@ -197,7 +197,7 @@ const ProductManager: React.FC = () => {
       }
 
       setEditing(updatedEditing);
-      const sourceLabel = data.source === 'rakuten' ? '🛒 Rakuten' : '🤖 IA';
+      const sourceLabel = data.source === 'yahoo' ? '🛒 Yahoo Shopping' : data.source === 'rakuten' ? '🛒 Rakuten' : '🤖 IA';
       toast({
         title: `✨ Produto enriquecido! (${sourceLabel})`,
         description: data.images?.length
