@@ -7,6 +7,7 @@ import { useLanguage } from '@/context/LanguageContext';
 import { getTranslatedProductName, getTranslatedProductDesc } from '@/data/translations';
 import { formatPrice } from '@/utils/currency';
 import { effectiveYen, hasDiscount } from '@/utils/pricing';
+import { convertYen as fxConvert } from '@/services/fxService';
 import { cn } from '@/lib/utils';
 
 const FeaturedProducts: React.FC = () => {
@@ -16,11 +17,7 @@ const FeaturedProducts: React.FC = () => {
 
   const isEuro = ['Portugal', 'França', 'Itália', 'Espanha'].includes(selectedCountry);
   const currency = selectedCountry === 'Japão' ? 'JPY' : isEuro ? 'EUR' : 'BRL';
-  const getDisplayPrice = (val: number) => {
-    if (selectedCountry === 'Japão') return val;
-    if (isEuro) return (val / 28) * 0.16;
-    return val / 28;
-  };
+  const getDisplayPrice = (val: number) => fxConvert(val, currency);
 
   return (
     <section className="py-16 bg-white">

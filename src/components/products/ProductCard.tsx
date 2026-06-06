@@ -13,6 +13,7 @@ import { getTranslatedProductName, getTranslatedProductDesc, getTranslatedProduc
 import { i18nName, i18nDesc } from '@/utils/productI18n';
 import { formatPrice } from '@/utils/currency';
 import { effectiveYen, baseYen, hasDiscount, getVariants } from '@/utils/pricing';
+import { convertYen as fxConvert } from '@/services/fxService';
 
 interface ProductCardProps {
   product: Product;
@@ -47,11 +48,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
   const isEuro = ['Portugal', 'França', 'Itália', 'Espanha'].includes(selectedCountry);
   const currency = selectedCountry === 'Japão' ? 'JPY' : (isEuro ? 'EUR' : 'BRL');
 
-  const convertYen = (yen: number) => {
-    if (selectedCountry === 'Japão') return yen;
-    if (isEuro) return (yen / 28) * 0.16;
-    return yen / 28;
-  };
+  const convertYen = (yen: number) => fxConvert(yen, currency);
   const getDisplayPrice = (size: string) => convertYen(effectiveYen(product, size));
 
   const multiVariant = variants.length > 1;

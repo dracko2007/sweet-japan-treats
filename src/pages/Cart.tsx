@@ -10,6 +10,7 @@ import { useUser, Coupon } from '@/context/UserContext';
 import { useNavigate } from 'react-router-dom';
 import { formatPrice } from '@/utils/currency';
 import { effectiveYen } from '@/utils/pricing';
+import { convertYen as fxConvert } from '@/services/fxService';
 import { POINTS } from '@/services/pointsService';
 import { affiliateService, Affiliate } from '@/services/affiliateService';
 import { safeStorage } from '@/utils/storage';
@@ -121,23 +122,14 @@ const Cart: React.FC = () => {
   const isEuro = ['Portugal', 'França', 'Itália', 'Espanha'].includes(selectedCountry);
   const currency = selectedCountry === 'Japão' ? 'JPY' : (isEuro ? 'EUR' : 'BRL');
   
-  const baseTotalPrice = items.reduce((sum, item) => {
-    const basePrice = effectiveYen(item.product, item.size);
-    let unitPrice = basePrice;
-    if (selectedCountry === 'Japão') {
-      unitPrice = basePrice;
-    } else if (isEuro) {
-      unitPrice = (basePrice / 28) * 0.16;
-    } else {
-      unitPrice = basePrice / 28; // BRL
-    }
-    return sum + unitPrice * item.quantity;
-  }, 0);
+  const baseTotalPrice = items.reduce(
+    (sum, item) => sum + fxConvert(effectiveYen(item.product, item.size), currency) * item.quantity, 0
+  );
 
   const discountAmount = activeCoupon ? computeDiscount(activeCoupon, baseTotalPrice) : 0;
 
   // Resgate de pontos: 1 ponto = ¥1, limitado ao valor dos produtos (em ¥)
-  const convertYen = (yen: number) => selectedCountry === 'Japão' ? yen : isEuro ? (yen / 28) * 0.16 : yen / 28;
+  const convertYen = (yen: number) => fxConvert(yen, currency);
   const productSubtotalYen = items.reduce((sum, item) => sum + effectiveYen(item.product, item.size) * item.quantity, 0);
   const availablePoints = user?.points || 0;
   const maxRedeemable = Math.min(availablePoints, Math.floor(productSubtotalYen / POINTS.yenPerPoint));

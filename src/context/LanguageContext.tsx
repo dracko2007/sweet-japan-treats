@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
 import { translations, Language } from '@/data/translations';
 import { safeStorage } from '@/utils/storage';
+import { loadFxRates, getRates } from '@/services/fxService';
 
 export type CountryType = 'Brasil' | 'Japão' | 'Portugal' | 'França' | 'Itália' | 'Espanha';
 
@@ -10,6 +11,7 @@ interface LanguageContextType {
   t: (key: string) => string;
   selectedCountry: CountryType;
   setSelectedCountry: (country: CountryType) => void;
+  fxRates: { BRL: number; EUR: number };
 }
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
@@ -37,6 +39,10 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
     return (stored as CountryType) || 'Brasil';
   });
 
+  // Cotação cambial do dia (¥→R$/€). Carrega 1×; re-renderiza ao atualizar.
+  const [fxRates, setFxRates] = useState(getRates());
+  useEffect(() => { loadFxRates().then(setFxRates); }, []);
+
   const setLanguage = useCallback((lang: Language) => {
     setLanguageState(lang);
     safeStorage.setItem('preferred-language', lang);
@@ -57,7 +63,7 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
   }, [language, selectedCountry]);
 
   return (
-    <LanguageContext.Provider value={{ language, setLanguage, t, selectedCountry, setSelectedCountry }}>
+    <LanguageContext.Provider value={{ language, setLanguage, t, selectedCountry, setSelectedCountry, fxRates }}>
       {children}
     </LanguageContext.Provider>
   );

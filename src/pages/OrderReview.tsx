@@ -12,6 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useLanguage } from '@/context/LanguageContext';
 import { formatPrice } from '@/utils/currency';
 import { effectiveYen } from '@/utils/pricing';
+import { convertYen as fxConvert } from '@/services/fxService';
 import { pointsForSpendYen, POINTS } from '@/services/pointsService';
 import { getTranslatedProductName } from '@/data/translations';
 import { Sparkles } from 'lucide-react';
@@ -71,7 +72,7 @@ const OrderReview: React.FC = () => {
   const isEurope = ['Portugal', 'França', 'Itália', 'Espanha'].includes(formData.country);
   const currency = isJapan ? 'JPY' : (isEurope ? 'EUR' : 'BRL');
 
-  const convertYen = (yen: number) => isJapan ? yen : isEurope ? (yen / 28) * 0.16 : yen / 28;
+  const convertYen = (yen: number) => fxConvert(yen, currency);
 
   // Subtotal dos produtos em ¥ (já com desconto promocional, sem frete) — base dos pontos
   const productSubtotalYen = items.reduce(

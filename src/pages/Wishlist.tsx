@@ -10,6 +10,7 @@ import { useProducts } from '@/context/ProductsContext';
 import { useToast } from '@/hooks/use-toast';
 import { useLanguage } from '@/context/LanguageContext';
 import { formatPrice } from '@/utils/currency';
+import { convertYen as fxConvert } from '@/services/fxService';
 
 const Wishlist: React.FC = () => {
   const navigate = useNavigate();
@@ -154,15 +155,7 @@ const Wishlist: React.FC = () => {
                               {(() => {
                                 const isEuro = ['Portugal', 'França', 'Itália', 'Espanha'].includes(selectedCountry);
                                 const cur = selectedCountry === 'Japão' ? 'JPY' : (isEuro ? 'EUR' : 'BRL');
-                                let price = item.productPrice; // base is JPY
-                                if (selectedCountry === 'Japão') {
-                                  price = item.productPrice;
-                                } else if (isEuro) {
-                                  price = (item.productPrice / 28) * 0.16;
-                                } else {
-                                  price = item.productPrice / 28;
-                                }
-                                return formatPrice(price, cur);
+                                return formatPrice(fxConvert(item.productPrice, cur), cur);
                               })()}
                             </p>
                             <p className="text-xs text-muted-foreground">

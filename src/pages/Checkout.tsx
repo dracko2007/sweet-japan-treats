@@ -18,6 +18,7 @@ import { usePostalCodeLookup } from '@/hooks/usePostalCodeLookup';
 import { useLanguage, CountryType } from '@/context/LanguageContext';
 import { formatPrice } from '@/utils/currency';
 import { effectiveYen } from '@/utils/pricing';
+import { convertYen as fxConvert } from '@/services/fxService';
 import { getTranslatedProductName } from '@/data/translations';
 import { isValidEmail, isValidCPF, isValidPhone, isNonEmpty, maskPhone, runValidations, FieldErrors } from '@/utils/validation';
 import DemoBanner from '@/components/DemoBanner';
@@ -54,18 +55,9 @@ const Checkout: React.FC = () => {
   const isEuro = ['Portugal', 'França', 'Itália', 'Espanha'].includes(formData.country);
   const currency = formData.country === 'Japão' ? 'JPY' : (isEuro ? 'EUR' : 'BRL');
 
-  const baseTotalPrice = items.reduce((sum, item) => {
-    const basePrice = effectiveYen(item.product, item.size);
-    let unitPrice = basePrice;
-    if (formData.country === 'Japão') {
-      unitPrice = basePrice;
-    } else if (isEuro) {
-      unitPrice = (basePrice / 28) * 0.16;
-    } else {
-      unitPrice = basePrice / 28; // BRL
-    }
-    return sum + unitPrice * item.quantity;
-  }, 0);
+  const baseTotalPrice = items.reduce(
+    (sum, item) => sum + fxConvert(effectiveYen(item.product, item.size), currency) * item.quantity, 0
+  );
 
   const [selectedShipping, setSelectedShipping] = useState<{
     carrier: string;
@@ -705,17 +697,9 @@ const Checkout: React.FC = () => {
 
                 <div className="space-y-4">
                   {items.map((item) => {
-                    const basePrice = effectiveYen(item.product, item.size);
-                    let displayUnitPrice = basePrice;
-                    if (formData.country === 'Japão') {
-                      displayUnitPrice = basePrice;
-                    } else if (isEuro) {
-                      displayUnitPrice = (basePrice / 28) * 0.16;
-                    } else {
-                      displayUnitPrice = basePrice / 28; // BRL
-                    }
-                    const displayItemPrice = displayUnitPrice * item.quantity;
                     const currency = formData.country === 'Japão' ? 'JPY' : (isEuro ? 'EUR' : 'BRL');
+                    const displayUnitPrice = fxConvert(effectiveYen(item.product, item.size), currency);
+                    const displayItemPrice = displayUnitPrice * item.quantity;
                     const productName = getTranslatedProductName(item.product.id, t);
                     return (
                       <div 

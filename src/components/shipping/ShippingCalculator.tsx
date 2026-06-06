@@ -4,6 +4,7 @@ import { prefectures, shippingRates } from '@/data/prefectures';
 import { japanPrefectures, japanShippingRates } from '@/data/japanPrefectures';
 import { europePrefectures, europeShippingRates } from '@/data/europePrefectures';
 import { useCart } from '@/context/CartContext';
+import { convertYen as fxConvert } from '@/services/fxService';
 import { useLanguage } from '@/context/LanguageContext';
 import { cn } from '@/lib/utils';
 import { formatPrice } from '@/utils/currency';
@@ -69,14 +70,8 @@ const ShippingCalculator: React.FC<ShippingCalculatorProps> = ({
   const displaySubtotal = useMemo(() => {
     return items.reduce((sum, item) => {
       const basePrice = item.size === 'small' ? item.product.prices.small : item.product.prices.large;
-      let unitPrice = basePrice;
-      if (isJapan) {
-        unitPrice = basePrice;
-      } else if (isEurope) {
-        unitPrice = (basePrice / 28) * 0.16;
-      } else {
-        unitPrice = basePrice / 28; // BRL
-      }
+      const cur = isJapan ? 'JPY' : isEurope ? 'EUR' : 'BRL';
+      const unitPrice = fxConvert(basePrice, cur);
       return sum + unitPrice * item.quantity;
     }, 0);
   }, [items, isJapan, isEurope]);

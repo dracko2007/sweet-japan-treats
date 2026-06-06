@@ -6,6 +6,7 @@ import { useLanguage } from '@/context/LanguageContext';
 import { getTranslatedProductName, getTranslatedProductFlavor } from '@/data/translations';
 import { formatPrice } from '@/utils/currency';
 import { effectiveYen } from '@/utils/pricing';
+import { convertYen as fxConvert } from '@/services/fxService';
 
 interface CartItemProps {
   item: CartItemType;
@@ -23,14 +24,7 @@ const CartItemComponent: React.FC<CartItemProps> = ({ item }) => {
   // Determine display price and currency
   const isEuro = ['Portugal', 'França', 'Itália', 'Espanha'].includes(selectedCountry);
   const currency = selectedCountry === 'Japão' ? 'JPY' : (isEuro ? 'EUR' : 'BRL');
-  let unitPrice = basePrice;
-  if (selectedCountry === 'Japão') {
-    unitPrice = basePrice;
-  } else if (isEuro) {
-    unitPrice = (basePrice / 28) * 0.16;
-  } else {
-    unitPrice = basePrice / 28;
-  }
+  const unitPrice = fxConvert(basePrice, currency);
 
   const finalPrice = unitPrice * item.quantity;
 
