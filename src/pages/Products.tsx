@@ -124,78 +124,71 @@ const Products: React.FC = () => {
 
   return (
     <Layout>
-      <div className="gradient-hero py-16">
+      <div className="gradient-hero py-10">
         <div className="container mx-auto px-4">
           <div className="text-center max-w-2xl mx-auto">
-            <h1 className="font-display text-4xl lg:text-5xl font-bold text-foreground mb-4">
+            <h1 className="font-display text-3xl lg:text-4xl font-bold text-foreground mb-2">
               {t('productsPage.title')}
             </h1>
-            <p className="text-muted-foreground text-lg">
+            <p className="text-muted-foreground">
               {t('productsPage.description')}
             </p>
           </div>
 
-          {/* Barra de pesquisa */}
-          <div className="max-w-xl mx-auto mt-8">
-            <div className="relative">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground pointer-events-none" />
-              <input
-                type="text"
-                value={query}
-                onChange={(e) => { setQuery(e.target.value); setPage(1); }}
-                placeholder="Pesquisar produto por nome, sabor..."
-                className="w-full pl-12 pr-11 py-3 rounded-full border border-border bg-card text-foreground shadow-sm focus:ring-2 focus:ring-primary focus:outline-none transition"
-              />
-              {query && (
-                <button
-                  onClick={() => setQuery('')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-full hover:bg-secondary text-muted-foreground"
-                  aria-label="Limpar busca"
+          {/* Toolbar compacta: categorias + busca + botão de filtros */}
+          <div className="mt-6 flex flex-col lg:flex-row lg:items-center gap-3">
+            <div className="flex flex-wrap gap-2 flex-1 justify-center lg:justify-start">
+              {navCategories.map((cat) => (
+                <Link
+                  key={cat.id}
+                  to={cat.href}
+                  onClick={() => { setQuery(''); setPage(1); }}
+                  className={cn(
+                    "px-3.5 py-1.5 rounded-full font-medium text-xs transition-all",
+                    currentRoute === cat.id
+                      ? "bg-primary text-primary-foreground shadow-soft"
+                      : "bg-card text-muted-foreground hover:text-foreground hover:bg-secondary"
+                  )}
                 >
-                  <X className="w-4 h-4" />
-                </button>
-              )}
+                  {cat.label}
+                </Link>
+              ))}
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0 justify-center">
+              <div className="relative w-full sm:w-52">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+                <input
+                  type="text"
+                  value={query}
+                  onChange={(e) => { setQuery(e.target.value); setPage(1); }}
+                  placeholder="Pesquisar..."
+                  className="w-full pl-9 pr-8 py-2 text-sm rounded-full border border-border bg-card text-foreground shadow-sm focus:ring-2 focus:ring-primary focus:outline-none transition"
+                />
+                {query && (
+                  <button onClick={() => setQuery('')} className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-secondary text-muted-foreground" aria-label="Limpar busca">
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+              <button
+                onClick={() => setFiltersOpen(v => !v)}
+                className={cn(
+                  "flex items-center gap-1.5 px-3 py-2 rounded-full border text-sm font-semibold transition-colors shrink-0",
+                  hasActiveFilters ? "bg-primary text-primary-foreground border-primary" : "bg-card border-border text-muted-foreground hover:text-foreground"
+                )}
+              >
+                <SlidersHorizontal className="w-4 h-4" />
+                <span className="hidden sm:inline">Filtros</span>
+                {hasActiveFilters && <span className="bg-white/30 text-[10px] px-1.5 py-0.5 rounded-full font-bold">●</span>}
+                <ChevronDown className={cn("w-4 h-4 transition-transform", filtersOpen && "rotate-180")} />
+              </button>
             </div>
           </div>
 
-          {/* Nav de categorias (roteado) */}
-          <div className="flex flex-wrap justify-center gap-3 mt-6">
-            {navCategories.map((cat) => (
-              <Link
-                key={cat.id}
-                to={cat.href}
-                onClick={() => { setQuery(''); setPage(1); }}
-                className={cn(
-                  "px-6 py-2.5 rounded-full font-medium text-sm transition-all",
-                  currentRoute === cat.id
-                    ? "bg-primary text-primary-foreground shadow-soft"
-                    : "bg-card text-muted-foreground hover:text-foreground hover:bg-secondary"
-                )}
-              >
-                {cat.label}
-              </Link>
-            ))}
-          </div>
-
-          {/* ── Painel de Filtros Avançados ── */}
-          <div className="max-w-3xl mx-auto mt-5">
-            {/* Toggle mobile */}
-            <button
-              onClick={() => setFiltersOpen(v => !v)}
-              className={cn(
-                "sm:hidden flex items-center gap-2 mx-auto px-5 py-2 rounded-full border text-sm font-semibold transition-colors",
-                hasActiveFilters
-                  ? "bg-primary text-primary-foreground border-primary"
-                  : "bg-card border-border text-muted-foreground hover:text-foreground"
-              )}
-            >
-              <SlidersHorizontal className="w-4 h-4" />
-              Filtros avançados
-              {hasActiveFilters && <span className="bg-white/30 text-[10px] px-1.5 py-0.5 rounded-full font-bold">ativo</span>}
-              <ChevronDown className={cn("w-4 h-4 transition-transform", filtersOpen && "rotate-180")} />
-            </button>
-
-            <div className={cn("space-y-3 mt-3", !filtersOpen && "hidden sm:block")}>
+          {/* ── Painel de Filtros Avançados (recolhido por padrão) ── */}
+          <div className="max-w-3xl mx-auto mt-3">
+            <div className={cn("space-y-3", !filtersOpen && "hidden")}>
 
               {/* Ordenar */}
               <div className="flex flex-wrap items-center gap-2">
