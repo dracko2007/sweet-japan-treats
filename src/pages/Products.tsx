@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Search, X, SlidersHorizontal, ChevronDown } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
@@ -120,6 +120,17 @@ const Products: React.FC = () => {
   const hasActiveFilters = !!(sort || catFilter || typeFilter);
   const clearFilters = () => { setSort(null); setCatFilter(null); setTypeFilter(null); };
 
+  // Fecha o dropdown de filtros ao clicar fora
+  const filterRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!filtersOpen) return;
+    const onClick = (e: MouseEvent) => {
+      if (filterRef.current && !filterRef.current.contains(e.target as Node)) setFiltersOpen(false);
+    };
+    document.addEventListener('mousedown', onClick);
+    return () => document.removeEventListener('mousedown', onClick);
+  }, [filtersOpen]);
+
   const catMeta = effectiveCat ? CATEGORY_META[effectiveCat] : null;
 
   return (
@@ -171,125 +182,89 @@ const Products: React.FC = () => {
                   </button>
                 )}
               </div>
-              <button
-                onClick={() => setFiltersOpen(v => !v)}
-                className={cn(
-                  "flex items-center gap-1.5 px-3 py-2 rounded-full border text-sm font-semibold transition-colors shrink-0",
-                  hasActiveFilters ? "bg-primary text-primary-foreground border-primary" : "bg-card border-border text-muted-foreground hover:text-foreground"
+              <div className="relative" ref={filterRef}>
+                <button
+                  onClick={() => setFiltersOpen(v => !v)}
+                  className={cn(
+                    "flex items-center gap-1.5 px-3 py-2 rounded-full border text-sm font-semibold transition-colors shrink-0",
+                    hasActiveFilters ? "bg-primary text-primary-foreground border-primary" : "bg-card border-border text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <SlidersHorizontal className="w-4 h-4" />
+                  <span className="hidden sm:inline">Filtros</span>
+                  {hasActiveFilters && <span className="bg-white/30 text-[10px] px-1.5 py-0.5 rounded-full font-bold">●</span>}
+                  <ChevronDown className={cn("w-4 h-4 transition-transform", filtersOpen && "rotate-180")} />
+                </button>
+
+                {/* Lista suspensa de filtros */}
+                {filtersOpen && (
+                  <div className="absolute right-0 top-full mt-2 z-40 w-[min(20rem,88vw)] max-h-[70vh] overflow-y-auto bg-card border border-border rounded-2xl shadow-elevated p-4 space-y-4 text-left">
+                    {/* Ordenar */}
+                    <div>
+                      <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground mb-1.5">Ordenar</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {SORT_OPTIONS.map(opt => (
+                          <button key={opt.key} onClick={() => { setSort(sort === opt.key ? null : opt.key); setPage(1); }}
+                            className={cn("px-3 py-1 rounded-full text-xs font-semibold border transition-all",
+                              sort === opt.key ? "bg-primary text-primary-foreground border-primary" : "bg-card text-muted-foreground border-border hover:text-foreground")}>
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Categoria — só na rota /todos */}
+                    {isAllRoute && availableCats.length > 0 && (
+                      <div>
+                        <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground mb-1.5">Categoria</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          <button onClick={() => { setCatFilter(null); setPage(1); }}
+                            className={cn("px-3 py-1 rounded-full text-xs font-semibold border transition-all",
+                              !catFilter ? "bg-primary text-primary-foreground border-primary" : "bg-card text-muted-foreground border-border hover:text-foreground")}>
+                            Todas
+                          </button>
+                          {availableCats.map(id => (
+                            <button key={id} onClick={() => { setCatFilter(catFilter === id ? null : id); setPage(1); }}
+                              className={cn("px-3 py-1 rounded-full text-xs font-semibold border transition-all",
+                                catFilter === id ? "bg-primary text-primary-foreground border-primary" : "bg-card text-muted-foreground border-border hover:text-foreground")}>
+                              {CATEGORY_META[id]?.icon} {CATEGORY_META[id]?.label || id}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Tipo — dinâmico */}
+                    {availableTypes.length > 0 && (
+                      <div>
+                        <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground mb-1.5">Tipo</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          <button onClick={() => { setTypeFilter(null); setPage(1); }}
+                            className={cn("px-3 py-1 rounded-full text-xs font-semibold border transition-all",
+                              !typeFilter ? "bg-secondary text-foreground border-foreground/20" : "bg-card text-muted-foreground border-border hover:text-foreground")}>
+                            Todos
+                          </button>
+                          {availableTypes.map(type => (
+                            <button key={type} onClick={() => { setTypeFilter(typeFilter === type ? null : type); setPage(1); }}
+                              className={cn("px-3 py-1 rounded-full text-xs font-semibold border transition-all capitalize",
+                                typeFilter === type ? "bg-secondary text-foreground border-foreground/20" : "bg-card text-muted-foreground border-border hover:text-foreground")}>
+                              {type}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Limpar */}
+                    {hasActiveFilters && (
+                      <button onClick={clearFilters}
+                        className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground font-semibold pt-1 border-t border-border w-full justify-center">
+                        <X className="w-3.5 h-3.5" /> Limpar filtros
+                      </button>
+                    )}
+                  </div>
                 )}
-              >
-                <SlidersHorizontal className="w-4 h-4" />
-                <span className="hidden sm:inline">Filtros</span>
-                {hasActiveFilters && <span className="bg-white/30 text-[10px] px-1.5 py-0.5 rounded-full font-bold">●</span>}
-                <ChevronDown className={cn("w-4 h-4 transition-transform", filtersOpen && "rotate-180")} />
-              </button>
-            </div>
-          </div>
-
-          {/* ── Painel de Filtros Avançados (recolhido por padrão) ── */}
-          <div className="max-w-3xl mx-auto mt-3">
-            <div className={cn("space-y-3", !filtersOpen && "hidden")}>
-
-              {/* Ordenar */}
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-xs font-bold uppercase tracking-wide text-muted-foreground w-20 shrink-0">Ordenar</span>
-                <div className="flex flex-wrap gap-2">
-                  {SORT_OPTIONS.map(opt => (
-                    <button
-                      key={opt.key}
-                      onClick={() => { setSort(sort === opt.key ? null : opt.key); setPage(1); }}
-                      className={cn(
-                        "px-4 py-1.5 rounded-full text-sm font-semibold border transition-all",
-                        sort === opt.key
-                          ? "bg-primary text-primary-foreground border-primary shadow-sm"
-                          : "bg-card text-muted-foreground border-border hover:text-foreground hover:border-foreground/30"
-                      )}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
               </div>
-
-              {/* Filtro por categoria — só na rota /todos */}
-              {isAllRoute && availableCats.length > 0 && (
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-xs font-bold uppercase tracking-wide text-muted-foreground w-20 shrink-0">Categoria</span>
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      onClick={() => { setCatFilter(null); setPage(1); }}
-                      className={cn(
-                        "px-4 py-1.5 rounded-full text-sm font-semibold border transition-all",
-                        !catFilter
-                          ? "bg-primary text-primary-foreground border-primary shadow-sm"
-                          : "bg-card text-muted-foreground border-border hover:text-foreground hover:border-foreground/30"
-                      )}
-                    >
-                      Todas
-                    </button>
-                    {availableCats.map(id => (
-                      <button
-                        key={id}
-                        onClick={() => { setCatFilter(catFilter === id ? null : id); setPage(1); }}
-                        className={cn(
-                          "px-4 py-1.5 rounded-full text-sm font-semibold border transition-all",
-                          catFilter === id
-                            ? "bg-primary text-primary-foreground border-primary shadow-sm"
-                            : "bg-card text-muted-foreground border-border hover:text-foreground hover:border-foreground/30"
-                        )}
-                      >
-                        {CATEGORY_META[id]?.icon} {CATEGORY_META[id]?.label || id}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Filtro por tipo — dinâmico, só aparece quando há tags na categoria atual */}
-              {availableTypes.length > 0 && (
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-xs font-bold uppercase tracking-wide text-muted-foreground w-20 shrink-0">Tipo</span>
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      onClick={() => { setTypeFilter(null); setPage(1); }}
-                      className={cn(
-                        "px-4 py-1.5 rounded-full text-sm font-semibold border transition-all",
-                        !typeFilter
-                          ? "bg-secondary text-foreground border-foreground/20 shadow-sm"
-                          : "bg-card text-muted-foreground border-border hover:text-foreground hover:border-foreground/30"
-                      )}
-                    >
-                      Todos
-                    </button>
-                    {availableTypes.map(type => (
-                      <button
-                        key={type}
-                        onClick={() => { setTypeFilter(typeFilter === type ? null : type); setPage(1); }}
-                        className={cn(
-                          "px-4 py-1.5 rounded-full text-sm font-semibold border transition-all capitalize",
-                          typeFilter === type
-                            ? "bg-secondary text-foreground border-foreground/20 shadow-sm"
-                            : "bg-card text-muted-foreground border-border hover:text-foreground hover:border-foreground/30"
-                        )}
-                      >
-                        {type}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Limpar filtros */}
-              {hasActiveFilters && (
-                <div className="flex justify-end">
-                  <button
-                    onClick={clearFilters}
-                    className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground font-medium transition-colors"
-                  >
-                    <X className="w-3.5 h-3.5" /> Limpar filtros
-                  </button>
-                </div>
-              )}
             </div>
           </div>
         </div>
