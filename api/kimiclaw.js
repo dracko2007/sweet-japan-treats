@@ -3,7 +3,7 @@
 // Sem a chave, retorna 503 e o KimiClaw responde pelas regras (fallback).
 const GROQ_MODELS = process.env.GROQ_MODEL
   ? [process.env.GROQ_MODEL]
-  : ['moonshotai/kimi-k2-instruct', 'llama-3.3-70b-versatile'];
+  : ['llama-3.3-70b-versatile', 'openai/gpt-oss-120b'];
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 

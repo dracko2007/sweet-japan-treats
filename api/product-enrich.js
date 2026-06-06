@@ -9,7 +9,7 @@ const YAHOO_APP_ID   = process.env.YAHOO_APP_ID || ''; // Yahoo! Shopping Client
 const GROQ_API_KEY   = process.env.GROQ_API_KEY || '';
 const GROQ_MODELS    = process.env.GROQ_MODEL
   ? [process.env.GROQ_MODEL]
-  : ['moonshotai/kimi-k2-instruct', 'llama-3.3-70b-versatile'];
+  : ['llama-3.3-70b-versatile', 'openai/gpt-oss-120b'];
 
 // ---- Rate limiting em memória (10 req/min por IP) --------------------------
 const RATE_WINDOW_MS = 60_000;
