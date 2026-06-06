@@ -191,6 +191,28 @@ pt = português do Brasil, en = English, ja = 日本語. Não use markdown.`;
   return null;
 }
 
+// ---- Traduz nome (PT/EN) para termo de busca em JAPONÊS via Groq -----------
+async function toJapaneseKeyword(name) {
+  if (!GROQ_API_KEY) return '';
+  const prompt = `Traduza o nome de produto abaixo para o MELHOR termo de busca em JAPONÊS usado em lojas japonesas (Yahoo/Rakuten). Use katakana para marcas estrangeiras e kanji/hiragana quando apropriado. Mantenha curto (a marca + o tipo). Responda APENAS com o termo em japonês, sem aspas, sem explicação.\n\nProduto: "${name}"`;
+  for (const model of GROQ_MODELS) {
+    try {
+      const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${GROQ_API_KEY}` },
+        body: JSON.stringify({ model, max_tokens: 40, temperature: 0.2, messages: [{ role: 'user', content: prompt }] }),
+      });
+      if (!r.ok) continue;
+      const data = await r.json();
+      const text = (data?.choices?.[0]?.message?.content || '').trim().replace(/["「」『』]/g, '');
+      if (text && /[぀-ヿ㐀-鿿]/.test(text)) return text.slice(0, 60);
+    } catch {}
+  }
+  return '';
+}
+
+const hasJapanese = (s) => /[぀-ヿ㐀-鿿]/.test(s || '');
+
 // ---- Estimativa de preço via IA (fallback sem Rakuten) ---------------------
 async function estimatePriceAI(productName) {
   if (!GROQ_API_KEY) return 0;
@@ -257,15 +279,22 @@ export default async function handler(req, res) {
   const markup = typeof body.markup === 'number' ? body.markup : 1.5; // padrão 50%
 
   try {
-    // 1. Busca a fonte real: Yahoo! Shopping → Rakuten → (nada = IA)
-    const rakuten = (await searchYahoo(productName)) || (await searchRakuten(productName));
+    // 0. Se o nome NÃO está em japonês, traduz para um termo de busca japonês.
+    let searchTerm = productName;
+    if (!hasJapanese(productName)) {
+      const jp = await toJapaneseKeyword(productName);
+      if (jp) searchTerm = jp;
+    }
+
+    // 1. Busca a fonte real (com o termo japonês): Yahoo → Rakuten → (nada = IA)
+    const rakuten = (await searchYahoo(searchTerm)) || (await searchRakuten(searchTerm));
 
     // 2. Preço de custo
     let costYen = rakuten?.priceYen || 0;
     if (!costYen) costYen = await estimatePriceAI(productName);
 
-    // 3. Traduções em todos os idiomas (pt/en/ja) + descrição do idioma atual
-    const i18n = await buildI18n(productName, rakuten?.descJa || '');
+    // 3. Traduções em todos os idiomas (pt/en/ja) — usa o nome japonês real achado
+    const i18n = await buildI18n(rakuten?.suggestName || searchTerm || productName, rakuten?.descJa || '');
     const description = i18n?.[targetLang]?.description
       || await buildDescription(productName, rakuten?.descJa || '', targetLang);
 
