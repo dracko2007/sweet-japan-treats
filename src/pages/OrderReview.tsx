@@ -1,7 +1,7 @@
 import { safeStorage } from '@/utils/storage';
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Package, ArrowRight, Printer, CreditCard, Landmark, Smartphone, FileText, MapPin, User, Phone, Mail, CheckCircle } from 'lucide-react';
+import { Package, ArrowRight, Printer, CreditCard, Landmark, Smartphone, MapPin, User, Phone, Mail, CheckCircle } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { useCart } from '@/context/CartContext';
@@ -622,23 +622,6 @@ const OrderReview: React.FC = () => {
                           </div>
                           <p className="text-xs text-muted-foreground leading-relaxed">
                             Parcele em até 12x no cartão (Visa, MasterCard, Elo, Amex).
-                          </p>
-                        </Label>
-                      </div>
-
-                      {/* Boleto Option */}
-                      <div className={cn(
-                        "flex items-start space-x-3 p-4 rounded-xl border-2 transition-all cursor-pointer",
-                        paymentMethod === 'boleto' ? "border-orange-500 bg-orange-50/50" : "border-border hover:border-gray-300"
-                      )}>
-                        <RadioGroupItem value="boleto" id="boleto" className="mt-1" />
-                        <Label htmlFor="boleto" className="flex-1 cursor-pointer">
-                          <div className="flex items-center gap-2 mb-1">
-                            <FileText className="w-5 h-5 text-gray-500" />
-                            <span className="font-bold text-base text-gray-800">Boleto Bancário</span>
-                          </div>
-                          <p className="text-xs text-muted-foreground leading-relaxed">
-                            Compensa em 1 a 2 dias úteis. Imprima o boleto ou copie o código de barras para pagamento.
                           </p>
                         </Label>
                       </div>

@@ -731,6 +731,11 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       // Encerra a sessão criada durante o cadastro (login é feito depois)
       await firebaseSyncService.logoutUser();
 
+      // E-mail de confirmação de cadastro (de contato@japanexpress-store.com) — fire-and-forget
+      import('@/services/mailService')
+        .then((m) => m.sendConfirmationEmail(normalizedEmail, userData.name))
+        .catch(() => {});
+
       devLog('✅ [REGISTER] Cadastro concluído (sync nuvem:', syncResult, ')');
       return { success: true };
     } catch (error) {
