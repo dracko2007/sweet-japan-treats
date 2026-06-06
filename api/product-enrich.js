@@ -5,6 +5,7 @@
 // Preço de venda = custo de aquisição × 1.5 (50% de markup).
 
 const RAKUTEN_APP_ID = process.env.RAKUTEN_APP_ID || '';
+const YAHOO_APP_ID   = process.env.YAHOO_APP_ID || ''; // Yahoo! Shopping Client ID
 const GROQ_API_KEY   = process.env.GROQ_API_KEY || '';
 const GROQ_MODELS    = process.env.GROQ_MODEL
   ? [process.env.GROQ_MODEL]
@@ -88,6 +89,42 @@ async function searchRakuten(productName) {
       .slice(0, 5);
 
     return { priceYen, descJa, images, suggestName, source: 'rakuten' };
+  } catch (e) {
+    lastRakutenDebug.error = String(e?.message || e);
+    return null;
+  }
+}
+
+// ---- Busca no Yahoo! Shopping (Japão) --------------------------------------
+async function searchYahoo(productName) {
+  if (!YAHOO_APP_ID) return null;
+  lastRakutenDebug = { provider: 'yahoo', hasAppId: true };
+  try {
+    const params = new URLSearchParams({
+      appid:   YAHOO_APP_ID,
+      query:   productName,
+      results: '5',
+      sort:    '-review_count',
+    });
+    const r = await fetch(
+      `https://shopping.yahooapis.jp/ShoppingWebService/V3/itemSearch?${params}`,
+      { headers: { 'User-Agent': 'JapanExpress/1.0' } }
+    );
+    lastRakutenDebug.status = r.status;
+    if (!r.ok) { lastRakutenDebug.body = (await r.text().catch(() => '')).slice(0, 300); return null; }
+    const data = await r.json();
+    const hits = data?.hits || [];
+    lastRakutenDebug.count = hits.length;
+    if (!hits.length) return null;
+
+    const item = hits[0];
+    const priceYen    = Number(item.price) || 0;
+    const descJa      = (item.description || item.headLine || '').replace(/<[^>]*>/g, '').trim().slice(0, 1200);
+    const suggestName = (item.name || productName).slice(0, 120);
+    // Yahoo dá 1 foto principal por item (em vários tamanhos) → pega a maior
+    const img = item.exImage?.url || item.image?.medium || item.image?.small || '';
+    const images = img ? [img] : [];
+    return { priceYen, descJa, images, suggestName, source: 'yahoo' };
   } catch (e) {
     lastRakutenDebug.error = String(e?.message || e);
     return null;
@@ -220,8 +257,8 @@ export default async function handler(req, res) {
   const markup = typeof body.markup === 'number' ? body.markup : 1.5; // padrão 50%
 
   try {
-    // 1. Busca no Rakuten (paralelo com geração de descrição quando possível)
-    const rakuten = await searchRakuten(productName);
+    // 1. Busca a fonte real: Yahoo! Shopping → Rakuten → (nada = IA)
+    const rakuten = (await searchYahoo(productName)) || (await searchRakuten(productName));
 
     // 2. Preço de custo
     let costYen = rakuten?.priceYen || 0;
