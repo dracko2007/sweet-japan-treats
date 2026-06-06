@@ -120,10 +120,12 @@ async function searchYahoo(productName) {
     const priceYen    = Number(item.price) || 0;
     const descJa      = (item.description || item.headLine || '').replace(/<[^>]*>/g, '').trim().slice(0, 1200);
     const suggestName = (item.name || productName).slice(0, 120);
-    // Pega a foto principal de cada um dos primeiros resultados (várias fotos reais)
-    const images = [...new Set(
-      hits.map(h => h.exImage?.url || h.image?.medium || h.image?.small).filter(Boolean)
-    )].slice(0, 5);
+    // Prioriza a imagem ESTENDIDA (exImage = maior/HD). Só usa média se não houver HD.
+    const hd  = hits.map(h => h.exImage?.url).filter(Boolean);
+    const med = hits.map(h => h.image?.medium || h.image?.small).filter(Boolean);
+    // Sobe a resolução das URLs do yimg para a maior versão (/i/z/ = HD)
+    const upscale = (u) => u.replace(/\/i\/[a-z]\//, '/i/z/');
+    const images = [...new Set((hd.length ? hd : med).map(upscale))].slice(0, 5);
     return { priceYen, descJa, images, suggestName, source: 'yahoo' };
   } catch (e) {
     yahooDebug.error = String(e?.message || e);
