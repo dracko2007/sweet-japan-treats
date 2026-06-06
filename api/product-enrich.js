@@ -98,21 +98,16 @@ async function searchRakuten(productName) {
 // ---- Busca no Yahoo! Shopping (Japão) --------------------------------------
 let yahooDebug = null;
 async function searchYahoo(productName) {
-  yahooDebug = { hasAppId: !!YAHOO_APP_ID, appIdLen: (YAHOO_APP_ID || '').length };
-  if (!YAHOO_APP_ID) { yahooDebug.reason = 'YAHOO_APP_ID ausente'; return null; }
+  const appid = (YAHOO_APP_ID || '').trim();
+  yahooDebug = { hasAppId: !!appid, appIdLen: appid.length };
+  if (!appid) { yahooDebug.reason = 'YAHOO_APP_ID ausente'; return null; }
   try {
-    const params = new URLSearchParams({
-      appid:   YAHOO_APP_ID,
-      query:   productName,
-      results: '5',
-      sort:    '-review_count',
-    });
-    const r = await fetch(
-      `https://shopping.yahooapis.jp/ShoppingWebService/V3/itemSearch?${params}`,
-      { headers: { 'User-Agent': 'JapanExpress/1.0' } }
-    );
+    const params = new URLSearchParams({ appid, query: productName, results: '5' });
+    const url = `https://shopping.yahooapis.jp/ShoppingWebService/V3/itemSearch?${params}`;
+    yahooDebug.qs = params.toString().replace(appid, 'APPID');
+    const r = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
     yahooDebug.status = r.status;
-    if (!r.ok) { yahooDebug.body = (await r.text().catch(() => '')).slice(0, 300); return null; }
+    if (!r.ok) { yahooDebug.body = (await r.text().catch(() => '')).slice(0, 400); return null; }
     const data = await r.json();
     const hits = data?.hits || [];
     yahooDebug.count = hits.length;
