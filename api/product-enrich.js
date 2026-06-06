@@ -116,6 +116,9 @@ async function searchYahoo(productName) {
     const data = await r.json();
     const hits = data?.hits || [];
     yahooDebug.count = hits.length;
+    yahooDebug.total = data?.totalResultsAvailable;
+    yahooDebug.returned = data?.totalResultsReturned;
+    yahooDebug.keys = Object.keys(data || {}).slice(0, 8);
     if (!hits.length) return null;
 
     const item = hits[0];
