@@ -212,7 +212,11 @@ pt = português do Brasil, en = English, ja = 日本語.`;
 // ---- Traduz nome (PT/EN) para termo de busca em JAPONÊS via Groq -----------
 async function toJapaneseKeyword(name) {
   if (!GROQ_API_KEY) return '';
-  const prompt = `Traduza o nome de produto abaixo para o MELHOR termo de busca em JAPONÊS usado em lojas japonesas (Yahoo/Rakuten). Use katakana para marcas estrangeiras e kanji/hiragana quando apropriado. Mantenha curto (a marca + o tipo). Responda APENAS com o termo em japonês, sem aspas, sem explicação.\n\nProduto: "${name}"`;
+  const prompt = `Você conhece os produtos japoneses. Dê o NOME JAPONÊS OFICIAL do produto abaixo, exatamente como é escrito e buscado nas lojas japonesas (Yahoo/Rakuten) — use o nome REAL da marca/produto, NÃO transliteração fonética.
+Exemplos: "Hada Labo Gokujyun" → 肌ラボ 極潤 ; "Biore UV" → ビオレ UV ; "Shiseido Senka" → 専科 ; "DHC Deep Cleansing Oil" → DHC ディープクレンジングオイル ; "KitKat Matcha" → キットカット 抹茶.
+Mantenha curto (marca + tipo). Responda APENAS com o termo em japonês, sem aspas, sem explicação.
+
+Produto: "${name}"`;
   for (const model of GROQ_MODELS) {
     try {
       const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -297,15 +301,21 @@ export default async function handler(req, res) {
   const markup = typeof body.markup === 'number' ? body.markup : 1.5; // padrão 50%
 
   try {
-    // 0. Se o nome NÃO está em japonês, traduz para um termo de busca japonês.
-    let searchTerm = productName;
+    // 0. Monta os termos de busca: o original (romaji/inglês, que o Yahoo indexa)
+    //    e o nome japonês real (traduzido pela IA). Tenta os dois.
+    const terms = [productName];
     if (!hasJapanese(productName)) {
       const jp = await toJapaneseKeyword(productName);
-      if (jp) searchTerm = jp;
+      if (jp && jp !== productName) terms.push(jp);
     }
 
-    // 1. Busca a fonte real (com o termo japonês): Yahoo → Rakuten → (nada = IA)
-    const rakuten = (await searchYahoo(searchTerm)) || (await searchRakuten(searchTerm));
+    // 1. Busca a fonte real: tenta cada termo no Yahoo → Rakuten até achar.
+    let rakuten = null;
+    let searchTerm = productName;
+    for (const term of terms) {
+      rakuten = (await searchYahoo(term)) || (await searchRakuten(term));
+      if (rakuten) { searchTerm = term; break; }
+    }
 
     // 2. Preço de custo
     let costYen = rakuten?.priceYen || 0;
