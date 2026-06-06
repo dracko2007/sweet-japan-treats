@@ -71,7 +71,8 @@ export const affiliateService = {
     if (!db) return [];
     try {
       const snap = await getDocs(collection(db, COL));
-      return snap.docs.map((d) => d.data() as Affiliate);
+      // Usa o ID real do documento como `code` (fonte da verdade p/ deletar/editar)
+      return snap.docs.map((d) => ({ ...(d.data() as Affiliate), code: d.id }));
     } catch (e) {
       devWarn('affiliateService.getAll falhou:', e);
       return [];
@@ -221,15 +222,15 @@ export const affiliateService = {
   },
 
   /** Remove um afiliado (admin). */
-  async remove(code: string): Promise<boolean> {
-    if (!db) return false;
+  async remove(code: string): Promise<{ ok: boolean; error?: string }> {
+    if (!db) return { ok: false, error: 'Firebase indisponível' };
     try {
       await ensureAdminAuth();
       await deleteDoc(doc(db, COL, normalize(code)));
-      return true;
-    } catch (e) {
+      return { ok: true };
+    } catch (e: any) {
       devError('affiliateService.remove falhou:', e);
-      return false;
+      return { ok: false, error: e?.message || String(e) };
     }
   },
 

@@ -88,10 +88,18 @@ const AffiliateManager: React.FC = () => {
 
   const handleDelete = async (code: string) => {
     if (!confirm(`Remover o afiliado ${code}?`)) return;
-    const ok = await affiliateService.remove(code);
-    if (ok) {
+    const res = await affiliateService.remove(code);
+    if (res.ok) {
       toast({ title: '🗑️ Afiliado removido', description: code });
       load();
+    } else {
+      toast({
+        title: 'Não foi possível remover',
+        description: res.error?.includes('permission')
+          ? 'Sem permissão (sessão de admin expirou). Saia e entre de novo como Administrador.'
+          : (res.error || 'Tente novamente.'),
+        variant: 'destructive',
+      });
     }
   };
 
