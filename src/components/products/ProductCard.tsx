@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Minus, ShoppingCart, Check, Heart, Share2, Eye } from 'lucide-react';
+import { ShoppingCart, Check, Heart, Share2, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Product } from '@/types';
 import { useCart } from '@/context/CartContext';
@@ -216,68 +216,40 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
         </div>
       </div>
 
-      {/* Content */}
-      <div className="p-6 flex flex-col flex-1">
-        <h3 className="font-display text-xl font-bold text-foreground mb-2 line-clamp-2">
+      {/* Content (compacto) */}
+      <div className="p-3.5 flex flex-col flex-1">
+        <h3 className="font-display text-sm sm:text-base font-bold text-foreground mb-1 line-clamp-2 leading-snug">
           {translatedName}
         </h3>
-        <p className="text-sm text-muted-foreground line-clamp-2 mb-4">
+        <p className="text-xs text-muted-foreground line-clamp-2 mb-3 hidden sm:block">
           {translatedDesc}
         </p>
 
-        {/* Price display */}
-        <div className="mt-auto mb-4 flex items-center justify-between border-b pb-3 border-border/50">
-          <span className="text-sm font-semibold text-muted-foreground">{multiVariant ? 'A partir de:' : 'Valor:'}</span>
-          <div className="flex flex-col items-end leading-tight">
-            {promoActive && (
-              <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 line-through decoration-2">
-                {formatPrice(originalPrice, currency)}
-              </span>
-            )}
-            <span className={cn('text-xl font-bold', promoActive ? 'text-red-600' : 'text-primary')}>
+        {/* Price */}
+        <div className="mt-auto mb-2.5">
+          {multiVariant && <span className="block text-[10px] text-muted-foreground leading-none mb-0.5">a partir de</span>}
+          <div className="flex items-baseline gap-1.5 flex-wrap">
+            <span className={cn('text-lg font-extrabold leading-none', promoActive ? 'text-red-600' : 'text-primary')}>
               {formatPrice(currentPrice, currency)}
             </span>
+            {promoActive && (
+              <span className="text-xs font-semibold text-gray-400 line-through">{formatPrice(originalPrice, currency)}</span>
+            )}
           </div>
         </div>
 
-        {/* Quantity & Add to Cart */}
-        <div className="flex items-center gap-3">
-          <div className="flex items-center border border-border rounded-lg">
-            <button
-              onClick={() => setQuantity(q => Math.max(1, q - 1))}
-              className="p-2 hover:bg-secondary/50 transition-colors rounded-l-lg"
-            >
-              <Minus className="w-4 h-4" />
-            </button>
-            <span className="w-10 text-center font-medium">{quantity}</span>
-            <button
-              onClick={() => setQuantity(q => q + 1)}
-              className="p-2 hover:bg-secondary/50 transition-colors rounded-r-lg"
-            >
-              <Plus className="w-4 h-4" />
-            </button>
-          </div>
-
-          <Button 
-            onClick={handleAddToCart}
-            className={cn(
-              "flex-1 rounded-lg transition-all btn-primary",
-              added && "bg-accent hover:bg-accent"
-            )}
-          >
-            {added ? (
-              <>
-                <Check className="w-5 h-5 mr-2" />
-                {t('productDetail.added')}
-              </>
-            ) : (
-              <>
-                <ShoppingCart className="w-5 h-5 mr-2" />
-                {formatPrice(currentPrice * quantity, currency)}
-              </>
-            )}
-          </Button>
-        </div>
+        {/* Add to cart */}
+        <Button
+          onClick={handleAddToCart}
+          size="sm"
+          className={cn('w-full rounded-lg transition-all btn-primary text-xs sm:text-sm h-9', added && 'bg-accent hover:bg-accent')}
+        >
+          {added ? (
+            <><Check className="w-4 h-4 mr-1.5" /> {t('productDetail.added')}</>
+          ) : (
+            <><ShoppingCart className="w-4 h-4 mr-1.5" /> Adicionar</>
+          )}
+        </Button>
       </div>
     </div>
   );

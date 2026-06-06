@@ -295,18 +295,18 @@ const Products: React.FC = () => {
         </div>
       </div>
 
-      <section className="py-16 bg-background">
+      <section className="py-8 bg-background">
         <div className="container mx-auto px-4">
-          {/* Banner da categoria atual */}
+          {/* Banner da categoria atual (compacto) */}
           {catMeta && (
-            <div className="mb-12 p-6 rounded-2xl bg-card border border-border">
-              <div className="flex items-center gap-4">
-                <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl bg-primary/10">
+            <div className="mb-6 p-3.5 rounded-xl bg-card border border-border">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg flex items-center justify-center text-xl bg-primary/10 shrink-0">
                   {catMeta.icon}
                 </div>
-                <div>
-                  <h2 className="font-display text-2xl font-bold text-foreground">{catMeta.label}</h2>
-                  <p className="text-muted-foreground">{catMeta.desc}</p>
+                <div className="min-w-0">
+                  <h2 className="font-display text-lg font-bold text-foreground leading-tight">{catMeta.label}</h2>
+                  <p className="text-xs text-muted-foreground line-clamp-1">{catMeta.desc}</p>
                 </div>
               </div>
             </div>
@@ -338,7 +338,7 @@ const Products: React.FC = () => {
             </div>
           )}
 
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 lg:gap-5">
             {pageItems.map((product) => (
               <ProductCard key={product.id} product={product} />
             ))}

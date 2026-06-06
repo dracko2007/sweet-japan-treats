@@ -46,8 +46,8 @@ const HeroSection: React.FC = () => {
                 </Link>
               </Button>
               <Button asChild variant="outline" size="lg" className="rounded-xl px-8 text-base border-2 border-gray-300 hover:bg-gray-50 text-gray-700 font-bold">
-                <Link to="/frete">
-                  {t('hero.cta.story')}
+                <Link to="/ofertas">
+                  Ver Ofertas
                 </Link>
               </Button>
             </div>

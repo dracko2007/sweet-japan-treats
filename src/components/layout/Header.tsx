@@ -28,6 +28,7 @@ const Header: React.FC = () => {
         { label: t('nav.products.doces'), href: '/produtos/doces' },
       ]
     },
+    { label: 'Ofertas', href: '/ofertas' },
     { label: t('nav.vlog'), href: '/vlog' },
     { label: t('nav.shipping'), href: '/frete' },
     { label: 'Como Funciona', href: '/como-funciona' },
