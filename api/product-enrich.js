@@ -185,14 +185,16 @@ pt = português do Brasil, en = English, ja = 日本語.`;
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${GROQ_API_KEY}` },
         body: JSON.stringify({
           model, max_tokens: 1600, temperature: 0.6,
-          response_format: { type: 'json_object' },
           messages: [{ role: 'user', content: prompt }],
         }),
       });
       if (!r.ok) continue;
       const data = await r.json();
-      const text = data?.choices?.[0]?.message?.content?.trim();
+      let text = data?.choices?.[0]?.message?.content?.trim();
       if (!text) continue;
+      // Extrai o bloco JSON do texto (caso venha com markdown/explicação)
+      const m = text.match(/\{[\s\S]*\}/);
+      if (m) text = m[0];
       const parsed = JSON.parse(text);
       if (parsed?.pt?.description || parsed?.en?.description || parsed?.ja?.description) {
         // Mantém o nome em inglês para TODOS os idiomas (não traduz o nome)
