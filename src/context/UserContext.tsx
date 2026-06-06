@@ -447,9 +447,12 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     }
   }, [coupons, user]);
 
-  // Save user-specific orders to safeStorage
+  // Save user-specific orders to safeStorage.
+  // IMPORTANTE: só persiste lista NÃO-vazia. Durante login/onAuthChange a lista
+  // pode ficar [] por um instante antes de carregar — se gravássemos isso, o
+  // histórico salvo seria apagado. A limpeza intencional é feita em clearOrderHistory.
   useEffect(() => {
-    if (user && orders.length >= 0) {
+    if (user && orders.length > 0) {
       saveUserOrders(user.id, orders);
     }
   }, [orders, user]);
@@ -916,6 +919,8 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
 
   const clearOrderHistory = () => {
     setOrders([]);
+    // Persiste o vazio explicitamente (o auto-save não grava lista vazia)
+    if (user) saveUserOrders(user.id, []);
   };
 
   const sendPasswordReset = async (email: string): Promise<{ success: boolean; error?: string }> => {
