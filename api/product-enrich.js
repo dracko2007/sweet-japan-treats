@@ -160,16 +160,23 @@ async function buildDescription(productName, descJa, targetLang) {
   return '';
 }
 
-// ---- Tradução em TODOS os idiomas (pt/en/ja) em uma chamada (JSON) ----------
+// ---- Nome em INGLÊS + descrição traduzida (a partir da descrição real do Yahoo) ----
+// Regras do lojista: o NOME do produto fica em INGLÊS (não traduz). A DESCRIÇÃO
+// vem da descrição original (Yahoo, em japonês) e é traduzida por IA (pt/en/ja).
 async function buildI18n(productName, descJa) {
   if (!GROQ_API_KEY) return null;
-  const prompt = `Produto importado do Japão. Nome (pode estar em japonês): "${productName}".
-Descrição original (japonês/inglês, pode estar vazia): ${descJa || '(vazia — crie uma descrição comercial atraente)'}
+  const prompt = `Produto importado do Japão.
+Nome de referência (pode estar em inglês/japonês): "${productName}".
+Descrição ORIGINAL do produto (japonês, vinda da loja — pode estar vazia):
+${descJa || '(vazia — crie uma descrição comercial curta e fiel ao produto)'}
 
-Gere o NOME e uma DESCRIÇÃO comercial atraente (2-3 parágrafos) para uma loja online de importados do Japão, em 3 idiomas.
-Responda APENAS com JSON válido, sem texto antes/depois, exatamente neste formato:
-{"pt":{"name":"","description":""},"en":{"name":"","description":""},"ja":{"name":"","description":""}}
-pt = português do Brasil, en = English, ja = 日本語. Não use markdown.`;
+Tarefas:
+1) "name_en": o NOME do produto em INGLÊS, curto e comercial (marca + tipo). NÃO traduza para português.
+2) Traduza/adapte a DESCRIÇÃO original acima (mantendo os fatos do produto) em 3 idiomas, 2-3 parágrafos, atraente para loja online.
+
+Responda APENAS com JSON válido, sem markdown, exatamente neste formato:
+{"name_en":"","pt":{"description":""},"en":{"description":""},"ja":{"description":""}}
+pt = português do Brasil, en = English, ja = 日本語.`;
 
   for (const model of GROQ_MODELS) {
     try {
@@ -187,7 +194,16 @@ pt = português do Brasil, en = English, ja = 日本語. Não use markdown.`;
       const text = data?.choices?.[0]?.message?.content?.trim();
       if (!text) continue;
       const parsed = JSON.parse(text);
-      if (parsed?.pt?.description || parsed?.en?.description || parsed?.ja?.description) return parsed;
+      if (parsed?.pt?.description || parsed?.en?.description || parsed?.ja?.description) {
+        // Mantém o nome em inglês para TODOS os idiomas (não traduz o nome)
+        const nameEn = (parsed.name_en || '').trim();
+        return {
+          name_en: nameEn,
+          pt: { description: parsed.pt?.description || '' },
+          en: { description: parsed.en?.description || '' },
+          ja: { description: parsed.ja?.description || '' },
+        };
+      }
     } catch { /* tenta próximo modelo */ }
   }
   return null;
@@ -295,21 +311,26 @@ export default async function handler(req, res) {
     let costYen = rakuten?.priceYen || 0;
     if (!costYen) costYen = await estimatePriceAI(productName);
 
-    // 3. Traduções em todos os idiomas (pt/en/ja) — usa o nome japonês real achado
-    const i18n = await buildI18n(rakuten?.suggestName || searchTerm || productName, rakuten?.descJa || '');
+    // 3. Nome em INGLÊS + descrição traduzida (a partir da descrição real do Yahoo)
+    const enrich = await buildI18n(productName, rakuten?.descJa || '');
+    const i18n = enrich
+      ? { pt: enrich.pt, en: enrich.en, ja: enrich.ja } // só descrições (nome fica em inglês)
+      : null;
     const description = i18n?.[targetLang]?.description
       || await buildDescription(productName, rakuten?.descJa || '', targetLang);
+    // Nome do produto em inglês (não traduz). Usa o do IA, senão o nome real do Yahoo, senão o digitado.
+    const nameEn = enrich?.name_en || rakuten?.suggestName || productName;
 
     // 4. Preço de venda = custo × markup
     const sellingPriceYen = costYen ? Math.round(costYen * markup) : 0;
 
     res.status(200).json({
       description,
-      i18n,                       // { pt:{name,description}, en:{...}, ja:{...} }
+      i18n,                       // { pt:{description}, en:{description}, ja:{description} }
       costYen,                    // custo de aquisição (Rakuten ou estimado)
       sellingPriceYen,            // preço de venda final (custo × markup)
       images:      rakuten?.images || [],
-      suggestName: i18n?.[targetLang]?.name || rakuten?.suggestName || productName,
+      suggestName: nameEn,        // nome em inglês (não traduzido)
       source:      rakuten?.source || 'ai',
       ...(body.debug === true ? { rakutenDebug: lastRakutenDebug, yahooDebug, searchTerm } : {}),
     });
