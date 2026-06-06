@@ -5,13 +5,14 @@ import { Button } from '@/components/ui/button';
 import { useProducts } from '@/context/ProductsContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { getTranslatedProductDesc } from '@/data/translations';
+import { i18nDesc } from '@/utils/productI18n';
 import { formatPrice } from '@/utils/currency';
 import { effectiveYen, hasDiscount } from '@/utils/pricing';
 import { convertYen as fxConvert } from '@/services/fxService';
 import { cn } from '@/lib/utils';
 
 const FeaturedProducts: React.FC = () => {
-  const { t, selectedCountry } = useLanguage();
+  const { t, language, selectedCountry } = useLanguage();
   const { products } = useProducts();
   const featuredProducts = products.filter(p => !p.hidden).slice(0, 4);
 
@@ -87,7 +88,7 @@ const FeaturedProducts: React.FC = () => {
                       {product.name}
                     </h3>
                     <p className="text-xs text-muted-foreground mt-1 line-clamp-2 leading-relaxed">
-                      {getTranslatedProductDesc(product.id, t)}
+                      {i18nDesc(product, language) || getTranslatedProductDesc(product.id, t)}
                     </p>
                   </div>
 

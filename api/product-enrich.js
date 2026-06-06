@@ -504,11 +504,14 @@ export default async function handler(req, res) {
 
     // 3. Nome em INGLÊS + descrição traduzida (a partir da descrição real do Yahoo)
     const enrich = await buildI18n(productName, rakuten?.descJa || '');
-    const i18n = enrich
+    let i18n = enrich
       ? { pt: enrich.pt, en: enrich.en, ja: enrich.ja } // só descrições (nome fica em inglês)
       : null;
     const description = i18n?.[targetLang]?.description
       || await buildDescription(productName, rakuten?.descJa || '', targetLang);
+    if (!i18n && description) {
+      i18n = { [targetLang]: { description } };
+    }
     // Nome do produto em inglês (não traduz). Usa o do IA, senão o nome real do Yahoo, senão o digitado.
     const nameEn = chooseEnglishName(enrich?.name_en, productName, rakuten?.suggestName) || productName;
 
