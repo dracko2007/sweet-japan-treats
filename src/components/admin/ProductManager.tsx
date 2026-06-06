@@ -181,8 +181,8 @@ const ProductManager: React.FC = () => {
         updatedEditing.i18n = { ...currentI18n, ...incomingI18n };
       }
 
-      // Nome sugerido pela IA em inglês — só substitui se o admin não editou
-      if (data.suggestName && data.suggestName !== editing.name && editing.name.trim().length < 30) {
+      // Nome final sempre em inglês; substitui inclusive quando o admin digitou japonês.
+      if (data.suggestName && data.suggestName !== editing.name) {
         updatedEditing.name = data.suggestName;
       }
 

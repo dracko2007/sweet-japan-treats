@@ -19,6 +19,7 @@ import { useLanguage, CountryType } from '@/context/LanguageContext';
 import { formatPrice } from '@/utils/currency';
 import { effectiveYen } from '@/utils/pricing';
 import { convertYen as fxConvert } from '@/services/fxService';
+import { productEnglishName } from '@/utils/productName';
 import { isValidEmail, isValidCPF, isValidPhone, isNonEmpty, maskPhone, runValidations, FieldErrors } from '@/utils/validation';
 import DemoBanner from '@/components/DemoBanner';
 
@@ -699,7 +700,7 @@ const Checkout: React.FC = () => {
                     const currency = formData.country === 'Japão' ? 'JPY' : (isEuro ? 'EUR' : 'BRL');
                     const displayUnitPrice = fxConvert(effectiveYen(item.product, item.size), currency);
                     const displayItemPrice = displayUnitPrice * item.quantity;
-                    const productName = item.product.name;
+                    const productName = productEnglishName(item.product);
                     return (
                       <div 
                         key={`${item.product.id}-${item.size}`}

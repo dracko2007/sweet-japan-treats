@@ -7,6 +7,7 @@ import { getTranslatedProductFlavor } from '@/data/translations';
 import { formatPrice } from '@/utils/currency';
 import { effectiveYen } from '@/utils/pricing';
 import { convertYen as fxConvert } from '@/services/fxService';
+import { productEnglishName } from '@/utils/productName';
 
 interface CartItemProps {
   item: CartItemType;
@@ -18,7 +19,7 @@ const CartItemComponent: React.FC<CartItemProps> = ({ item }) => {
   const basePrice = effectiveYen(item.product, item.size);
 
   // Compute translated values
-  const productName = item.product.name;
+  const productName = productEnglishName(item.product);
   const productFlavor = getTranslatedProductFlavor(item.product.id, t) || item.product.flavor;
 
   // Determine display price and currency

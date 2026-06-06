@@ -11,6 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useLanguage } from '@/context/LanguageContext';
 import { formatPrice } from '@/utils/currency';
 import { convertYen as fxConvert } from '@/services/fxService';
+import { productEnglishName } from '@/utils/productName';
 
 const Wishlist: React.FC = () => {
   const navigate = useNavigate();
@@ -58,7 +59,7 @@ const Wishlist: React.FC = () => {
       addToCart(product, 'small', 1);
       toast({
         title: "Adicionado ao carrinho!",
-        description: `${product.name} (Pequeno) adicionado`,
+        description: `${productEnglishName(product)} (Pequeno) adicionado`,
       });
     }
   };
@@ -131,7 +132,10 @@ const Wishlist: React.FC = () => {
                 </div>
 
                 <div className="space-y-4">
-                  {wishlistItems.map((item) => (
+                  {wishlistItems.map((item) => {
+                    const product = products.find((p) => p.id === item.productId);
+                    const displayName = product ? productEnglishName(product) : item.productName;
+                    return (
                     <div
                       key={item.productId}
                       className="bg-card rounded-xl border border-border p-4 hover:shadow-lg transition-shadow"
@@ -140,7 +144,7 @@ const Wishlist: React.FC = () => {
                         <div className="relative w-full sm:w-32 h-32 rounded-lg overflow-hidden bg-secondary flex-shrink-0">
                           <img
                             src={item.productImage}
-                            alt={item.productName}
+                            alt={displayName}
                             loading="lazy"
                             className="w-full h-full object-cover"
                           />
@@ -149,7 +153,7 @@ const Wishlist: React.FC = () => {
                         <div className="flex-1 flex flex-col justify-between">
                           <div>
                             <h3 className="font-semibold text-lg mb-1">
-                              {item.productName}
+                              {displayName}
                             </h3>
                             <p className="text-primary font-bold text-xl mb-2">
                               {(() => {
@@ -183,7 +187,8 @@ const Wishlist: React.FC = () => {
                         </div>
                       </div>
                     </div>
-                  ))}
+                  );
+                  })}
                 </div>
 
                 <div className="mt-8 text-center">

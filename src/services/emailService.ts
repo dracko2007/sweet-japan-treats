@@ -5,6 +5,7 @@
  */
 
 import type { EmailOrderData, CartItem, ShippingLabelData } from '@/types/order';
+import { productEnglishName } from '@/utils/productName';
 
 const isDev = import.meta.env.DEV;
 const devLog = isDev ? console.log.bind(console) : () => {};
@@ -322,7 +323,7 @@ export const emailService = {
             ${items.map((item: CartItem) => `
               <div class="product-item">
                 <div>
-                  <strong>${item.product.name}</strong><br>
+                  <strong>${productEnglishName(item.product as any)}</strong><br>
                   <small>Tamanho: ${item.size} | Quantidade: ${item.quantity}</small>
                 </div>
                 <div style="text-align: right;">
@@ -554,7 +555,7 @@ export const emailService = {
             ${items.map((item: CartItem) => `
               <div class="product-item">
                 <div>
-                  <strong>${item.product.name}</strong><br>
+                  <strong>${productEnglishName(item.product as any)}</strong><br>
                   <small>Tamanho: ${item.size} | Quantidade: ${item.quantity}</small>
                 </div>
                 <div style="text-align: right;">

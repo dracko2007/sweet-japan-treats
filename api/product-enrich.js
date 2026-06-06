@@ -277,7 +277,9 @@ Descrição ORIGINAL do produto (japonês, vinda da loja — pode estar vazia):
 ${descJa || '(vazia — crie uma descrição comercial curta e fiel ao produto)'}
 
 Tarefas:
-1) "name_en": o NOME do produto em INGLÊS, curto e comercial (marca + tipo). NÃO traduza para português.
+1) "name_en": o NOME do produto em INGLÊS, curto e comercial (marca + linha + tipo). NÃO use japonês, NÃO use português.
+   Se o nome de referência estiver em japonês, traduza/romanize para o nome comercial em inglês.
+   Exemplos: 肌ラボ 極潤 化粧水 -> Hada Labo Gokujyun Hyaluronic Acid Lotion; DHC ディープクレンジングオイル -> DHC Deep Cleansing Oil; ビオレUV アクアリッチ -> Biore UV Aqua Rich.
 2) Traduza/adapte a DESCRIÇÃO original acima (mantendo os fatos do produto) em 3 idiomas, 2-3 parágrafos, atraente para loja online.
 
 Responda APENAS com JSON válido, sem markdown, exatamente neste formato:
@@ -325,13 +327,102 @@ pt = português do Brasil, en = English, ja = 日本語.`;
   return null;
 }
 
+function stripAccents(text) {
+  return String(text || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
+function hasPortugueseProductWords(name) {
+  const n = stripAccents(name).toLowerCase();
+  return /\b(limpeza|profunda|protetor|solar|locao|hidratante|oleo|sabonete|creme|essencia|clareador|maquiagem|acido|hialuronico|vitamina|pele|cabelo)\b/.test(n);
+}
+
+function looksEnglishProductName(name) {
+  const s = String(name || '').trim();
+  return !!s && /[A-Za-z0-9]/.test(s) && !hasJapanese(s) && !hasPortugueseProductWords(s);
+}
+
+function localEnglishName(...parts) {
+  const n = stripAccents(parts.join(' ')).toLowerCase();
+  const original = parts.join(' ');
+
+  if (/肌ラボ|ハダラボ|hada\s*labo|gokujyun|gokujun|goku-jyun/.test(original) || /hada\s*labo|gokujyun|gokujun|goku-jyun/.test(n)) {
+    if (/premium|プレミアム/.test(original) || /premium/.test(n)) return 'Hada Labo Gokujyun Premium Hyaluronic Acid Lotion';
+    if (/化粧水|lotion|toner|locao/.test(original) || /lotion|toner|locao/.test(n)) return 'Hada Labo Gokujyun Hyaluronic Acid Lotion';
+    return 'Hada Labo Gokujyun';
+  }
+
+  if (/ビオレ|biore/.test(original) || /biore/.test(n)) {
+    if (/ウォータリーエッセンス|watery\s*essence/.test(original) || /watery\s*essence/.test(n)) return 'Biore UV Aqua Rich Watery Essence';
+    if (/ライトアップエッセンス|light\s*up/.test(original) || /light\s*up/.test(n)) return 'Biore UV Aqua Rich Light Up Essence';
+    if (/アクアリッチ|aqua\s*rich|uv/.test(original) || /aqua\s*rich|uv/.test(n)) return 'Biore UV Aqua Rich';
+  }
+
+  if (/dhc/i.test(original) && (/ディープクレンジング|クレンジングオイル|deep\s*cleansing|limpeza\s*profunda|cleansing\s*oil/.test(original) || /deep\s*cleansing|limpeza\s*profunda|cleansing\s*oil/.test(n))) {
+    return 'DHC Deep Cleansing Oil';
+  }
+
+  if (/メラノcc|melano\s*cc/.test(original) || /melano\s*cc/.test(n)) return 'Melano CC Vitamin C Brightening Essence';
+  if (/専科|senka|shiseido/.test(original) || /senka|shiseido/.test(n)) return 'Shiseido Senka';
+  if (/キットカット|kit\s*kat|kitkat/.test(original) || /kit\s*kat|kitkat/.test(n)) {
+    if (/抹茶|matcha|green\s*tea/.test(original) || /matcha|green\s*tea/.test(n)) return 'Nestle KitKat Matcha Green Tea';
+    return 'Nestle KitKat';
+  }
+  if (/ソフティモ|softymo|kose/.test(original) && (/クレンジング|cleansing/.test(original) || /cleansing/.test(n))) {
+    return 'Kose Softymo Speedy Cleansing Oil';
+  }
+
+  return '';
+}
+
+async function buildEnglishName(productName, sourceName, descJa, currentName) {
+  const local = localEnglishName(productName, sourceName, descJa);
+  if (looksEnglishProductName(currentName)) return currentName.trim().slice(0, 120);
+  if (looksEnglishProductName(productName)) return productName.trim().slice(0, 120);
+
+  if (!GROQ_API_KEY) return local;
+
+  const prompt = `Convert the Japanese/Portuguese/romaji product name below into a short commercial ENGLISH product name.
+Return ONLY the English name, no quotes, no explanation.
+Do not return Japanese. Do not return Portuguese.
+
+Input typed by admin: ${productName || '(empty)'}
+Marketplace title from Yahoo/Rakuten: ${sourceName || '(empty)'}
+Original product description: ${(descJa || '').slice(0, 900) || '(empty)'}
+
+Examples:
+肌ラボ 極潤 化粧水 -> Hada Labo Gokujyun Hyaluronic Acid Lotion
+DHC Limpeza Profunda -> DHC Deep Cleansing Oil
+ビオレUV アクアリッチ -> Biore UV Aqua Rich
+メラノCC -> Melano CC Vitamin C Brightening Essence`;
+
+  for (const model of GROQ_MODELS) {
+    try {
+      const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${GROQ_API_KEY}` },
+        body: JSON.stringify({ model, max_tokens: 80, temperature: 0.15, messages: [{ role: 'user', content: prompt }] }),
+      });
+      if (!r.ok) continue;
+      const data = await r.json();
+      const text = (data?.choices?.[0]?.message?.content || '')
+        .trim()
+        .replace(/^["'「『]|["'」』]$/g, '')
+        .split(/\r?\n/)[0]
+        .trim();
+      if (looksEnglishProductName(text)) return text.slice(0, 120);
+    } catch {}
+  }
+
+  return local;
+}
+
 // ---- Traduz nome (PT/EN) para termos de busca em JAPONÊS via Groq ----------
 function localJapaneseTerms(name) {
   const n = String(name || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
   const terms = [];
 
   if (/hada\s*labo|gokujyun|gokujun|goku-jyun/.test(n)) {
-    if (/lotion|toner|化粧水/.test(n)) {
+    if (/lotion|toner|locao|化粧水/.test(n)) {
       terms.push('肌ラボ 極潤 化粧水', 'ロート 肌ラボ 極潤 化粧水');
     }
     terms.push('肌ラボ 極潤', 'ハダラボ ゴクジュン');
@@ -347,7 +438,9 @@ function localJapaneseTerms(name) {
     terms.push('Biore UV アクアリッチ', 'ビオレUV アクアリッチ');
   }
 
-  if (/dhc/.test(n) && /cleansing\s*oil/.test(n)) terms.push('DHC ディープクレンジングオイル');
+  if (/dhc/.test(n) && /(cleansing\s*oil|limpeza\s*profunda|oleo\s*de\s*limpeza|maquiagem)/.test(n)) {
+    terms.push('DHC ディープクレンジングオイル', 'DHC クレンジングオイル');
+  }
   if (/shiseido|senka/.test(n)) terms.push('専科', '資生堂 専科');
   if (/kit\s*kat|kitkat/.test(n) && /matcha|green\s*tea/.test(n)) terms.push('キットカット 抹茶');
   if (/melano\s*cc/.test(n)) terms.push('メラノCC');
@@ -433,9 +526,7 @@ async function estimatePriceAI(productName) {
 function chooseEnglishName(...candidates) {
   for (const candidate of candidates) {
     const name = String(candidate || '').trim();
-    if (!name) continue;
-    if (hasJapanese(name)) continue;
-    if (!/[A-Za-z0-9]/.test(name)) continue;
+    if (!looksEnglishProductName(name)) continue;
     return name.slice(0, 120);
   }
   return '';
@@ -512,8 +603,11 @@ export default async function handler(req, res) {
     if (!i18n && description) {
       i18n = { [targetLang]: { description } };
     }
-    // Nome do produto em inglês (não traduz). Usa o do IA, senão o nome real do Yahoo, senão o digitado.
-    const nameEn = chooseEnglishName(enrich?.name_en, productName, rakuten?.suggestName) || productName;
+    // Nome final sempre em inglês. A conversão japonesa só é usada para buscar no Yahoo/Rakuten.
+    const generatedNameEn = await buildEnglishName(productName, rakuten?.suggestName || '', rakuten?.descJa || '', enrich?.name_en || '');
+    const nameEn = chooseEnglishName(enrich?.name_en, generatedNameEn, localEnglishName(productName, rakuten?.suggestName, rakuten?.descJa), productName, rakuten?.suggestName)
+      || generatedNameEn
+      || productName;
 
     // 4. Preço de venda = custo × markup
     const sellingPriceYen = costYen ? Math.round(costYen * markup) : 0;
@@ -526,7 +620,7 @@ export default async function handler(req, res) {
       images:      rakuten?.images || [],
       suggestName: nameEn,        // nome em inglês (não traduzido)
       source:      rakuten?.source || 'ai',
-      ...(body.debug === true ? { rakutenDebug: lastRakutenDebug, yahooDebug, searchTerm, searchTerms: terms, i18nDebug } : {}),
+      ...(body.debug === true ? { rakutenDebug: lastRakutenDebug, yahooDebug, searchTerm, searchTerms: terms, generatedNameEn, i18nDebug } : {}),
     });
   } catch (e) {
     res.status(500).json({ error: String(e?.message || e) });

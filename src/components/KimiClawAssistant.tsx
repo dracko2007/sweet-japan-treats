@@ -9,6 +9,7 @@ import { Product } from '@/types';
 import { safeStorage } from '@/utils/storage';
 import { formatPrice, getCurrencyByCountry } from '@/utils/currency';
 import { askQwen, qwenEnabled, QwenMsg, AdminCatalogItem } from '@/services/qwenService';
+import { productEnglishName } from '@/utils/productName';
 import { toast } from 'sonner';
 
 interface ShippingOption {
@@ -187,7 +188,7 @@ const KimiClawAssistant: React.FC = () => {
       let score = 0;
       let strong = 0; // só nome/id/categoria/marca/sabor (sinal forte de produto)
       const nId = normalizeText(product.id);
-      const nName = normalizeText(product.name);
+      const nName = normalizeText(productEnglishName(product));
       const nDesc = normalizeText(product.description);
       const nFlavor = normalizeText(product.flavor);
       const nCat = normalizeText(product.category);
@@ -328,7 +329,7 @@ const KimiClawAssistant: React.FC = () => {
     // Catálogo público (produtos visíveis) — enviado sempre
     const catalog = products
       .filter((p) => !p.hidden)
-      .map((p) => ({ name: p.name, category: p.category, priceYen: p.prices?.small || 0, discount: p.discountPercent || 0 }));
+      .map((p) => ({ name: productEnglishName(p), category: p.category, priceYen: p.prices?.small || 0, discount: p.discountPercent || 0 }));
 
     if (isAdmin) {
       // Admin recebe TODOS os produtos (incluindo ocultos), com custo e peso estimado
@@ -336,7 +337,7 @@ const KimiClawAssistant: React.FC = () => {
         const wt = WEIGHT_BY_CATEGORY[p.category] || DEFAULT_WEIGHT;
         return {
           id: p.id,
-          name: p.name,
+          name: productEnglishName(p),
           category: p.category,
           priceYen: p.prices?.small || 0,
           discount: p.discountPercent || 0,
@@ -853,9 +854,9 @@ const KimiClawAssistant: React.FC = () => {
                       {msg.products.map((product) => (
                         <div key={product.id} className="bg-muted/40 border border-border rounded-lg p-2.5 hover:bg-muted/60 transition-colors">
                           <div className="flex gap-2 items-start">
-                            <img src={product.image} alt={product.name} className="w-12 h-12 rounded object-cover" />
+                            <img src={product.image} alt={productEnglishName(product)} className="w-12 h-12 rounded object-cover" />
                             <div className="flex-1 min-w-0">
-                              <p className="text-[11px] font-semibold text-foreground truncate">{product.name}</p>
+                              <p className="text-[11px] font-semibold text-foreground truncate">{productEnglishName(product)}</p>
                               <p className="text-[10px] text-muted-foreground">{product.category}</p>
                               <p className="text-[11px] font-bold text-primary mt-1">
                                 {formatPrice(product.prices.small, getCurrencyByCountry(selectedCountry))}
@@ -864,7 +865,7 @@ const KimiClawAssistant: React.FC = () => {
                             <button
                               onClick={() => {
                                 addToCart(product, 'small', 1);
-                                toast.success(language === 'pt' ? `Adicionado: ${product.name}` : `Added: ${product.name}`);
+                                toast.success(language === 'pt' ? `Adicionado: ${productEnglishName(product)}` : `Added: ${productEnglishName(product)}`);
                               }}
                               className="flex-shrink-0 bg-primary hover:bg-primary/95 text-white p-1.5 rounded-lg transition-colors"
                               title={t('kimiclaw.search.add_to_cart')}

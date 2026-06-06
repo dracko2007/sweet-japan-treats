@@ -14,6 +14,7 @@
 
 import type { CartItem } from '@/types/order';
 import { emailJsConfig } from '@/config/emailjs';
+import { productEnglishName } from '@/utils/productName';
 
 const isDev = import.meta.env.DEV;
 const devLog = isDev ? console.log.bind(console) : () => {};
@@ -82,7 +83,7 @@ export const emailServiceSimple = {
       await loadEmailJS();
       
       const itemsList = orderData.items.map((item: CartItem) => 
-        `${item.product.name} (${item.size}) x${item.quantity} - ¥${(item.product.prices[item.size] * item.quantity).toLocaleString()}`
+        `${productEnglishName(item.product as any)} (${item.size}) x${item.quantity} - ¥${(item.product.prices[item.size] * item.quantity).toLocaleString()}`
       );
       
       const couponDiscount = orderData.couponDiscount || 0;
@@ -270,7 +271,7 @@ Enviado com carinho e rapidez.
       await loadEmailJS();
       
       const itemsList = orderData.items.map((item: CartItem) => 
-        `${item.product.name} (${item.size}) x${item.quantity} - ¥${(item.product.prices[item.size] * item.quantity).toLocaleString()}`
+        `${productEnglishName(item.product as any)} (${item.size}) x${item.quantity} - ¥${(item.product.prices[item.size] * item.quantity).toLocaleString()}`
       ).join('\n');
       
       const shippingAddress = `

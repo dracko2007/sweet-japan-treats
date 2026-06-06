@@ -14,6 +14,7 @@ import { i18nDesc } from '@/utils/productI18n';
 import { formatPrice } from '@/utils/currency';
 import { effectiveYen, baseYen, hasDiscount, getVariants } from '@/utils/pricing';
 import { convertYen as fxConvert } from '@/services/fxService';
+import { productEnglishName } from '@/utils/productName';
 
 interface ProductCardProps {
   product: Product;
@@ -35,7 +36,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
   const { t, language, selectedCountry } = useLanguage();
 
   // Nome do produto fica no idioma original salvo (normalmente inglês). Só a descrição é traduzida.
-  const translatedName = product.name;
+  const translatedName = productEnglishName(product);
   const translatedDesc = i18nDesc(product, language) || getTranslatedProductDesc(product.id, t);
   const translatedFlavor = getTranslatedProductFlavor(product.id, t);
 
@@ -83,7 +84,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
     } else {
       const success = wishlistService.addToWishlist(user.email, {
         productId: product.id,
-        productName: product.name,
+        productName: translatedName,
         productImage: product.image,
         productPrice: product.prices.small,
       });

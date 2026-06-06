@@ -10,6 +10,7 @@ import { formatPrice } from '@/utils/currency';
 import { effectiveYen, hasDiscount } from '@/utils/pricing';
 import { convertYen as fxConvert } from '@/services/fxService';
 import { cn } from '@/lib/utils';
+import { productEnglishName } from '@/utils/productName';
 
 const FeaturedProducts: React.FC = () => {
   const { t, language, selectedCountry } = useLanguage();
@@ -54,7 +55,7 @@ const FeaturedProducts: React.FC = () => {
                 <div className="aspect-square bg-white relative overflow-hidden">
                   <img
                     src={product.image}
-                    alt={product.name}
+                    alt={productEnglishName(product)}
                     loading="lazy"
                     className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                   />
@@ -85,7 +86,7 @@ const FeaturedProducts: React.FC = () => {
                 <div className="p-3 md:p-4 flex-1 flex flex-col justify-between">
                   <div>
                     <h3 className="font-sans font-bold text-sm text-gray-800 line-clamp-1 group-hover:text-primary transition-colors">
-                      {product.name}
+                      {productEnglishName(product)}
                     </h3>
                     <p className="text-xs text-muted-foreground mt-1 line-clamp-2 leading-relaxed">
                       {i18nDesc(product, language) || getTranslatedProductDesc(product.id, t)}
