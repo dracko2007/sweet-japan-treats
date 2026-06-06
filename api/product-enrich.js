@@ -96,9 +96,10 @@ async function searchRakuten(productName) {
 }
 
 // ---- Busca no Yahoo! Shopping (Japão) --------------------------------------
+let yahooDebug = null;
 async function searchYahoo(productName) {
-  if (!YAHOO_APP_ID) return null;
-  lastRakutenDebug = { provider: 'yahoo', hasAppId: true };
+  yahooDebug = { hasAppId: !!YAHOO_APP_ID, appIdLen: (YAHOO_APP_ID || '').length };
+  if (!YAHOO_APP_ID) { yahooDebug.reason = 'YAHOO_APP_ID ausente'; return null; }
   try {
     const params = new URLSearchParams({
       appid:   YAHOO_APP_ID,
@@ -110,11 +111,11 @@ async function searchYahoo(productName) {
       `https://shopping.yahooapis.jp/ShoppingWebService/V3/itemSearch?${params}`,
       { headers: { 'User-Agent': 'JapanExpress/1.0' } }
     );
-    lastRakutenDebug.status = r.status;
-    if (!r.ok) { lastRakutenDebug.body = (await r.text().catch(() => '')).slice(0, 300); return null; }
+    yahooDebug.status = r.status;
+    if (!r.ok) { yahooDebug.body = (await r.text().catch(() => '')).slice(0, 300); return null; }
     const data = await r.json();
     const hits = data?.hits || [];
-    lastRakutenDebug.count = hits.length;
+    yahooDebug.count = hits.length;
     if (!hits.length) return null;
 
     const item = hits[0];
@@ -126,7 +127,7 @@ async function searchYahoo(productName) {
     const images = img ? [img] : [];
     return { priceYen, descJa, images, suggestName, source: 'yahoo' };
   } catch (e) {
-    lastRakutenDebug.error = String(e?.message || e);
+    yahooDebug.error = String(e?.message || e);
     return null;
   }
 }
@@ -280,7 +281,7 @@ export default async function handler(req, res) {
       images:      rakuten?.images || [],
       suggestName: i18n?.[targetLang]?.name || rakuten?.suggestName || productName,
       source:      rakuten ? 'rakuten' : 'ai',
-      ...(body.debug === true ? { rakutenDebug: lastRakutenDebug } : {}),
+      ...(body.debug === true ? { rakutenDebug: lastRakutenDebug, yahooDebug } : {}),
     });
   } catch (e) {
     res.status(500).json({ error: String(e?.message || e) });
