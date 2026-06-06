@@ -200,10 +200,9 @@ const ProductManager: React.FC = () => {
         }
       }
 
-      // Fotos do Rakuten — adiciona às existentes sem ultrapassar o limite
+      // Fotos do Yahoo/Rakuten substituem as antigas para evitar cache visual de imagens removidas.
       if (Array.isArray(data.images) && data.images.length > 0) {
-        const existing = updatedEditing.gallery || (updatedEditing.image ? [updatedEditing.image] : []);
-        const merged   = [...existing, ...data.images].slice(0, MAX_PHOTOS);
+        const merged = [...new Set(data.images.filter(Boolean))].slice(0, MAX_PHOTOS);
         updatedEditing.gallery = merged;
         updatedEditing.image   = merged[0] || updatedEditing.image;
       }

@@ -35,7 +35,7 @@ const CATEGORY_META: Record<string, { label: string; icon: string; desc: string 
 const Products: React.FC = () => {
   const { category } = useParams<{ category?: string }>();
   const { t } = useLanguage();
-  const { products } = useProducts();
+  const { products, loading } = useProducts();
 
   const [query,      setQuery]      = useState('');
   const [sort,       setSort]       = useState<SortKey | null>(null);
@@ -313,25 +313,41 @@ const Products: React.FC = () => {
             </div>
           )}
 
-          <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 lg:gap-5">
-            {pageItems.map((product) => (
-              <ProductCard key={product.id} product={product} />
-            ))}
-          </div>
+          {loading ? (
+            <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 lg:gap-5">
+              {Array.from({ length: 8 }).map((_, idx) => (
+                <div key={idx} className="rounded-xl border border-border bg-card overflow-hidden animate-pulse">
+                  <div className="aspect-square bg-secondary" />
+                  <div className="p-4 space-y-3">
+                    <div className="h-4 bg-secondary rounded w-4/5" />
+                    <div className="h-3 bg-secondary rounded w-full" />
+                    <div className="h-3 bg-secondary rounded w-2/3" />
+                    <div className="h-8 bg-secondary rounded-lg w-full" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 lg:gap-5">
+                {pageItems.map((product) => (
+                  <ProductCard key={product.id} product={product} />
+                ))}
+              </div>
 
-          {displayProducts.length > 0 && (
-            <Pagination
-              page={page}
-              totalPages={totalPages}
-              onPageChange={setPage}
-              rangeStart={rangeStart}
-              rangeEnd={rangeEnd}
-              total={total}
-              className="mt-12"
-            />
-          )}
+              {displayProducts.length > 0 && (
+                <Pagination
+                  page={page}
+                  totalPages={totalPages}
+                  onPageChange={setPage}
+                  rangeStart={rangeStart}
+                  rangeEnd={rangeEnd}
+                  total={total}
+                  className="mt-12"
+                />
+              )}
 
-          {displayProducts.length === 0 && (
+              {displayProducts.length === 0 && (
             <div className="text-center py-16">
               {query || hasActiveFilters ? (
                 <div>
@@ -351,6 +367,8 @@ const Products: React.FC = () => {
                 <p className="text-muted-foreground">{t('productsPage.noProducts')}</p>
               )}
             </div>
+              )}
+            </>
           )}
         </div>
       </section>

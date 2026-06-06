@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { Product } from '@/types';
-import { products as defaultProducts } from '@/data/products';
 import { productService } from '@/services/productService';
 
 const isDev = import.meta.env.DEV;
@@ -16,22 +15,24 @@ interface ProductsContextValue {
 }
 
 const ProductsContext = createContext<ProductsContextValue>({
-  products: defaultProducts,
-  loading: false,
+  products: [],
+  loading: true,
   refresh: async () => {},
 });
 
 export const ProductsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Começa com os defaults para a loja nunca ficar vazia/quebrada.
-  const [products, setProducts] = useState<Product[]>(defaultProducts);
+  // Evita piscar o catalogo antigo local enquanto o Firestore carrega.
+  const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
+    setLoading(true);
     try {
       const merged = await productService.getMerged();
-      if (merged.length > 0) setProducts(merged);
+      setProducts(merged);
     } catch (e) {
-      devWarn('ProductsContext refresh falhou, usando defaults:', e);
+      devWarn('ProductsContext refresh falhou:', e);
+      setProducts([]);
     } finally {
       setLoading(false);
     }

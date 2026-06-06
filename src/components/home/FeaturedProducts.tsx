@@ -14,7 +14,7 @@ import { productEnglishName } from '@/utils/productName';
 
 const FeaturedProducts: React.FC = () => {
   const { t, language, selectedCountry } = useLanguage();
-  const { products } = useProducts();
+  const { products, loading } = useProducts();
   const featuredProducts = products.filter(p => !p.hidden).slice(0, 4);
 
   const isEuro = ['Portugal', 'França', 'Itália', 'Espanha'].includes(selectedCountry);
@@ -40,7 +40,16 @@ const FeaturedProducts: React.FC = () => {
 
         {/* Products Grid */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 mb-12">
-          {featuredProducts.map((product) => {
+          {loading ? Array.from({ length: 4 }).map((_, idx) => (
+            <div key={idx} className="bg-gray-50 border border-gray-100 rounded-xl overflow-hidden animate-pulse">
+              <div className="aspect-square bg-secondary" />
+              <div className="p-3 md:p-4 space-y-3">
+                <div className="h-4 bg-secondary rounded w-4/5" />
+                <div className="h-3 bg-secondary rounded w-full" />
+                <div className="h-6 bg-secondary rounded w-2/3" />
+              </div>
+            </div>
+          )) : featuredProducts.map((product) => {
             const promo = hasDiscount(product);
             const smallPrice = getDisplayPrice(effectiveYen(product, 'small'));
             const smallOriginal = getDisplayPrice(product.prices.small);

@@ -32,7 +32,7 @@ interface Overrides {
 export const productService = {
   /** Lê os documentos do Firestore (overrides do admin). */
   async getOverrides(): Promise<Overrides> {
-    if (!db) return { items: [], deleted: [] };
+    if (!db) throw new Error('Firebase indisponível');
     try {
       const snap = await getDocs(collection(db, COL));
       const items: Product[] = [];
@@ -48,13 +48,16 @@ export const productService = {
       return { items, deleted };
     } catch (e) {
       devWarn('productService.getOverrides falhou:', e);
-      return { items: [], deleted: [] };
+      throw e;
     }
   },
 
   /** Lista final: defaults + criados no admin, com edições aplicadas e removidos escondidos. */
   async getMerged(): Promise<Product[]> {
     const { items, deleted } = await this.getOverrides();
+    const hasFirestoreCatalog = items.length > 0 || deleted.length > 0;
+    if (!hasFirestoreCatalog) return defaultProducts;
+
     const map = new Map<string, Product>();
     for (const p of defaultProducts) map.set(p.id, p);
     for (const p of items) map.set(p.id, p);
