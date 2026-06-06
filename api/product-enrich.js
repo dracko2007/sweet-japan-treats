@@ -59,7 +59,8 @@ async function searchRakuten(productName) {
       sort:          '-reviewCount',
     });
     const r = await fetch(
-      `https://app.rakuten.co.jp/services/api/IchibaItem/Search/20220601?${params}`
+      `https://app.rakuten.co.jp/services/api/IchibaItem/Search/20220601?${params}`,
+      { headers: { Referer: 'https://japanexpress-store.com/', 'User-Agent': 'JapanExpress/1.0' } }
     );
     lastRakutenDebug.status = r.status;
     if (!r.ok) {
