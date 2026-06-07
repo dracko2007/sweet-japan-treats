@@ -332,9 +332,9 @@ const Cart: React.FC = () => {
 
                   {/* Os pontos de fidelidade são aplicados na última etapa (revisão do pedido). */}
                   {isAuthenticated && availablePoints > 0 && (
-                    <div className="bg-purple-50 dark:bg-purple-950/20 border border-dashed border-purple-300 rounded-xl p-3 text-xs text-purple-700 flex items-center gap-1.5">
-                      <Sparkles className="w-3.5 h-3.5 shrink-0" />
-                      Você tem <b>{availablePoints} pontos</b> — use-os como desconto na etapa final da compra.
+                    <div className="bg-purple-50 dark:bg-purple-950/20 border border-dashed border-purple-300 rounded-xl p-3 text-xs text-purple-700 flex items-center gap-2">
+                      <Sparkles className="w-4 h-4 shrink-0" />
+                      <span>Você tem <b>{availablePoints} pontos</b>. Use como desconto na etapa final da compra.</span>
                     </div>
                   )}
 
