@@ -216,9 +216,34 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     return list;
   };
 
-  const getUserOrders = (userId: string): Order[] => {
-    const ordersData = safeStorage.getItem(`orders_${userId}`);
-    return ordersData ? JSON.parse(ordersData) : [];
+  const getUserOrders = (userId: string, email?: string): Order[] => {
+    const orderMap = new Map<string, Order>();
+    const addOrders = (list: unknown) => {
+      if (!Array.isArray(list)) return;
+      list.forEach((order: any) => {
+        const key = order?.orderNumber || order?.id;
+        if (key) orderMap.set(String(key), order as Order);
+      });
+    };
+
+    try {
+      const ordersData = safeStorage.getItem(`orders_${userId}`);
+      addOrders(ordersData ? JSON.parse(ordersData) : []);
+    } catch {
+      // Ignore malformed local cache.
+    }
+
+    try {
+      const normalizedEmail = email ? normalizeEmail(email) : '';
+      const users = JSON.parse(safeStorage.getItem('sweet-japan-users') || '{}');
+      addOrders(users[normalizedEmail]?.orders || users[email || '']?.orders);
+    } catch {
+      // Ignore malformed local users backup.
+    }
+
+    return Array.from(orderMap.values()).sort((a: any, b: any) =>
+      new Date(b.orderDate || b.date).getTime() - new Date(a.orderDate || a.date).getTime()
+    );
   };
 
   const saveUserOrders = (userId: string, orders: Order[]) => {
@@ -279,14 +304,14 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
   };
 
   // Helper: load orders from Firestore for a user
-  const loadOrdersFromFirestore = async (userId: string): Promise<Order[]> => {
+  const loadOrdersFromFirestore = async (userId: string, userEmail?: string): Promise<Order[]> => {
     try {
-      const firestoreOrders = await firebaseSyncService.getOrdersFromFirestore(userId);
+      const firestoreOrders = await firebaseSyncService.getOrdersFromFirestore(userId, userEmail);
       return firestoreOrders.map((o: any) => {
         const mapped = {
           id: o.id || o.orderNumber,
           orderNumber: o.orderNumber || o.id,
-          date: o.date || o.orderDate || o.syncedAt,
+          date: o.orderDate || o.date || o.syncedAt,
           items: o.items || [],
           totalAmount: o.totalAmount || o.totalPrice || 0,
           paymentMethod: o.paymentMethod || '',
@@ -338,7 +363,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
           setUser(userData);
         setIsAuthenticated(true);
         const userCoupons = resolveUserCoupons(userData);
-        const userOrders = getUserOrders(userData.id).map(fixTrackingUrl);
+        const userOrders = getUserOrders(userData.id, userData.email).map(fixTrackingUrl);
         setCoupons(userCoupons);
         setOrders(userOrders);
 
@@ -407,11 +432,11 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
           setIsAuthenticated(true);
           
           // Load local orders
-          const localOrders = getUserOrders(mergedUser.id);
+          const localOrders = getUserOrders(mergedUser.id, mergedUser.email);
           const userCoupons = resolveUserCoupons(mergedUser);
           
           // Load Firestore orders
-          const firestoreOrders = await loadOrdersFromFirestore(firebaseUser.uid);
+          const firestoreOrders = await loadOrdersFromFirestore(firebaseUser.uid, mergedUser.email);
           
           // Merge and set
           const allOrders = mergeOrders(localOrders, firestoreOrders);
@@ -441,7 +466,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
               setUser(userData);
             setIsAuthenticated(true);
             const userCoupons = resolveUserCoupons(userData);
-            const userOrders = getUserOrders(userData.id);
+            const userOrders = getUserOrders(userData.id, userData.email);
             setCoupons(userCoupons);
               setOrders(userOrders);
             } else {
@@ -525,7 +550,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
         setUser(foundUser);
         setIsAuthenticated(true);
         const userCoupons = resolveUserCoupons(foundUser);
-        const userOrders = getUserOrders(foundUser.id);
+        const userOrders = getUserOrders(foundUser.id, foundUser.email);
         setCoupons(userCoupons);
         setOrders(userOrders);
         safeStorage.setItem('user', JSON.stringify(stripSensitive(foundUser)));
@@ -590,8 +615,8 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
         setIsAuthenticated(true);
         
         // Load and merge orders
-        const localOrders = getUserOrders(userData.id);
-        const firestoreOrders = await loadOrdersFromFirestore(firebaseUser.uid);
+        const localOrders = getUserOrders(userData.id, (userData as any).email || normalizedEmail);
+        const firestoreOrders = await loadOrdersFromFirestore(firebaseUser.uid, (userData as any).email || normalizedEmail);
         const allOrders = mergeOrders(localOrders, firestoreOrders);
         
         const userCoupons = resolveUserCoupons(userData as UserProfile);
@@ -915,17 +940,22 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     };
     
     // Atualiza os pedidos do usuário atual
-    setOrders(prev => [newOrder, ...prev]);
+    setOrders(prev => (
+      prev.some((order) => order.orderNumber === newOrder.orderNumber)
+        ? prev
+        : [newOrder, ...prev]
+    ));
     
     // Sync to Firestore
     if (user) {
       try {
+        const customerEmail = normalizeEmail((orderData as any).customerEmail || user.email);
         await firebaseSyncService.syncOrderToFirestore(user.id, {
           ...newOrder,
           orderDate: newOrder.date,
           totalPrice: newOrder.totalAmount,
-          customerEmail: user.email,
-          customerName: user.name,
+          customerEmail,
+          customerName: (orderData as any).customerName || user.name,
           customerPhone: user.phone,
         });
         devLog('✅ [ORDER] Synced to Firestore:', newOrder.orderNumber);
@@ -939,11 +969,13 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       const usersData = safeStorage.getItem('sweet-japan-users');
       if (usersData) {
         const users = JSON.parse(usersData);
-        if (users[user.email]) {
-          if (!users[user.email].orders) {
-            users[user.email].orders = [];
+        const customerEmail = normalizeEmail((orderData as any).customerEmail || user.email);
+        const userKey = users[customerEmail] ? customerEmail : user.email;
+        if (users[userKey]) {
+          if (!users[userKey].orders) {
+            users[userKey].orders = [];
           }
-          users[user.email].orders.unshift({
+          users[userKey].orders.unshift({
             ...newOrder,
             orderDate: newOrder.date,
             totalPrice: newOrder.totalAmount,

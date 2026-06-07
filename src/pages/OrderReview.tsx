@@ -29,7 +29,7 @@ const devError = isDev ? console.error.bind(console) : () => {};
 
 const OrderReview: React.FC = () => {
   const { items, clearCart } = useCart();
-  const { consumeCouponByCode, user, addPoints } = useUser();
+  const { consumeCouponByCode, user, addPoints, addOrder } = useUser();
   const [pointsToUse, setPointsToUse] = useState<number>(() => {
     const v = Number(safeStorage.getItem('redeem_points'));
     return Number.isFinite(v) && v > 0 ? v : 0;
@@ -140,12 +140,14 @@ const OrderReview: React.FC = () => {
 
     const trackingPrefix = isJapan ? 'JP' : countryPrefix === 'BR' ? 'NX' : 'EX';
     const trackingCode = `${trackingPrefix}${Math.floor(100000000 + Math.random() * 900000000)}JP`;
+    const orderCreatedAt = new Date().toISOString();
+    const customerEmail = String(formData.email || user?.email || '').trim().toLowerCase();
 
     // Save mock order to simulated db (local storage for the admin panel)
     const mockOrder = {
       id: orderId,
       name: formData.name,
-      email: formData.email,
+      email: customerEmail,
       phone: formData.phone,
       cpf: formData.cpf || '',
       postalCode: formData.postalCode,
@@ -194,9 +196,9 @@ const OrderReview: React.FC = () => {
       orderNumber: orderId,
       id: orderId,
       customerName: formData.name,
-      customerEmail: formData.email || '',
+      customerEmail,
       status: 'pending',
-      orderDate: new Date().toISOString(),
+      orderDate: orderCreatedAt,
       date: mockOrder.date,
       totalPrice: grandTotal,
       total: grandTotal,
@@ -215,7 +217,7 @@ const OrderReview: React.FC = () => {
       shippingAddress: {
         name: formData.name,
         phone: formData.phone || '',
-        email: formData.email || '',
+        email: customerEmail,
         postalCode: formData.postalCode || '',
         prefecture: formData.prefecture || '',
         city: formData.city || '',
@@ -236,8 +238,12 @@ const OrderReview: React.FC = () => {
     };
 
     // Fire-and-forget: não trava a confirmação para o comprador
+    if (user) {
+      void addOrder(firestoreOrder as any);
+    }
+
     firebaseSyncService
-      .syncOrderToFirestore(user?.id || formData.email || 'guest', firestoreOrder)
+      .syncOrderToFirestore(user?.id || customerEmail || 'guest', firestoreOrder)
       .then((ok) => devLog(ok ? '✅ Pedido salvo no Firestore' : '⚠️ Falha ao salvar pedido no Firestore'))
       .catch((e) => devError('❌ Erro ao salvar pedido no Firestore:', e));
 
@@ -255,7 +261,7 @@ const OrderReview: React.FC = () => {
           affiliateCode: appliedCoupon.affiliateCode,
           netYen,
           orderId,
-          buyerEmail: formData.email || '',
+          buyerEmail: customerEmail,
         });
       });
       safeStorage.removeItem('affiliate_ref');

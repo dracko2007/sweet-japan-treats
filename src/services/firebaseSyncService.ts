@@ -165,7 +165,7 @@ export const firebaseSyncService = {
         ...cleanOrder,
         userId,
         syncedAt: new Date().toISOString()
-      });
+      }, { merge: true });
       
       devLog('✅ [FIREBASE] Order synced:', order.orderNumber);
       return true;
@@ -178,19 +178,43 @@ export const firebaseSyncService = {
   /**
    * Busca todos os pedidos de um usuário
    */
-  async getOrdersFromFirestore(userId: string) {
+  async getOrdersFromFirestore(userId: string, userEmail?: string) {
     try {
       ensureFirebaseReady();
       const ordersRef = collection(db, 'orders');
-      const q = query(ordersRef, where('userId', '==', userId));
-      const querySnapshot = await getDocs(q);
-      
-      const orders: any[] = [];
-      querySnapshot.forEach((doc) => {
-        orders.push({ id: doc.id, ...doc.data() });
-      });
-      
-      return orders;
+      const orderMap = new Map<string, any>();
+
+      const addSnapshot = (snapshot: any) => {
+        snapshot.forEach((docSnap: any) => {
+          const data = { id: docSnap.id, ...docSnap.data() };
+          const key = data.orderNumber || data.id || docSnap.id;
+          orderMap.set(key, data);
+        });
+      };
+
+      const runOrderQuery = async (field: string, value?: string) => {
+        const cleanValue = String(value || '').trim();
+        if (!cleanValue) return;
+        try {
+          const q = query(ordersRef, where(field, '==', cleanValue));
+          addSnapshot(await getDocs(q));
+        } catch (error) {
+          devWarn(`[FIREBASE] Could not query orders by ${field}:`, error);
+        }
+      };
+
+      await runOrderQuery('userId', userId);
+
+      const emailCandidates = Array.from(new Set(
+        [userEmail, userEmail?.toLowerCase()]
+          .map((email) => String(email || '').trim())
+          .filter(Boolean)
+      ));
+      for (const email of emailCandidates) {
+        await runOrderQuery('customerEmail', email);
+      }
+
+      return Array.from(orderMap.values());
     } catch (error) {
       devError('❌ [FIREBASE] Error getting orders:', error);
       return [];
