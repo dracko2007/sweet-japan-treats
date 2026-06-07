@@ -29,15 +29,22 @@ const devError = isDev ? console.error.bind(console) : () => {};
 const Profile: React.FC = () => {
   const { user, isAuthenticated, coupons, orders, updateProfile, logout } = useUser();
   const { selectedCountry } = useLanguage();
-  const isJapanAddress = selectedCountry === 'Japão';
-  // Lista de estados/províncias e dataset corretos conforme o país.
-  const addressList = isJapanAddress ? japanPrefectures : prefectures;
   const { products } = useProducts();
   const { addToCart, clearCart } = useCart();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [isEditing, setIsEditing] = useState(false);
   const [editedUser, setEditedUser] = useState<Partial<UserProfile>>(user || {});
+
+  // País do ENDEREÇO (independente do idioma do site). Define qual busca de CEP
+  // e qual lista de estados/províncias usar.
+  const addressCountry = (editedUser.address as any)?.country || selectedCountry || 'Brasil';
+  const EUROPE = ['Portugal', 'França', 'Itália', 'Espanha', 'Alemanha'];
+  const isJapanAddress = addressCountry === 'Japão';
+  const isBrazilAddress = addressCountry === 'Brasil';
+  const isEuropeAddress = EUROPE.includes(addressCountry);
+  // Lista de estados/províncias (Japão/Brasil têm lista; Europa é texto livre).
+  const addressList = isJapanAddress ? japanPrefectures : prefectures;
 
   // Avaliação a partir do histórico de pedidos
   const [reviewTarget, setReviewTarget] = useState<{ id: string; name: string } | null>(null);
@@ -163,6 +170,9 @@ const Profile: React.FC = () => {
           devError('Erro ao buscar CEP japonês:', error);
         }
       }
+    } else if (isEuropeAddress) {
+      // Europa: formato livre, sem busca automática (o cliente digita região e cidade).
+      setEditedUser(prev => ({ ...prev, address: { ...prev.address, postalCode: e.target.value } }));
     } else {
       // CEP brasileiro: 8 dígitos, formato XXXXX-XXX
       const clean = value.slice(0, 8);
@@ -344,54 +354,81 @@ const Profile: React.FC = () => {
                     />
                   </div>
                   <div className="space-y-2 md:col-span-2">
-                    <Label htmlFor="postalCode">{isJapanAddress ? 'CEP (郵便番号)' : 'CEP'}</Label>
+                    <Label htmlFor="addressCountry">País do endereço</Label>
+                    <select
+                      id="addressCountry"
+                      value={addressCountry}
+                      onChange={(e) => setEditedUser(prev => ({
+                        ...prev,
+                        // Troca o país e limpa estado/cidade pra evitar mistura de listas.
+                        address: { ...prev.address, country: e.target.value, prefecture: '', city: '' } as any,
+                      }))}
+                      className="w-full p-3 rounded-lg border border-border bg-background text-foreground focus:ring-2 focus:ring-primary focus:border-primary transition-all"
+                    >
+                      {['Brasil', 'Japão', 'Portugal', 'França', 'Itália', 'Espanha', 'Alemanha'].map((c) => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-2 md:col-span-2">
+                    <Label htmlFor="postalCode">{isJapanAddress ? 'CEP (郵便番号)' : isEuropeAddress ? 'Código Postal' : 'CEP'}</Label>
                     <Input
                       id="postalCode"
                       name="address.postalCode"
                       type="text"
-                      placeholder={isJapanAddress ? '100-0001' : '01001-000'}
+                      placeholder={isJapanAddress ? '100-0001' : isEuropeAddress ? '0000-000' : '01001-000'}
                       value={editedUser.address?.postalCode || ''}
                       onChange={handlePostalCodeChange}
-                      maxLength={isJapanAddress ? 8 : 9}
+                      maxLength={isEuropeAddress ? 12 : isJapanAddress ? 8 : 9}
                     />
                     <p className="text-xs text-muted-foreground">
-                      Digite o CEP - {isJapanAddress ? 'Província' : 'Estado'} e cidade preenchem automaticamente
+                      {isEuropeAddress
+                        ? 'Digite o código postal, a região/distrito e a cidade manualmente.'
+                        : `Digite o CEP - ${isJapanAddress ? 'Província' : 'Estado'} e cidade preenchem automaticamente`}
                     </p>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="prefecture">{isJapanAddress ? 'Província (都道府県)' : 'Estado (UF)'}</Label>
-                    <select
-                      id="prefecture"
-                      name="address.prefecture"
-                      value={editedUser.address?.prefecture || ''}
-                      onChange={(e) => {
-                        setEditedUser(prev => ({
-                          ...prev,
-                          address: {
-                            ...prev.address,
-                            prefecture: e.target.value
-                          }
-                        }));
-                      }}
-                      className="w-full p-3 rounded-lg border border-border bg-background text-foreground focus:ring-2 focus:ring-primary focus:border-primary transition-all"
-                    >
-                      <option value="">{isJapanAddress ? 'Escolha uma província...' : 'Escolha um estado...'}</option>
-                      {addressList.map((pref) => (
-                        <option key={pref.name} value={pref.name}>
-                          {pref.nameJa} ({pref.name})
-                        </option>
-                      ))}
-                    </select>
+                    <Label htmlFor="prefecture">{isJapanAddress ? 'Província (都道府県)' : isEuropeAddress ? 'Região / Distrito' : 'Estado (UF)'}</Label>
+                    {isEuropeAddress ? (
+                      <Input
+                        id="prefecture"
+                        name="address.prefecture"
+                        value={editedUser.address?.prefecture || ''}
+                        onChange={handleInputChange}
+                        placeholder="Ex.: Lisboa, Île-de-France..."
+                      />
+                    ) : (
+                      <select
+                        id="prefecture"
+                        name="address.prefecture"
+                        value={editedUser.address?.prefecture || ''}
+                        onChange={(e) => {
+                          setEditedUser(prev => ({
+                            ...prev,
+                            address: { ...prev.address, prefecture: e.target.value }
+                          }));
+                        }}
+                        className="w-full p-3 rounded-lg border border-border bg-background text-foreground focus:ring-2 focus:ring-primary focus:border-primary transition-all"
+                      >
+                        <option value="">{isJapanAddress ? 'Escolha uma província...' : 'Escolha um estado...'}</option>
+                        {addressList.map((pref) => (
+                          <option key={pref.name} value={pref.name}>
+                            {pref.nameJa} ({pref.name})
+                          </option>
+                        ))}
+                      </select>
+                    )}
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="city">Cidade (市区町村)</Label>
+                    <Label htmlFor="city">{isJapanAddress ? 'Cidade (市区町村)' : 'Cidade'}</Label>
                     <Input
                       id="city"
                       name="address.city"
                       value={editedUser.address?.city || ''}
                       onChange={handleInputChange}
-                      readOnly
-                      className="bg-secondary/50"
+                      readOnly={isBrazilAddress || isJapanAddress}
+                      className={isBrazilAddress || isJapanAddress ? 'bg-secondary/50' : ''}
+                      placeholder={isEuropeAddress ? 'Digite a cidade' : undefined}
                     />
                   </div>
                   <div className="space-y-2 md:col-span-2">
