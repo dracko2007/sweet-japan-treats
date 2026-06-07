@@ -68,10 +68,14 @@ const VideoReviewManager: React.FC = () => {
           </span>
         </div>
 
-        <a href={v.videoUrl} target="_blank" rel="noopener noreferrer"
-          className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline break-all mb-3">
-          <ExternalLink className="w-3.5 h-3.5 shrink-0" /> Abrir vídeo
-        </a>
+        {/^https?:\/\/(www\.)?(youtube\.com|youtu\.be)/.test(v.videoUrl) ? (
+          <a href={v.videoUrl} target="_blank" rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline break-all mb-3">
+            <ExternalLink className="w-3.5 h-3.5 shrink-0" /> Abrir vídeo
+          </a>
+        ) : (
+          <video src={v.videoUrl} controls className="w-full rounded-lg border border-border bg-black mb-3 max-h-60" />
+        )}
 
         {v.status === 'pending' ? (
           <div className="flex flex-wrap items-end gap-2 pt-2 border-t border-border">

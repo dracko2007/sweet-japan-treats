@@ -5,8 +5,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { useUser } from '@/context/UserContext';
 import { reviewService } from '@/services/reviewService';
 import { pointsService, POINTS } from '@/services/pointsService';
+import { uploadMedia } from '@/services/uploadService';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+
+const MAX_VIDEO_MB = 60;
 
 interface ReviewModalProps {
   productId: string;
@@ -23,7 +26,9 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ productId, productName, onClo
   const [hoverRating, setHoverRating] = useState(0);
   const [comment, setComment] = useState('');
   const [images, setImages] = useState<string[]>([]);
-  const [videoUrl, setVideoUrl] = useState('');
+  const [videoFile, setVideoFile] = useState<File | null>(null);
+  const [videoPreview, setVideoPreview] = useState('');
+  const [videoProgress, setVideoProgress] = useState(0);
   const [alreadyHasVideo, setAlreadyHasVideo] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -41,13 +46,37 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ productId, productName, onClo
     });
   };
 
-  const submit = () => {
+  const handleVideoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > MAX_VIDEO_MB * 1024 * 1024) {
+      toast({ title: 'Vídeo muito grande', description: `O limite é ${MAX_VIDEO_MB}MB. Grave um vídeo mais curto.`, variant: 'destructive' });
+      return;
+    }
+    setVideoFile(file);
+    setVideoPreview(URL.createObjectURL(file));
+  };
+
+  const submit = async () => {
     if (!user) return;
     if (selectedRating === 0) { toast({ title: 'Selecione uma nota (estrelas)', variant: 'destructive' }); return; }
     if (comment.trim().length < 10) { toast({ title: 'Escreva pelo menos 10 caracteres', variant: 'destructive' }); return; }
 
     setSaving(true);
-    const trimmedVideo = videoUrl.trim();
+
+    // Faz upload do vídeo (se houver) para o Firebase Storage antes de salvar.
+    let videoUrl = '';
+    if (videoFile && !alreadyHasVideo) {
+      try {
+        const { url } = await uploadMedia(videoFile, `review-videos/${productId}`, setVideoProgress);
+        videoUrl = url;
+      } catch (err: any) {
+        toast({ title: 'Falha ao enviar o vídeo', description: err?.message || 'Tente novamente.', variant: 'destructive' });
+        setSaving(false);
+        return;
+      }
+    }
+
     reviewService.addReview({
       productId,
       userId: user.id,
@@ -55,17 +84,17 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ productId, productName, onClo
       rating: selectedRating,
       comment: comment.trim(),
       images: images.length > 0 ? images : undefined,
-      videoUrl: trimmedVideo || undefined,
+      videoUrl: videoUrl || undefined,
       pointsAwarded: POINTS.perReview,
       verified: true, // veio do histórico → compra garantida
     });
     addPoints(POINTS.perReview);
 
     let videoMsg = '';
-    if (trimmedVideo && !alreadyHasVideo) {
+    if (videoUrl && !alreadyHasVideo) {
       pointsService.submitVideo({
         userId: user.id, userName: user.name, userEmail: user.email,
-        productId, productName, videoUrl: trimmedVideo,
+        productId, productName, videoUrl,
       });
       videoMsg = ' Seu vídeo foi enviado para validação — os pontos do vídeo entram após a aprovação do time.';
     }
@@ -139,14 +168,36 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ productId, productName, onClo
             </div>
           </div>
 
-          {/* Vídeo */}
+          {/* Vídeo — upload direto no site */}
           <div>
             <label className="block text-sm font-medium mb-2 flex items-center gap-1.5">
               <Video className="w-4 h-4" /> Vídeo de review <span className="text-amber-600 font-bold">(+{POINTS.perVideoMinute} pts/min, após validação)</span>
             </label>
-            <input type="url" value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)} disabled={alreadyHasVideo}
-              placeholder={alreadyHasVideo ? 'Você já enviou um vídeo deste produto' : 'Cole o link (YouTube, Instagram, TikTok)'}
-              className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm disabled:opacity-60" />
+
+            {alreadyHasVideo ? (
+              <p className="text-xs text-muted-foreground">Você já enviou um vídeo deste produto.</p>
+            ) : videoFile ? (
+              <div className="relative">
+                <video src={videoPreview} controls className="w-full max-h-48 rounded-lg bg-black" />
+                <button type="button" onClick={() => { setVideoFile(null); setVideoPreview(''); setVideoProgress(0); }}
+                  className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1"><X className="w-4 h-4" /></button>
+                <p className="text-xs text-muted-foreground mt-1 truncate">{videoFile.name} · {(videoFile.size / 1024 / 1024).toFixed(1)}MB</p>
+                {saving && videoProgress > 0 && (
+                  <div className="mt-2">
+                    <div className="h-2 bg-secondary rounded-full overflow-hidden">
+                      <div className="h-full bg-primary transition-all" style={{ width: `${videoProgress}%` }} />
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">Enviando vídeo... {videoProgress}%</p>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <label className="flex flex-col items-center justify-center gap-1 border-2 border-dashed border-border rounded-lg py-6 cursor-pointer hover:border-primary">
+                <Video className="w-6 h-6 text-muted-foreground" />
+                <span className="text-xs text-muted-foreground">Toque para gravar/enviar um vídeo (até {MAX_VIDEO_MB}MB)</span>
+                <input type="file" accept="video/*" className="hidden" onChange={handleVideoSelect} />
+              </label>
+            )}
           </div>
         </div>
 

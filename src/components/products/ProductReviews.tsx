@@ -122,10 +122,9 @@ const ProductReviews: React.FC<ProductReviewsProps> = ({ productId }) => {
                         allowFullScreen />
                     </div>
                   ) : (
-                    <a href={review.videoUrl} target="_blank" rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline">
-                      <PlayCircle className="w-5 h-5" /> Ver vídeo de review
-                    </a>
+                    // Vídeo enviado direto pelo cliente (arquivo no Storage) → player nativo.
+                    <video src={review.videoUrl} controls
+                      className="w-full max-w-md rounded-lg border border-border bg-black" />
                   )}
                 </div>
               )}
