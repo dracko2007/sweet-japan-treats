@@ -216,13 +216,55 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     return list;
   };
 
+  const normalizeStoredOrder = (order: any): Order | null => {
+    if (!order) return null;
+    const statusText = String(order.status || '').toLowerCase();
+    const status =
+      statusText.includes('cancel') ? 'cancelled'
+      : statusText.includes('deliv') || statusText.includes('entreg') ? 'delivered'
+      : statusText.includes('ship') || statusText.includes('trans') ? 'shipped'
+      : statusText.includes('confirm') || statusText.includes('pago') ? 'confirmed'
+      : 'pending';
+
+    return {
+      ...order,
+      id: order.id || order.orderNumber || `order-${Date.now()}`,
+      orderNumber: order.orderNumber || order.id,
+      date: order.orderDate || order.date || order.syncedAt || new Date().toISOString(),
+      items: Array.isArray(order.items)
+        ? order.items.map((item: any) => ({
+            productName: item.productName || item.name || item.productId || 'Produto',
+            size: item.size || '',
+            quantity: Number(item.quantity) || 1,
+            price: Number(item.price) || 0,
+          }))
+        : [],
+      totalAmount: Number(order.totalAmount ?? order.totalPrice ?? order.total ?? 0),
+      paymentMethod: order.paymentMethod || '',
+      status,
+      shipping: order.shipping || {
+        cost: Number(order.shippingCost) || 0,
+        carrier: order.shippingCarrier || '',
+      },
+      shippingAddress: order.shippingAddress || {
+        name: order.name || '',
+        postalCode: order.postalCode || '',
+        prefecture: order.prefecture || '',
+        city: order.city || '',
+        address: order.address || '',
+        building: order.building || '',
+      },
+    };
+  };
+
   const getUserOrders = (userId: string, email?: string): Order[] => {
     const orderMap = new Map<string, Order>();
     const addOrders = (list: unknown) => {
       if (!Array.isArray(list)) return;
       list.forEach((order: any) => {
-        const key = order?.orderNumber || order?.id;
-        if (key) orderMap.set(String(key), order as Order);
+        const normalized = normalizeStoredOrder(order);
+        const key = normalized?.orderNumber || normalized?.id;
+        if (key && normalized) orderMap.set(String(key), normalized);
       });
     };
 
@@ -239,6 +281,20 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       addOrders(users[normalizedEmail]?.orders || users[email || '']?.orders);
     } catch {
       // Ignore malformed local users backup.
+    }
+
+    try {
+      const normalizedEmail = email ? normalizeEmail(email) : '';
+      const legacyOrders = JSON.parse(safeStorage.getItem('sakura_orders') || '[]');
+      addOrders(
+        Array.isArray(legacyOrders)
+          ? legacyOrders.filter((order: any) =>
+              normalizeEmail(order?.customerEmail || order?.email || order?.shippingAddress?.email || '') === normalizedEmail
+            )
+          : []
+      );
+    } catch {
+      // Ignore malformed legacy orders backup.
     }
 
     return Array.from(orderMap.values()).sort((a: any, b: any) =>
