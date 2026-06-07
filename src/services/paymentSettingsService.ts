@@ -13,9 +13,18 @@ const devError = isDev ? console.error.bind(console) : () => {};
 export interface PaymentSettings {
   wiseLink: string;     // link de cobrança Wise ou Wisetag (ex: https://wise.com/pay/me/...)
   wiseEnabled: boolean; // mostra a opção Wise no checkout
+  pixKey: string;       // chave PIX que recebe os pagamentos (e-mail, CPF, telefone ou aleatória)
+  pixReceiverName: string; // nome do recebedor (como no banco), máx 25 caracteres
+  pixCity: string;      // cidade do recebedor, máx 15 caracteres
 }
 
-const DEFAULT: PaymentSettings = { wiseLink: '', wiseEnabled: false };
+const DEFAULT: PaymentSettings = {
+  wiseLink: '',
+  wiseEnabled: false,
+  pixKey: '',
+  pixReceiverName: 'Japan Express',
+  pixCity: 'Sao Paulo',
+};
 
 export const paymentSettingsService = {
   async get(): Promise<PaymentSettings> {

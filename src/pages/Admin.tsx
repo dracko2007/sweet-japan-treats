@@ -174,8 +174,8 @@ const Admin: React.FC = () => {
 
   const getStatusLabel = (status: string) => {
     const labels: Record<string, string> = {
-      pending: 'Pendente',
-      processing: 'Processando',
+      pending: 'Aguardando Pagamento',
+      processing: 'Pago / Preparando',
       shipped: 'Enviado',
       delivered: 'Entregue',
       cancelled: 'Cancelado',
@@ -720,12 +720,11 @@ _This is an automated test message_
                       {order.status === 'pending' && (
                         <Button
                           onClick={() => handleUpdateStatus(order.orderNumber, 'processing')}
-                          variant="outline"
                           size="sm"
-                          className="gap-2"
+                          className="gap-2 bg-green-600 hover:bg-green-700 text-white"
                         >
                           <CheckCircle className="w-4 h-4" />
-                          Processar
+                          Confirmar Pagamento
                         </Button>
                       )}
                       {(order.status === 'pending' || order.status === 'processing') && (

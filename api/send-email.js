@@ -160,8 +160,6 @@ export default async function handler(req, res) {
       rejected: info?.rejected,
       response: info?.response,
       messageId: info?.messageId,
-      linkError: linkError || undefined,
-      hasServiceAccount: Boolean(serviceAccountFromEnv()),
     });
   } catch (e) {
     console.error('[send-email]', e);

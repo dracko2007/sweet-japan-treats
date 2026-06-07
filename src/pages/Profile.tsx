@@ -9,6 +9,8 @@ import { useUser, UserProfile } from '@/context/UserContext';
 import { useCart } from '@/context/CartContext';
 import { useToast } from '@/hooks/use-toast';
 import { prefectures } from '@/data/prefectures';
+import { japanPrefectures } from '@/data/japanPrefectures';
+import { useLanguage } from '@/context/LanguageContext';
 import { addAddressHints } from '@/utils/romanize';
 import { useProducts } from '@/context/ProductsContext';
 import { isValidEmail, isValidPhone, isNonEmpty, maskPhone } from '@/utils/validation';
@@ -25,6 +27,10 @@ const devError = isDev ? console.error.bind(console) : () => {};
 
 const Profile: React.FC = () => {
   const { user, isAuthenticated, coupons, orders, updateProfile, logout } = useUser();
+  const { selectedCountry } = useLanguage();
+  const isJapanAddress = selectedCountry === 'Japão';
+  // Lista de estados/províncias e dataset corretos conforme o país.
+  const addressList = isJapanAddress ? japanPrefectures : prefectures;
   const { products } = useProducts();
   const { addToCart, clearCart } = useCart();
   const navigate = useNavigate();
@@ -125,57 +131,60 @@ const Profile: React.FC = () => {
     }
   };
 
-  // Busca automática de endereço por CEP
+  // Busca automática de endereço por CEP (Japão via zipcloud, Brasil via ViaCEP).
   const handlePostalCodeChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value.replace(/\D/g, '');
-    
-    // Formata CEP (XXX-XXXX)
-    let formatted = value;
-    if (value.length > 3) {
-      formatted = `${value.slice(0, 3)}-${value.slice(3, 7)}`;
-    }
-    
-    // Atualiza o campo CEP
-    setEditedUser(prev => ({
-      ...prev,
-      address: {
-        ...prev.address,
-        postalCode: formatted
-      }
-    }));
 
-    // Busca endereço quando CEP está completo (7 dígitos)
-    if (value.length === 7) {
-      try {
-        const response = await fetch(`https://zipcloud.ibsnet.co.jp/api/search?zipcode=${value}`);
-        const data = await response.json();
-        
-        if (data.status === 200 && data.results && data.results.length > 0) {
-          const result = data.results[0];
-          const prefecture = prefectures.find(p => p.nameJa === result.address1);
-          
-          // Adiciona hints de leitura para cidade e bairro separadamente
-          const city = addAddressHints(result.address2);
-          const neighborhood = result.address3 ? addAddressHints(result.address3) : '';
-          const cityDisplay = neighborhood ? `${city} ${neighborhood}` : city;
-          
-          setEditedUser(prev => ({
-            ...prev,
-            address: {
-              ...prev.address,
-              postalCode: formatted,
-              prefecture: prefecture?.name || '', // Usa apenas o nome em português
-              city: cityDisplay,
-            }
-          }));
-          
-          toast({
-            title: "Endereço encontrado!",
-            description: "Província e cidade preenchidos automaticamente.",
-          });
+    if (isJapanAddress) {
+      // CEP japonês: 7 dígitos, formato XXX-XXXX
+      const clean = value.slice(0, 7);
+      const formatted = clean.length > 3 ? `${clean.slice(0, 3)}-${clean.slice(3, 7)}` : clean;
+      setEditedUser(prev => ({ ...prev, address: { ...prev.address, postalCode: formatted } }));
+
+      if (clean.length === 7) {
+        try {
+          const response = await fetch(`https://zipcloud.ibsnet.co.jp/api/search?zipcode=${clean}`);
+          const data = await response.json();
+          if (data.status === 200 && data.results && data.results.length > 0) {
+            const result = data.results[0];
+            // Casa com a lista JAPONESA de províncias (ex.: 東京都)
+            const prefecture = japanPrefectures.find(p => p.nameJa === result.address1);
+            const city = addAddressHints(result.address2);
+            const neighborhood = result.address3 ? addAddressHints(result.address3) : '';
+            const cityDisplay = neighborhood ? `${city} ${neighborhood}` : city;
+            setEditedUser(prev => ({
+              ...prev,
+              address: { ...prev.address, postalCode: formatted, prefecture: prefecture?.name || '', city: cityDisplay },
+            }));
+            toast({ title: "Endereço encontrado!", description: "Província e cidade preenchidos automaticamente." });
+          }
+        } catch (error) {
+          devError('Erro ao buscar CEP japonês:', error);
         }
-      } catch (error) {
-        devError('Erro ao buscar CEP:', error);
+      }
+    } else {
+      // CEP brasileiro: 8 dígitos, formato XXXXX-XXX
+      const clean = value.slice(0, 8);
+      const formatted = clean.length > 5 ? `${clean.slice(0, 5)}-${clean.slice(5, 8)}` : clean;
+      setEditedUser(prev => ({ ...prev, address: { ...prev.address, postalCode: formatted } }));
+
+      if (clean.length === 8) {
+        try {
+          const response = await fetch(`https://viacep.com.br/ws/${clean}/json/`);
+          const data = await response.json();
+          if (response.ok && !data.erro) {
+            const addr = data.logradouro ? `${data.logradouro}${data.bairro ? `, Bairro: ${data.bairro}` : ''}` : '';
+            setEditedUser(prev => ({
+              ...prev,
+              address: { ...prev.address, postalCode: formatted, prefecture: data.uf || '', city: data.localidade || '', address: addr || prev.address?.address || '' },
+            }));
+            toast({ title: "CEP encontrado!", description: `${data.localidade} - ${data.uf}` });
+          } else {
+            toast({ title: "Erro no CEP", description: "Não foi possível localizar este CEP.", variant: "destructive" });
+          }
+        } catch (error) {
+          devError('Erro ao buscar CEP:', error);
+        }
       }
     }
   };
@@ -334,22 +343,22 @@ const Profile: React.FC = () => {
                     />
                   </div>
                   <div className="space-y-2 md:col-span-2">
-                    <Label htmlFor="postalCode">CEP (郵便番号)</Label>
+                    <Label htmlFor="postalCode">{isJapanAddress ? 'CEP (郵便番号)' : 'CEP'}</Label>
                     <Input
                       id="postalCode"
                       name="address.postalCode"
                       type="text"
-                      placeholder="100-0001"
+                      placeholder={isJapanAddress ? '100-0001' : '01001-000'}
                       value={editedUser.address?.postalCode || ''}
                       onChange={handlePostalCodeChange}
-                      maxLength={8}
+                      maxLength={isJapanAddress ? 8 : 9}
                     />
                     <p className="text-xs text-muted-foreground">
-                      Digite o CEP - Província e cidade preenchem automaticamente
+                      Digite o CEP - {isJapanAddress ? 'Província' : 'Estado'} e cidade preenchem automaticamente
                     </p>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="prefecture">Província (都道府県)</Label>
+                    <Label htmlFor="prefecture">{isJapanAddress ? 'Província (都道府県)' : 'Estado (UF)'}</Label>
                     <select
                       id="prefecture"
                       name="address.prefecture"
@@ -365,8 +374,8 @@ const Profile: React.FC = () => {
                       }}
                       className="w-full p-3 rounded-lg border border-border bg-background text-foreground focus:ring-2 focus:ring-primary focus:border-primary transition-all"
                     >
-                      <option value="">Escolha uma província...</option>
-                      {prefectures.map((pref) => (
+                      <option value="">{isJapanAddress ? 'Escolha uma província...' : 'Escolha um estado...'}</option>
+                      {addressList.map((pref) => (
                         <option key={pref.name} value={pref.name}>
                           {pref.nameJa} ({pref.name})
                         </option>

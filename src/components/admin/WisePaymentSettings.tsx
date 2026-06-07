@@ -25,10 +25,13 @@ const WisePaymentSettings: React.FC = () => {
       const clean: PaymentSettings = {
         wiseLink: settings.wiseLink.trim(),
         wiseEnabled: settings.wiseEnabled && !!settings.wiseLink.trim(),
+        pixKey: settings.pixKey.trim(),
+        pixReceiverName: settings.pixReceiverName.trim() || 'Japan Express',
+        pixCity: settings.pixCity.trim() || 'Sao Paulo',
       };
       await paymentSettingsService.save(clean);
       setSettings(clean);
-      toast({ title: '✅ Pagamento Wise salvo', description: clean.wiseEnabled ? 'Opção Wise ativa no checkout.' : 'Opção Wise desativada.' });
+      toast({ title: '✅ Pagamento salvo', description: clean.pixKey ? 'Chave PIX configurada — o QR Code do checkout usa ela.' : 'Configurações salvas.' });
     } catch (e: any) {
       toast({ title: 'Erro ao salvar', description: e?.message, variant: 'destructive' });
     } finally {
@@ -68,6 +71,44 @@ const WisePaymentSettings: React.FC = () => {
         />
         Mostrar a opção <strong>Wise</strong> no checkout (precisa do link preenchido)
       </label>
+
+      {/* Seção PIX */}
+      <div className="mt-5 pt-5 border-t border-border space-y-2">
+        <div className="flex items-center gap-2 mb-1">
+          <div className="w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center">
+            <Wallet className="w-4 h-4 text-orange-600" />
+          </div>
+          <div>
+            <p className="font-semibold text-foreground text-sm">Chave PIX (Brasil)</p>
+            <p className="text-xs text-muted-foreground">A chave abaixo gera o QR Code / Copia e Cola que o cliente paga.</p>
+          </div>
+        </div>
+        <input
+          value={settings.pixKey}
+          onChange={(e) => setSettings({ ...settings, pixKey: e.target.value })}
+          placeholder="Chave PIX (e-mail, CPF, telefone ou aleatória)"
+          className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm"
+        />
+        <div className="grid grid-cols-2 gap-2">
+          <input
+            value={settings.pixReceiverName}
+            onChange={(e) => setSettings({ ...settings, pixReceiverName: e.target.value })}
+            placeholder="Nome do recebedor (máx 25)"
+            maxLength={25}
+            className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm"
+          />
+          <input
+            value={settings.pixCity}
+            onChange={(e) => setSettings({ ...settings, pixCity: e.target.value })}
+            placeholder="Cidade (máx 15)"
+            maxLength={15}
+            className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm"
+          />
+        </div>
+        <p className="text-[11px] text-muted-foreground">
+          O nome e a cidade devem ser os mesmos cadastrados na sua conta do banco/PIX.
+        </p>
+      </div>
     </div>
   );
 };

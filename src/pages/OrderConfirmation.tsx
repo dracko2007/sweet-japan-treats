@@ -10,6 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { QRCodeSVG } from 'qrcode.react';
 import { formatPrice } from '@/utils/currency';
 import { paymentSettingsService } from '@/services/paymentSettingsService';
+import { buildPixPayload } from '@/utils/pixPayload';
 import DemoBanner from '@/components/DemoBanner';
 
 const OrderConfirmation: React.FC = () => {
@@ -18,17 +19,17 @@ const OrderConfirmation: React.FC = () => {
   const { toast } = useToast();
   const order = location.state?.order;
   
-  const [pixTimeLeft, setPixTimeLeft] = useState(600); // 10 minutes for PIX
-  const [pixStatus, setPixStatus] = useState<'pending' | 'loading' | 'success'>('pending');
   const [copied, setCopied] = useState(false);
   const [cardData, setCardData] = useState({ number: '', name: '', expiry: '', cvv: '' });
   const [cardStatus, setCardStatus] = useState<'idle' | 'processing' | 'success'>('idle');
   const [wiseLink, setWiseLink] = useState('');
+  const [pixSettings, setPixSettings] = useState({ pixKey: '', pixReceiverName: 'Japan Express', pixCity: 'Sao Paulo' });
 
   useEffect(() => {
-    if (order?.paymentMethod === 'wise') {
-      paymentSettingsService.get().then((s) => setWiseLink(s.wiseLink || ''));
-    }
+    paymentSettingsService.get().then((s) => {
+      setWiseLink(s.wiseLink || '');
+      setPixSettings({ pixKey: s.pixKey || '', pixReceiverName: s.pixReceiverName || 'Japan Express', pixCity: s.pixCity || 'Sao Paulo' });
+    });
   }, [order]);
 
   // Redirect if no order data is received
@@ -38,56 +39,25 @@ const OrderConfirmation: React.FC = () => {
     }
   }, [order, navigate]);
 
-  // PIX Countdown Timer
-  useEffect(() => {
-    if (order?.paymentMethod !== 'pix' || pixStatus === 'success') return;
-
-    const interval = setInterval(() => {
-      setPixTimeLeft(prev => {
-        if (prev <= 1) {
-          clearInterval(interval);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [order, pixStatus]);
-
-  // Simulate PIX Automatic Payment Detection (after 8 seconds)
-  useEffect(() => {
-    if (order?.paymentMethod !== 'pix' || pixStatus !== 'pending') return;
-
-    const timer = setTimeout(() => {
-      setPixStatus('loading');
-      setTimeout(() => {
-        setPixStatus('success');
-        
-        // Update order status in safeStorage to 'Pago'
-        const existingOrders = JSON.parse(safeStorage.getItem('sakura_orders') || '[]');
-        const updatedOrders = existingOrders.map((o: any) => {
-          if (o.id === order.id) {
-            return { ...o, status: 'Pago' };
-          }
-          return o;
-        });
-        safeStorage.setItem('sakura_orders', JSON.stringify(updatedOrders));
-
-        toast({
-          title: "Pagamento Aprovado! 🎉",
-          description: "Seu PIX foi identificado e o pedido foi enviado para o centro logístico de Tóquio.",
-        });
-      }, 2000);
-    }, 8000);
-
-    return () => clearTimeout(timer);
-  }, [order, pixStatus, toast]);
-
   if (!order) return null;
 
-  // Format PIX Payload Code
-  const pixPayload = `00020101021226870014br.gov.bcb.pix25800263600020000000000000000000000000000000000000000000000000000000000000000000000053039865405${order.total.toFixed(2)}5802BR5914Japan Express6009Sao Paulo62070503***6304`;
+  // PIX Copia e Cola real, gerado a partir da chave configurada pelo admin.
+  // Se a chave ainda não foi cadastrada, fica vazio e a tela mostra um aviso.
+  const pixPayload = pixSettings.pixKey
+    ? buildPixPayload({
+        key: pixSettings.pixKey,
+        amount: Number(order.total) || 0,
+        receiverName: pixSettings.pixReceiverName,
+        city: pixSettings.pixCity,
+        txid: String(order.id || '').replace(/[^a-zA-Z0-9]/g, '').slice(0, 25),
+      })
+    : '';
+
+  // Link de WhatsApp para o cliente enviar o comprovante do PIX.
+  const waMessage = encodeURIComponent(
+    `Olá! Acabei de fazer o pagamento PIX do pedido ${order.id} no valor de ${formatPrice(order.total, order.currency)}. Segue o comprovante:`
+  );
+  const whatsappComprovante = `https://wa.me/817013671679?text=${waMessage}`;
 
   const copyToClipboard = () => {
     navigator.clipboard.writeText(pixPayload);
@@ -99,39 +69,17 @@ const OrderConfirmation: React.FC = () => {
     setTimeout(() => setCopied(false), 3000);
   };
 
+  // Cartão ainda não integrado — não confirma pagamento automaticamente.
   const handleCardPay = (e: React.FormEvent) => {
     e.preventDefault();
-    setCardStatus('processing');
-    
-    setTimeout(() => {
-      setCardStatus('success');
-      
-      // Update order status in safeStorage to 'Pago'
-      const existingOrders = JSON.parse(safeStorage.getItem('sakura_orders') || '[]');
-      const updatedOrders = existingOrders.map((o: any) => {
-        if (o.id === order.id) {
-          return { ...o, status: 'Pago' };
-        }
-        return o;
-      });
-      safeStorage.setItem('sakura_orders', JSON.stringify(updatedOrders));
-
-      toast({
-        title: "Transação Aprovada! 💳",
-        description: "Seu pagamento foi confirmado pela operadora e enviado para Tóquio.",
-      });
-    }, 2500);
+    toast({
+      title: "Cartão em breve",
+      description: "O pagamento com cartão ainda não está disponível. Use o PIX por enquanto.",
+    });
   };
 
   const handlePrint = () => {
     window.print();
-  };
-
-  // Timer Formatting
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
   return (
@@ -245,20 +193,20 @@ const OrderConfirmation: React.FC = () => {
               </div>
             )}
 
-            {/* PIX SCREEN */}
+            {/* PIX SCREEN — pagamento manual com confirmação por comprovante */}
             {order.paymentMethod === 'pix' && (
               <div className="bg-white rounded-3xl border-2 border-orange-500 p-6 mb-8 shadow-md print:hidden text-center space-y-4">
                 <div className="flex items-center justify-center gap-2 text-orange-600 font-extrabold text-lg">
-                  <Smartphone className="w-6 h-6 animate-pulse" />
-                  <span>ÁREA DE PAGAMENTO PIX</span>
+                  <Smartphone className="w-6 h-6" />
+                  <span>PAGAMENTO VIA PIX</span>
                 </div>
 
-                {pixStatus === 'pending' && (
+                {pixPayload ? (
                   <div className="space-y-4">
-                    <div className="bg-red-50 text-red-700 text-xs font-semibold px-4 py-3 rounded-xl inline-flex items-center gap-2">
-                      <AlertCircle className="w-4 h-4 shrink-0" />
-                      <span>Seu pedido será cancelado se o PIX não for pago em {formatTime(pixTimeLeft)}</span>
-                    </div>
+                    <p className="text-sm text-gray-600 max-w-md mx-auto">
+                      Pague <strong>{formatPrice(order.total, order.currency)}</strong> escaneando o QR Code
+                      ou usando a chave Copia e Cola abaixo no app do seu banco.
+                    </p>
 
                     <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 inline-block shadow-sm">
                       <QRCodeSVG value={pixPayload} size={200} includeMargin={true} />
@@ -283,30 +231,33 @@ const OrderConfirmation: React.FC = () => {
                       </div>
                     </div>
 
-                    <div className="pt-2 flex flex-col items-center justify-center">
-                      <div className="animate-spin rounded-full h-5 h-5 border-2 border-orange-500 border-t-transparent mb-2"></div>
-                      <p className="text-xs text-orange-600 font-bold animate-pulse">
-                        Aguardando pagamento... (Simulador ativo)
+                    <div className="bg-orange-50 border border-orange-200 rounded-2xl p-4 max-w-md mx-auto space-y-3 text-left">
+                      <p className="text-sm font-bold text-orange-700 flex items-center gap-2">
+                        <AlertCircle className="w-4 h-4 shrink-0" />
+                        Importante: envie o comprovante
                       </p>
+                      <p className="text-xs text-orange-700 leading-relaxed">
+                        Depois de pagar, mande o <strong>comprovante</strong> pelo WhatsApp para confirmarmos.
+                        Seu pedido fica <strong>Aguardando Pagamento</strong> até a confirmação — aí preparamos o envio.
+                      </p>
+                      <a
+                        href={whatsappComprovante}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center justify-center gap-2 w-full bg-green-600 hover:bg-green-700 text-white font-bold px-4 py-3 rounded-xl transition-all"
+                      >
+                        <ExternalLink className="w-4 h-4" />
+                        Enviar comprovante no WhatsApp
+                      </a>
                     </div>
                   </div>
-                )}
-
-                {pixStatus === 'loading' && (
-                  <div className="py-8 space-y-3">
-                    <div className="animate-spin rounded-full h-12 w-12 border-4 border-orange-500 border-t-transparent mx-auto"></div>
-                    <p className="text-sm font-bold text-orange-600">Verificando recebimento do PIX...</p>
-                  </div>
-                )}
-
-                {pixStatus === 'success' && (
-                  <div className="bg-green-50 border border-green-200 rounded-2xl p-6 text-center space-y-3 animate-fade-in">
-                    <div className="w-12 h-12 rounded-full bg-green-500 flex items-center justify-center text-white mx-auto">
-                      ✓
-                    </div>
-                    <h3 className="font-sans font-bold text-lg text-green-800">Pagamento PIX Confirmado!</h3>
-                    <p className="text-xs text-green-700 max-w-sm mx-auto leading-relaxed">
-                      Seu pagamento foi aprovado instantaneamente. Seu pacote já está em processo de separação e rotulagem no porto de Tóquio. Rastreio: <strong>{order.trackingCode}</strong>.
+                ) : (
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-6 max-w-md mx-auto space-y-2">
+                    <AlertCircle className="w-8 h-8 text-yellow-600 mx-auto" />
+                    <p className="text-sm font-bold text-yellow-800">Chave PIX ainda não configurada</p>
+                    <p className="text-xs text-yellow-700 leading-relaxed">
+                      A loja ainda não cadastrou a chave PIX. Entre em contato pelo WhatsApp
+                      <strong> +81 70-1367-1679</strong> para combinar o pagamento do pedido <strong>{order.id}</strong>.
                     </p>
                   </div>
                 )}
@@ -516,7 +467,7 @@ const OrderConfirmation: React.FC = () => {
                   <div className="text-right">
                     <span className="text-muted-foreground block">Status Logístico:</span>
                     <span className="bg-orange-600 text-white font-extrabold px-2 py-0.5 rounded text-xs uppercase inline-block mt-1">
-                      {order.status === 'Pago' || pixStatus === 'success' || cardStatus === 'success'
+                      {order.status === 'Pago'
                         ? (order.currency === 'JPY' ? 'Preparando Envio Doméstico' : 'Aguardando Despacho Aéreo')
                         : 'Aguardando Pagamento'
                       }

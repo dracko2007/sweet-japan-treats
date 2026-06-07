@@ -92,11 +92,11 @@ const OrderReview: React.FC = () => {
   // Pontos ganhos pelo gasto em produtos (descontando o que foi pago com pontos)
   const earnedPoints = pointsForSpendYen(Math.max(0, productSubtotalYen - redeemPoints * POINTS.yenPerPoint));
 
-  // PIX gets 5% additional discount (Temu high conversion strategy) - ONLY for Brazil
   const isPix = paymentMethod === 'pix';
   const subtotalWithCoupon = Math.max(0, baseTotalPrice - couponDiscount - pointsDiscount);
-  const pixDiscount = (formData.country === 'Brasil' && isPix) ? subtotalWithCoupon * 0.05 : 0;
-  const priceAfterPix = subtotalWithCoupon - pixDiscount;
+  // Sem desconto por método de pagamento.
+  const pixDiscount = 0;
+  const priceAfterPix = subtotalWithCoupon;
   
   // Taxes (Estimated only, NOT added to grand total)
   let federalTax = 0;
@@ -607,28 +607,25 @@ const OrderReview: React.FC = () => {
                         <Label htmlFor="pix" className="flex-1 cursor-pointer">
                           <div className="flex items-center gap-2 mb-1">
                             <Smartphone className="w-5 h-5 text-orange-500" />
-                            <span className="font-bold text-base text-gray-800">PIX de Alta Velocidade</span>
-                            <span className="text-[10px] bg-orange-600 text-white font-extrabold px-2 py-0.5 rounded-full uppercase">5% OFF EXTRA</span>
+                            <span className="font-bold text-base text-gray-800">PIX</span>
                           </div>
                           <p className="text-xs text-muted-foreground leading-relaxed">
-                            Aprovação em 3 segundos. Mostraremos o QR Code e a chave Copia e Cola na próxima página.
+                            Mostraremos o QR Code e a chave Copia e Cola na próxima página. Após pagar, envie o comprovante para confirmarmos.
                           </p>
                         </Label>
                       </div>
 
-                      {/* Credit Card Option */}
-                      <div className={cn(
-                        "flex items-start space-x-3 p-4 rounded-xl border-2 transition-all cursor-pointer",
-                        paymentMethod === 'card' ? "border-orange-500 bg-orange-50/50" : "border-border hover:border-gray-300"
-                      )}>
-                        <RadioGroupItem value="card" id="card" className="mt-1" />
-                        <Label htmlFor="card" className="flex-1 cursor-pointer">
+                      {/* Credit Card Option — desativado por enquanto */}
+                      <div className="flex items-start space-x-3 p-4 rounded-xl border-2 border-border opacity-60 cursor-not-allowed">
+                        <RadioGroupItem value="card" id="card" className="mt-1" disabled />
+                        <Label htmlFor="card" className="flex-1">
                           <div className="flex items-center gap-2 mb-1">
-                            <CreditCard className="w-5 h-5 text-blue-500" />
-                            <span className="font-bold text-base text-gray-800">Cartão de Crédito Nacional / Internacional</span>
+                            <CreditCard className="w-5 h-5 text-gray-400" />
+                            <span className="font-bold text-base text-gray-600">Cartão de Crédito</span>
+                            <span className="text-[10px] bg-gray-400 text-white font-extrabold px-2 py-0.5 rounded-full uppercase">Em breve</span>
                           </div>
                           <p className="text-xs text-muted-foreground leading-relaxed">
-                            Parcele em até 12x no cartão (Visa, MasterCard, Elo, Amex).
+                            Pagamento com cartão estará disponível em breve. Por enquanto, use o PIX.
                           </p>
                         </Label>
                       </div>
