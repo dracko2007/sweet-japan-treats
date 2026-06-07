@@ -11,6 +11,7 @@ import {
   doc,
   setDoc,
   serverTimestamp,
+  deleteField,
 } from 'firebase/firestore';
 import { Product } from '@/types';
 import { products as defaultProducts } from '@/data/products';
@@ -23,6 +24,23 @@ const devError = isDev ? console.error.bind(console) : () => {};
 
 
 const COL = 'products';
+
+const stripUndefined = (value: unknown): unknown => {
+  if (value === undefined) return undefined;
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => stripUndefined(item))
+      .filter((item) => item !== undefined);
+  }
+  if (value && typeof value === 'object') {
+    return Object.entries(value as Record<string, unknown>).reduce<Record<string, unknown>>((acc, [key, item]) => {
+      const cleanItem = stripUndefined(item);
+      if (cleanItem !== undefined) acc[key] = cleanItem;
+      return acc;
+    }, {});
+  }
+  return value;
+};
 
 interface Overrides {
   items: Product[];
@@ -70,9 +88,13 @@ export const productService = {
     if (!db) throw new Error('Firebase indisponível');
     await ensureAdminAuth();
     const { id, ...rest } = product;
+    const cleanRest = stripUndefined(rest) as Record<string, unknown>;
+    Object.entries(rest).forEach(([key, value]) => {
+      if (value === undefined) cleanRest[key] = deleteField();
+    });
     await setDoc(
       doc(db, COL, id),
-      { ...rest, __deleted: false, updatedAt: serverTimestamp() },
+      { ...cleanRest, __deleted: false, updatedAt: serverTimestamp() },
       { merge: true }
     );
   },
