@@ -117,10 +117,13 @@ const Register: React.FC = () => {
 
       if (result.success) {
         toast({
-          title: "Cadastro realizado!",
-          description: "Sua conta foi criada. Entre com seu e-mail e senha.",
+          title: "Confirme seu e-mail",
+          description: "Enviamos um link de confirmação. Clique no link antes de fazer login.",
         });
-        navigate('/login', { replace: true, state: { registeredEmail: formData.email.trim() } });
+        navigate('/login', {
+          replace: true,
+          state: { registeredEmail: formData.email.trim(), verificationEmailSent: true },
+        });
       } else {
         toast({
           title: "Erro no cadastro",

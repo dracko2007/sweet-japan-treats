@@ -13,7 +13,10 @@ import LanguageSwitcher from '@/components/LanguageSwitcher';
 const Login: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const registeredEmail = (location.state as { registeredEmail?: string } | null)?.registeredEmail || '';
+  const loginState = location.state as { registeredEmail?: string; verificationEmailSent?: boolean } | null;
+  const registeredEmail = loginState?.registeredEmail || '';
+  const verificationEmailSent = Boolean(loginState?.verificationEmailSent);
+  const verifiedFromLink = new URLSearchParams(location.search).get('verified') === '1';
   const { toast } = useToast();
   const { login, isAuthenticated, sendPasswordReset, isAdminAccount } = useUser();
   const { t } = useLanguage();
@@ -26,7 +29,12 @@ const Login: React.FC = () => {
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [forgotEmail, setForgotEmail] = useState('');
   const [isSendingReset, setIsSendingReset] = useState(false);
-  const [needsVerification, setNeedsVerification] = useState(false);
+  const [needsVerification, setNeedsVerification] = useState(verificationEmailSent);
+  const [verificationNotice, setVerificationNotice] = useState(() => {
+    if (verifiedFromLink) return 'E-mail confirmado. Agora entre com seu e-mail e senha.';
+    if (verificationEmailSent) return 'Enviamos um link de confirmação para seu e-mail. Clique no link antes de fazer login.';
+    return '';
+  });
 
   // Conta admin → painel; conta usuário → loja. Sem escolha/troca.
   React.useEffect(() => {
@@ -54,7 +62,15 @@ const Login: React.FC = () => {
         });
         // Admin → tela de escolha (Admin/Cliente); cliente → o efeito redireciona
       } else {
-        if (result.needsVerification) setNeedsVerification(true);
+        if (result.needsVerification) {
+          setNeedsVerification(true);
+          setVerificationNotice(result.error || 'Confirme seu e-mail pelo link enviado antes de fazer login.');
+          toast({
+            title: "Confirme seu e-mail",
+            description: "Reenviamos o link de confirmação. Verifique a caixa de entrada e o spam.",
+          });
+          return;
+        }
         toast({
           title: "Erro ao fazer login",
           description: result.error || "Email ou senha incorretos.",
@@ -170,14 +186,16 @@ const Login: React.FC = () => {
                     </h2>
                   </div>
 
-                  {needsVerification && (
+                  {(needsVerification || verificationNotice) && (
                     <div className="mb-4 p-4 bg-yellow-50 dark:bg-yellow-950 border border-yellow-200 dark:border-yellow-800 rounded-lg">
                       <div className="flex items-start gap-3">
                         <MailCheck className="w-5 h-5 text-yellow-600 mt-0.5 flex-shrink-0" />
                         <div>
-                          <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">Email não verificado</p>
+                          <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
+                            {verifiedFromLink && !needsVerification ? 'E-mail confirmado' : 'Confirme seu e-mail'}
+                          </p>
                           <p className="text-xs text-yellow-700 dark:text-yellow-300 mt-1">
-                            Verifique sua caixa de entrada e clique no link de confirmação.
+                            {verificationNotice || 'Verifique sua caixa de entrada e clique no link de confirmação.'}
                           </p>
                         </div>
                       </div>

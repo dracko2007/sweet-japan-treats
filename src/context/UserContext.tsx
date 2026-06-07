@@ -140,6 +140,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
   const [loginAs, setLoginAsState] = useState<'admin' | 'user' | null>(
     () => (safeStorage.getItem('loginAs') as 'admin' | 'user' | null) || null
   );
+  const isRegisteringRef = React.useRef(false);
   const setLoginAs = (mode: 'admin' | 'user') => {
     setLoginAsState(mode);
     safeStorage.setItem('loginAs', mode);
@@ -153,6 +154,19 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
   const stripSensitive = (u: UserProfile): UserProfile => {
     const { password: _pw, ...safe } = u;
     return safe as UserProfile;
+  };
+
+  const canRestoreStoredSession = (u: Partial<UserProfile>): boolean =>
+    u.id === ADMIN_USER_ID || isAdminEmail(u.email) || (!firebaseConfigReady && allowLocalOnly);
+
+  const clearCurrentSession = () => {
+    setUser(null);
+    setIsAuthenticated(false);
+    setCoupons([]);
+    setOrders([]);
+    setLoginAsState(null);
+    safeStorage.removeItem('user');
+    safeStorage.removeItem('loginAs');
   };
 
   // Helper functions for users database
@@ -320,7 +334,8 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       try {
         const userData = JSON.parse(storedUser);
         devLog('⚡ [INIT] Restoring user from safeStorage:', userData.email);
-        setUser(userData);
+        if (canRestoreStoredSession(userData)) {
+          setUser(userData);
         setIsAuthenticated(true);
         const userCoupons = resolveUserCoupons(userData);
         const userOrders = getUserOrders(userData.id).map(fixTrackingUrl);
@@ -334,6 +349,10 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
           signInWithEmailAndPassword(auth, ADMIN_EMAIL, ADMIN_PASSWORD)
             .then(() => devLog('✅ Admin reautenticado no Firebase (sessão restaurada)'))
             .catch((err) => devWarn('⚠️ Falha ao reautenticar admin no Firebase:', err?.code));
+          }
+        } else {
+          devLog('[INIT] Ignoring customer safeStorage session until Firebase verifies email:', userData.email);
+          safeStorage.removeItem('user');
         }
       } catch (e) {
         devError('❌ [INIT] Failed to parse stored user:', e);
@@ -353,9 +372,12 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
         } catch { /* ignore */ }
         
         // Block unverified users (except admin)
-        if (!firebaseUser.emailVerified && firebaseUser.email !== 'dracko2007@gmail.com') {
+        if (!firebaseUser.emailVerified && !isAdminEmail(firebaseUser.email)) {
           devLog('🔥 [FIREBASE] User email not verified, signing out:', firebaseUser.email);
-          await firebaseSyncService.logoutUser();
+          clearCurrentSession();
+          if (!isRegisteringRef.current) {
+            await firebaseSyncService.logoutUser();
+          }
           return;
         }
         
@@ -415,12 +437,16 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
           try {
             const userData = JSON.parse(storedUser);
             devLog('🔥 [FIREBASE] Keeping safeStorage session for:', userData.email);
-            setUser(userData);
+            if (canRestoreStoredSession(userData)) {
+              setUser(userData);
             setIsAuthenticated(true);
             const userCoupons = resolveUserCoupons(userData);
             const userOrders = getUserOrders(userData.id);
             setCoupons(userCoupons);
-            setOrders(userOrders);
+              setOrders(userOrders);
+            } else {
+              clearCurrentSession();
+            }
           } catch (e) {
             devError('❌ Failed to parse stored user');
           }
@@ -529,11 +555,22 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
         };
       }
       
-      // Verificação de e-mail NÃO é exigida (ambiente de demonstração).
-      // O usuário pode entrar logo após o cadastro. Para produção, reative o
-      // bloqueio abaixo conferindo firebaseUser.emailVerified.
-      if (!firebaseUser.emailVerified) {
-        devLog('ℹ️ [LOGIN] E-mail não verificado, mas login liberado (modo demo):', normalizedEmail);
+      try {
+        await firebaseUser.reload();
+      } catch {
+        // Se o reload falhar, mantém o valor atual e bloqueia se ainda estiver falso.
+      }
+
+      if (!firebaseUser.emailVerified && !isAdminEmail(firebaseUser.email || normalizedEmail)) {
+        devLog('🔒 [LOGIN] E-mail não verificado, bloqueando acesso:', normalizedEmail);
+        await firebaseSyncService.resendVerificationEmail();
+        await firebaseSyncService.logoutUser();
+        clearCurrentSession();
+        return {
+          success: false,
+          needsVerification: true,
+          error: 'Confirme seu e-mail pelo link que enviamos. Reenviamos o link agora; verifique a caixa de entrada e o spam.',
+        };
       }
 
       // Get user data - we already have userProfile from above
@@ -637,6 +674,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
   };
 
   const register = async (userData: Omit<UserProfile, 'id' | 'createdAt' | 'password'> & { password: string }): Promise<{ success: boolean; error?: string }> => {
+    isRegisteringRef.current = true;
     try {
       const normalizedEmail = normalizeEmail(userData.email);
       devLog('🔍 [DEBUG] ===== REGISTER START =====');
@@ -741,6 +779,8 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     } catch (error) {
       devError('❌ [DEBUG] Error registering user:', error);
       return { success: false, error: 'Erro ao criar conta. Tente novamente.' };
+    } finally {
+      isRegisteringRef.current = false;
     }
   };
 
@@ -749,16 +789,8 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     // Logout from Firebase Auth
     await firebaseSyncService.logoutUser();
     
-    // Just clear the current session
-    setUser(null);
-    setIsAuthenticated(false);
-    setCoupons([]);
-    setOrders([]);
-    setLoginAsState(null);
-
     // Remove only current session, keep users database intact
-    safeStorage.removeItem('user');
-    safeStorage.removeItem('loginAs');
+    clearCurrentSession();
     devLog('User logged out successfully');
   };
 

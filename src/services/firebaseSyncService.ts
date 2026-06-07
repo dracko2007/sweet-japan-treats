@@ -33,6 +33,18 @@ const devLog = isDev ? console.log.bind(console) : () => {};
 const devWarn = isDev ? console.warn.bind(console) : () => {};
 const devError = isDev ? console.error.bind(console) : () => {};
 
+const getEmailActionSettings = () => {
+  const origin =
+    typeof window !== 'undefined' && window.location?.origin
+      ? window.location.origin
+      : 'https://japanexpress-store.com';
+
+  return {
+    url: `${origin}/login?verified=1`,
+    handleCodeInApp: false,
+  };
+};
+
 const ensureFirebaseReady = () => {
   if (!firebaseConfigReady || !auth || !db) {
     const error: any = new Error('Firebase not configured');
@@ -385,7 +397,7 @@ export const firebaseSyncService = {
       
       // Send email verification
       try {
-        await sendEmailVerification(userCredential.user);
+        await sendEmailVerification(userCredential.user, getEmailActionSettings());
         devLog('📧 [FIREBASE AUTH] Verification email sent to:', email);
       } catch (verifyError) {
         devWarn('⚠️ [FIREBASE AUTH] Could not send verification email:', verifyError);
@@ -406,7 +418,7 @@ export const firebaseSyncService = {
       ensureFirebaseReady();
       const currentUser = auth.currentUser;
       if (currentUser) {
-        await sendEmailVerification(currentUser);
+        await sendEmailVerification(currentUser, getEmailActionSettings());
         devLog('📧 [FIREBASE AUTH] Verification email resent');
         return true;
       }
