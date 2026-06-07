@@ -131,13 +131,15 @@ export default async function handler(req, res) {
 
     let type = String(body.type || 'welcome');
     let extra = {};
+    let linkError = null;
     if (type === 'verify') {
       // Se o link de verificação do Firebase falhar (ex.: domínio não autorizado),
       // não derruba o e-mail: cai para o template de boas-vindas e envia mesmo assim.
       try {
         extra = { link: await buildVerificationLink(to, req) };
       } catch (linkErr) {
-        console.warn('[send-email] verify link falhou, enviando welcome:', linkErr?.message);
+        linkError = String(linkErr?.message || linkErr);
+        console.warn('[send-email] verify link falhou, enviando welcome:', linkError);
         type = 'welcome';
       }
     }
@@ -158,6 +160,8 @@ export default async function handler(req, res) {
       rejected: info?.rejected,
       response: info?.response,
       messageId: info?.messageId,
+      linkError: linkError || undefined,
+      hasServiceAccount: Boolean(serviceAccountFromEnv()),
     });
   } catch (e) {
     console.error('[send-email]', e);
