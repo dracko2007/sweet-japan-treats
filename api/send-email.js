@@ -129,10 +129,18 @@ export default async function handler(req, res) {
       return;
     }
 
-    const type = String(body.type || 'welcome');
-    const extra = type === 'verify'
-      ? { link: await buildVerificationLink(to, req) }
-      : {};
+    let type = String(body.type || 'welcome');
+    let extra = {};
+    if (type === 'verify') {
+      // Se o link de verificação do Firebase falhar (ex.: domínio não autorizado),
+      // não derruba o e-mail: cai para o template de boas-vindas e envia mesmo assim.
+      try {
+        extra = { link: await buildVerificationLink(to, req) };
+      } catch (linkErr) {
+        console.warn('[send-email] verify link falhou, enviando welcome:', linkErr?.message);
+        type = 'welcome';
+      }
+    }
     const { subject, html } = buildTemplate(type, body.name || '', body.code || '', extra);
 
     const transporter = nodemailer.createTransport({
