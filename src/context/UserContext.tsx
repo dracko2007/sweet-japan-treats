@@ -806,7 +806,21 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
             const existingProfile = await firebaseSyncService.getUserFromFirestore(ghostUser.uid);
             
             if (existingProfile) {
-              // Real user with profile - truly already registered
+              // Conta já existe. Se o e-mail ainda NÃO foi confirmado, reenvia o
+              // link de verificação (em vez de só barrar) — assim o cliente que
+              // não recebeu/perdeu o e-mail consegue tentar de novo.
+              if (!ghostUser.emailVerified) {
+                const resent = await sendVerificationEmailWithFallback(normalizedEmail, userData.name);
+                await firebaseSyncService.logoutUser();
+                return {
+                  success: false,
+                  verificationEmailSent: resent,
+                  error: resent
+                    ? 'Este e-mail já tem cadastro, mas ainda não foi confirmado. Reenviamos o link de confirmação — verifique sua caixa de entrada e o spam.'
+                    : 'Este e-mail já tem cadastro mas ainda não foi confirmado. Tente fazer login para reenviar o link.',
+                };
+              }
+              // E-mail já confirmado → realmente já cadastrado.
               await firebaseSyncService.logoutUser();
               return { success: false, error: 'Este email já está cadastrado. Faça login na página de login.' };
             }

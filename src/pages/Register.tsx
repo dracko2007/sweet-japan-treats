@@ -133,6 +133,17 @@ const Register: React.FC = () => {
           replace: true,
           state: { registeredEmail: formData.email.trim(), verificationEmailSent },
         });
+      } else if (result.verificationEmailSent) {
+        // E-mail já cadastrado mas não confirmado → reenviamos o link.
+        // Não é erro: leva pro login com o aviso amigável.
+        toast({
+          title: "Link reenviado",
+          description: result.error || "Reenviamos o link de confirmação. Verifique sua caixa de entrada e o spam.",
+        });
+        navigate('/login', {
+          replace: true,
+          state: { registeredEmail: formData.email.trim(), verificationEmailSent: true },
+        });
       } else {
         toast({
           title: "Erro no cadastro",
