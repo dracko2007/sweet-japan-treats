@@ -26,6 +26,8 @@ export const getRates = () => _rates;
  *  JPY permanece em ienes (sem conversão nem margem). */
 export function convertYen(yen: number, currency: string): number {
   if (currency === 'JPY') return yen;
+  // Valor zerado (ou negativo) não recebe a margem — senão ¥0 viraria ~R$0,16.
+  if (!yen || yen <= 0) return 0;
   const rate = currency === 'EUR' ? _rates.EUR : _rates.BRL;
   return (yen + BUFFER_YEN) * rate;
 }

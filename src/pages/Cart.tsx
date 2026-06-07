@@ -39,11 +39,8 @@ const Cart: React.FC = () => {
   const [couponError, setCouponError] = useState('');
   const [showCouponList, setShowCouponList] = useState(false);
 
-  // Pontos de fidelidade a resgatar (persistido para o checkout/revisão usarem)
-  const [pointsToUse, setPointsToUse] = useState<number>(() => {
-    const v = Number(safeStorage.getItem('redeem_points'));
-    return Number.isFinite(v) && v > 0 ? v : 0;
-  });
+  // Os pontos são aplicados só na etapa de revisão do pedido — no carrinho fica 0.
+  const [pointsToUse, setPointsToUse] = useState<number>(0);
 
   // Cupons do perfil que estão válidos (para sugerir ao clicar no campo)
   const availableCoupons = coupons.filter(
@@ -136,10 +133,10 @@ const Cart: React.FC = () => {
   const redeemPoints = Math.max(0, Math.min(pointsToUse, maxRedeemable));
   const pointsDiscount = convertYen(redeemPoints * POINTS.yenPerPoint);
 
-  // Mantém o valor escolhido salvo para o checkout/revisão aplicarem
+  // Zera qualquer resgate antigo — os pontos são escolhidos na revisão do pedido.
   useEffect(() => {
-    safeStorage.setItem('redeem_points', String(redeemPoints));
-  }, [redeemPoints]);
+    safeStorage.setItem('redeem_points', '0');
+  }, []);
 
   const subtotalWithDiscount = Math.max(0, baseTotalPrice - discountAmount - pointsDiscount);
   
@@ -333,31 +330,11 @@ const Cart: React.FC = () => {
                     </form>
                   )}
 
-                  {/* Resgate de pontos de fidelidade */}
+                  {/* Os pontos de fidelidade são aplicados na última etapa (revisão do pedido). */}
                   {isAuthenticated && availablePoints > 0 && (
-                    <div className="bg-purple-50 dark:bg-purple-950/20 border border-dashed border-purple-300 rounded-xl p-3">
-                      <label className="text-xs font-bold text-purple-700 uppercase flex items-center justify-between gap-1.5 mb-2">
-                        <span className="flex items-center gap-1.5"><Sparkles className="w-3.5 h-3.5" /> Usar pontos</span>
-                        <span className="font-semibold normal-case">{availablePoints} disp. · 1 pt = ¥1</span>
-                      </label>
-                      <div className="flex gap-2">
-                        <input
-                          type="number" min={0} max={maxRedeemable}
-                          value={pointsToUse || ''}
-                          onChange={(e) => setPointsToUse(Math.max(0, Math.min(maxRedeemable, Number(e.target.value) || 0)))}
-                          placeholder="0"
-                          className="flex-1 px-3 py-2 text-sm rounded-lg border border-purple-300 bg-background font-bold"
-                        />
-                        <Button type="button" variant="secondary" onClick={() => setPointsToUse(maxRedeemable)} className="px-3 text-xs font-bold whitespace-nowrap">
-                          Usar máx.
-                        </Button>
-                      </div>
-                      {redeemPoints > 0 && (
-                        <p className="text-[11px] text-purple-700 font-semibold mt-1.5">
-                          −{formatPrice(pointsDiscount, currency)} de desconto ({redeemPoints} pts)
-                          <button onClick={() => setPointsToUse(0)} className="text-muted-foreground hover:underline ml-2">limpar</button>
-                        </p>
-                      )}
+                    <div className="bg-purple-50 dark:bg-purple-950/20 border border-dashed border-purple-300 rounded-xl p-3 text-xs text-purple-700 flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 shrink-0" />
+                      Você tem <b>{availablePoints} pontos</b> — use-os como desconto na etapa final da compra.
                     </div>
                   )}
 
@@ -386,15 +363,6 @@ const Cart: React.FC = () => {
                             ×
                           </button>
                         </span>
-                      </div>
-                    )}
-
-                    {pointsDiscount > 0 && (
-                      <div className="flex justify-between text-sm text-purple-700 font-bold bg-purple-50/60 p-2 rounded-lg border border-dashed border-purple-200">
-                        <span className="flex items-center gap-1">
-                          <Sparkles className="w-3.5 h-3.5 shrink-0" /> Pontos ({redeemPoints} pts)
-                        </span>
-                        <span>-{formatPrice(pointsDiscount, currency)}</span>
                       </div>
                     )}
 

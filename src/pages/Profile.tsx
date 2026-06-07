@@ -12,6 +12,7 @@ import { prefectures } from '@/data/prefectures';
 import { japanPrefectures } from '@/data/japanPrefectures';
 import { useLanguage } from '@/context/LanguageContext';
 import { addAddressHints } from '@/utils/romanize';
+import { formatPrice } from '@/utils/currency';
 import { useProducts } from '@/context/ProductsContext';
 import { isValidEmail, isValidPhone, isNonEmpty, maskPhone } from '@/utils/validation';
 import { affiliateService, AffiliateRequest } from '@/services/affiliateService';
@@ -654,7 +655,7 @@ const Profile: React.FC = () => {
                         </div>
                         <div className="text-right">
                           <p className="font-bold text-lg text-foreground">
-                            ¥{order.totalAmount.toLocaleString()}
+                            {formatPrice(order.totalAmount, (order as any).currency || 'JPY')}
                           </p>
                           <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${
                             order.status === 'delivered' ? 'bg-green-100 text-green-800' :
@@ -763,7 +764,7 @@ const Profile: React.FC = () => {
                                   </button>
                                 )
                               )}
-                              <span className="font-medium shrink-0">¥{(item.price * item.quantity).toLocaleString()}</span>
+                              <span className="font-medium shrink-0">{formatPrice(item.price * item.quantity, (order as any).currency || 'JPY')}</span>
                             </div>
                           );
                         })}
@@ -777,12 +778,13 @@ const Profile: React.FC = () => {
                         const shippingCost = shippingData?.cost ?? null;
                         const carrierName = shippingData?.carrier || '';
                         const couponCode = (order as any).couponCode || (order as any).appliedCoupon?.code || '';
-                        
+                        const oc = (order as any).currency || 'JPY';
+
                         return (
                           <div className="mt-2 pt-2 border-t border-border space-y-1 text-sm">
                             <div className="flex justify-between text-muted-foreground">
                               <span>Subtotal</span>
-                              <span>¥{itemsSubtotal.toLocaleString()}</span>
+                              <span>{formatPrice(itemsSubtotal, oc)}</span>
                             </div>
                             {discount > 0 && (
                               <div className="flex justify-between text-green-600">
@@ -790,7 +792,7 @@ const Profile: React.FC = () => {
                                   <Tag className="w-3 h-3" />
                                   Cupom {couponCode && <span className="font-mono text-xs">({couponCode})</span>}
                                 </span>
-                                <span>-¥{discount.toLocaleString()}</span>
+                                <span>-{formatPrice(discount, oc)}</span>
                               </div>
                             )}
                             {shippingCost != null && (
@@ -799,12 +801,12 @@ const Profile: React.FC = () => {
                                   <Truck className="w-3 h-3" />
                                   Frete {carrierName && <span className="text-xs">({carrierName})</span>}
                                 </span>
-                                <span>{shippingCost === 0 ? <span className="text-green-600">Grátis</span> : `¥${shippingCost.toLocaleString()}`}</span>
+                                <span>{shippingCost === 0 ? <span className="text-green-600">Grátis</span> : formatPrice(shippingCost, oc)}</span>
                               </div>
                             )}
                             <div className="flex justify-between font-semibold pt-1 border-t border-border">
                               <span>Total</span>
-                              <span className="text-primary">¥{order.totalAmount.toLocaleString()}</span>
+                              <span className="text-primary">{formatPrice(order.totalAmount, oc)}</span>
                             </div>
                           </div>
                         );
