@@ -419,13 +419,7 @@ export const firebaseSyncService = {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       devLog('✅ [FIREBASE AUTH] User registered:', userCredential.user.uid);
       
-      // Send email verification
-      try {
-        await sendEmailVerification(userCredential.user, getEmailActionSettings());
-        devLog('📧 [FIREBASE AUTH] Verification email sent to:', email);
-      } catch (verifyError) {
-        devWarn('⚠️ [FIREBASE AUTH] Could not send verification email:', verifyError);
-      }
+      // Verification is sent by UserContext through /api/send-email.
       
       return userCredential.user;
     } catch (error: any) {

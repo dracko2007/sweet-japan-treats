@@ -102,7 +102,7 @@ interface UserContextType {
   coupons: Coupon[];
   orders: Order[];
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string; code?: string; needsVerification?: boolean }>;
-  register: (userData: Omit<UserProfile, 'id' | 'createdAt' | 'password'> & { password: string }) => Promise<{ success: boolean; error?: string }>;
+  register: (userData: Omit<UserProfile, 'id' | 'createdAt' | 'password'> & { password: string }) => Promise<{ success: boolean; error?: string; verificationEmailSent?: boolean }>;
   logout: () => void;
   updateProfile: (userData: Partial<UserProfile>) => void;
   addPoints: (amount: number) => void;
@@ -564,6 +564,23 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     }
   }, [orders, user]);
 
+  const sendVerificationEmailWithFallback = async (email: string, name?: string): Promise<boolean> => {
+    const normalizedEmail = normalizeEmail(email);
+    try {
+      const mail = await import('@/services/mailService');
+      const sentByStore = await mail.sendVerificationEmail(normalizedEmail, name);
+      if (sentByStore) return true;
+    } catch (error) {
+      devWarn('[EMAIL] Store verification email failed:', error);
+    }
+
+    const fallbackSent = await firebaseSyncService.resendVerificationEmail();
+    if (fallbackSent) {
+      devWarn('[EMAIL] Firebase fallback accepted the verification email, but store email did not.');
+    }
+    return false;
+  };
+
   const login = async (email: string, password: string): Promise<{ success: boolean; error?: string; code?: string; needsVerification?: boolean }> => {
     const normalizedEmail = normalizeEmail(email);
     // 1) LOGIN DE ADMIN por usuário/nome ("Administrador" ou nome cadastrado) + senha.
@@ -644,13 +661,18 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
 
       if (!firebaseUser.emailVerified && !isAdminEmail(firebaseUser.email || normalizedEmail)) {
         devLog('🔒 [LOGIN] E-mail não verificado, bloqueando acesso:', normalizedEmail);
-        await firebaseSyncService.resendVerificationEmail();
+        const verificationSent = await sendVerificationEmailWithFallback(
+          normalizedEmail,
+          (userProfile as any)?.name || localUser?.name
+        );
         await firebaseSyncService.logoutUser();
         clearCurrentSession();
         return {
           success: false,
           needsVerification: true,
-          error: 'Confirme seu e-mail pelo link que enviamos. Reenviamos o link agora; verifique a caixa de entrada e o spam.',
+          error: verificationSent
+            ? 'Confirme seu e-mail pelo link que enviamos. Reenviamos o link agora; verifique a caixa de entrada e o spam.'
+            : 'Seu e-mail ainda nao foi confirmado, mas nao conseguimos reenviar o link automaticamente. Avise a loja para reenviar manualmente.',
         };
       }
 
@@ -754,7 +776,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     return { success: false, error: 'Erro ao fazer login. Tente novamente.' };
   };
 
-  const register = async (userData: Omit<UserProfile, 'id' | 'createdAt' | 'password'> & { password: string }): Promise<{ success: boolean; error?: string }> => {
+  const register = async (userData: Omit<UserProfile, 'id' | 'createdAt' | 'password'> & { password: string }): Promise<{ success: boolean; error?: string; verificationEmailSent?: boolean }> => {
     isRegisteringRef.current = true;
     try {
       const normalizedEmail = normalizeEmail(userData.email);
@@ -794,15 +816,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
             devLog('👻 [REGISTER] Ghost user confirmed. Creating profile...');
             firebaseUser = ghostUser;
             
-            // Resend verification email since they never verified
-            if (!ghostUser.emailVerified) {
-              try {
-                await firebaseSyncService.resendVerificationEmail();
-                devLog('📧 [REGISTER] Verification email resent for ghost user');
-              } catch (e) {
-                devWarn('⚠️ [REGISTER] Could not resend verification:', e);
-              }
-            }
+            // Verification is sent once below, after the profile is saved.
             // Fall through to profile creation below
           } catch (loginError: any) {
             // Can't login - wrong password for existing Auth account
@@ -848,15 +862,11 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       }
 
       // Encerra a sessão criada durante o cadastro (login é feito depois)
+      const verificationSent = await sendVerificationEmailWithFallback(normalizedEmail, userData.name);
       await firebaseSyncService.logoutUser();
 
-      // E-mail de confirmação de cadastro (de contato@japanexpress-store.com) — fire-and-forget
-      import('@/services/mailService')
-        .then((m) => m.sendConfirmationEmail(normalizedEmail, userData.name))
-        .catch(() => {});
-
       devLog('✅ [REGISTER] Cadastro concluído (sync nuvem:', syncResult, ')');
-      return { success: true };
+      return { success: true, verificationEmailSent: verificationSent };
     } catch (error) {
       devError('❌ [DEBUG] Error registering user:', error);
       return { success: false, error: 'Erro ao criar conta. Tente novamente.' };
@@ -1065,7 +1075,9 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
   };
 
   const resendVerificationEmail = async (): Promise<boolean> => {
-    return await firebaseSyncService.resendVerificationEmail();
+    const currentEmail = auth?.currentUser?.email;
+    if (!currentEmail) return false;
+    return await sendVerificationEmailWithFallback(currentEmail, user?.name);
   };
 
   const value: UserContextType = {

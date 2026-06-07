@@ -1,7 +1,9 @@
-// Cliente do envio de e-mail (chama a função serverless /api/send-email,
-// que usa o SMTP do Zoho no servidor). Falha de leve se não configurado.
+// Client for the serverless /api/send-email endpoint, which sends through
+// the store SMTP account on the server.
 
-async function send(payload: { to: string; type: 'welcome' | '2fa'; name?: string; code?: string }) {
+type MailType = 'welcome' | 'verify' | '2fa';
+
+async function send(payload: { to: string; type: MailType; name?: string; code?: string }) {
   try {
     const res = await fetch('/api/send-email', {
       method: 'POST',
@@ -14,10 +16,11 @@ async function send(payload: { to: string; type: 'welcome' | '2fa'; name?: strin
   }
 }
 
-/** E-mail de confirmação/boas-vindas no cadastro. */
 export const sendConfirmationEmail = (to: string, name?: string) =>
   send({ to, type: 'welcome', name });
 
-/** E-mail com código de verificação (2FA por e-mail). */
+export const sendVerificationEmail = (to: string, name?: string) =>
+  send({ to, type: 'verify', name });
+
 export const send2FACode = (to: string, code: string, name?: string) =>
   send({ to, type: '2fa', code, name });

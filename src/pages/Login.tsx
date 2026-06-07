@@ -16,6 +16,7 @@ const Login: React.FC = () => {
   const loginState = location.state as { registeredEmail?: string; verificationEmailSent?: boolean } | null;
   const registeredEmail = loginState?.registeredEmail || '';
   const verificationEmailSent = Boolean(loginState?.verificationEmailSent);
+  const verificationEmailFailed = Boolean(registeredEmail) && loginState?.verificationEmailSent === false;
   const verifiedFromLink = new URLSearchParams(location.search).get('verified') === '1';
   const { toast } = useToast();
   const { login, isAuthenticated, sendPasswordReset, isAdminAccount } = useUser();
@@ -32,6 +33,7 @@ const Login: React.FC = () => {
   const [needsVerification, setNeedsVerification] = useState(verificationEmailSent);
   const [verificationNotice, setVerificationNotice] = useState(() => {
     if (verifiedFromLink) return 'E-mail confirmado. Agora entre com seu e-mail e senha.';
+    if (verificationEmailFailed) return 'Conta criada, mas nao conseguimos enviar o link automaticamente. Tente entrar para reenviar.';
     if (verificationEmailSent) return 'Enviamos um link de confirmação para seu e-mail. Clique no link antes de fazer login.';
     return '';
   });
@@ -67,7 +69,7 @@ const Login: React.FC = () => {
           setVerificationNotice(result.error || 'Confirme seu e-mail pelo link enviado antes de fazer login.');
           toast({
             title: "Confirme seu e-mail",
-            description: "Reenviamos o link de confirmação. Verifique a caixa de entrada e o spam.",
+            description: result.error || "Verifique sua caixa de entrada e o spam.",
           });
           return;
         }

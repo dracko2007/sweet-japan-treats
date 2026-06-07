@@ -116,13 +116,22 @@ const Register: React.FC = () => {
       });
 
       if (result.success) {
-        toast({
-          title: "Confirme seu e-mail",
-          description: "Enviamos um link de confirmação. Clique no link antes de fazer login.",
-        });
+        const verificationEmailSent = result.verificationEmailSent !== false;
+        if (verificationEmailSent) {
+          toast({
+            title: "Confirme seu e-mail",
+            description: "Enviamos um link de confirmação. Clique no link antes de fazer login.",
+          });
+        } else {
+          toast({
+            title: "Conta criada",
+            description: "Nao conseguimos enviar o link automaticamente. Tente fazer login para reenviar ou avise a loja.",
+            variant: "destructive",
+          });
+        }
         navigate('/login', {
           replace: true,
-          state: { registeredEmail: formData.email.trim(), verificationEmailSent: true },
+          state: { registeredEmail: formData.email.trim(), verificationEmailSent },
         });
       } else {
         toast({
