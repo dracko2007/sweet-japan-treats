@@ -150,8 +150,15 @@ export default async function handler(req, res) {
       auth: { user: FROM, pass },
     });
 
-    await transporter.sendMail({ from: `"${BRAND}" <${FROM}>`, to, subject, html });
-    res.status(200).json({ ok: true, type });
+    const info = await transporter.sendMail({ from: `"${BRAND}" <${FROM}>`, to, subject, html });
+    res.status(200).json({
+      ok: true,
+      type,
+      accepted: info?.accepted,
+      rejected: info?.rejected,
+      response: info?.response,
+      messageId: info?.messageId,
+    });
   } catch (e) {
     console.error('[send-email]', e);
     res.status(e?.statusCode || 500).json({ error: String(e?.message || e) });
