@@ -8,6 +8,7 @@ import { convertYen as fxConvert } from '@/services/fxService';
 import { useLanguage } from '@/context/LanguageContext';
 import { cn } from '@/lib/utils';
 import { formatPrice } from '@/utils/currency';
+import { calculateCartShippingBoxes } from '@/utils/shippingDimensions';
 
 interface ShippingCalculatorProps {
   selectedPrefecture?: string;
@@ -45,19 +46,10 @@ const ShippingCalculator: React.FC<ShippingCalculatorProps> = ({
   const isEurope = ['Portugal', 'França', 'Itália', 'Espanha'].includes(destinationCountry || '');
   const hasDoceDeLeite = items.length > 0;
 
-  const calculateBoxes = useMemo(() => {
-    if (items.length === 0) return { boxes60: 0, boxes80: 0 };
-    const totalSmallEq = spaceInfo.totalSmallEquivalent;
-    if (totalSmallEq <= 4) return { boxes60: 1, boxes80: 0 };
-    else if (totalSmallEq <= 6) return { boxes60: 0, boxes80: 1 };
-    else if (totalSmallEq <= 8) return { boxes60: 2, boxes80: 0 };
-    else {
-      const boxes80Needed = Math.floor(totalSmallEq / 6);
-      const remaining = totalSmallEq % 6;
-      const boxes60Needed = remaining > 0 ? Math.ceil(remaining / 4) : 0;
-      return { boxes60: boxes60Needed, boxes80: boxes80Needed };
-    }
-  }, [items, spaceInfo.totalSmallEquivalent]);
+  const calculateBoxes = useMemo(
+    () => calculateCartShippingBoxes(items, spaceInfo),
+    [items, spaceInfo]
+  );
 
   const activePrefectures = isJapan 
     ? japanPrefectures 
@@ -330,6 +322,26 @@ const ShippingCalculator: React.FC<ShippingCalculatorProps> = ({
                 <span className="text-muted-foreground">Caixas 80cm estimadas:</span>
                 <span className="font-medium">{calculateBoxes.boxes80}</span>
               </div>
+              {calculateBoxes.usedRealDimensions && (
+                <div className="mt-2 rounded-lg bg-background/70 border border-border p-2 text-[11px] text-muted-foreground leading-relaxed">
+                  Frete calculado com medidas de embalagem e margem segura de +{calculateBoxes.safetyMarginCm}cm em largura,
+                  comprimento e altura.
+                  <span className="block">
+                    Maior soma usada: {Math.ceil(calculateBoxes.maxPaddedDimensionSumCm)}cm.
+                    Volume protegido: {Math.ceil(calculateBoxes.totalPaddedVolumeCm3).toLocaleString()}cm3.
+                  </span>
+                  {calculateBoxes.missingDimensionsCount > 0 && (
+                    <span className="block text-amber-700 dark:text-amber-300">
+                      {calculateBoxes.missingDimensionsCount} item(ns) sem medida real ainda foram estimados pelo padrao antigo.
+                    </span>
+                  )}
+                  {calculateBoxes.oversizeCount > 0 && (
+                    <span className="block text-orange-700 dark:text-orange-300">
+                      {calculateBoxes.oversizeCount} item(ns) passam de 80cm apos a margem; confira manualmente a tabela da transportadora.
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
             <div className="border-t border-border pt-2 mt-2">
               <div className="flex justify-between text-foreground font-bold">

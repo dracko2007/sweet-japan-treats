@@ -6,6 +6,14 @@ export interface ProductVariant {
   price: number;   // em ¥
 }
 
+export interface ProductPackageDimensionsCm {
+  widthCm: number;
+  lengthCm: number;
+  heightCm: number;
+  source?: 'yahoo' | 'rakuten' | 'manual' | string;
+  raw?: string;
+}
+
 export interface Product {
   id: string;
   name: string;
@@ -27,6 +35,7 @@ export interface Product {
   // Traduções por idioma (geradas via IA no cadastro). Mostra automático conforme o idioma do cliente.
   i18n?: Record<string, { name?: string; description?: string }>;
   weightGrams?: number;      // Peso real da embalagem em g (para cálculo de frete); se ausente, estimado por categoria.
+  packageDimensionsCm?: ProductPackageDimensionsCm; // Medidas da embalagem/produto em cm, sem margem de seguranca.
   tags?: string[];           // Tipos/subcategorias para filtro inteligente (ex: 'shampoo', 'filtro solar')
   isNew?: boolean;           // Marca como lançamento (aparece em destaque no filtro "Lançamento")
   salesCount?: number;       // Quantidade vendida (usado no filtro "Mais Vendidos"); atualizado manualmente pelo admin

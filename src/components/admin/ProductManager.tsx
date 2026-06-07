@@ -12,6 +12,7 @@ import { useProducts } from '@/context/ProductsContext';
 import { productService } from '@/services/productService';
 import { useToast } from '@/hooks/use-toast';
 import { useUser } from '@/context/UserContext';
+import { PACKAGE_SAFETY_MARGIN_CM, sanitizePackageDimensions } from '@/utils/shippingDimensions';
 
 const CATEGORIES = [
   { id: 'cosmeticos', label: 'Cosméticos', icon: '🧴' },
@@ -136,6 +137,19 @@ const ProductManager: React.FC = () => {
     setEditing({ ...editing, tags: (editing.tags || []).filter(t => t !== tag) });
   };
 
+  const updatePackageDimension = (field: 'widthCm' | 'lengthCm' | 'heightCm', value: string) => {
+    if (!editing) return;
+    const current = editing.packageDimensionsCm || { widthCm: 0, lengthCm: 0, heightCm: 0, source: 'manual' };
+    setEditing({
+      ...editing,
+      packageDimensionsCm: {
+        ...current,
+        [field]: Number(value) || 0,
+        source: current.source || 'manual',
+      },
+    });
+  };
+
   // Chama /api/product-enrich para preencher automaticamente descrição, preços e fotos.
   const handleEnrich = async () => {
     if (!editing || !editing.name.trim()) {
@@ -187,6 +201,11 @@ const ProductManager: React.FC = () => {
       }
 
       // Custo e preço de venda — sempre atualiza quando a IA retorna valor
+      if (data.packageDimensionsCm) {
+        const dimensions = sanitizePackageDimensions(data.packageDimensionsCm);
+        if (dimensions) updatedEditing.packageDimensionsCm = dimensions;
+      }
+
       if (canPrice) {
         if (data.costYen) updatedEditing.cost = data.costYen;
         if (data.sellingPriceYen) {
@@ -282,6 +301,7 @@ const ProductManager: React.FC = () => {
       const priceVals = cleanVariants.map((v) => v.price);
       const small = priceVals.length ? Math.min(...priceVals) : Number(editing.prices?.small) || 0;
       const large = priceVals.length ? Math.max(...priceVals) : Number(editing.prices?.large) || small;
+      const packageDimensionsCm = sanitizePackageDimensions(editing.packageDimensionsCm);
       const product: Product = {
         ...editing,
         id,
@@ -290,6 +310,7 @@ const ProductManager: React.FC = () => {
         cost: Number(editing.cost) || 0,
         variants: cleanVariants.length ? cleanVariants : undefined,
         prices: { small, large },
+        packageDimensionsCm: packageDimensionsCm || undefined,
       };
       await productService.save(product);
       await refresh();
@@ -409,7 +430,7 @@ const ProductManager: React.FC = () => {
                     type="button"
                     onClick={handleEnrich}
                     disabled={enriching || !editing.name.trim()}
-                    title="Busca descrição, fotos e preço automaticamente no Rakuten + IA"
+                    title="Busca descrição, fotos, preço e medidas no Yahoo/Rakuten + IA"
                     className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-sm font-bold disabled:opacity-50 disabled:cursor-not-allowed transition-colors shrink-0"
                   >
                     {enriching
@@ -420,7 +441,7 @@ const ProductManager: React.FC = () => {
                   </button>
                 </div>
                 <p className="text-[11px] text-muted-foreground mt-1">
-                  ✨ <strong>Auto-preencher</strong>: busca descrição, preço (Rakuten/IA) e até 5 fotos automaticamente.
+                  ✨ <strong>Auto-preencher</strong>: busca descrição, preço, medidas da embalagem (quando o marketplace informa) e até 5 fotos automaticamente.
                 </p>
               </div>
 
@@ -638,6 +659,53 @@ const ProductManager: React.FC = () => {
                 ) : (
                   <p className="text-xs text-amber-700/80 dark:text-amber-400/80 mt-1.5">Para calcular lucro real no dashboard. O cliente NUNCA vê este valor.</p>
                 )}
+              </div>
+
+              <div className="bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-900 rounded-lg p-3">
+                <label className="text-sm font-semibold block mb-2">
+                  Medidas da embalagem para frete (cm)
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  <div>
+                    <span className="text-[11px] text-muted-foreground">Largura</span>
+                    <input
+                      type="number"
+                      min={0}
+                      step="0.1"
+                      value={editing.packageDimensionsCm?.widthCm || ''}
+                      onChange={(e) => updatePackageDimension('widthCm', e.target.value)}
+                      placeholder="L"
+                      className="w-full px-3 py-2 rounded-lg border border-orange-200 bg-background text-sm"
+                    />
+                  </div>
+                  <div>
+                    <span className="text-[11px] text-muted-foreground">Comprimento</span>
+                    <input
+                      type="number"
+                      min={0}
+                      step="0.1"
+                      value={editing.packageDimensionsCm?.lengthCm || ''}
+                      onChange={(e) => updatePackageDimension('lengthCm', e.target.value)}
+                      placeholder="C"
+                      className="w-full px-3 py-2 rounded-lg border border-orange-200 bg-background text-sm"
+                    />
+                  </div>
+                  <div>
+                    <span className="text-[11px] text-muted-foreground">Altura</span>
+                    <input
+                      type="number"
+                      min={0}
+                      step="0.1"
+                      value={editing.packageDimensionsCm?.heightCm || ''}
+                      onChange={(e) => updatePackageDimension('heightCm', e.target.value)}
+                      placeholder="A"
+                      className="w-full px-3 py-2 rounded-lg border border-orange-200 bg-background text-sm"
+                    />
+                  </div>
+                </div>
+                <p className="text-[11px] text-orange-700 dark:text-orange-300 mt-2 leading-relaxed">
+                  O frete soma automaticamente +{PACKAGE_SAFETY_MARGIN_CM}cm em largura, comprimento e altura. Fonte: {editing.packageDimensionsCm?.source || 'manual/nao informado'}.
+                </p>
               </div>
 
               {/* Descrição */}

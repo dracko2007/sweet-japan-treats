@@ -97,6 +97,76 @@ function cleanDescription(text, maxLen = 1200) {
     .slice(0, maxLen);
 }
 
+function normalizeDimensionText(text) {
+  return decodeHtmlEntities(text)
+    .normalize('NFKC')
+    .replace(/[×✕✖＊*]/g, 'x')
+    .replace(/[㎝]/g, 'cm')
+    .replace(/[㎜]/g, 'mm')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function dimensionNumber(value) {
+  const n = Number(String(value || '').replace(',', '.'));
+  return Number.isFinite(n) ? n : 0;
+}
+
+function makePackageDimensions(a, b, c, unitHint, raw, source) {
+  let widthCm = dimensionNumber(a);
+  let lengthCm = dimensionNumber(b);
+  let heightCm = dimensionNumber(c);
+  const unit = String(unitHint || '').toLowerCase();
+
+  if (!widthCm || !lengthCm || !heightCm) return null;
+  if (unit.includes('mm') || Math.max(widthCm, lengthCm, heightCm) > 120) {
+    widthCm /= 10;
+    lengthCm /= 10;
+    heightCm /= 10;
+  }
+
+  const values = [widthCm, lengthCm, heightCm];
+  if (!values.every((n) => n > 0 && n <= 200)) return null;
+
+  return {
+    widthCm: Math.round(widthCm * 10) / 10,
+    lengthCm: Math.round(lengthCm * 10) / 10,
+    heightCm: Math.round(heightCm * 10) / 10,
+    source,
+    raw: String(raw || '').slice(0, 180),
+  };
+}
+
+function extractPackageDimensions(text, source) {
+  const normalized = normalizeDimensionText(text || '');
+  if (!normalized) return null;
+
+  const labeledPatterns = [
+    /(?:幅|横|W|width)\D{0,16}(\d+(?:[.,]\d+)?)\s*(cm|mm|センチ|ミリ)?[\s\S]{0,100}(?:奥行|長さ|縦|D|depth|L|length)\D{0,16}(\d+(?:[.,]\d+)?)\s*(cm|mm|センチ|ミリ)?[\s\S]{0,100}(?:高さ|H|height)\D{0,16}(\d+(?:[.,]\d+)?)\s*(cm|mm|センチ|ミリ)?/i,
+    /(?:W|width)\D{0,10}(\d+(?:[.,]\d+)?)\s*(cm|mm)?\D{0,30}(?:D|depth|L|length)\D{0,10}(\d+(?:[.,]\d+)?)\s*(cm|mm)?\D{0,30}(?:H|height)\D{0,10}(\d+(?:[.,]\d+)?)\s*(cm|mm)?/i,
+  ];
+
+  for (const pattern of labeledPatterns) {
+    const match = normalized.match(pattern);
+    if (!match) continue;
+    const unit = match[2] || match[4] || match[6] || '';
+    const result = makePackageDimensions(match[1], match[3], match[5], unit, match[0], source);
+    if (result) return result;
+  }
+
+  const contextPattern = /(?:パッケージサイズ|梱包サイズ|商品サイズ|本体サイズ|外寸|寸法|サイズ|size|dimensions?)[\s\S]{0,160}/ig;
+  const contexts = [...normalized.matchAll(contextPattern)].map((m) => m[0]);
+  for (const context of contexts) {
+    const sequence = context.match(/(\d+(?:[.,]\d+)?)\s*(cm|mm|センチ|ミリ)?\s*x\s*(\d+(?:[.,]\d+)?)\s*(cm|mm|センチ|ミリ)?\s*x\s*(\d+(?:[.,]\d+)?)\s*(cm|mm|センチ|ミリ)?/i);
+    if (!sequence) continue;
+    const unit = sequence[2] || sequence[4] || sequence[6] || '';
+    const result = makePackageDimensions(sequence[1], sequence[3], sequence[5], unit, context, source);
+    if (result) return result;
+  }
+
+  return null;
+}
+
 function attrValue(tag, attr) {
   const m = tag.match(new RegExp(`\\b${attr}\\s*=\\s*(["'])([\\s\\S]*?)\\1`, 'i'));
   return m ? m[2] : '';
@@ -190,6 +260,10 @@ async function searchRakuten(productName) {
     const descJa      = cleanDescription(item.itemCaption || item.itemDescription || '');
     const descSource  = descJa ? 'rakuten-api-description' : 'none';
     const suggestName = (item.itemName || productName).slice(0, 120);
+    const packageDimensionsCm = extractPackageDimensions(
+      [item.itemName, item.itemCaption, item.itemDescription].filter(Boolean).join('\n'),
+      'rakuten'
+    );
 
     // mediumImageUrls pode ser array de strings ou de objetos {imageUrl}
     const rawImgs = item.mediumImageUrls || item.smallImageUrls || [];
@@ -199,7 +273,7 @@ async function searchRakuten(productName) {
       .map(u => u.replace('?_ex=128x128', '')) // tenta versão maior
       .slice(0, 5);
 
-    return { priceYen, descJa, descSource, images, suggestName, source: 'rakuten' };
+    return { priceYen, descJa, descSource, images, suggestName, source: 'rakuten', packageDimensionsCm };
   } catch (e) {
     lastRakutenDebug.error = String(e?.message || e);
     return null;
@@ -231,8 +305,9 @@ async function searchYahoo(productName) {
     const priceYen    = Number(item.price) || 0;
     let descJa        = cleanDescription(item.description || item.headLine || '');
     let descSource    = item.description ? 'yahoo-api-description' : item.headLine ? 'yahoo-headline' : 'none';
+    let pageDesc      = '';
     if (descJa.length < 80 && item.url) {
-      const pageDesc = await fetchYahooPageDescription(item.url);
+      pageDesc = await fetchYahooPageDescription(item.url);
       yahooDebug.pageDescLen = pageDesc.length;
       yahooDebug.itemUrl = item.url;
       if (pageDesc.length > descJa.length) {
@@ -241,13 +316,27 @@ async function searchYahoo(productName) {
       }
     }
     const suggestName = (item.name || productName).slice(0, 120);
+    let packageDimensionsCm = extractPackageDimensions(
+      [item.name, item.description, item.headLine, descJa].filter(Boolean).join('\n'),
+      'yahoo'
+    );
+    if (!packageDimensionsCm && item.url) {
+      pageDesc = pageDesc || await fetchYahooPageDescription(item.url);
+      yahooDebug.pageDescLen = Math.max(Number(yahooDebug.pageDescLen) || 0, pageDesc.length);
+      yahooDebug.itemUrl = item.url;
+      packageDimensionsCm = extractPackageDimensions(
+        [item.name, item.description, item.headLine, descJa, pageDesc].filter(Boolean).join('\n'),
+        'yahoo'
+      );
+    }
+    yahooDebug.packageDimensionsCm = packageDimensionsCm;
     // Prioriza a imagem ESTENDIDA (exImage = maior/HD). Só usa média se não houver HD.
     const hd  = hits.map(h => h.exImage?.url).filter(Boolean);
     const med = hits.map(h => h.image?.medium || h.image?.small).filter(Boolean);
     // Sobe a resolução das URLs do yimg para a maior versão (/i/z/ = HD)
     const upscale = (u) => u.replace(/\/i\/[a-z]\//, '/i/z/');
     const images = [...new Set((hd.length ? hd : med).map(upscale))].slice(0, 5);
-    return { priceYen, descJa, descSource, images, suggestName, source: 'yahoo' };
+    return { priceYen, descJa, descSource, images, suggestName, source: 'yahoo', packageDimensionsCm };
   } catch (e) {
     yahooDebug.error = String(e?.message || e);
     return null;
@@ -641,6 +730,7 @@ export default async function handler(req, res) {
       i18n,                       // { pt:{description}, en:{description}, ja:{description} }
       costYen,                    // custo de aquisição (Rakuten ou estimado)
       sellingPriceYen,            // preço de venda final (custo × markup)
+      packageDimensionsCm: rakuten?.packageDimensionsCm || null,
       images:      rakuten?.images || [],
       suggestName: nameEn,        // nome em inglês (não traduzido)
       source:      rakuten?.source || 'ai',
