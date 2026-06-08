@@ -4,6 +4,7 @@ import { firebaseSyncService } from '@/services/firebaseSyncService';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '@/config/firebase';
 import { ensureAdminAuth } from '@/utils/adminAuth';
+import { toYen } from '@/utils/currency';
 
 const isDev = import.meta.env.DEV;
 const devLog = isDev ? console.log.bind(console) : () => {};
@@ -68,12 +69,14 @@ export const customerService = {
       const orderHistory: Array<{ orderNumber: string; date: string; total: number; status: string }> = [];
 
       orders.forEach((order: any) => {
-        totalSpent += order.totalPrice || 0;
+        // Normaliza tudo para ¥ (pedidos podem estar em R$/€) para o painel admin.
+        const oc = order.currency;
+        totalSpent += toYen(order.totalPrice || 0, oc);
 
         orderHistory.push({
           orderNumber: order.orderNumber,
           date: order.date,
-          total: order.totalPrice || 0,
+          total: toYen(order.totalPrice || 0, oc),
           status: order.status || 'pending',
         });
 
@@ -83,7 +86,7 @@ export const customerService = {
             productMap[item.name] = { quantity: 0, total: 0 };
           }
           productMap[item.name].quantity += item.quantity;
-          productMap[item.name].total += item.price * item.quantity;
+          productMap[item.name].total += toYen(item.price * item.quantity, oc);
         });
       });
 
@@ -171,11 +174,12 @@ export const customerService = {
         const productMap: Record<string, { quantity: number; total: number }> = {};
 
         orders.forEach((order: any) => {
-          totalSpent += order.totalPrice || order.totalAmount || 0;
+          const oc = order.currency;
+          totalSpent += toYen(order.totalPrice || order.totalAmount || 0, oc);
           orderHistory.push({
             orderNumber: order.orderNumber,
             date: order.date || order.orderDate,
-            total: order.totalPrice || order.totalAmount || 0,
+            total: toYen(order.totalPrice || order.totalAmount || 0, oc),
             status: order.status || 'pending',
           });
           if (order.items) {
@@ -183,7 +187,7 @@ export const customerService = {
               const name = item.name || item.productName;
               if (!productMap[name]) productMap[name] = { quantity: 0, total: 0 };
               productMap[name].quantity += item.quantity;
-              productMap[name].total += (item.price || 0) * item.quantity;
+              productMap[name].total += toYen((item.price || 0) * item.quantity, oc);
             });
           }
         });
@@ -219,11 +223,11 @@ export const customerService = {
             const existingOrder = customer.orderHistory.find((o: any) => o.orderNumber === order.orderNumber);
             if (!existingOrder) {
               customer.totalOrders += 1;
-              customer.totalSpent += order.totalPrice || order.totalAmount || 0;
+              customer.totalSpent += toYen(order.totalPrice || order.totalAmount || 0, order.currency);
               customer.orderHistory.push({
                 orderNumber: order.orderNumber || doc.id,
                 date: order.orderDate || order.date || order.syncedAt,
-                total: order.totalPrice || order.totalAmount || 0,
+                total: toYen(order.totalPrice || order.totalAmount || 0, order.currency),
                 status: order.status || 'pending',
               });
               customer.averageOrderValue = customer.totalOrders > 0 ? customer.totalSpent / customer.totalOrders : 0;
