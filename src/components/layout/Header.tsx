@@ -117,10 +117,12 @@ const Header: React.FC = () => {
 
           {/* Cart, Language & Mobile Menu */}
           <div className="flex items-center gap-3">
-            {/* País (cima) + Idioma (baixo) empilhados — escondidos no admin */}
+            {/* País (cima) + Idioma (baixo) — idioma sempre visível, país aparece a partir de md */}
             {!isAdminPage && (
-              <div className="hidden md:flex flex-col gap-1">
-                <CountrySwitcher />
+              <div className="flex flex-col gap-1">
+                <div className="hidden md:block">
+                  <CountrySwitcher />
+                </div>
                 <LanguageSwitcher />
               </div>
             )}

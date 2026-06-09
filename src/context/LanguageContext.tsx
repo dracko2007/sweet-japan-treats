@@ -65,11 +65,12 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 4000);
 
-    fetch('https://ip-api.com/json/?fields=countryCode', { signal: controller.signal })
+    // ipapi.co suporta HTTPS gratuitamente (ip-api.com bloqueia mixed-content em HTTPS)
+    fetch('https://ipapi.co/json/', { signal: controller.signal })
       .then(r => r.ok ? r.json() : null)
-      .then((data: { countryCode?: string } | null) => {
-        if (!data?.countryCode) return;
-        const code = data.countryCode.toUpperCase();
+      .then((data: { country_code?: string } | null) => {
+        if (!data?.country_code) return;
+        const code = data.country_code.toUpperCase();
 
         if (!hasLang) {
           const lang = ipToLanguage(code);
