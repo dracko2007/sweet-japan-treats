@@ -59,10 +59,16 @@ export default async function handler(req, res) {
           writes: [{
             transform: {
               document: docName,
-              fieldTransforms: [{
-                fieldPath: 'stock.quantity',
-                increment: { integerValue: String(-qty) },
-              }],
+              fieldTransforms: [
+                {
+                  fieldPath: 'stock.quantity',
+                  increment: { integerValue: String(-qty) },
+                },
+                {
+                  fieldPath: 'salesCount',
+                  increment: { integerValue: String(qty) },
+                },
+              ],
             },
           }],
         }),

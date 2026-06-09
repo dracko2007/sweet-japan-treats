@@ -170,13 +170,12 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
           </div>
         )}
 
-        {/* Sold Out diagonal banner */}
+        {/* Sold Out corner ribbon (top-left) */}
         {isSoldOut && (
-          <div className="absolute inset-0 z-30 pointer-events-none overflow-hidden">
-            <div className="absolute inset-0 bg-black/25 rounded-t-xl" />
+          <div className="absolute top-0 left-0 z-30 pointer-events-none overflow-hidden w-28 h-28">
             <div
-              className="absolute bg-red-600 text-white text-[11px] font-black tracking-widest text-center py-1.5 shadow-lg"
-              style={{ transform: 'rotate(-35deg)', width: '170%', top: '37%', left: '-35%' }}
+              className="absolute bg-red-600 text-white text-[10px] font-black tracking-widest text-center shadow-lg"
+              style={{ transform: 'rotate(-45deg)', width: '120px', top: '22px', left: '-28px', paddingTop: '5px', paddingBottom: '5px' }}
             >
               SOLD OUT
             </div>

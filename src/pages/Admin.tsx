@@ -697,11 +697,26 @@ _This is an automated test message_
                                   <span className="font-mono">{shippingCost != null ? (shippingCost === 0 ? <span className="text-green-600">Grátis</span> : `R$ ${shippingCost.toFixed(2)}`) : 'N/A'}</span>
                                 </div>
 
-                                {/* ICMS */}
-                                <div className="flex justify-between text-sm text-muted-foreground">
-                                  <span>ICMS (17%)</span>
-                                  <span className="font-mono">R$ {(order.taxAmount || 0).toFixed(2)}</span>
-                                </div>
+                                {/* Impostos */}
+                                {(order.federalTax > 0 || order.icmsTax > 0 || order.taxAmount > 0) && (
+                                  order.federalTax != null && order.icmsTax != null ? (
+                                    <>
+                                      <div className="flex justify-between text-xs text-muted-foreground">
+                                        <span>II Federal</span>
+                                        <span className="font-mono">R$ {Number(order.federalTax).toFixed(2)}</span>
+                                      </div>
+                                      <div className="flex justify-between text-xs text-muted-foreground">
+                                        <span>ICMS (17%)</span>
+                                        <span className="font-mono">R$ {Number(order.icmsTax).toFixed(2)}</span>
+                                      </div>
+                                    </>
+                                  ) : (
+                                    <div className="flex justify-between text-xs text-muted-foreground">
+                                      <span>Impostos Estimados (II + ICMS)</span>
+                                      <span className="font-mono">R$ {Number(order.taxAmount || 0).toFixed(2)}</span>
+                                    </div>
+                                  )
+                                )}
                                 
                                 {/* Total */}
                                 <div className="flex justify-between font-bold pt-1 border-t border-border text-base">
