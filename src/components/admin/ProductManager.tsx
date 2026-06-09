@@ -721,16 +721,24 @@ const ProductManager: React.FC = () => {
                 </p>
               </div>
 
-              {/* Promoção: Compre X ganhe produto */}
+              {/* Promoção: Compre X, ganhe +1 deste mesmo produto grátis */}
               <div className="bg-purple-50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-800 rounded-lg p-3 space-y-3">
                 <label className="text-sm font-semibold flex items-center gap-1.5">
-                  <Gift className="w-4 h-4 text-purple-500" /> Promoção: Compre X, ganhe presente
+                  <Gift className="w-4 h-4 text-purple-500" /> Promoção: Compre X, ganhe +1 grátis
                 </label>
 
-                {/* Qtd. mínima para ativar */}
-                <div className="flex items-center gap-3">
+                {/* Produto que será dado = sempre este mesmo */}
+                <div className="flex items-center gap-2 bg-purple-100 dark:bg-purple-900/40 rounded-lg px-3 py-2">
+                  {editing.image && <img src={editing.image} alt={editing.name} className="w-8 h-8 rounded object-cover shrink-0" />}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold text-purple-800 dark:text-purple-200 truncate">{editing.name || '(nome do produto)'}</p>
+                    <p className="text-[10px] text-purple-600">Este produto será o brinde</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 flex-wrap">
                   <div>
-                    <label className="text-xs text-muted-foreground block mb-1">Qtd. mínima no carrinho (0 = sem promo)</label>
+                    <label className="text-xs text-muted-foreground block mb-1">Compre quantos para ganhar +1? (0 = sem promo)</label>
                     <input
                       type="number"
                       min={0}
@@ -738,15 +746,14 @@ const ProductManager: React.FC = () => {
                       onChange={(e) => {
                         const qty = Number(e.target.value) || 0;
                         setEditing({ ...editing, promoGift: qty > 0
-                          ? { buyQuantity: qty, giftProductId: editing.promoGift?.giftProductId || '', giftProductName: editing.promoGift?.giftProductName || '', minOrderValueYen: editing.promoGift?.minOrderValueYen }
+                          ? { buyQuantity: qty, giftProductId: editing.id, giftProductName: editing.name, minOrderValueYen: editing.promoGift?.minOrderValueYen }
                           : undefined });
                       }}
-                      placeholder="0 = sem promo"
-                      className="w-28 px-3 py-2 rounded-lg border border-border bg-background text-sm"
+                      placeholder="Ex: 2"
+                      className="w-24 px-3 py-2 rounded-lg border border-border bg-background text-sm"
                     />
                   </div>
 
-                  {/* Gasto mínimo */}
                   {editing.promoGift && (
                     <div>
                       <label className="text-xs text-muted-foreground block mb-1">Gasto mínimo no carrinho (¥) — 0 = sem mínimo</label>
@@ -765,49 +772,14 @@ const ProductManager: React.FC = () => {
                   )}
                 </div>
 
-                {/* Seletor de produto presente (radio buttons) */}
-                {editing.promoGift && (
-                  <div>
-                    <label className="text-xs text-muted-foreground block mb-1.5">Selecione o produto que será dado de presente:</label>
-                    <div className="max-h-44 overflow-y-auto border border-purple-200 dark:border-purple-700 rounded-lg divide-y divide-purple-100 dark:divide-purple-800">
-                      {products.map((p) => (
-                        <label
-                          key={p.id}
-                          className={`flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-purple-100/60 dark:hover:bg-purple-900/30 transition-colors ${
-                            editing.promoGift?.giftProductId === p.id
-                              ? 'bg-purple-100 dark:bg-purple-900/50'
-                              : ''
-                          }`}
-                        >
-                          <input
-                            type="radio"
-                            name="giftProduct"
-                            value={p.id}
-                            checked={editing.promoGift?.giftProductId === p.id}
-                            onChange={() => setEditing({ ...editing, promoGift: { ...editing.promoGift!, giftProductId: p.id, giftProductName: p.name } })}
-                            className="accent-purple-600 shrink-0"
-                          />
-                          {p.image && (
-                            <img src={p.image} alt={p.name} className="w-7 h-7 rounded object-cover shrink-0" />
-                          )}
-                          <span className="text-xs truncate flex-1">{p.name}</span>
-                          {p.id === editing.id && (
-                            <span className="text-[9px] font-bold text-purple-600 bg-purple-200 dark:bg-purple-800 px-1 rounded shrink-0">ESTE</span>
-                          )}
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {editing.promoGift && editing.promoGift.buyQuantity > 0 && editing.promoGift.giftProductId && (
+                {editing.promoGift && editing.promoGift.buyQuantity > 0 && (
                   <p className="text-[11px] text-purple-700 dark:text-purple-300">
                     🎁 Compre {editing.promoGift.buyQuantity}x
-                    {editing.promoGift.minOrderValueYen ? ` + gaste ¥${editing.promoGift.minOrderValueYen.toLocaleString()} no total` : ''}
-                    {' '}→ ganhe: <strong>{editing.promoGift.giftProductName}</strong>
+                    {editing.promoGift.minOrderValueYen ? ` (ou gaste ¥${editing.promoGift.minOrderValueYen.toLocaleString()} no total)` : ''}
+                    {' '}→ ganhe +1 <strong>{editing.name || 'este produto'}</strong> grátis
                   </p>
                 )}
-                <p className="text-[11px] text-muted-foreground">0 ou vazio = sem promoção.</p>
+                <p className="text-[11px] text-muted-foreground">0 = sem promoção ativa.</p>
               </div>
 
               {/* Custo + margem de lucro — SÓ ADMIN */}
