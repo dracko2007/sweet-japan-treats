@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
+import FlagIcon from '@/components/FlagIcon';
 import { cn } from '@/lib/utils';
 
 /* ════════════════════════════════════════════════════════════════
@@ -235,7 +236,7 @@ const PaymentMethods: React.FC = () => {
 // ---------- 3. IMPOSTOS (explicador por país) ----------
 const TAX = {
   Brasil: {
-    flag: '🇧🇷', tone: '#f59e0b',
+    flagCode: 'br', tone: '#f59e0b',
     headline: 'Quem cobra é a Receita Federal (Remessa Conforme)',
     rows: [
       ['Compras até US$ 50', '20% Imposto de Importação + 17% ICMS'],
@@ -244,7 +245,7 @@ const TAX = {
     note: 'Os Correios apenas entregam — quem tributa é a Receita Federal. Você é avisado pelo app/e-mail/SMS dos Correios e paga online (Pix, cartão ou boleto) ANTES da liberação. Nunca se paga em dinheiro ao carteiro. ⚠️ Cuidado com links falsos: confirme sempre no app oficial ou em correios.com.br.',
   },
   Europa: {
-    flag: '🇪🇺', tone: '#3b82f6',
+    flagCode: 'eu', tone: '#3b82f6',
     headline: 'IVA + taxa postal local, pagos na entrega',
     rows: [
       ['No site (checkout)', '€ 0,00 de imposto'],
@@ -253,7 +254,7 @@ const TAX = {
     note: 'Enviamos via remessa postal internacional. O IVA e a taxa dos correios locais (CTT, La Poste...) são cobrados na entrega.',
   },
   Japão: {
-    flag: '🇯🇵', tone: '#22c55e',
+    flagCode: 'jp', tone: '#22c55e',
     headline: 'Envio nacional — sem imposto de importação',
     rows: [
       ['Imposto de importação', 'Isento (¥0)'],
@@ -282,7 +283,7 @@ const TaxExplainer: React.FC = () => {
             )}
             style={{ background: c === k ? TAX[k].tone : undefined, borderColor: c === k ? TAX[k].tone : 'transparent' }}
           >
-            {TAX[k].flag} {k}
+            <FlagIcon code={TAX[k].flagCode} size={18} className="mr-1" />{k}
           </button>
         ))}
       </div>

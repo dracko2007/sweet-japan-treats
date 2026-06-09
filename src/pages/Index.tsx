@@ -5,6 +5,7 @@ import FeaturedProducts from '@/components/home/FeaturedProducts';
 import HomeVideos from '@/components/home/HomeVideos';
 import ShippingBanner from '@/components/home/ShippingBanner';
 import { useLanguage } from '@/context/LanguageContext';
+import FlagIcon from '@/components/FlagIcon';
 
 const Index: React.FC = () => {
   const { t } = useLanguage();
@@ -58,9 +59,9 @@ const Index: React.FC = () => {
                 </div>
                 <div className="absolute -bottom-6 -left-6 bg-card rounded-2xl shadow-card p-4">
                   <div className="flex items-center gap-3">
-                    <span className="text-3xl">🇧🇷</span>
+                    <FlagIcon code="br" size={40} />
                     <span className="text-2xl">❤️</span>
-                    <span className="text-3xl">🇯🇵</span>
+                    <FlagIcon code="jp" size={40} />
                   </div>
                 </div>
               </div>

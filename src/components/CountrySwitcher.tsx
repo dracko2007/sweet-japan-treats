@@ -4,6 +4,7 @@ import { useCart } from '@/context/CartContext';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { ChevronDown } from 'lucide-react';
+import FlagIcon from '@/components/FlagIcon';
 
 const CountrySwitcher: React.FC = () => {
   const { selectedCountry, setSelectedCountry } = useLanguage();
@@ -12,13 +13,13 @@ const CountrySwitcher: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const countries: { code: CountryType; flag: string; label: string; details: string }[] = [
-    { code: 'Japão', flag: '🇯🇵', label: 'Japão', details: 'Japan Express (Local)' },
-    { code: 'Brasil', flag: '🇧🇷', label: 'Brasil', details: 'Japan Express (Aéreo)' },
-    { code: 'Portugal', flag: '🇵🇹', label: 'Portugal', details: 'Japan Express (Aéreo)' },
-    { code: 'França', flag: '🇫🇷', label: 'França', details: 'Japan Express (Aéreo)' },
-    { code: 'Itália', flag: '🇮🇹', label: 'Itália', details: 'Japan Express (Aéreo)' },
-    { code: 'Espanha', flag: '🇪🇸', label: 'Espanha', details: 'Japan Express (Aéreo)' },
+  const countries: { code: CountryType; flagCode: string; label: string; details: string }[] = [
+    { code: 'Japão', flagCode: 'jp', label: 'Japão', details: 'Japan Express (Local)' },
+    { code: 'Brasil', flagCode: 'br', label: 'Brasil', details: 'Japan Express (Aéreo)' },
+    { code: 'Portugal', flagCode: 'pt', label: 'Portugal', details: 'Japan Express (Aéreo)' },
+    { code: 'França', flagCode: 'fr', label: 'França', details: 'Japan Express (Aéreo)' },
+    { code: 'Itália', flagCode: 'it', label: 'Itália', details: 'Japan Express (Aéreo)' },
+    { code: 'Espanha', flagCode: 'es', label: 'Espanha', details: 'Japan Express (Aéreo)' },
   ];
 
   // Close dropdown on click outside
@@ -37,7 +38,7 @@ const CountrySwitcher: React.FC = () => {
     const selected = countries.find(c => c.code === country);
     toast({
       title: "Destino de Entrega Alterado",
-      description: `Seu destino agora é: ${country} ${selected?.flag} (${selected?.details})`,
+      description: `Seu destino agora é: ${country} (${selected?.details})`,
     });
   };
 
@@ -50,7 +51,7 @@ const CountrySwitcher: React.FC = () => {
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center gap-2 px-3 py-1.5 bg-secondary/80 border border-border rounded-full hover:bg-secondary transition-all text-xs font-semibold text-foreground shadow-sm focus:outline-none"
       >
-        <span>{currentCountry.flag}</span>
+        <FlagIcon code={currentCountry.flagCode} alt={currentCountry.label} size={20} />
         <span>{currentCountry.label}</span>
         <ChevronDown className={cn("w-3.5 h-3.5 text-muted-foreground transition-transform duration-200", isOpen && "rotate-180")} />
       </button>
@@ -73,7 +74,7 @@ const CountrySwitcher: React.FC = () => {
               )}
             >
               <div className="flex items-center gap-2">
-                <span>{countryItem.flag}</span>
+                <FlagIcon code={countryItem.flagCode} alt={countryItem.label} size={20} />
                 <span>{countryItem.label}</span>
               </div>
               {selectedCountry === countryItem.code && (

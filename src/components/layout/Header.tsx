@@ -55,7 +55,7 @@ const Header: React.FC = () => {
           </Link>
 
           {/* Desktop Navigation (escondida no painel admin) */}
-          <nav className={cn("items-center gap-5", isAdminPage ? "hidden" : "hidden xl:flex")}>
+          <nav className={cn("items-center gap-3", isAdminPage ? "hidden" : "hidden xl:flex")}>
             {navItems.map((item) => (
               <div key={item.label} className="relative group">
                 {item.submenu ? (
@@ -137,31 +137,31 @@ const Header: React.FC = () => {
                 asChild
                 variant="ghost"
                 size="sm"
-                className="hidden lg:flex items-center gap-2 text-orange-600 hover:text-orange-700"
+                className="hidden xl:flex items-center gap-2 text-orange-600 hover:text-orange-700"
               >
                 {isAdminPage ? (
                   <Link to="/">
                     <ShoppingCart className="w-5 h-5 text-primary" />
-                    <span>Ver Loja</span>
+                    <span className="hidden 2xl:inline">Ver Loja</span>
                   </Link>
                 ) : (
                   <Link to="/admin">
                     <UserCircle className="w-5 h-5 text-primary animate-pulse" />
-                    <span>{t('nav.admin')}</span>
+                    <span className="hidden 2xl:inline">{t('nav.admin')}</span>
                   </Link>
                 )}
               </Button>
             )}
             
-            <Button 
+            <Button
               asChild
-              variant="ghost" 
+              variant="ghost"
               size="sm"
-              className="hidden lg:flex items-center gap-2"
+              className="hidden xl:flex items-center gap-2"
             >
               <Link to={isAuthenticated ? "/perfil" : "/cadastro"}>
                 <UserCircle className="w-5 h-5" />
-                <span>{isAuthenticated ? (user?.name?.split(' ')[0] || t('nav.profile')) : t('nav.register')}</span>
+                <span className="hidden 2xl:inline">{isAuthenticated ? (user?.name?.split(' ')[0] || t('nav.profile')) : t('nav.register')}</span>
               </Link>
             </Button>
 
@@ -169,7 +169,7 @@ const Header: React.FC = () => {
             {isAuthenticated && !isAdminPage && (
               <Link
                 to="/favoritos"
-                className="relative p-2 rounded-full hover:bg-secondary/50 transition-colors hidden lg:block"
+                className="relative p-2 rounded-full hover:bg-secondary/50 transition-colors hidden xl:block"
                 title={t('nav.favorites')}
               >
                 <Heart className="w-6 h-6 text-foreground" />
