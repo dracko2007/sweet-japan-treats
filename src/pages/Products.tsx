@@ -66,14 +66,15 @@ const Products: React.FC = () => {
     typeFilter ? byCat.filter(p => p.tags?.includes(typeFilter)) : byCat,
     [byCat, typeFilter]);
 
-  // 3) Filtra por busca
+  // 3) Filtra por busca (nome, descrição, sabor e tags)
   const bySearch = useMemo(() => {
     const q = normalize(query.trim());
     if (!q) return byType;
     return byType.filter(p =>
       normalize(p.name).includes(q) ||
       normalize(p.description).includes(q) ||
-      normalize(p.flavor).includes(q)
+      normalize(p.flavor).includes(q) ||
+      p.tags?.some(tag => normalize(tag).includes(q))
     );
   }, [byType, query]);
 
@@ -98,13 +99,12 @@ const Products: React.FC = () => {
       .sort((a, b) => (CATEGORY_META[a]?.label || a).localeCompare(CATEGORY_META[b]?.label || b, 'pt')),
     [visible]);
 
-  // Tipos disponíveis (tags) na categoria efetiva
+  // Tipos disponíveis (tags) — mostra sempre que existam tags na lista atual
   const availableTypes = useMemo(() => {
-    if (!effectiveCat) return [];
     const set = new Set<string>();
     byCat.forEach(p => p.tags?.forEach(t => t && set.add(t)));
     return Array.from(set).sort((a, b) => a.localeCompare(b, 'pt'));
-  }, [byCat, effectiveCat]);
+  }, [byCat]);
 
   // Categorias como nav links (compatibilidade com rotas existentes)
   const navCategories = [
