@@ -682,6 +682,13 @@ export default async function handler(req, res) {
     ? body.targetLang : 'pt';
   const markup = typeof body.markup === 'number' ? body.markup : 1.5; // padrão 50%
 
+  // Campos solicitados (todos ativos por padrão para retrocompatibilidade)
+  const reqFields = body.fields && typeof body.fields === 'object' ? body.fields : {};
+  const wantPrice = reqFields.price !== false;
+  const wantImages = reqFields.images !== false;
+  const wantDescription = reqFields.description !== false;
+  const needMarketplace = wantPrice || wantImages || wantDescription;
+
   try {
     // 0. Monta termos de busca: original em inglês/romaji + japonês/katakana.
     const localTerms = hasJapanese(productName) ? [] : localJapaneseTerms(productName);
@@ -691,31 +698,42 @@ export default async function handler(req, res) {
     // 1. Busca a fonte real: tenta cada termo no Yahoo → Rakuten até achar.
     let rakuten = null;
     let searchTerm = productName;
-    for (const term of terms) {
-      rakuten = (await searchYahoo(term)) || (await searchRakuten(term));
-      if (rakuten) { searchTerm = term; break; }
+    if (needMarketplace) {
+      for (const term of terms) {
+        rakuten = (await searchYahoo(term)) || (await searchRakuten(term));
+        if (rakuten) { searchTerm = term; break; }
+      }
     }
 
     // 2. Preço de custo
-    let costYen = rakuten?.priceYen || 0;
-    if (!costYen) costYen = await estimatePriceAI(productName);
+    let costYen = 0;
+    if (wantPrice) {
+      costYen = rakuten?.priceYen || 0;
+      if (!costYen) costYen = await estimatePriceAI(productName);
+    }
 
     // 3. Nome em INGLÊS + descrição traduzida (a partir da descrição real do Yahoo)
-    const enrich = await buildI18n(productName, rakuten?.descJa || '');
-    let i18n = enrich
-      ? { pt: enrich.pt, en: enrich.en, ja: enrich.ja } // só descrições (nome fica em inglês)
-      : null;
-    const description = i18n?.[targetLang]?.description
-      || await buildDescription(productName, rakuten?.descJa || '', targetLang);
-    if (!i18n && description) {
-      i18n = { [targetLang]: { description } };
+    let enrich = null;
+    let i18n = null;
+    let description = '';
+    let generatedNameEn = '';
+    if (wantDescription) {
+      enrich = await buildI18n(productName, rakuten?.descJa || '');
+      i18n = enrich
+        ? { pt: enrich.pt, en: enrich.en, ja: enrich.ja }
+        : null;
+      description = i18n?.[targetLang]?.description
+        || await buildDescription(productName, rakuten?.descJa || '', targetLang);
+      if (!i18n && description) {
+        i18n = { [targetLang]: { description } };
+      }
+      generatedNameEn = await buildEnglishName(productName, rakuten?.suggestName || '', rakuten?.descJa || '', enrich?.name_en || '');
     }
     const descriptionBaseSource = rakuten?.descSource || (rakuten ? 'marketplace-empty-description' : 'no-marketplace-result');
     const descriptionMethod = rakuten?.descJa
       ? 'marketplace-description-translated-by-ai'
       : 'ai-generated-without-real-description';
     // Nome final sempre em inglês. A conversão japonesa só é usada para buscar no Yahoo/Rakuten.
-    const generatedNameEn = await buildEnglishName(productName, rakuten?.suggestName || '', rakuten?.descJa || '', enrich?.name_en || '');
     const nameEn = chooseEnglishName(enrich?.name_en, generatedNameEn, localEnglishName(productName, rakuten?.suggestName, rakuten?.descJa), productName, rakuten?.suggestName)
       || generatedNameEn
       || productName;
@@ -724,15 +742,15 @@ export default async function handler(req, res) {
     const sellingPriceYen = costYen ? Math.round(costYen * markup) : 0;
 
     res.status(200).json({
-      description,
-      descriptionBaseSource,       // origem do texto-base: yahoo/rakuten/site ou fallback
-      descriptionMethod,           // se foi tradução de texto real ou geração por IA
-      i18n,                       // { pt:{description}, en:{description}, ja:{description} }
-      costYen,                    // custo de aquisição (Rakuten ou estimado)
-      sellingPriceYen,            // preço de venda final (custo × markup)
-      packageDimensionsCm: rakuten?.packageDimensionsCm || null,
-      images:      rakuten?.images || [],
-      suggestName: nameEn,        // nome em inglês (não traduzido)
+      description:            wantDescription ? description : undefined,
+      descriptionBaseSource,
+      descriptionMethod,
+      i18n:                   wantDescription ? i18n : undefined,
+      costYen:                wantPrice ? costYen : undefined,
+      sellingPriceYen:        wantPrice ? sellingPriceYen : undefined,
+      packageDimensionsCm:    rakuten?.packageDimensionsCm || null,
+      images:                 wantImages ? (rakuten?.images || []) : [],
+      suggestName: nameEn,
       source:      rakuten?.source || 'ai',
       ...(body.debug === true ? { rakutenDebug: lastRakutenDebug, yahooDebug, searchTerm, searchTerms: terms, generatedNameEn, i18nDebug } : {}),
     });

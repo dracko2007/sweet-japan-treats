@@ -91,6 +91,7 @@ const ProductManager: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [enriching, setEnriching] = useState(false);
+  const [enrichFields, setEnrichFields] = useState({ price: true, images: true, description: true });
   const [tagInput, setTagInput] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -166,6 +167,7 @@ const ProductManager: React.FC = () => {
           productName: editing.name.trim(),
           targetLang: language || 'pt',
           markup: 1.5,
+          fields: enrichFields,
         }),
       });
       if (!res.ok) {
@@ -177,9 +179,9 @@ const ProductManager: React.FC = () => {
       // Mescla os dados recebidos mantendo o que o admin já preencheu manualmente
       const updatedEditing: Product = { ...editing };
 
-      if (data.description) updatedEditing.description = data.description;
+      if (enrichFields.description && data.description) updatedEditing.description = data.description;
       // Traduções por idioma (pt/en/ja). Nome não entra no i18n: fica sempre em inglês.
-      if (data.i18n && typeof data.i18n === 'object') {
+      if (enrichFields.description && data.i18n && typeof data.i18n === 'object') {
         const currentI18n = Object.fromEntries(
           Object.entries(updatedEditing.i18n || {}).map(([lang, value]) => [
             lang,
@@ -206,7 +208,7 @@ const ProductManager: React.FC = () => {
         if (dimensions) updatedEditing.packageDimensionsCm = dimensions;
       }
 
-      if (canPrice) {
+      if (canPrice && enrichFields.price) {
         if (data.costYen) updatedEditing.cost = data.costYen;
         if (data.sellingPriceYen) {
           const vs = (updatedEditing.variants || []).length > 0
@@ -220,7 +222,7 @@ const ProductManager: React.FC = () => {
       }
 
       // Fotos do Yahoo/Rakuten substituem as antigas para evitar cache visual de imagens removidas.
-      if (Array.isArray(data.images) && data.images.length > 0) {
+      if (enrichFields.images && Array.isArray(data.images) && data.images.length > 0) {
         const merged = [...new Set(data.images.filter(Boolean))].slice(0, MAX_PHOTOS);
         updatedEditing.gallery = merged;
         updatedEditing.image   = merged[0] || updatedEditing.image;
@@ -443,6 +445,24 @@ const ProductManager: React.FC = () => {
                 <p className="text-[11px] text-muted-foreground mt-1">
                   ✨ <strong>Auto-preencher</strong>: busca descrição, preço, medidas da embalagem (quando o marketplace informa) e até 5 fotos automaticamente.
                 </p>
+                <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+                  <span className="text-[11px] text-muted-foreground font-medium">Buscar:</span>
+                  {([
+                    { key: 'price', label: 'Valor' },
+                    { key: 'images', label: 'Imagens' },
+                    { key: 'description', label: 'Descrição' },
+                  ] as const).map(({ key, label }) => (
+                    <label key={key} className="flex items-center gap-1 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={enrichFields[key]}
+                        onChange={(e) => setEnrichFields(prev => ({ ...prev, [key]: e.target.checked }))}
+                        className="w-3.5 h-3.5 rounded accent-amber-500"
+                      />
+                      <span className="text-[11px] text-muted-foreground">{label}</span>
+                    </label>
+                  ))}
+                </div>
               </div>
 
               {/* Categoria + Sabor/tag */}

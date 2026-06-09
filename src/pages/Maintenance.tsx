@@ -1,10 +1,14 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Wrench, Lock } from 'lucide-react';
+import LanguageSwitcher from '@/components/LanguageSwitcher';
 
 const MaintenancePage: React.FC = () => {
   return (
     <div className="min-h-screen bg-gradient-to-b from-pink-100 via-pink-50 to-white flex items-center justify-center px-4">
+      <div className="fixed top-4 right-4 z-50">
+        <LanguageSwitcher />
+      </div>
       <div className="text-center max-w-md space-y-6">
         <div className="flex justify-center">
           <div className="w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center">
