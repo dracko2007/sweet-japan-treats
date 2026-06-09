@@ -115,7 +115,7 @@ const ProductManager: React.FC = () => {
     const cost = p.cost || 0;
     const price = vs[0]?.price || 0;
     setMarginPct(cost > 0 && price > cost
-      ? Math.round(((price - cost) / price) * 100)
+      ? Math.round(((price - cost) / cost) * 100)
       : 50);
   };
 
@@ -227,7 +227,7 @@ const ProductManager: React.FC = () => {
           );
           updatedEditing.prices = { small: data.sellingPriceYen, large: data.sellingPriceYen };
           if (data.costYen && data.sellingPriceYen > data.costYen) {
-            setMarginPct(Math.round(((data.sellingPriceYen - data.costYen) / data.sellingPriceYen) * 100));
+            setMarginPct(Math.round(((data.sellingPriceYen - data.costYen) / data.costYen) * 100));
           }
         }
       }
@@ -684,8 +684,8 @@ const ProductManager: React.FC = () => {
                       value={editing.cost || ''}
                       onChange={(e) => {
                         const cost = Number(e.target.value);
-                        if (marginPct > 0 && marginPct < 100 && cost > 0) {
-                          const selling = Math.round(cost / (1 - marginPct / 100));
+                        if (marginPct > 0 && cost > 0) {
+                          const selling = Math.round(cost * (1 + marginPct / 100));
                           const vs = variants().map((v, i) => i === 0 ? { ...v, price: selling } : v);
                           setEditing({ ...editing, cost, variants: vs, prices: { ...editing.prices, small: selling } });
                         } else {
@@ -705,13 +705,13 @@ const ProductManager: React.FC = () => {
                       <input
                         type="number"
                         min={1}
-                        max={99}
+                        max={9999}
                         value={marginPct}
                         onChange={(e) => {
-                          const pct = Math.min(99, Math.max(1, Number(e.target.value) || 1));
+                          const pct = Math.max(1, Number(e.target.value) || 1);
                           setMarginPct(pct);
-                          if (editing.cost && pct > 0 && pct < 100) {
-                            const selling = Math.round(editing.cost / (1 - pct / 100));
+                          if (editing.cost && pct > 0) {
+                            const selling = Math.round(editing.cost * (1 + pct / 100));
                             const vs = variants().map((v, i) => i === 0 ? { ...v, price: selling } : v);
                             setEditing({ ...editing, variants: vs, prices: { ...editing.prices, small: selling } });
                           }
@@ -731,8 +731,8 @@ const ProductManager: React.FC = () => {
                         ? 'border-green-300 bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-400'
                         : 'border-border bg-muted text-muted-foreground'
                     }`}>
-                      {editing.cost && marginPct > 0 && marginPct < 100
-                        ? `¥${Math.round(editing.cost / (1 - marginPct / 100)).toLocaleString()}`
+                      {editing.cost && marginPct > 0
+                        ? `¥${Math.round(editing.cost * (1 + marginPct / 100)).toLocaleString()}`
                         : '—'}
                     </div>
                   </div>
@@ -740,7 +740,7 @@ const ProductManager: React.FC = () => {
 
                 <p className="text-xs text-amber-700/80 dark:text-amber-400/80 mt-1.5">
                   {editing.cost && variants()[0]?.price
-                    ? `Lucro: ¥${(variants()[0].price - (editing.cost || 0)).toLocaleString()} · margem real ${Math.round(((variants()[0].price - (editing.cost || 0)) / variants()[0].price) * 100)}% · O cliente NUNCA vê o custo.`
+                    ? `Lucro: ¥${(variants()[0].price - (editing.cost || 0)).toLocaleString()} · markup real ${Math.round(((variants()[0].price - (editing.cost || 0)) / (editing.cost || 1)) * 100)}% · O cliente NUNCA vê o custo.`
                     : 'Preencha custo + margem para calcular o preço de venda automaticamente.'}
                 </p>
               </div>
