@@ -63,7 +63,7 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
     if (hasLang && hasCountry) return; // já tem preferências salvas
 
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 4000);
+    const timer = setTimeout(() => controller.abort(), 2000);
 
     // ipapi.co suporta HTTPS gratuitamente (ip-api.com bloqueia mixed-content em HTTPS)
     fetch('https://ipapi.co/json/', { signal: controller.signal })

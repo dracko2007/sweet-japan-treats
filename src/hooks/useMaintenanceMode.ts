@@ -1,13 +1,23 @@
 import { useState, useEffect } from 'react';
 import { db, auth } from '@/config/firebase';
 import { doc, onSnapshot, setDoc } from 'firebase/firestore';
+import { safeStorage } from '@/utils/storage';
+
+const CACHE_KEY = 'jp_maint';
 
 // Controla o modo manutenção (flag em Firestore settings/maintenance).
 // Usa onSnapshot para atualizar todos os tabs/usuários em tempo real.
+// CACHE: lê o último estado do localStorage para evitar tela em branco em visitas repetidas.
 // FAIL-SAFE: qualquer erro de leitura mantém o site NORMAL (nunca trava).
 export const useMaintenanceMode = () => {
-  const [isEnabled, setIsEnabled] = useState(false);
-  const [loading, setLoading] = useState(true);
+  // Inicializa do cache → sem tela em branco em visitas repetidas
+  const [isEnabled, setIsEnabled] = useState<boolean>(() => {
+    return safeStorage.getItem(CACHE_KEY) === '1';
+  });
+  // loading=true só na primeira visita ever (sem cache) para evitar flicker do site
+  const [loading, setLoading] = useState<boolean>(() => {
+    return safeStorage.getItem(CACHE_KEY) === null;
+  });
 
   useEffect(() => {
     if (!db) {
@@ -19,8 +29,10 @@ export const useMaintenanceMode = () => {
     const unsub = onSnapshot(
       doc(db, 'settings', 'maintenance'),
       (snap) => {
-        setIsEnabled(snap.exists() && snap.data().enabled === true);
+        const enabled = snap.exists() && snap.data().enabled === true;
+        setIsEnabled(enabled);
         setLoading(false);
+        safeStorage.setItem(CACHE_KEY, enabled ? '1' : '0');
       },
       (_err) => {
         // Falha de leitura → site fica NORMAL
