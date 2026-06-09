@@ -47,7 +47,7 @@ const Header: React.FC = () => {
         <div className="flex items-center justify-between h-20 gap-4">
           {/* Logo */}
           <Link to="/" className="flex items-center gap-1.5 sm:gap-2.5 group shrink-0">
-            <JapanExpressLogo size={44} className="sm:!w-14 sm:!h-14 animate-float drop-shadow-lg group-hover:scale-105 transition-transform shrink-0" />
+            <JapanExpressLogo size={56} className="w-11 h-11 sm:w-14 sm:h-14 animate-float drop-shadow-lg group-hover:scale-105 transition-transform shrink-0" />
             <div className="flex items-baseline gap-1">
               <span className="font-display text-xl sm:text-2xl lg:text-3xl font-black text-foreground tracking-tight">Japan</span>
               <span className="font-display text-base sm:text-lg lg:text-2xl font-extrabold text-white bg-gradient-to-r from-primary to-accent shadow-md px-1.5 sm:px-2 py-0.5 rounded-lg transform -rotate-6">Express</span>
