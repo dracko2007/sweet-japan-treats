@@ -77,12 +77,12 @@ const OrderReview: React.FC = () => {
 
   // Subtotal dos produtos em ¥ (já com desconto promocional, sem frete) — base dos pontos
   const productSubtotalYen = items.reduce(
-    (sum, item) => sum + effectiveYen(item.product, item.size) * item.quantity, 0
+    (sum, item) => item.freeGift ? sum : sum + effectiveYen(item.product, item.size) * item.quantity, 0
   );
 
-  // Base Total Price (subtotal before discounts/taxes) in target currency
+  // Base Total Price (subtotal before discounts/taxes) in target currency — excludes free gifts
   const baseTotalPrice = items.reduce(
-    (sum, item) => sum + convertYen(effectiveYen(item.product, item.size)) * item.quantity, 0
+    (sum, item) => item.freeGift ? sum : sum + convertYen(effectiveYen(item.product, item.size)) * item.quantity, 0
   );
 
   // Resgate de pontos (1 ponto = ¥1). Não pode passar do valor dos produtos.
@@ -173,15 +173,15 @@ const OrderReview: React.FC = () => {
       trackingCode: trackingCode,
       date: new Date().toLocaleDateString('pt-BR'),
       items: items.map(item => {
-        const finalUnitPrice = convertYen(effectiveYen(item.product, item.size));
+        const finalUnitPrice = item.freeGift ? 0 : convertYen(effectiveYen(item.product, item.size));
         return {
           id: item.product.id,
-          name: productEnglishName(item.product),
+          name: productEnglishName(item.product) + (item.freeGift ? ' 🎁 GRÁTIS' : ''),
           image: item.product.image,
           quantity: item.quantity,
           size: item.variantLabel || (item.size === 'small' ? 'Pequeno' : 'Grande'),
           price: finalUnitPrice,
-          cost: item.product.cost || 0, // custo de aquisição em ¥ (admin)
+          cost: item.freeGift ? 0 : (item.product.cost || 0),
         };
       })
     };
@@ -243,10 +243,14 @@ const OrderReview: React.FC = () => {
       void addOrder(firestoreOrder as any);
     }
 
-    // Decrementa estoque dos produtos com quantidade limitada
+    // Decrementa estoque via API server-side (admin credentials no Vercel)
     items.forEach((item) => {
-      if (item.product.stock && !item.product.stock.unlimited) {
-        void productService.decrementStock(item.product.id, item.quantity);
+      if (!item.freeGift && item.product.stock && !item.product.stock.unlimited) {
+        fetch('/api/decrement-stock', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ productId: item.product.id, qty: item.quantity }),
+        }).catch(() => {});
       }
     });
 
@@ -259,8 +263,8 @@ const OrderReview: React.FC = () => {
     // quando o admin confirmar a entrega do pedido)
     if (appliedCoupon?.affiliateCode) {
       const netYenBase = items.reduce((sum, item) => {
-        const p = effectiveYen(item.product, item.size);
-        return sum + p * item.quantity;
+        if (item.freeGift) return sum;
+        return sum + effectiveYen(item.product, item.size) * item.quantity;
       }, 0);
       const fraction = appliedCoupon.discountType === 'percentage' ? appliedCoupon.discount / 100 : 0;
       const netYen = Math.round(netYenBase * (1 - fraction));

@@ -2,15 +2,16 @@ import React, { createContext, useContext, useState, useCallback, useEffect, use
 import { CartItem, Product } from '@/types';
 import { safeStorage } from '@/utils/storage';
 import { effectiveYen } from '@/utils/pricing';
+import { useProducts } from '@/context/ProductsContext';
 
 const CART_STORAGE_KEY = 'sakura_cart';
 
-// Carrega o carrinho salvo (persiste entre recarregamentos da página)
 const loadCart = (): CartItem[] => {
   try {
     const raw = safeStorage.getItem(CART_STORAGE_KEY);
     const parsed = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed) ? parsed : [];
+    const arr = Array.isArray(parsed) ? parsed : [];
+    return arr.filter((i: CartItem) => !i.freeGift); // strip stale gift items on load
   } catch {
     return [];
   }
@@ -30,19 +31,49 @@ interface CartContextType {
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [items, setItems] = useState<CartItem[]>(loadCart);
+  const [rawItems, setRawItems] = useState<CartItem[]>(loadCart);
+  const { products } = useProducts();
 
-  // Persiste o carrinho a cada mudança
+  // Persist only non-gift items to localStorage
   useEffect(() => {
-    safeStorage.setItem(CART_STORAGE_KEY, JSON.stringify(items));
-  }, [items]);
+    safeStorage.setItem(CART_STORAGE_KEY, JSON.stringify(rawItems));
+  }, [rawItems]);
+
+  // Gift items are fully derived — no state, no loops
+  const giftItems = useMemo<CartItem[]>(() => {
+    if (!products.length) return [];
+    const totalYen = rawItems.reduce((s, i) => s + effectiveYen(i.product, i.size) * i.quantity, 0);
+    const gifts: CartItem[] = [];
+    const addedGiftIds = new Set<string>();
+    for (const item of rawItems) {
+      const pg = item.product.promoGift;
+      if (!pg || pg.buyQuantity <= 0 || !pg.giftProductId) continue;
+      if (item.quantity < pg.buyQuantity) continue;
+      if (pg.minOrderValueYen && totalYen < pg.minOrderValueYen) continue;
+      if (addedGiftIds.has(pg.giftProductId)) continue;
+      const giftProduct = products.find(p => p.id === pg.giftProductId);
+      if (!giftProduct) continue;
+      addedGiftIds.add(pg.giftProductId);
+      gifts.push({
+        product: giftProduct,
+        size: 'small',
+        quantity: 1,
+        variantLabel: 'Presente 🎁',
+        freeGift: true,
+        freeGiftFromProductId: item.product.id,
+      });
+    }
+    return gifts;
+  }, [rawItems, products]);
+
+  // All items exposed to consumers = regular + auto-gifts
+  const items = useMemo(() => [...rawItems, ...giftItems], [rawItems, giftItems]);
 
   const addToCart = useCallback((product: Product, size: string, quantity = 1, variantLabel?: string) => {
-    setItems(prev => {
+    setRawItems(prev => {
       const existingIndex = prev.findIndex(
         item => item.product.id === product.id && item.size === size
       );
-
       if (existingIndex >= 0) {
         const updated = [...prev];
         updated[existingIndex] = {
@@ -51,32 +82,32 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         };
         return updated;
       }
-
       return [...prev, { product, size, quantity, variantLabel }];
     });
   }, []);
 
   const removeFromCart = useCallback((productId: string, size: string) => {
-    setItems(prev => prev.filter(
+    setRawItems(prev => prev.filter(
       item => !(item.product.id === productId && item.size === size)
     ));
   }, []);
 
   const updateQuantity = useCallback((productId: string, size: string, quantity: number) => {
     if (quantity <= 0) {
-      removeFromCart(productId, size);
+      setRawItems(prev => prev.filter(
+        item => !(item.product.id === productId && item.size === size)
+      ));
       return;
     }
-    
-    setItems(prev => prev.map(item => 
+    setRawItems(prev => prev.map(item =>
       item.product.id === productId && item.size === size
         ? { ...item, quantity }
         : item
     ));
-  }, [removeFromCart]);
+  }, []);
 
   const clearCart = useCallback(() => {
-    setItems([]);
+    setRawItems([]);
   }, []);
 
   const totalItems = useMemo(
@@ -84,9 +115,10 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     [items]
   );
 
+  // Price excludes free gifts
   const totalPrice = useMemo(
-    () => items.reduce((sum, item) => sum + effectiveYen(item.product, item.size) * item.quantity, 0),
-    [items]
+    () => rawItems.reduce((sum, item) => sum + effectiveYen(item.product, item.size) * item.quantity, 0),
+    [rawItems]
   );
 
   const getSpaceUsed = useCallback(() => {

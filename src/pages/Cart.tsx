@@ -120,14 +120,14 @@ const Cart: React.FC = () => {
   const currency = selectedCountry === 'Japão' ? 'JPY' : (isEuro ? 'EUR' : 'BRL');
   
   const baseTotalPrice = items.reduce(
-    (sum, item) => sum + fxConvert(effectiveYen(item.product, item.size), currency) * item.quantity, 0
+    (sum, item) => item.freeGift ? sum : sum + fxConvert(effectiveYen(item.product, item.size), currency) * item.quantity, 0
   );
 
   const discountAmount = activeCoupon ? computeDiscount(activeCoupon, baseTotalPrice) : 0;
 
   // Resgate de pontos: 1 ponto = ¥1, limitado ao valor dos produtos (em ¥)
   const convertYen = (yen: number) => fxConvert(yen, currency);
-  const productSubtotalYen = items.reduce((sum, item) => sum + effectiveYen(item.product, item.size) * item.quantity, 0);
+  const productSubtotalYen = items.reduce((sum, item) => item.freeGift ? sum : sum + effectiveYen(item.product, item.size) * item.quantity, 0);
   const availablePoints = user?.points || 0;
   const maxRedeemable = Math.min(availablePoints, Math.floor(productSubtotalYen / POINTS.yenPerPoint));
   const redeemPoints = Math.max(0, Math.min(pointsToUse, maxRedeemable));

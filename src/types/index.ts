@@ -40,7 +40,7 @@ export interface Product {
   isNew?: boolean;           // Marca como lançamento (aparece em destaque no filtro "Lançamento")
   salesCount?: number;       // Quantidade vendida (usado no filtro "Mais Vendidos"); atualizado manualmente pelo admin
   stock?: { unlimited: boolean; quantity: number }; // undefined = ilimitado (retrocompat)
-  promoGift?: { buyQuantity: number; giftProductId: string; giftProductName: string };
+  promoGift?: { buyQuantity: number; giftProductId: string; giftProductName: string; minOrderValueYen?: number };
 }
 
 export interface CartItem {
@@ -48,6 +48,8 @@ export interface CartItem {
   size: string;          // id da variante ('small'/'large' nos antigos, ou id custom)
   variantLabel?: string; // rótulo exibido (Pequeno, Kit...) — opcional p/ compatibilidade
   quantity: number;
+  freeGift?: boolean;            // true = presente grátis adicionado automaticamente
+  freeGiftFromProductId?: string; // produto que ativou o brinde
 }
 
 /* ------------------------------------------------------------------ */
