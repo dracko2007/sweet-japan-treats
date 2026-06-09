@@ -127,39 +127,26 @@ const Header: React.FC = () => {
               </div>
             )}
 
-            {/* Admin: no painel mostra "Ver Loja"; na loja mostra "Painel Admin" */}
-            {isAdmin && (
-              <Button
-                asChild
-                variant="ghost"
-                size="sm"
-                className="hidden xl:flex items-center gap-2 text-orange-600 hover:text-orange-700"
+            {/* Admin + Perfil empilhados (desktop) — igual País/Idioma */}
+            <div className="hidden xl:flex flex-col gap-1">
+              {isAdmin && (
+                <Link
+                  to={isAdminPage ? '/' : '/admin'}
+                  className="flex items-center gap-1.5 px-2 py-1 bg-orange-500/10 border border-orange-300/60 rounded-full text-[11px] font-semibold text-orange-700 dark:text-orange-400 hover:bg-orange-500/20 transition-colors"
+                >
+                  {isAdminPage
+                    ? <><ShoppingCart className="w-3.5 h-3.5" /> Ver Loja</>
+                    : <><UserCircle className="w-3.5 h-3.5 animate-pulse" /> Admin</>}
+                </Link>
+              )}
+              <Link
+                to={isAuthenticated ? '/perfil' : '/cadastro'}
+                className="flex items-center gap-1.5 px-2 py-1 bg-secondary/80 border border-border rounded-full text-[11px] font-semibold text-foreground hover:bg-secondary transition-colors"
               >
-                {isAdminPage ? (
-                  <Link to="/">
-                    <ShoppingCart className="w-5 h-5 text-primary" />
-                    <span className="hidden 2xl:inline">Ver Loja</span>
-                  </Link>
-                ) : (
-                  <Link to="/admin">
-                    <UserCircle className="w-5 h-5 text-primary animate-pulse" />
-                    <span className="hidden 2xl:inline">{t('nav.admin')}</span>
-                  </Link>
-                )}
-              </Button>
-            )}
-            
-            <Button
-              asChild
-              variant="ghost"
-              size="sm"
-              className="hidden xl:flex items-center gap-2"
-            >
-              <Link to={isAuthenticated ? "/perfil" : "/cadastro"}>
-                <UserCircle className="w-5 h-5" />
-                <span className="hidden 2xl:inline">{isAuthenticated ? (user?.name?.split(' ')[0] || t('nav.profile')) : t('nav.register')}</span>
+                <UserCircle className="w-3.5 h-3.5" />
+                {isAuthenticated ? (user?.name?.split(' ')[0] || t('nav.profile')) : t('nav.register')}
               </Link>
-            </Button>
+            </div>
 
             {/* Wishlist Button (escondido no admin) */}
             {isAuthenticated && !isAdminPage && (

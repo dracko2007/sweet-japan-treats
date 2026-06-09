@@ -60,6 +60,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
   const currentPrice = getDisplayPrice(selectedSize);
   const promoActive = hasDiscount(product);
   const originalPrice = convertYen(baseYen(product, selectedSize));
+  const isSoldOut = product.stock && !product.stock.unlimited && product.stock.quantity === 0;
 
   const handleAddToCart = () => {
     addToCart(product, selectedSize, quantity, firstVariant?.label);
@@ -169,6 +170,28 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
           </div>
         )}
 
+        {/* Sold Out diagonal banner */}
+        {isSoldOut && (
+          <div className="absolute inset-0 z-30 pointer-events-none overflow-hidden">
+            <div className="absolute inset-0 bg-black/25 rounded-t-xl" />
+            <div
+              className="absolute bg-red-600 text-white text-[11px] font-black tracking-widest text-center py-1.5 shadow-lg"
+              style={{ transform: 'rotate(-35deg)', width: '170%', top: '37%', left: '-35%' }}
+            >
+              SOLD OUT
+            </div>
+          </div>
+        )}
+
+        {/* Promo gift badge */}
+        {product.promoGift && product.promoGift.buyQuantity > 0 && !isSoldOut && (
+          <div className="absolute bottom-14 left-2 z-20">
+            <span className="px-2 py-1 rounded-lg text-[10px] font-bold bg-purple-600 text-white shadow">
+              🎁 Compre {product.promoGift.buyQuantity}x, ganhe {product.promoGift.giftProductName}
+            </span>
+          </div>
+        )}
+
         {/* Category Badge */}
         <div className={cn('absolute left-4 z-10', promoActive ? 'top-14' : 'top-4')}>
           <span className="px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wide bg-primary text-primary-foreground shadow-sm">
@@ -266,17 +289,23 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
         </div>
 
         {/* Add to cart */}
-        <Button
-          onClick={handleAddToCart}
-          size="sm"
-          className={cn('w-full rounded-lg transition-all btn-primary text-xs sm:text-sm h-9', added && 'bg-accent hover:bg-accent')}
-        >
-          {added ? (
-            <><Check className="w-4 h-4 mr-1.5" /> {t('productDetail.added')}</>
-          ) : (
-            <><ShoppingCart className="w-4 h-4 mr-1.5" /> Adicionar</>
-          )}
-        </Button>
+        {isSoldOut ? (
+          <Button size="sm" disabled className="w-full rounded-lg h-9 bg-red-100 text-red-600 cursor-not-allowed text-xs sm:text-sm font-bold border border-red-300 hover:bg-red-100">
+            Esgotado
+          </Button>
+        ) : (
+          <Button
+            onClick={handleAddToCart}
+            size="sm"
+            className={cn('w-full rounded-lg transition-all btn-primary text-xs sm:text-sm h-9', added && 'bg-accent hover:bg-accent')}
+          >
+            {added ? (
+              <><Check className="w-4 h-4 mr-1.5" /> {t('productDetail.added')}</>
+            ) : (
+              <><ShoppingCart className="w-4 h-4 mr-1.5" /> Adicionar</>
+            )}
+          </Button>
+        )}
       </div>
     </div>
   );

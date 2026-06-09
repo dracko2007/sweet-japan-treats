@@ -13,6 +13,7 @@ import { useLanguage } from '@/context/LanguageContext';
 import { formatPrice } from '@/utils/currency';
 import { effectiveYen } from '@/utils/pricing';
 import { convertYen as fxConvert } from '@/services/fxService';
+import { productService } from '@/services/productService';
 import { pointsForSpendYen, POINTS } from '@/services/pointsService';
 import { productEnglishName } from '@/utils/productName';
 import { Sparkles } from 'lucide-react';
@@ -241,6 +242,13 @@ const OrderReview: React.FC = () => {
     if (user) {
       void addOrder(firestoreOrder as any);
     }
+
+    // Decrementa estoque dos produtos com quantidade limitada
+    items.forEach((item) => {
+      if (item.product.stock && !item.product.stock.unlimited) {
+        void productService.decrementStock(item.product.id, item.quantity);
+      }
+    });
 
     firebaseSyncService
       .syncOrderToFirestore(user?.id || customerEmail || 'guest', firestoreOrder)

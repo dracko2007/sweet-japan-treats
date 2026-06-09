@@ -10,6 +10,8 @@ import {
   getDocs,
   doc,
   setDoc,
+  updateDoc,
+  increment,
   serverTimestamp,
   deleteField,
 } from 'firebase/firestore';
@@ -97,6 +99,18 @@ export const productService = {
       { ...cleanRest, __deleted: false, updatedAt: serverTimestamp() },
       { merge: true }
     );
+  },
+
+  /** Decrementa o estoque ao confirmar uma venda. No-op se produto não existe ou é ilimitado. */
+  async decrementStock(productId: string, qty: number): Promise<void> {
+    if (!db || qty <= 0) return;
+    try {
+      await updateDoc(doc(db, COL, productId), {
+        'stock.quantity': increment(-qty),
+      });
+    } catch {
+      // Produto pode não existir no Firestore (default); ignora silenciosamente
+    }
   },
 
   /** Esconde um produto (soft-delete) — funciona inclusive para os 8 defaults. */

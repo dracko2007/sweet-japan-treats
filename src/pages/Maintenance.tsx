@@ -8,7 +8,7 @@ const MaintenancePage: React.FC = () => {
   const { t } = useLanguage();
 
   return (
-    <div className="relative min-h-screen bg-gradient-to-b from-pink-100 via-pink-50 to-white flex items-center justify-center px-4 overflow-hidden">
+    <div className="relative min-h-screen bg-gradient-to-b from-pink-100 via-pink-50 to-white flex items-center justify-center px-4">
       {/* Language selector */}
       <div className="fixed top-4 right-4 z-50">
         <LanguageSwitcher />
@@ -44,11 +44,11 @@ const MaintenancePage: React.FC = () => {
       </div>
 
       {/* Flight illustration — Japan → Brazil */}
-      <div className="absolute bottom-0 left-0 right-0 flex justify-center pb-1 pointer-events-none select-none">
+      <div className="absolute bottom-0 left-0 right-0 flex justify-center pb-2 pointer-events-none select-none">
         <svg
-          viewBox="0 0 520 152"
-          className="w-full max-w-2xl"
-          style={{ opacity: 0.28 }}
+          viewBox="0 0 520 160"
+          className="w-full max-w-3xl"
+          style={{ opacity: 0.72 }}
           aria-hidden="true"
           xmlns="http://www.w3.org/2000/svg"
         >
@@ -119,7 +119,7 @@ const MaintenancePage: React.FC = () => {
             </g>
             <animateMotion dur="7s" repeatCount="indefinite" rotate="auto">
               {/* eslint-disable-next-line react/no-unknown-property */}
-              <mpath href="#route" />
+              <mpath href="#route" xlinkHref="#route" />
             </animateMotion>
           </g>
         </svg>

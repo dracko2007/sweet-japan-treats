@@ -39,6 +39,8 @@ export interface Product {
   tags?: string[];           // Tipos/subcategorias para filtro inteligente (ex: 'shampoo', 'filtro solar')
   isNew?: boolean;           // Marca como lançamento (aparece em destaque no filtro "Lançamento")
   salesCount?: number;       // Quantidade vendida (usado no filtro "Mais Vendidos"); atualizado manualmente pelo admin
+  stock?: { unlimited: boolean; quantity: number }; // undefined = ilimitado (retrocompat)
+  promoGift?: { buyQuantity: number; giftProductId: string; giftProductName: string };
 }
 
 export interface CartItem {
@@ -152,4 +154,5 @@ export interface Coupon {
   targetEmails?: string[]; // Lista de emails específicos (quando targetType = 'specific')
   minOrders?: number; // Mínimo de pedidos no histórico (quando targetType = 'loyalty')
   freeShipping?: boolean; // Se o cupom dá frete grátis em vez de desconto
+  minOrderValue?: number; // Valor mínimo do pedido em ¥ para usar o cupom
 }

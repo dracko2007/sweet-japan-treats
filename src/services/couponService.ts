@@ -194,7 +194,7 @@ export const couponService = {
   },
 
   // Validate and get coupon by code (with user email check)
-  validateCoupon: (code: string, userEmail?: string): { valid: boolean; coupon?: Coupon; error?: string } => {
+  validateCoupon: (code: string, userEmail?: string, orderTotalYen?: number): { valid: boolean; coupon?: Coupon; error?: string } => {
     const coupons = couponService.getAll();
     const coupon = coupons.find(c => c.code.toUpperCase() === code.toUpperCase());
 
@@ -215,6 +215,10 @@ export const couponService = {
       return { valid: false, error: 'Cupom esgotado' };
     }
 
+    if (coupon.minOrderValue && orderTotalYen !== undefined && orderTotalYen < coupon.minOrderValue) {
+      return { valid: false, error: `Pedido mínimo de ¥${coupon.minOrderValue.toLocaleString()} para usar este cupom.` };
+    }
+
     // Check if user has already used this coupon
     if (userEmail) {
       const usedBy = couponService.getCouponUsage(code);
@@ -227,12 +231,12 @@ export const couponService = {
   },
 
   // Async validation: loads coupons from Firestore first, then checks usage
-  validateCouponAsync: async (code: string, userEmail?: string): Promise<{ valid: boolean; coupon?: Coupon; error?: string }> => {
+  validateCouponAsync: async (code: string, userEmail?: string, orderTotalYen?: number): Promise<{ valid: boolean; coupon?: Coupon; error?: string }> => {
     // Load latest coupons from Firestore so client has admin-created ones
     await loadCouponsFromFirestore();
-    
+
     // Now do local validation (safeStorage is up to date)
-    const localResult = couponService.validateCoupon(code, userEmail);
+    const localResult = couponService.validateCoupon(code, userEmail, orderTotalYen);
     if (!localResult.valid) return localResult;
     
     // Then check Firestore for usage

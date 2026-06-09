@@ -452,7 +452,7 @@ _This is an automated test message_
           <div className="max-w-7xl mx-auto lg:flex lg:gap-8 lg:items-start">
 
             {/* MENU LATERAL (desktop) */}
-            <aside className="hidden lg:block lg:w-56 shrink-0 lg:sticky lg:top-24">
+            <aside className="hidden lg:block lg:w-56 shrink-0 lg:sticky lg:top-24 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto lg:rounded-2xl">
               <div className="bg-card rounded-2xl border border-border p-3 space-y-4">
                 {tabGroups.map((group) => (
                   <div key={group.title}>
@@ -484,7 +484,7 @@ _This is an automated test message_
             </aside>
 
             {/* COLUNA DE CONTEÚDO */}
-            <div className="flex-1 min-w-0">
+            <div className="flex-1 min-w-0 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto">
               {/* Navegação mobile (scroll horizontal) */}
               <div className="lg:hidden mb-6">
                 <nav className="flex overflow-x-auto scrollbar-hide gap-2 pb-1">

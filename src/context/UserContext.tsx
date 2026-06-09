@@ -109,7 +109,7 @@ interface UserContextType {
   addCoupon: (coupon: Coupon) => void;
   useCoupon: (couponId: string) => void;
   consumeCouponByCode: (code: string) => void;
-  validateProfileCoupon: (code: string) => { valid: boolean; coupon?: Coupon; error?: string };
+  validateProfileCoupon: (code: string, orderTotalYen?: number) => { valid: boolean; coupon?: Coupon; error?: string };
   addOrder: (order: Omit<Order, 'id' | 'date'> & { orderNumber?: string }) => Promise<void> | void;
   clearOrderHistory: () => void;
   sendPasswordReset: (email: string) => Promise<{ success: boolean; error?: string }>;
@@ -1001,13 +1001,16 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
 
   // Valida um cupom contra a lista do PERFIL (precisa existir, estar ativo
   // e não usado). É assim que garantimos que só quem possui o cupom usa.
-  const validateProfileCoupon = (code: string): { valid: boolean; coupon?: Coupon; error?: string } => {
+  const validateProfileCoupon = (code: string, orderTotalYen?: number): { valid: boolean; coupon?: Coupon; error?: string } => {
     const normalized = code.trim().toUpperCase();
     if (!normalized) return { valid: false, error: 'Digite um cupom.' };
     const found = coupons.find(c => c.code.toUpperCase() === normalized);
     if (!found) return { valid: false, error: 'Você não possui este cupom.' };
     if (found.isUsed) return { valid: false, error: 'Este cupom já foi utilizado.' };
     if (new Date(found.expiresAt) <= new Date()) return { valid: false, error: 'Cupom expirado.' };
+    if (found.minOrderValue && orderTotalYen !== undefined && orderTotalYen < found.minOrderValue) {
+      return { valid: false, error: `Pedido mínimo de ¥${found.minOrderValue.toLocaleString()} para usar este cupom.` };
+    }
     return { valid: true, coupon: found };
   };
 

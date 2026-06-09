@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Plus, Pencil, Trash2, X, Save, Image as ImageIcon, Loader2, PackageOpen, Sparkles, GripVertical } from 'lucide-react';
+import { Plus, Pencil, Trash2, X, Image as ImageIcon, Loader2, PackageOpen, Sparkles, GripVertical, Gift, Infinity } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Product, ProductVariant } from '@/types';
@@ -387,8 +387,16 @@ const ProductManager: React.FC = () => {
                       ) : null}
                     </div>
                     <div className="p-3 flex-1 min-w-0 flex flex-col">
-                      <p className="font-semibold text-sm leading-tight line-clamp-2 flex items-center gap-1">
+                      <p className="font-semibold text-sm leading-tight line-clamp-2 flex items-center gap-1 flex-wrap">
                         {p.hidden && <span className="text-[9px] font-bold bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 px-1.5 py-0.5 rounded shrink-0">OCULTO</span>}
+                        {p.stock && !p.stock.unlimited && (
+                          <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded shrink-0 ${p.stock.quantity === 0 ? 'bg-red-600 text-white' : 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300'}`}>
+                            {p.stock.quantity === 0 ? 'ESGOTADO' : `${p.stock.quantity} un.`}
+                          </span>
+                        )}
+                        {p.promoGift && p.promoGift.buyQuantity > 0 && (
+                          <span className="text-[9px] font-bold bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded shrink-0">🎁 PROMO</span>
+                        )}
                         {p.name}
                       </p>
                       {p.discountPercent ? (
@@ -667,6 +675,90 @@ const ProductManager: React.FC = () => {
                   />
                   <p className="text-[11px] text-muted-foreground mt-1.5">Usado no filtro "Mais Vendidos".</p>
                 </div>
+              </div>
+
+              {/* Estoque */}
+              <div className="bg-slate-50 dark:bg-slate-900/30 border border-slate-200 dark:border-slate-700 rounded-lg p-3">
+                <label className="text-sm font-semibold flex items-center gap-1.5 mb-2">
+                  <Infinity className="w-4 h-4 text-slate-500" /> Estoque
+                </label>
+                <div className="flex gap-4 mb-3">
+                  {(['unlimited', 'limited'] as const).map((type) => {
+                    const isUnlimited = type === 'unlimited';
+                    const checked = isUnlimited ? (!editing.stock || editing.stock.unlimited) : (editing.stock && !editing.stock.unlimited);
+                    return (
+                      <label key={type} className="flex items-center gap-2 cursor-pointer select-none">
+                        <input
+                          type="radio"
+                          name="stockType"
+                          checked={!!checked}
+                          onChange={() => setEditing({ ...editing, stock: { unlimited: isUnlimited, quantity: editing.stock?.quantity || 0 } })}
+                          className="accent-primary"
+                        />
+                        <span className="text-sm font-medium">{isUnlimited ? 'Ilimitado' : 'Quantidade específica'}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+                {editing.stock && !editing.stock.unlimited && (
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      min={0}
+                      value={editing.stock.quantity}
+                      onChange={(e) => setEditing({ ...editing, stock: { unlimited: false, quantity: Math.max(0, Number(e.target.value) || 0) } })}
+                      placeholder="Ex: 25"
+                      className="w-28 px-3 py-2 rounded-lg border border-border bg-background text-sm"
+                    />
+                    <span className="text-xs text-muted-foreground">unidades em estoque</span>
+                    {editing.stock.quantity === 0 && (
+                      <span className="text-[11px] font-bold text-red-600 bg-red-100 px-2 py-0.5 rounded">ESGOTADO — aparecerá Sold Out</span>
+                    )}
+                  </div>
+                )}
+                <p className="text-[11px] text-muted-foreground mt-1.5">
+                  A cada venda confirmada o estoque é descontado automaticamente. Ao chegar a zero aparece tarja "Sold Out".
+                </p>
+              </div>
+
+              {/* Promoção: Compre X ganhe produto */}
+              <div className="bg-purple-50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-800 rounded-lg p-3">
+                <label className="text-sm font-semibold flex items-center gap-1.5 mb-2">
+                  <Gift className="w-4 h-4 text-purple-500" /> Promoção: Compre X, ganhe presente
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-muted-foreground block mb-1">Qtd. mínima para ganhar</label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={editing.promoGift?.buyQuantity ?? ''}
+                      onChange={(e) => {
+                        const qty = Number(e.target.value) || 0;
+                        setEditing({ ...editing, promoGift: qty > 0 ? { buyQuantity: qty, giftProductId: editing.promoGift?.giftProductId || '', giftProductName: editing.promoGift?.giftProductName || '' } : undefined });
+                      }}
+                      placeholder="Ex: 3 (0 = sem promo)"
+                      className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground block mb-1">Nome do produto presente</label>
+                    <input
+                      type="text"
+                      value={editing.promoGift?.giftProductName ?? ''}
+                      onChange={(e) => editing.promoGift && setEditing({ ...editing, promoGift: { ...editing.promoGift, giftProductName: e.target.value } })}
+                      disabled={!editing.promoGift}
+                      placeholder="Ex: Amostra Bioré"
+                      className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm disabled:opacity-50"
+                    />
+                  </div>
+                </div>
+                {editing.promoGift && editing.promoGift.buyQuantity > 0 && (
+                  <p className="text-[11px] text-purple-700 dark:text-purple-300 mt-1.5">
+                    🎁 Compre {editing.promoGift.buyQuantity}x este produto e ganhe: <strong>{editing.promoGift.giftProductName || '(definir nome)'}</strong>
+                  </p>
+                )}
+                <p className="text-[11px] text-muted-foreground mt-1">0 ou vazio = sem promoção de presente.</p>
               </div>
 
               {/* Custo + margem de lucro — SÓ ADMIN */}

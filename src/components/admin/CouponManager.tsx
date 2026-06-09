@@ -21,6 +21,7 @@ const CouponManager: React.FC = () => {
     discountPercent: 0,
     expiryDate: '',
     usageLimit: 0,
+    minOrderValue: 0,
     description: '',
     targetType: 'all' as 'all' | 'specific' | 'birthday' | 'loyalty',
     targetEmails: '',
@@ -101,6 +102,7 @@ const CouponManager: React.FC = () => {
         targetEmails: emails.length ? emails : undefined,
         minOrders: formData.targetType === 'loyalty' ? formData.minOrders : undefined,
         freeShipping: formData.freeShipping,
+        minOrderValue: formData.minOrderValue || undefined,
       });
 
       // 2) Concede o cupom ao PERFIL dos clientes (para aparecer em "Meus Cupons")
@@ -142,6 +144,7 @@ const CouponManager: React.FC = () => {
         discountPercent: 0,
         expiryDate: '',
         usageLimit: 0,
+        minOrderValue: 0,
         description: '',
         targetType: 'all',
         targetEmails: '',
@@ -287,6 +290,28 @@ const CouponManager: React.FC = () => {
                   value={formData.usageLimit}
                   onChange={handleInputChange}
                 />
+                {formData.usageLimit > 0 && (
+                  <p className="text-[11px] text-amber-700 bg-amber-50 px-2 py-1 rounded">
+                    🏆 <strong>Primeiros {formData.usageLimit} compradores</strong> — o cupom se desativa automaticamente após {formData.usageLimit} usos.
+                  </p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="minOrderValue">Valor Mínimo do Pedido (¥) — 0 = sem mínimo</Label>
+                <Input
+                  id="minOrderValue"
+                  name="minOrderValue"
+                  type="number"
+                  min="0"
+                  value={formData.minOrderValue}
+                  onChange={handleInputChange}
+                />
+                {formData.minOrderValue > 0 && (
+                  <p className="text-[11px] text-blue-700 bg-blue-50 px-2 py-1 rounded">
+                    O cupom só será válido em pedidos acima de ¥{formData.minOrderValue.toLocaleString()}.
+                  </p>
+                )}
               </div>
 
               <div className="space-y-2 md:col-span-2">

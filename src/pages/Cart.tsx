@@ -65,7 +65,7 @@ const Cart: React.FC = () => {
 
     // 1) Cupom pessoal (precisa estar logado e possuir o cupom)
     if (isAuthenticated) {
-      const personal = validateProfileCoupon(code);
+      const personal = validateProfileCoupon(code, productSubtotalYen);
       if (personal.valid && personal.coupon) {
         applyCouponObject(personal.coupon);
         return;
