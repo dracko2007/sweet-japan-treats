@@ -330,7 +330,11 @@ export const translations: Record<Language, Record<string, string>> = {
     "kimiclaw.shipping.result_header": "Estimativas de frete para {country} ({weight}kg):",
     "kimiclaw.shipping.carrier": "Transportadora",
     "kimiclaw.shipping.price": "Preço",
-    "kimiclaw.shipping.select": "Selecionar"
+    "kimiclaw.shipping.select": "Selecionar",
+    "maintenance.title": "Em Manutenção",
+    "maintenance.description": "Estamos trabalhando para trazer novidades incríveis para você!",
+    "maintenance.card": "Em breve voltaremos com melhorias e novos produtos do Japão.",
+    "maintenance.admin": "Acesso administrativo"
   },
   "en": {
     "nav.products": "Products",
@@ -658,7 +662,11 @@ export const translations: Record<Language, Record<string, string>> = {
     "kimiclaw.shipping.result_header": "Shipping estimates for {country} ({weight}kg):",
     "kimiclaw.shipping.carrier": "Carrier",
     "kimiclaw.shipping.price": "Price",
-    "kimiclaw.shipping.select": "Select"
+    "kimiclaw.shipping.select": "Select",
+    "maintenance.title": "Under Maintenance",
+    "maintenance.description": "We're working hard to bring you amazing new products!",
+    "maintenance.card": "We'll be back soon with improvements and new products from Japan.",
+    "maintenance.admin": "Admin access"
   },
   "ja": {
     "nav.products": "商品",
@@ -987,6 +995,10 @@ export const translations: Record<Language, Record<string, string>> = {
     "kimiclaw.shipping.carrier": "配送業者",
     "kimiclaw.shipping.price": "料金",
     "kimiclaw.shipping.select": "選択",
+    "maintenance.title": "メンテナンス中",
+    "maintenance.description": "より良いサービスをお届けするため、作業中です！",
+    "maintenance.card": "まもなく新しい日本の商品とともに戻ってきます。",
+    "maintenance.admin": "管理者アクセス",
     "product.chocolate.desc": "プレミアムベルギーチョコレートとブラジルのドーセ・デ・レイチが出会う、チョコレート好きにたまらない一品。",
     "product.chocolate.flavor": "チョコレート",
     "vlog.title": "開封＆カスタマーテスト",

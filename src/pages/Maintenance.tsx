@@ -2,8 +2,11 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { Wrench, Lock } from 'lucide-react';
 import LanguageSwitcher from '@/components/LanguageSwitcher';
+import { useLanguage } from '@/context/LanguageContext';
 
 const MaintenancePage: React.FC = () => {
+  const { t } = useLanguage();
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-pink-100 via-pink-50 to-white flex items-center justify-center px-4">
       <div className="fixed top-4 right-4 z-50">
@@ -16,15 +19,15 @@ const MaintenancePage: React.FC = () => {
           </div>
         </div>
 
-        <h1 className="font-display text-4xl font-bold text-foreground">Em Manutenção</h1>
+        <h1 className="font-display text-4xl font-bold text-foreground">{t('maintenance.title')}</h1>
 
         <p className="text-lg text-muted-foreground leading-relaxed">
-          Estamos trabalhando para trazer novidades incríveis para você! 🎨
+          {t('maintenance.description')} 🎨
         </p>
 
         <div className="bg-card rounded-2xl border border-border p-6">
           <p className="text-sm text-muted-foreground">
-            Em breve voltaremos com melhorias e novos produtos do Japão. ✨
+            {t('maintenance.card')} ✨
           </p>
         </div>
 
@@ -33,7 +36,7 @@ const MaintenancePage: React.FC = () => {
           to="/login"
           className="inline-flex items-center gap-1.5 text-xs text-muted-foreground/70 hover:text-primary transition-colors"
         >
-          <Lock className="w-3 h-3" /> Acesso administrativo
+          <Lock className="w-3 h-3" /> {t('maintenance.admin')}
         </Link>
       </div>
     </div>
