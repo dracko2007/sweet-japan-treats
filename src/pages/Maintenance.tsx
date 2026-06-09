@@ -103,9 +103,9 @@ const MaintenancePage: React.FC = () => {
             <line x1="117" y1="72.5" x2="131" y2="72.5" />
           </g>
 
-          {/* Animated airplane (shape points in +x direction; rotate=auto turns it along the arc) */}
+          {/* Animated airplane — scaled up 2× so it's clearly visible */}
           <g>
-            <g fill="#a78bfa">
+            <g fill="#a78bfa" transform="scale(2)">
               {/* fuselage */}
               <path d="M10,0 L-5,-3 L-8,-1 L-3,0 L-8,1 L-5,3 Z" />
               {/* top wing */}
@@ -117,7 +117,7 @@ const MaintenancePage: React.FC = () => {
               {/* tail bottom */}
               <path d="M-5,3 L-9,7 L-5,1 Z" />
             </g>
-            <animateMotion dur="7s" repeatCount="indefinite" rotate="auto">
+            <animateMotion begin="0s" dur="7s" repeatCount="indefinite" rotate="auto">
               {/* eslint-disable-next-line react/no-unknown-property */}
               <mpath href="#route" xlinkHref="#route" />
             </animateMotion>

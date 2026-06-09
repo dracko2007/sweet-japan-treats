@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Plus, Pencil, Trash2, X, Image as ImageIcon, Loader2, PackageOpen, Sparkles, GripVertical, Gift, Infinity } from 'lucide-react';
+import { Plus, Pencil, Trash2, X, Image as ImageIcon, Loader2, PackageOpen, Sparkles, GripVertical, Save, Gift, Infinity } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Product, ProductVariant } from '@/types';
