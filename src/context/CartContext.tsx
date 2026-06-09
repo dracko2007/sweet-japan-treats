@@ -71,18 +71,20 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const addToCart = useCallback((product: Product, size: string, quantity = 1, variantLabel?: string) => {
     setRawItems(prev => {
+      const maxQty = product.stock && !product.stock.unlimited ? product.stock.quantity : Infinity;
       const existingIndex = prev.findIndex(
         item => item.product.id === product.id && item.size === size
       );
       if (existingIndex >= 0) {
+        const newQty = Math.min(prev[existingIndex].quantity + quantity, maxQty);
+        if (newQty === prev[existingIndex].quantity) return prev;
         const updated = [...prev];
-        updated[existingIndex] = {
-          ...updated[existingIndex],
-          quantity: updated[existingIndex].quantity + quantity
-        };
+        updated[existingIndex] = { ...updated[existingIndex], quantity: newQty };
         return updated;
       }
-      return [...prev, { product, size, quantity, variantLabel }];
+      const newQty = Math.min(quantity, maxQty);
+      if (newQty <= 0) return prev;
+      return [...prev, { product, size, quantity: newQty, variantLabel }];
     });
   }, []);
 
@@ -99,11 +101,11 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       ));
       return;
     }
-    setRawItems(prev => prev.map(item =>
-      item.product.id === productId && item.size === size
-        ? { ...item, quantity }
-        : item
-    ));
+    setRawItems(prev => prev.map(item => {
+      if (item.product.id !== productId || item.size !== size) return item;
+      const maxQty = item.product.stock && !item.product.stock.unlimited ? item.product.stock.quantity : Infinity;
+      return { ...item, quantity: Math.min(quantity, maxQty) };
+    }));
   }, []);
 
   const clearCart = useCallback(() => {

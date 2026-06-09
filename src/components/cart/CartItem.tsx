@@ -1,5 +1,6 @@
 import React from 'react';
 import { Trash2, Plus, Minus } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { CartItem as CartItemType } from '@/types';
 import { useCart } from '@/context/CartContext';
 import { useLanguage } from '@/context/LanguageContext';
@@ -28,6 +29,8 @@ const CartItemComponent: React.FC<CartItemProps> = ({ item }) => {
   const unitPrice = fxConvert(basePrice, currency);
 
   const finalPrice = unitPrice * item.quantity;
+  const maxQty = item.product.stock && !item.product.stock.unlimited ? item.product.stock.quantity : Infinity;
+  const atStockLimit = item.quantity >= maxQty;
 
   if (item.freeGift) {
     return (
@@ -116,7 +119,8 @@ const CartItemComponent: React.FC<CartItemProps> = ({ item }) => {
             <span className="w-8 text-center text-sm font-medium">{item.quantity}</span>
             <button
               onClick={() => updateQuantity(item.product.id, item.size, item.quantity + 1)}
-              className="p-1.5 hover:bg-secondary/50 transition-colors rounded-r-lg"
+              disabled={atStockLimit}
+              className={cn("p-1.5 hover:bg-secondary/50 transition-colors rounded-r-lg", atStockLimit && "opacity-30 cursor-not-allowed")}
             >
               <Plus className="w-4 h-4" />
             </button>
