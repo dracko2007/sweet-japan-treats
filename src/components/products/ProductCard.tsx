@@ -172,10 +172,10 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
 
         {/* Sold Out corner ribbon (top-left) */}
         {isSoldOut && (
-          <div className="absolute top-0 left-0 z-30 pointer-events-none overflow-hidden w-28 h-28">
+          <div className="absolute top-0 left-0 z-30 pointer-events-none overflow-hidden w-48 h-48">
             <div
-              className="absolute bg-red-600 text-white text-[10px] font-black tracking-widest text-center shadow-lg"
-              style={{ transform: 'rotate(-45deg)', width: '120px', top: '22px', left: '-28px', paddingTop: '5px', paddingBottom: '5px' }}
+              className="absolute bg-red-600 text-white text-sm font-black tracking-widest text-center shadow-xl"
+              style={{ transform: 'rotate(-45deg)', width: '220px', top: '44px', left: '-52px', paddingTop: '10px', paddingBottom: '10px' }}
             >
               SOLD OUT
             </div>
