@@ -187,7 +187,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
         {product.promoGift && product.promoGift.buyQuantity > 0 && product.promoGift.giftProductId && !isSoldOut && (
           <div className="absolute bottom-14 left-2 z-20 max-w-[90%]">
             <span className="px-2 py-1 rounded-lg text-[10px] font-bold bg-purple-600 text-white shadow leading-tight block">
-              🎁 Compre {product.promoGift.buyQuantity}x{product.promoGift.minOrderValueYen ? ` + gaste ¥${product.promoGift.minOrderValueYen.toLocaleString()}` : ''} → ganhe {product.promoGift.giftProductName}
+              🎁 Compre {product.promoGift.buyQuantity}x{product.promoGift.minOrderValueYen ? ` + gaste ${formatPrice(convertYen(product.promoGift.minOrderValueYen), currency)}` : ''} → ganhe {product.promoGift.giftProductName}
             </span>
           </div>
         )}

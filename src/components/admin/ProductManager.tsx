@@ -13,6 +13,8 @@ import { productService } from '@/services/productService';
 import { useToast } from '@/hooks/use-toast';
 import { useUser } from '@/context/UserContext';
 import { PACKAGE_SAFETY_MARGIN_CM, sanitizePackageDimensions } from '@/utils/shippingDimensions';
+import { convertYen as fxConvertYen } from '@/services/fxService';
+import { formatPrice } from '@/utils/currency';
 
 const CATEGORIES = [
   { id: 'cosmeticos', label: 'Cosméticos', icon: '🧴' },
@@ -757,17 +759,26 @@ const ProductManager: React.FC = () => {
                   {editing.promoGift && (
                     <div>
                       <label className="text-xs text-muted-foreground block mb-1">Gasto mínimo no carrinho (¥) — 0 = sem mínimo</label>
-                      <input
-                        type="number"
-                        min={0}
-                        value={editing.promoGift.minOrderValueYen ?? 0}
-                        onChange={(e) => {
-                          const val = Number(e.target.value) || 0;
-                          setEditing({ ...editing, promoGift: { ...editing.promoGift!, minOrderValueYen: val > 0 ? val : undefined } });
-                        }}
-                        placeholder="Ex: 3000"
-                        className="w-32 px-3 py-2 rounded-lg border border-border bg-background text-sm"
-                      />
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <input
+                          type="number"
+                          min={0}
+                          value={editing.promoGift.minOrderValueYen ?? 0}
+                          onChange={(e) => {
+                            const val = Number(e.target.value) || 0;
+                            setEditing({ ...editing, promoGift: { ...editing.promoGift!, minOrderValueYen: val > 0 ? val : undefined } });
+                          }}
+                          placeholder="Ex: 3000"
+                          className="w-32 px-3 py-2 rounded-lg border border-border bg-background text-sm"
+                        />
+                        {(editing.promoGift.minOrderValueYen ?? 0) > 0 && (
+                          <span className="text-[11px] text-muted-foreground whitespace-nowrap">
+                            ≈ <strong>{formatPrice(fxConvertYen(editing.promoGift.minOrderValueYen!, 'BRL'), 'BRL')}</strong>
+                            {' · '}
+                            <strong>{formatPrice(fxConvertYen(editing.promoGift.minOrderValueYen!, 'EUR'), 'EUR')}</strong>
+                          </span>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>
