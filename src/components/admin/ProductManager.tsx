@@ -92,6 +92,7 @@ const ProductManager: React.FC = () => {
   const [uploading, setUploading] = useState(false);
   const [enriching, setEnriching] = useState(false);
   const [enrichFields, setEnrichFields] = useState({ price: true, images: true, description: true });
+  const [marginPct, setMarginPct] = useState(50);
   const [tagInput, setTagInput] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -104,11 +105,18 @@ const ProductManager: React.FC = () => {
     setEditing(emptyForm());
     setIsNew(true);
     setTagInput('');
+    setMarginPct(50);
   };
   const openEdit = (p: Product) => {
-    setEditing({ ...p, gallery: p.gallery ? [...p.gallery] : [p.image], variants: getVariants(p) });
+    const vs = getVariants(p);
+    setEditing({ ...p, gallery: p.gallery ? [...p.gallery] : [p.image], variants: vs });
     setIsNew(false);
     setTagInput('');
+    const cost = p.cost || 0;
+    const price = vs[0]?.price || 0;
+    setMarginPct(cost > 0 && price > cost
+      ? Math.round(((price - cost) / price) * 100)
+      : 50);
   };
 
   // Helpers das variantes de preço
@@ -218,6 +226,9 @@ const ProductManager: React.FC = () => {
             i === 0 ? { ...v, price: data.sellingPriceYen } : v
           );
           updatedEditing.prices = { small: data.sellingPriceYen, large: data.sellingPriceYen };
+          if (data.costYen && data.sellingPriceYen > data.costYen) {
+            setMarginPct(Math.round(((data.sellingPriceYen - data.costYen) / data.sellingPriceYen) * 100));
+          }
         }
       }
 
@@ -658,27 +669,80 @@ const ProductManager: React.FC = () => {
                 </div>
               </div>
 
-              {/* Custo de aquisição — SÓ ADMIN, não aparece para o cliente */}
+              {/* Custo + margem de lucro — SÓ ADMIN */}
               <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
-                <label className="text-sm font-semibold block mb-1 flex items-center gap-1.5">
-                  🔒 Custo de aquisição (¥) <span className="text-[10px] font-normal text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded">interno</span>
+                <label className="text-sm font-semibold flex items-center gap-1.5 mb-2">
+                  🔒 Custo & Margem <span className="text-[10px] font-normal text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded">interno</span>
                 </label>
-                <input
-                  type="number"
-                  value={editing.cost || ''}
-                  onChange={(e) => setEditing({ ...editing, cost: Number(e.target.value) })}
-                  placeholder="Quanto você pagou no produto (ex: 500)"
-                  disabled={!canPrice}
-                  className="w-full px-3 py-2 rounded-lg border border-amber-300 bg-background disabled:opacity-60 disabled:cursor-not-allowed"
-                />
-                {editing.cost && variants()[0]?.price ? (
-                  <p className="text-xs text-amber-800 dark:text-amber-300 mt-1.5">
-                    Margem ({variants()[0].label}): <strong>¥{(variants()[0].price - editing.cost).toLocaleString()}</strong>
-                    {` (${Math.round(((variants()[0].price - editing.cost) / variants()[0].price) * 100)}%)`}
-                  </p>
-                ) : (
-                  <p className="text-xs text-amber-700/80 dark:text-amber-400/80 mt-1.5">Para calcular lucro real no dashboard. O cliente NUNCA vê este valor.</p>
-                )}
+
+                <div className="flex items-center gap-2">
+                  {/* Custo de aquisição */}
+                  <div className="flex-1 min-w-0">
+                    <span className="text-[11px] text-muted-foreground">Custo (¥)</span>
+                    <input
+                      type="number"
+                      value={editing.cost || ''}
+                      onChange={(e) => {
+                        const cost = Number(e.target.value);
+                        if (marginPct > 0 && marginPct < 100 && cost > 0) {
+                          const selling = Math.round(cost / (1 - marginPct / 100));
+                          const vs = variants().map((v, i) => i === 0 ? { ...v, price: selling } : v);
+                          setEditing({ ...editing, cost, variants: vs, prices: { ...editing.prices, small: selling } });
+                        } else {
+                          setEditing({ ...editing, cost });
+                        }
+                      }}
+                      placeholder="ex: 500"
+                      disabled={!canPrice}
+                      className="w-full px-3 py-2 rounded-lg border border-amber-300 bg-background disabled:opacity-60 disabled:cursor-not-allowed text-sm"
+                    />
+                  </div>
+
+                  {/* Margem % */}
+                  <div className="w-24 shrink-0">
+                    <span className="text-[11px] text-muted-foreground">Margem (%)</span>
+                    <div className="relative flex items-center">
+                      <input
+                        type="number"
+                        min={1}
+                        max={99}
+                        value={marginPct}
+                        onChange={(e) => {
+                          const pct = Math.min(99, Math.max(1, Number(e.target.value) || 1));
+                          setMarginPct(pct);
+                          if (editing.cost && pct > 0 && pct < 100) {
+                            const selling = Math.round(editing.cost / (1 - pct / 100));
+                            const vs = variants().map((v, i) => i === 0 ? { ...v, price: selling } : v);
+                            setEditing({ ...editing, variants: vs, prices: { ...editing.prices, small: selling } });
+                          }
+                        }}
+                        disabled={!canPrice}
+                        className="w-full pl-3 pr-7 py-2 rounded-lg border border-amber-300 bg-background disabled:opacity-60 disabled:cursor-not-allowed text-sm"
+                      />
+                      <span className="absolute right-2 text-xs text-muted-foreground pointer-events-none">%</span>
+                    </div>
+                  </div>
+
+                  {/* Preço de venda calculado */}
+                  <div className="shrink-0">
+                    <span className="text-[11px] text-muted-foreground">Venda (¥)</span>
+                    <div className={`px-3 py-2 rounded-lg border text-sm font-semibold min-w-[80px] text-center ${
+                      editing.cost && marginPct > 0
+                        ? 'border-green-300 bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-400'
+                        : 'border-border bg-muted text-muted-foreground'
+                    }`}>
+                      {editing.cost && marginPct > 0 && marginPct < 100
+                        ? `¥${Math.round(editing.cost / (1 - marginPct / 100)).toLocaleString()}`
+                        : '—'}
+                    </div>
+                  </div>
+                </div>
+
+                <p className="text-xs text-amber-700/80 dark:text-amber-400/80 mt-1.5">
+                  {editing.cost && variants()[0]?.price
+                    ? `Lucro: ¥${(variants()[0].price - (editing.cost || 0)).toLocaleString()} · margem real ${Math.round(((variants()[0].price - (editing.cost || 0)) / variants()[0].price) * 100)}% · O cliente NUNCA vê o custo.`
+                    : 'Preencha custo + margem para calcular o preço de venda automaticamente.'}
+                </p>
               </div>
 
               <div className="bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-900 rounded-lg p-3">
