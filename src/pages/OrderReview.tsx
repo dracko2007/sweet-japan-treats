@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useToast } from '@/hooks/use-toast';
 import { useLanguage } from '@/context/LanguageContext';
+import { useProducts } from '@/context/ProductsContext';
 import { formatPrice } from '@/utils/currency';
 import { effectiveYen } from '@/utils/pricing';
 import { convertYen as fxConvert } from '@/services/fxService';
@@ -30,6 +31,7 @@ const devError = isDev ? console.error.bind(console) : () => {};
 
 const OrderReview: React.FC = () => {
   const { items, clearCart } = useCart();
+  const { refresh: refreshProducts } = useProducts();
   const { consumeCouponByCode, user, addPoints, addOrder } = useUser();
   const [pointsToUse, setPointsToUse] = useState<number>(() => {
     const v = Number(safeStorage.getItem('redeem_points'));
@@ -243,16 +245,20 @@ const OrderReview: React.FC = () => {
       void addOrder(firestoreOrder as any);
     }
 
-    // Decrementa estoque via API server-side (admin credentials no Vercel)
-    items.forEach((item) => {
-      if (!item.freeGift && item.product.stock && !item.product.stock.unlimited) {
-        fetch('/api/decrement-stock', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ productId: item.product.id, qty: item.quantity }),
-        }).catch(() => {});
-      }
-    });
+    // Decrementa estoque via API server-side, depois recarrega produtos para
+    // refletir o Sold Out imediatamente na loja sem precisar de um reload manual.
+    const stockItems = items.filter(i => !i.freeGift && i.product.stock && !i.product.stock.unlimited);
+    if (stockItems.length > 0) {
+      Promise.all(
+        stockItems.map(item =>
+          fetch('/api/decrement-stock', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ productId: item.product.id, qty: item.quantity }),
+          }).catch(() => {})
+        )
+      ).then(() => refreshProducts()).catch(() => {});
+    }
 
     firebaseSyncService
       .syncOrderToFirestore(user?.id || customerEmail || 'guest', firestoreOrder)
