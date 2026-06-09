@@ -4,7 +4,6 @@ import { Button } from '@/components/ui/button';
 import { useMaintenanceMode } from '@/hooks/useMaintenanceMode';
 import { useToast } from '@/hooks/use-toast';
 
-// Botão de ligar/desligar o modo manutenção (painel admin)
 const MaintenanceToggle: React.FC = () => {
   const { isEnabled, loading, toggle } = useMaintenanceMode();
   const { toast } = useToast();
@@ -12,11 +11,21 @@ const MaintenanceToggle: React.FC = () => {
 
   const handleToggle = async () => {
     setBusy(true);
-    const result = await toggle();
+    const { ok, newState, error } = await toggle();
     setBusy(false);
+
+    if (!ok) {
+      toast({
+        title: '❌ Falha ao alterar modo manutenção',
+        description: error || 'Erro desconhecido',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     toast({
-      title: result ? '🔧 Modo manutenção ATIVADO' : '✅ Site ONLINE novamente',
-      description: result
+      title: newState ? '🔧 Modo manutenção ATIVADO' : '✅ Site ONLINE novamente',
+      description: newState
         ? 'O público vê a página de manutenção. Você (admin) continua com acesso normal.'
         : 'A loja voltou ao ar para todos.',
     });

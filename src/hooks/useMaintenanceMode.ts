@@ -1,57 +1,60 @@
 import { useState, useEffect } from 'react';
-import { db } from '@/config/firebase';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
-
-const isDev = import.meta.env.DEV;
-const devLog = isDev ? console.log.bind(console) : () => {};
-const devWarn = isDev ? console.warn.bind(console) : () => {};
-const devError = isDev ? console.error.bind(console) : () => {};
-
+import { db, auth } from '@/config/firebase';
+import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 
 // Controla o modo manutenção (flag em Firestore settings/maintenance).
+// Usa onSnapshot para atualizar todos os tabs/usuários em tempo real.
 // FAIL-SAFE: qualquer erro de leitura mantém o site NORMAL (nunca trava).
 export const useMaintenanceMode = () => {
   const [isEnabled, setIsEnabled] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    let active = true;
-    const load = async () => {
-      if (!db) {
-        if (active) setLoading(false);
-        return;
+    if (!db) {
+      setLoading(false);
+      return;
+    }
+
+    // Listener real-time: qualquer mudança no Firestore reflete imediatamente
+    const unsub = onSnapshot(
+      doc(db, 'settings', 'maintenance'),
+      (snap) => {
+        setIsEnabled(snap.exists() && snap.data().enabled === true);
+        setLoading(false);
+      },
+      (_err) => {
+        // Falha de leitura → site fica NORMAL
+        setIsEnabled(false);
+        setLoading(false);
       }
-      try {
-        const snap = await getDoc(doc(db, 'settings', 'maintenance'));
-        if (active) setIsEnabled(snap.exists() && snap.data().enabled === true);
-      } catch (e) {
-        // Falha de leitura (ex: regra não publicada) → site fica NORMAL
-        devWarn('[maintenance] leitura falhou, mantendo site normal:', e);
-        if (active) setIsEnabled(false);
-      } finally {
-        if (active) setLoading(false);
-      }
-    };
-    load();
-    return () => {
-      active = false;
-    };
+    );
+
+    return unsub;
   }, []);
 
-  // Liga/desliga (só admin consegue gravar pelas regras)
-  const toggle = async (): Promise<boolean> => {
-    if (!db) return isEnabled;
+  // Liga/desliga — lança erro para que o componente possa mostrar ao usuário
+  const toggle = async (): Promise<{ ok: boolean; newState: boolean; error?: string }> => {
+    if (!db) return { ok: false, newState: isEnabled, error: 'Firebase não inicializado' };
+
+    const currentUser = auth?.currentUser;
+    if (!currentUser) {
+      return { ok: false, newState: isEnabled, error: 'Sessão Firebase expirada — faça login novamente' };
+    }
+
     const newState = !isEnabled;
     try {
       await setDoc(doc(db, 'settings', 'maintenance'), {
         enabled: newState,
         updatedAt: new Date().toISOString(),
+        updatedBy: currentUser.email,
       });
-      setIsEnabled(newState);
-      return newState;
-    } catch (e) {
-      devError('[maintenance] não foi possível salvar:', e);
-      return isEnabled;
+      // onSnapshot atualiza isEnabled automaticamente
+      return { ok: true, newState };
+    } catch (e: any) {
+      const msg = e?.code === 'permission-denied'
+        ? 'Permissão negada — verifique se está logado como admin no Firebase'
+        : String(e?.message || e);
+      return { ok: false, newState: isEnabled, error: msg };
     }
   };
 
