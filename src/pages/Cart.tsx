@@ -197,29 +197,64 @@ const Cart: React.FC = () => {
             <div className="max-w-6xl mx-auto grid lg:grid-cols-3 gap-8">
               {/* Cart Items List */}
               <div className="lg:col-span-2 space-y-4">
-                <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
                   <h2 className="font-sans text-xl font-bold text-foreground">
                     Seus Produtos
                   </h2>
-                  <Button 
-                    variant="ghost" 
-                    size="sm"
-                    onClick={clearCart}
-                    className="text-muted-foreground hover:text-destructive font-semibold"
-                  >
-                    <Trash2 className="w-4 h-4 mr-2" />
-                    Limpar carrinho
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => navigate('/produtos')}
+                      className="font-semibold text-xs"
+                    >
+                      ← Continuar comprando
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={clearCart}
+                      className="text-muted-foreground hover:text-destructive font-semibold"
+                    >
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Limpar
+                    </Button>
+                  </div>
                 </div>
 
 
 
                 {items.map((item) => (
-                  <CartItemComponent 
-                    key={`${item.product.id}-${item.size}`} 
-                    item={item} 
+                  <CartItemComponent
+                    key={`${item.product.id}-${item.size}${item.freeGift ? '-gift' : ''}`}
+                    item={item}
                   />
                 ))}
+
+                {/* PromoGift progress reminders */}
+                {items.filter(i => !i.freeGift && (i.product.promoGift?.buyQuantity ?? 0) > 0 && i.product.promoGift?.giftProductId).map(item => {
+                  const pg = item.product.promoGift!;
+                  const qtyMet = item.quantity >= pg.buyQuantity;
+                  const yenMet = !pg.minOrderValueYen || productSubtotalYen >= pg.minOrderValueYen;
+                  if (qtyMet && yenMet) return null;
+                  const missingQty = qtyMet ? 0 : pg.buyQuantity - item.quantity;
+                  const missingVal = !yenMet ? formatPrice(convertYen(pg.minOrderValueYen! - productSubtotalYen), currency) : null;
+                  return (
+                    <div key={`reminder-${item.product.id}`} className="bg-purple-50 dark:bg-purple-950/20 border border-dashed border-purple-300 dark:border-purple-700 rounded-xl p-3 flex items-start gap-2.5">
+                      <span className="text-xl shrink-0">🎁</span>
+                      <div>
+                        <p className="text-sm font-bold text-purple-800 dark:text-purple-200">
+                          Ganhe <span className="underline">{pg.giftProductName}</span> grátis!
+                        </p>
+                        <p className="text-xs text-purple-600 dark:text-purple-400 mt-0.5">
+                          {missingQty > 0 && !missingVal && `Compre mais ${missingQty} unidade(s) deste produto.`}
+                          {missingQty === 0 && missingVal && `Adicione mais ${missingVal} em produtos no carrinho.`}
+                          {missingQty > 0 && missingVal && `Compre mais ${missingQty} unidade(s) e adicione mais ${missingVal} no total.`}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
 
                 {/* Remessa Conforme Trust Badge Info Banner for Brazil */}
                 {selectedCountry === 'Brasil' && (

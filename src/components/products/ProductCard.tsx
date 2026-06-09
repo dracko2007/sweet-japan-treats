@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ShoppingCart, Check, Heart, Share2, Eye } from 'lucide-react';
+import { ShoppingCart, Check, Heart, Share2, Eye, Plus, Minus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Product } from '@/types';
 import { useCart } from '@/context/CartContext';
@@ -288,23 +288,45 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
           </div>
         </div>
 
-        {/* Add to cart */}
+        {/* Quantity selector + Add to cart */}
         {isSoldOut ? (
           <Button size="sm" disabled className="w-full rounded-lg h-9 bg-red-100 text-red-600 cursor-not-allowed text-xs sm:text-sm font-bold border border-red-300 hover:bg-red-100">
             Esgotado
           </Button>
         ) : (
-          <Button
-            onClick={handleAddToCart}
-            size="sm"
-            className={cn('w-full rounded-lg transition-all btn-primary text-xs sm:text-sm h-9', added && 'bg-accent hover:bg-accent')}
-          >
-            {added ? (
-              <><Check className="w-4 h-4 mr-1.5" /> {t('productDetail.added')}</>
-            ) : (
-              <><ShoppingCart className="w-4 h-4 mr-1.5" /> Adicionar</>
-            )}
-          </Button>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center border border-border rounded-lg shrink-0">
+              <button
+                onClick={(e) => { e.stopPropagation(); setQuantity(q => Math.max(1, q - 1)); }}
+                className="p-1.5 hover:bg-secondary/50 transition-colors rounded-l-lg"
+              >
+                <Minus className="w-3.5 h-3.5" />
+              </button>
+              <span className="w-7 text-center text-sm font-semibold">{quantity}</span>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const maxQty = product.stock && !product.stock.unlimited ? product.stock.quantity : Infinity;
+                  setQuantity(q => Math.min(q + 1, maxQty));
+                }}
+                disabled={!!(product.stock && !product.stock.unlimited && quantity >= product.stock.quantity)}
+                className={cn('p-1.5 hover:bg-secondary/50 transition-colors rounded-r-lg', product.stock && !product.stock.unlimited && quantity >= product.stock.quantity && 'opacity-30 cursor-not-allowed')}
+              >
+                <Plus className="w-3.5 h-3.5" />
+              </button>
+            </div>
+            <Button
+              onClick={handleAddToCart}
+              size="sm"
+              className={cn('flex-1 rounded-lg transition-all btn-primary text-xs sm:text-sm h-9', added && 'bg-accent hover:bg-accent')}
+            >
+              {added ? (
+                <><Check className="w-4 h-4 mr-1" /> {t('productDetail.added')}</>
+              ) : (
+                <><ShoppingCart className="w-4 h-4 mr-1" /> Adicionar</>
+              )}
+            </Button>
+          </div>
         )}
       </div>
     </div>
