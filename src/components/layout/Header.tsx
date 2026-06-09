@@ -117,16 +117,10 @@ const Header: React.FC = () => {
 
           {/* Cart, Language & Mobile Menu */}
           <div className="flex items-center gap-3">
-            {/* Country Switcher (escondido no admin) */}
+            {/* País (cima) + Idioma (baixo) empilhados — escondidos no admin */}
             {!isAdminPage && (
-              <div className="hidden md:block">
+              <div className="hidden md:flex flex-col gap-1">
                 <CountrySwitcher />
-              </div>
-            )}
-
-            {/* Language Switcher (escondido no admin — só português lá) */}
-            {!isAdminPage && (
-              <div className="hidden sm:block">
                 <LanguageSwitcher />
               </div>
             )}

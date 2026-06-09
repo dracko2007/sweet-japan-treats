@@ -1,41 +1,68 @@
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useLanguage } from '@/context/LanguageContext';
 import { Language } from '@/data/translations';
 import { cn } from '@/lib/utils';
+import { ChevronDown } from 'lucide-react';
 import FlagIcon from '@/components/FlagIcon';
 
-const LANG_FLAGS: Record<Language, { code: string; label: string }> = {
-  pt: { code: 'br', label: 'Português' },
-  en: { code: 'us', label: 'English' },
-  ja: { code: 'jp', label: '日本語' },
-};
+const LANGUAGES: { code: Language; flagCode: string; label: string }[] = [
+  { code: 'pt', flagCode: 'br', label: 'Português' },
+  { code: 'en', flagCode: 'us', label: 'English' },
+  { code: 'ja', flagCode: 'jp', label: '日本語' },
+];
 
 const LanguageSwitcher: React.FC = () => {
   const { language, setLanguage } = useLanguage();
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const languages: Language[] = ['pt', 'en', 'ja'];
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const current = LANGUAGES.find(l => l.code === language) || LANGUAGES[0];
 
   return (
-    <div className="flex items-center gap-1">
-      {languages.map((lang) => {
-        const { code, label } = LANG_FLAGS[lang];
-        return (
-          <button
-            key={lang}
-            onClick={() => setLanguage(lang)}
-            className={cn(
-              "p-1 rounded-md transition-all duration-200 hover:scale-110",
-              language === lang
-                ? "bg-primary/15 ring-2 ring-primary/40 scale-110"
-                : "opacity-60 hover:opacity-100"
-            )}
-            title={label}
-            aria-label={`Switch to ${label}`}
-          >
-            <FlagIcon code={code} alt={label} size={22} />
-          </button>
-        );
-      })}
+    <div className="relative inline-block text-left" ref={dropdownRef}>
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex items-center gap-2 px-3 py-1.5 bg-secondary/80 border border-border rounded-full hover:bg-secondary transition-all text-xs font-semibold text-foreground shadow-sm focus:outline-none"
+      >
+        <FlagIcon code={current.flagCode} alt={current.label} size={20} />
+        <span>{current.label}</span>
+        <ChevronDown className={cn("w-3.5 h-3.5 text-muted-foreground transition-transform duration-200", isOpen && "rotate-180")} />
+      </button>
+
+      {isOpen && (
+        <div className="absolute right-0 mt-2 w-40 rounded-xl bg-card border border-border shadow-lg z-50 py-1.5 animate-fade-in">
+          {LANGUAGES.map((lang) => (
+            <button
+              key={lang.code}
+              onClick={() => { setLanguage(lang.code); setIsOpen(false); }}
+              className={cn(
+                "w-full flex items-center justify-between px-3.5 py-2 text-xs text-left transition-colors font-medium",
+                language === lang.code
+                  ? "bg-primary/10 text-primary font-bold"
+                  : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+              )}
+            >
+              <div className="flex items-center gap-2">
+                <FlagIcon code={lang.flagCode} alt={lang.label} size={20} />
+                <span>{lang.label}</span>
+              </div>
+              {language === lang.code && (
+                <span className="w-1.5 h-1.5 rounded-full bg-primary" />
+              )}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 };
