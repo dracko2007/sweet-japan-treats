@@ -1,14 +1,13 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Truck, Package, Calculator, MapPin } from 'lucide-react';
-import { prefectures, shippingRates } from '@/data/prefectures';
+import { Truck, Package, Calculator, MapPin, Scale } from 'lucide-react';
 import { japanPrefectures, japanShippingRates } from '@/data/japanPrefectures';
-import { europePrefectures, europeShippingRates } from '@/data/europePrefectures';
 import { useCart } from '@/context/CartContext';
 import { convertYen as fxConvert } from '@/services/fxService';
 import { useLanguage } from '@/context/LanguageContext';
 import { cn } from '@/lib/utils';
 import { formatPrice } from '@/utils/currency';
 import { calculateCartShippingBoxes } from '@/utils/shippingDimensions';
+import { getELightRate, getKozutsumiRate, type JapanPostZone } from '@/utils/japanPostRates';
 
 interface ShippingCalculatorProps {
   selectedPrefecture?: string;
@@ -17,7 +16,7 @@ interface ShippingCalculatorProps {
   couponDiscount?: number;
 }
 
-const ShippingCalculator: React.FC<ShippingCalculatorProps> = ({ 
+const ShippingCalculator: React.FC<ShippingCalculatorProps> = ({
   selectedPrefecture: externalPrefecture,
   onShippingSelect,
   destinationCountry = 'Brasil',
@@ -29,35 +28,28 @@ const ShippingCalculator: React.FC<ShippingCalculatorProps> = ({
   const { t } = useLanguage();
 
   useEffect(() => {
-    if (externalPrefecture) {
-      setSelectedPrefecture(externalPrefecture);
-    }
+    if (externalPrefecture) setSelectedPrefecture(externalPrefecture);
   }, [externalPrefecture]);
 
-  // Reset selected prefecture when destination country changes
   useEffect(() => {
     setSelectedPrefecture('');
     setSelectedCarrier(null);
   }, [destinationCountry]);
 
   const spaceInfo = getSpaceUsed();
-  
+
   const isJapan = destinationCountry === 'Japão';
   const isEurope = ['Portugal', 'França', 'Itália', 'Espanha'].includes(destinationCountry || '');
-  const hasDoceDeLeite = items.length > 0;
+  const jpZone: JapanPostZone = isEurope ? 3 : 5;
 
   const calculateBoxes = useMemo(
     () => calculateCartShippingBoxes(items, spaceInfo),
     [items, spaceInfo]
   );
 
-  const activePrefectures = isJapan 
-    ? japanPrefectures 
-    : isEurope 
-    ? europePrefectures[destinationCountry as string] || [] 
-    : prefectures;
-
-  const selectedPref = activePrefectures.find(p => p.name === selectedPrefecture);
+  const selectedPref = isJapan
+    ? japanPrefectures.find(p => p.name === selectedPrefecture)
+    : undefined;
 
   const displaySubtotal = useMemo(() => {
     return items.reduce((sum, item) => {
@@ -69,126 +61,86 @@ const ShippingCalculator: React.FC<ShippingCalculatorProps> = ({
   }, [items, isJapan, isEurope]);
 
   const finalAmountForFreeShipping = displaySubtotal - couponDiscount;
-  const isFreeShipping = isJapan && hasDoceDeLeite && finalAmountForFreeShipping >= 6000;
+  const isFreeShipping = isJapan && items.length > 0 && finalAmountForFreeShipping >= 6000;
 
   const shippingOptions = useMemo(() => {
     if (items.length === 0) return [];
-    const options = [];
 
-    if (selectedPref) {
+    if (isJapan) {
+      if (!selectedPref) return [];
       const zone = selectedPref.zone as 1 | 2 | 3 | 4;
       const carriers: ('yuubin' | 'yamato' | 'sagawa')[] = ['yuubin', 'yamato', 'sagawa'];
+      const carrierNames = {
+        yuubin: { name: 'Japan Post Local (ゆうパック) ✉️', logo: '📮' },
+        yamato: { name: 'Yamato Transport (宅急便) 🐱', logo: '📦' },
+        sagawa: { name: 'Sagawa Express (飛脚宅配便) 🏃‍♂️', logo: '⚡' }
+      };
+      const deliveryDays = { 1: '1-2', 2: '1-2', 3: '2-3', 4: '3-4' };
 
-      if (isJapan) {
-        // Japan local carriers
-        const shippingCarriers = carriers.map(carrier => {
-          let totalCost = 0;
-          if (calculateBoxes.boxes60 > 0) totalCost += japanShippingRates[carrier]['60'][zone] * calculateBoxes.boxes60;
-          if (calculateBoxes.boxes80 > 0) totalCost += japanShippingRates[carrier]['80'][zone] * calculateBoxes.boxes80;
-
-          // If no boxes are somehow calculated but we have items, fallback to a single 60 box rate
-          if (totalCost === 0 && items.length > 0) {
-            totalCost = japanShippingRates[carrier]['60'][zone];
-          }
-
-          const carrierNames = {
-            yuubin: { name: 'Japan Post Local (ゆうパック) ✉️', logo: '📮' },
-            yamato: { name: 'Yamato Transport (宅急便) 🐱', logo: '📦' },
-            sagawa: { name: 'Sagawa Express (飛脚宅配便) 🏃‍♂️', logo: '⚡' }
-          };
-
-          const cost = isFreeShipping ? 0 : totalCost;
-
-          return {
-            carrier,
-            ...carrierNames[carrier],
-            cost: cost,
-            originalCost: isFreeShipping ? totalCost : undefined,
-            estimatedDays: zone === 1 ? '1-2' : zone === 2 ? '1-2' : zone === 3 ? '2-3' : '3-4'
-          };
-        });
-
-        options.push(...shippingCarriers);
-      } else if (isEurope) {
-        // Europe international carriers
-        const shippingCarriers = carriers.map(carrier => {
-          let totalCost = 0;
-          const rates = europeShippingRates[carrier];
-          if (calculateBoxes.boxes60 > 0) totalCost += rates['60'][zone] * calculateBoxes.boxes60;
-          if (calculateBoxes.boxes80 > 0) totalCost += rates['80'][zone] * calculateBoxes.boxes80;
-
-          if (totalCost === 0 && items.length > 0) {
-            totalCost = rates['60'][zone];
-          }
-
-          const carrierNames = {
-            yuubin: {
-              name: destinationCountry === 'Portugal' ? 'Correios CTT Padrão 🇵🇹' 
-                    : destinationCountry === 'França' ? 'La Poste Padrão 🇫🇷' 
-                    : destinationCountry === 'Itália' ? 'Poste Italiane Padrão 🇮🇹' 
-                    : 'Correos España Padrão 🇪🇸',
-              logo: '✉️'
-            },
-            yamato: { name: 'Aéreo Expresso EMS (Tóquio-Europa) ✈️', logo: '✈️' },
-            sagawa: { name: 'Priority Express Courier (DHL/FedEx) 🏃‍♂️', logo: '⚡' }
-          };
-
-          const deliveryTimes = {
-            1: '7-10',  // Western/Major cities
-            2: '9-13',  // Regional cities
-            3: '12-16', // Island groups / remote
-            4: '14-20'  // Distant islands
-          };
-
-          return {
-            carrier,
-            ...carrierNames[carrier],
-            cost: totalCost * 0.16, // Convert BRL base cost to EUR
-            estimatedDays: deliveryTimes[zone] || '10-15'
-          };
-        });
-
-        options.push(...shippingCarriers);
-      } else {
-        // Brazil international carriers
-        const shippingCarriers = carriers.map(carrier => {
-          let totalCost = 0;
-          if (calculateBoxes.boxes60 > 0) totalCost += shippingRates[carrier]['60'][zone] * calculateBoxes.boxes60;
-          if (calculateBoxes.boxes80 > 0) totalCost += shippingRates[carrier]['80'][zone] * calculateBoxes.boxes80;
-
-          // Fallback if totalCost is 0
-          if (totalCost === 0 && items.length > 0) {
-            totalCost = shippingRates[carrier]['60'][zone];
-          }
-
-          const carrierNames = {
-            yuubin: { name: 'Correios PAC Padrão', logo: '📦' },
-            yamato: { name: 'Aéreo Expresso EMS (Tóquio-Brasil)', logo: '✈️' },
-            sagawa: { name: 'Priority Courier Internacional', logo: '⚡' }
-          };
-
-          const deliveryTimes = {
-            1: '10-15', // Sudeste
-            2: '12-18', // Sul / Centro-Oeste
-            3: '15-20', // Nordeste
-            4: '18-25'  // Norte
-          };
-
-          return {
-            carrier,
-            ...carrierNames[carrier],
-            cost: totalCost,
-            estimatedDays: deliveryTimes[zone] || '15-20'
-          };
-        });
-
-        options.push(...shippingCarriers);
-      }
+      return carriers.map(carrier => {
+        let totalCost = 0;
+        if (calculateBoxes.boxes60 > 0) totalCost += japanShippingRates[carrier]['60'][zone] * calculateBoxes.boxes60;
+        if (calculateBoxes.boxes80 > 0) totalCost += japanShippingRates[carrier]['80'][zone] * calculateBoxes.boxes80;
+        if (totalCost === 0) totalCost = japanShippingRates[carrier]['60'][zone];
+        const cost = isFreeShipping ? 0 : totalCost;
+        return {
+          carrier,
+          ...carrierNames[carrier],
+          cost,
+          costYen: null as number | null,
+          originalCost: isFreeShipping ? totalCost : undefined,
+          estimatedDays: deliveryDays[zone] || '2-3',
+        };
+      }).sort((a, b) => a.cost - b.cost);
     }
 
-    // Sort by cost
+    // International — Japan Post weight-based
+    const weightG = calculateBoxes.totalWeightG;
+    if (weightG <= 0) return [];
+    const currency = isEurope ? 'EUR' : 'BRL';
+
+    if (weightG <= 2000) {
+      const rateYen = getELightRate(weightG, jpZone);
+      if (!rateYen) return [];
+      return [{
+        carrier: 'eraito',
+        name: `Japan Post e-Raito · 国際eパケットライト`,
+        logo: '✉️',
+        cost: fxConvert(rateYen, currency),
+        costYen: rateYen,
+        originalCost: undefined,
+        estimatedDays: isEurope ? '7-12' : '10-15',
+      }];
+    }
+
+    if (weightG > 30000) return []; // overweight — handled in JSX
+
+    const airYen = getKozutsumiRate(weightG, jpZone, 'air');
+    const salYen = getKozutsumiRate(weightG, jpZone, 'sal');
+    const options = [];
+
+    if (salYen) options.push({
+      carrier: 'kozutsumi-sal',
+      name: 'Japan Post SAL · 国際小包 エコノミー航空',
+      logo: '📦',
+      cost: fxConvert(salYen, currency),
+      costYen: salYen,
+      originalCost: undefined,
+      estimatedDays: isEurope ? '15-30' : '20-45',
+    });
+
+    if (airYen) options.push({
+      carrier: 'kozutsumi-air',
+      name: 'Japan Post Aéreo · 国際小包 航空便',
+      logo: '✈️',
+      cost: fxConvert(airYen, currency),
+      costYen: airYen,
+      originalCost: undefined,
+      estimatedDays: isEurope ? '5-8' : '7-10',
+    });
+
     return options.sort((a, b) => a.cost - b.cost);
-  }, [selectedPref, items, calculateBoxes, isJapan, isEurope, isFreeShipping, destinationCountry]);
+  }, [selectedPref, items, calculateBoxes, isJapan, isEurope, jpZone, isFreeShipping]);
 
   useEffect(() => {
     if (onShippingSelect && selectedCarrier && shippingOptions.length > 0) {
@@ -201,11 +153,15 @@ const ShippingCalculator: React.FC<ShippingCalculatorProps> = ({
     }
   }, [selectedCarrier, shippingOptions, onShippingSelect]);
 
-  const handleCarrierSelect = (carrier: string) => {
-    setSelectedCarrier(carrier);
-  };
-
   const currency = isJapan ? 'JPY' : (isEurope ? 'EUR' : 'BRL');
+
+  const weightG = calculateBoxes.totalWeightG;
+  const weightLabel = weightG >= 1000
+    ? `${(weightG / 1000).toFixed(2).replace(/\.0+$/, '')} kg`
+    : `${weightG} g`;
+  const isOverweight = !isJapan && weightG > 30000;
+  const isOversizeEraito = !isJapan && weightG <= 2000 && calculateBoxes.maxPaddedDimensionSumCm > 90;
+  const isOversizeKozutsumi = !isJapan && weightG > 2000 && calculateBoxes.maxPaddedDimensionSumCm > 150;
 
   return (
     <div className={cn("bg-card rounded-2xl border border-border p-6", !onShippingSelect && "lg:p-8")}>
@@ -219,51 +175,54 @@ const ShippingCalculator: React.FC<ShippingCalculatorProps> = ({
               {isJapan ? 'Calcular Frete Nacional' : 'Calcular Frete Internacional'}
             </h2>
             <p className="text-sm text-muted-foreground">
-              {isJapan 
-                ? 'De Hiroshima para todo o Japão' 
-                : isEurope 
-                ? `Diretamente do Japão para ${destinationCountry}` 
-                : 'Diretamente do Japão para o Brasil'}
+              {isJapan
+                ? 'De Hiroshima para todo o Japão'
+                : `Diretamente do Japão para ${destinationCountry}`}
             </p>
           </div>
         </div>
       )}
 
-      {/* Prefecture/State/Region Selection */}
-      <div className="mb-6">
-        <label className="block text-sm font-bold text-foreground mb-2">
-          <MapPin className="w-4 h-4 inline mr-1" />
-          {isJapan 
-            ? 'Selecione a Província Japonesa' 
-            : isEurope 
-            ? `Selecione a Região de destino em ${destinationCountry}` 
-            : 'Selecione o Estado Brasileiro'}
-          <span className="text-muted-foreground text-xs ml-2">
-            ({isJapan ? 'Envio Local' : 'Aéreo Direto'})
-          </span>
-        </label>
-        <select
-          value={selectedPrefecture}
-          onChange={(e) => { setSelectedPrefecture(e.target.value); setSelectedCarrier(null); }}
-          disabled={!!externalPrefecture}
-          className="w-full p-3 rounded-lg border border-border bg-background text-foreground focus:ring-2 focus:ring-primary focus:border-primary transition-all disabled:opacity-50 disabled:cursor-not-allowed font-medium"
-        >
-          <option value="">
-            {isJapan 
-              ? 'Escolha a Província...' 
-              : isEurope 
-              ? 'Escolha a Região/Distrito...' 
-              : 'Escolha o Estado...'}
-          </option>
-          {activePrefectures.map((pref) => (
-            <option key={pref.name} value={pref.name}>
-              {pref.nameJa} ({pref.name})
-            </option>
-          ))}
-        </select>
-      </div>
+      {/* Prefecture selector — Japan domestic only */}
+      {isJapan && (
+        <div className="mb-6">
+          <label className="block text-sm font-bold text-foreground mb-2">
+            <MapPin className="w-4 h-4 inline mr-1" />
+            Selecione a Província Japonesa
+            <span className="text-muted-foreground text-xs ml-2">(Envio Local)</span>
+          </label>
+          <select
+            value={selectedPrefecture}
+            onChange={(e) => { setSelectedPrefecture(e.target.value); setSelectedCarrier(null); }}
+            disabled={!!externalPrefecture}
+            className="w-full p-3 rounded-lg border border-border bg-background text-foreground focus:ring-2 focus:ring-primary focus:border-primary transition-all disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+          >
+            <option value="">Escolha a Província...</option>
+            {japanPrefectures.map((pref) => (
+              <option key={pref.name} value={pref.name}>
+                {pref.nameJa} ({pref.name})
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
-      {/* Free Shipping Promotion Banner for Japan Japan Express */}
+      {/* Japan Post international zone info */}
+      {!isJapan && (
+        <div className="mb-6 bg-blue-50 dark:bg-blue-950/20 rounded-xl p-4 border border-blue-200 dark:border-blue-800">
+          <p className="text-sm font-semibold text-blue-800 dark:text-blue-200 flex items-center gap-2">
+            🗾 Japan Post Internacional · Zona {jpZone}
+            <span className="text-xs font-normal text-blue-600 dark:text-blue-400">
+              — {isEurope ? `${destinationCountry} (Europa)` : 'Brasil (América do Sul)'}
+            </span>
+          </p>
+          <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+            Serviço determinado pelo peso total estimado do pedido.
+          </p>
+        </div>
+      )}
+
+      {/* Free Shipping Banner */}
       {isFreeShipping && items.length > 0 && (
         <div className="bg-gradient-to-r from-emerald-50 to-green-50 dark:from-emerald-950/20 dark:to-green-950/20 rounded-xl p-4 mb-6 border border-emerald-200">
           <div className="flex items-center gap-2 mb-1">
@@ -276,23 +235,42 @@ const ShippingCalculator: React.FC<ShippingCalculatorProps> = ({
         </div>
       )}
 
-      {isJapan && hasDoceDeLeite && !isFreeShipping && items.length > 0 && (
+      {isJapan && items.length > 0 && !isFreeShipping && (
         <div className="bg-amber-50 dark:bg-amber-950/20 rounded-xl p-4 mb-6 border border-amber-200">
           <div className="flex items-center gap-2 mb-1">
             <span className="text-2xl">🌸</span>
             <h3 className="font-bold text-amber-800 dark:text-amber-200">Frete Grátis acima de ¥6.000</h3>
           </div>
           <p className="text-sm text-amber-700 dark:text-amber-300 font-medium">
-            O frete local é gratuito para compras de produtos Japan Express acima de ¥6.000. Falta apenas {formatPrice(6000 - finalAmountForFreeShipping, 'JPY')} para obter o frete grátis.
+            Falta {formatPrice(6000 - finalAmountForFreeShipping, 'JPY')} para frete grátis.
           </p>
         </div>
       )}
 
-      {/* Alert for international shipping cost */}
+      {/* International shipping note */}
       {!isJapan && items.length > 0 && (
         <div className="bg-orange-50 dark:bg-orange-950/20 rounded-xl p-4 mb-6 border border-orange-200">
           <p className="text-xs text-orange-700 dark:text-orange-300 font-semibold leading-relaxed">
-            ✈️ Envio Aéreo de Tóquio para {isEurope ? destinationCountry : 'o Brasil'}: O frete internacional é calculado por volume de caixas e peso. Não elegível para frete grátis.
+            ✈️ Envio de Tóquio para {destinationCountry}: frete calculado pelo Japan Post, com base no peso estimado. Não elegível para frete grátis.
+          </p>
+        </div>
+      )}
+
+      {/* Overweight / oversize warnings */}
+      {isOverweight && items.length > 0 && (
+        <div className="bg-red-50 dark:bg-red-950/20 rounded-xl p-4 mb-6 border border-red-200">
+          <p className="text-sm font-bold text-red-700 dark:text-red-300">
+            ⚠️ Pedido excede 30 kg ({weightLabel}) — limite máximo Japan Post.
+          </p>
+          <p className="text-xs text-red-600 dark:text-red-400 mt-1">Entre em contato para envios especiais.</p>
+        </div>
+      )}
+      {(isOversizeEraito || isOversizeKozutsumi) && (
+        <div className="bg-yellow-50 dark:bg-yellow-950/20 rounded-xl p-4 mb-6 border border-yellow-200">
+          <p className="text-xs font-semibold text-yellow-700 dark:text-yellow-300">
+            ⚠️ Algum item pode exceder o limite de dimensões
+            {isOversizeEraito ? ' (e-Raito: L+C+A ≤ 90 cm)' : ' (Kozutsumi: L+C+A ≤ 150 cm)'}.
+            Confirme as medidas antes de enviar.
           </p>
         </div>
       )}
@@ -306,38 +284,39 @@ const ShippingCalculator: React.FC<ShippingCalculatorProps> = ({
           </h3>
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Itens Padrão (Padrão)</span>
+              <span className="text-muted-foreground">Itens Padrão</span>
               <span className="font-medium">{spaceInfo.small}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Itens Premium (Deluxe)</span>
+              <span className="text-muted-foreground">Itens Premium</span>
               <span className="font-medium">{spaceInfo.large}</span>
             </div>
-            <div className="border-t border-border pt-2 mt-2">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Caixas 60cm estimadas:</span>
-                <span className="font-medium">{calculateBoxes.boxes60}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Caixas 80cm estimadas:</span>
-                <span className="font-medium">{calculateBoxes.boxes80}</span>
-              </div>
-              {calculateBoxes.usedRealDimensions && (
-                <div className="mt-2 rounded-lg bg-background/70 border border-border p-2 text-[11px] text-muted-foreground leading-relaxed">
-                  Frete calculado com medidas de embalagem e margem segura de +{calculateBoxes.safetyMarginCm}cm em largura,
-                  comprimento e altura.
-                  <span className="block">
-                    Maior soma usada: {Math.ceil(calculateBoxes.maxPaddedDimensionSumCm)}cm.
-                    Volume protegido: {Math.ceil(calculateBoxes.totalPaddedVolumeCm3).toLocaleString()}cm3.
+            <div className="border-t border-border pt-2 mt-2 space-y-1">
+              {isJapan ? (
+                <>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Caixas 60 cm estimadas:</span>
+                    <span className="font-medium">{calculateBoxes.boxes60}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Caixas 80 cm estimadas:</span>
+                    <span className="font-medium">{calculateBoxes.boxes80}</span>
+                  </div>
+                </>
+              ) : (
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground flex items-center gap-1">
+                    <Scale className="w-3.5 h-3.5" /> Peso estimado:
                   </span>
+                  <span className="font-bold text-foreground">{weightLabel}</span>
+                </div>
+              )}
+              {calculateBoxes.usedRealDimensions && (
+                <div className="rounded-lg bg-background/70 border border-border p-2 text-[11px] text-muted-foreground leading-relaxed mt-1">
+                  Calculado com medidas reais de embalagem + margem de +{calculateBoxes.safetyMarginCm} cm.
                   {calculateBoxes.missingDimensionsCount > 0 && (
                     <span className="block text-amber-700 dark:text-amber-300">
-                      {calculateBoxes.missingDimensionsCount} item(ns) sem medida real ainda foram estimados pelo padrao antigo.
-                    </span>
-                  )}
-                  {calculateBoxes.oversizeCount > 0 && (
-                    <span className="block text-orange-700 dark:text-orange-300">
-                      {calculateBoxes.oversizeCount} item(ns) passam de 80cm apos a margem; confira manualmente a tabela da transportadora.
+                      {calculateBoxes.missingDimensionsCount} item(ns) sem medida real — peso estimado por padrão.
                     </span>
                   )}
                 </div>
@@ -354,51 +333,54 @@ const ShippingCalculator: React.FC<ShippingCalculatorProps> = ({
       )}
 
       {/* Shipping Results */}
-      {items.length > 0 && shippingOptions.length > 0 && (
+      {items.length > 0 && !isOverweight && shippingOptions.length > 0 && (
         <div className="space-y-3">
           <h3 className="font-bold text-sm text-foreground flex items-center gap-2">
             <Truck className="w-4 h-4" />
             {onShippingSelect ? t('calc.selectDelivery') : t('calc.deliveryOptions')}
-            {selectedPrefecture && ` para ${selectedPref?.nameJa}`}
+            {isJapan && selectedPrefecture && ` para ${selectedPref?.nameJa}`}
           </h3>
-          
-          {!selectedPrefecture && onShippingSelect && (
-            <p className="text-sm text-muted-foreground mb-3">Selecione uma província ou estado acima.</p>
+
+          {isJapan && !selectedPrefecture && onShippingSelect && (
+            <p className="text-sm text-muted-foreground mb-3">Selecione uma província acima.</p>
           )}
-          
+
           {shippingOptions.map((option, index) => (
-            <div 
+            <div
               key={option.carrier}
-              onClick={() => onShippingSelect && handleCarrierSelect(option.carrier)}
+              onClick={() => onShippingSelect && setSelectedCarrier(option.carrier)}
               className={cn(
-                    selectedCarrier === option.carrier
+                "rounded-xl p-4 border transition-all",
+                onShippingSelect ? "cursor-pointer" : "",
+                selectedCarrier === option.carrier
                   ? "border-primary bg-primary/10 ring-2 ring-primary/20"
                   : onShippingSelect
                   ? "border-border hover:border-primary/50"
-                  : index === 0 
-                  ? "border-primary bg-primary/5" 
-                  : "border-border hover:border-primary/50"
+                  : index === 0
+                  ? "border-primary bg-primary/5"
+                  : "border-border"
               )}
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   {onShippingSelect && (
                     <div className={cn(
-                       "w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all",
+                      "w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all shrink-0",
                       selectedCarrier === option.carrier ? "border-primary bg-primary" : "border-border"
                     )}>
-                      {selectedCarrier === option.carrier && <div className="w-2 h-2 rounded-full bg-white"></div>}
+                      {selectedCarrier === option.carrier && <div className="w-2 h-2 rounded-full bg-white" />}
                     </div>
                   )}
                   <span className="text-2xl">{option.logo}</span>
                   <div>
                     <p className="font-bold text-sm text-foreground">{option.name}</p>
                     <p className="text-xs text-muted-foreground">
-                      {`Entrega estimada em ${option.estimatedDays} dias úteis`}
+                      {option.costYen ? `¥${option.costYen.toLocaleString()} · ` : ''}
+                      Entrega em {option.estimatedDays} dias úteis
                     </p>
                   </div>
                 </div>
-                <div className="text-right">
+                <div className="text-right shrink-0">
                   <p className={cn(
                     "font-sans text-lg font-black",
                     option.cost === 0 ? "text-green-600" : "text-primary"
@@ -407,9 +389,6 @@ const ShippingCalculator: React.FC<ShippingCalculatorProps> = ({
                   </p>
                   {option.originalCost && option.originalCost > 0 && (
                     <p className="text-xs text-muted-foreground line-through">{formatPrice(option.originalCost, currency)}</p>
-                  )}
-                  {option.cost === 0 && option.originalCost && (
-                    <span className="text-[10px] text-emerald-600 font-bold block">✓ Doce de Leite Japão</span>
                   )}
                   {!onShippingSelect && index === 0 && (
                     <span className="text-xs text-primary font-bold">Melhor Opção</span>
@@ -435,7 +414,15 @@ const ShippingCalculator: React.FC<ShippingCalculatorProps> = ({
         </div>
       )}
 
-      {/* Empty state */}
+      {/* Needs prefecture selection (Japan) */}
+      {isJapan && items.length > 0 && !selectedPrefecture && shippingOptions.length === 0 && (
+        <div className="text-center py-4 text-muted-foreground text-sm">
+          <MapPin className="w-8 h-8 mx-auto mb-2 opacity-40" />
+          Selecione a província para ver as opções de envio.
+        </div>
+      )}
+
+      {/* Empty cart */}
       {items.length === 0 && (
         <div className="text-center py-8 text-muted-foreground">
           <Package className="w-12 h-12 mx-auto mb-3 opacity-50 text-orange-500" />

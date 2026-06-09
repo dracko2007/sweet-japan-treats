@@ -19,6 +19,7 @@ export interface CartShippingBoxes {
   totalPaddedVolumeCm3: number;
   maxPaddedDimensionSumCm: number;
   oversizeCount: number;
+  totalWeightG: number;
 }
 
 const emptyBoxes = (): CartShippingBoxes => ({
@@ -31,6 +32,7 @@ const emptyBoxes = (): CartShippingBoxes => ({
   totalPaddedVolumeCm3: 0,
   maxPaddedDimensionSumCm: 0,
   oversizeCount: 0,
+  totalWeightG: 0,
 });
 
 export const sanitizePackageDimensions = (
@@ -88,6 +90,18 @@ export const calculateCartShippingBoxes = (
 ): CartShippingBoxes => {
   if (items.length === 0) return emptyBoxes();
 
+  // Weight estimation: 0.25 g/cm³ for items with dimensions, fallback by size
+  let totalWeightG = 200; // packaging overhead
+  for (const item of items) {
+    const dim = sanitizePackageDimensions(item.product.packageDimensionsCm);
+    if (dim) {
+      totalWeightG += dim.widthCm * dim.lengthCm * dim.heightCm * 0.25 * item.quantity;
+    } else {
+      totalWeightG += (item.size === 'small' ? 300 : 600) * item.quantity;
+    }
+  }
+  totalWeightG = Math.max(100, Math.round(totalWeightG));
+
   let knownQuantity = 0;
   let missingQuantity = 0;
   let missingSmallEquivalent = 0;
@@ -114,7 +128,8 @@ export const calculateCartShippingBoxes = (
   }
 
   if (knownQuantity === 0) {
-    return fallbackBoxesFromSmallEquivalent(fallbackSpaceInfo?.totalSmallEquivalent || missingSmallEquivalent);
+    const fallback = fallbackBoxesFromSmallEquivalent(fallbackSpaceInfo?.totalSmallEquivalent || missingSmallEquivalent);
+    return { ...fallback, totalWeightG };
   }
 
   if (missingSmallEquivalent > 0) {
@@ -130,6 +145,7 @@ export const calculateCartShippingBoxes = (
     totalPaddedVolumeCm3,
     maxPaddedDimensionSumCm,
     oversizeCount,
+    totalWeightG,
   };
 
   if (maxPaddedDimensionSumCm <= 60) {
