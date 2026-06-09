@@ -56,7 +56,7 @@ const Checkout: React.FC = () => {
   const currency = formData.country === 'Japão' ? 'JPY' : (isEuro ? 'EUR' : 'BRL');
 
   const baseTotalPrice = items.reduce(
-    (sum, item) => sum + fxConvert(effectiveYen(item.product, item.size), currency) * item.quantity, 0
+    (sum, item) => item.freeGift ? sum : sum + fxConvert(effectiveYen(item.product, item.size), currency) * item.quantity, 0
   );
 
   const [selectedShipping, setSelectedShipping] = useState<{
@@ -698,27 +698,26 @@ const Checkout: React.FC = () => {
                 <div className="space-y-4">
                   {items.map((item) => {
                     const currency = formData.country === 'Japão' ? 'JPY' : (isEuro ? 'EUR' : 'BRL');
-                    const displayUnitPrice = fxConvert(effectiveYen(item.product, item.size), currency);
-                    const displayItemPrice = displayUnitPrice * item.quantity;
+                    const displayItemPrice = item.freeGift ? 0 : fxConvert(effectiveYen(item.product, item.size), currency) * item.quantity;
                     const productName = productEnglishName(item.product);
                     return (
-                      <div 
-                        key={`${item.product.id}-${item.size}`}
-                        className="flex items-center gap-3 pb-3 border-b border-border"
+                      <div
+                        key={`${item.product.id}-${item.size}${item.freeGift ? '-gift' : ''}`}
+                        className={`flex items-center gap-3 pb-3 border-b border-border${item.freeGift ? ' bg-purple-50 dark:bg-purple-950/20 rounded-lg px-2 pt-2' : ''}`}
                       >
-                        <img 
-                          src={item.product.image} 
+                        <img
+                          src={item.product.image}
                           alt={productName}
                           className="w-12 h-12 rounded-lg object-cover border border-gray-200"
                         />
                         <div className="flex-1 min-w-0">
                           <p className="font-bold text-xs text-gray-800 truncate">{productName}</p>
                           <p className="text-[10px] text-gray-400 font-semibold mt-0.5">
-                            {item.variantLabel || (item.size === 'small' ? 'Pequeno' : 'Grande')} • {item.quantity}x
+                            {item.freeGift ? '🎁 Presente da promoção' : (item.variantLabel || (item.size === 'small' ? 'Pequeno' : 'Grande'))} • {item.quantity}x
                           </p>
                         </div>
-                        <p className="font-bold text-xs text-gray-800">
-                          {formatPrice(displayItemPrice, currency)}
+                        <p className={`font-bold text-xs ${item.freeGift ? 'text-green-600' : 'text-gray-800'}`}>
+                          {item.freeGift ? 'GRÁTIS' : formatPrice(displayItemPrice, currency)}
                         </p>
                       </div>
                     );

@@ -358,32 +358,38 @@ const OrderReview: React.FC = () => {
 
               <div className="space-y-4">
                 {items.map((item) => {
-                  const displayUnitPrice = convertYen(effectiveYen(item.product, item.size));
+                  const displayUnitPrice = item.freeGift ? 0 : convertYen(effectiveYen(item.product, item.size));
                   const displayItemPrice = displayUnitPrice * item.quantity;
                   const productName = productEnglishName(item.product);
                   return (
-                    <div 
-                      key={`${item.product.id}-${item.size}`}
-                      className="flex items-center gap-4 pb-4 border-b border-border last:border-0"
+                    <div
+                      key={`${item.product.id}-${item.size}${item.freeGift ? '-gift' : ''}`}
+                      className={`flex items-center gap-4 pb-4 border-b border-border last:border-0${item.freeGift ? ' bg-purple-50 dark:bg-purple-950/20 rounded-lg px-2 pt-2' : ''}`}
                     >
-                      <img 
-                        src={item.product.image} 
+                      <img
+                        src={item.product.image}
                         alt={productName}
                         className="w-16 h-16 rounded-lg object-cover border border-gray-200"
                       />
                       <div className="flex-1 min-w-0">
                         <p className="font-bold text-sm text-foreground truncate">{productName}</p>
                         <p className="text-xs text-muted-foreground mt-0.5">
-                          Opção: {item.variantLabel || (item.size === 'small' ? 'Pequeno' : 'Grande')} • Quantidade: {item.quantity}x
+                          Opção: {item.freeGift ? '🎁 Presente da promoção' : (item.variantLabel || (item.size === 'small' ? 'Pequeno' : 'Grande'))} • Quantidade: {item.quantity}x
                         </p>
-                        <p className="text-xs text-gray-400">
-                          Preço unitário: {formatPrice(displayUnitPrice, currency)}
-                        </p>
+                        {!item.freeGift && (
+                          <p className="text-xs text-gray-400">
+                            Preço unitário: {formatPrice(displayUnitPrice, currency)}
+                          </p>
+                        )}
                       </div>
                       <div className="text-right">
-                        <p className="font-bold text-base text-foreground">
-                          {formatPrice(displayItemPrice, currency)}
-                        </p>
+                        {item.freeGift ? (
+                          <p className="font-bold text-base text-green-600">GRÁTIS 🎁</p>
+                        ) : (
+                          <p className="font-bold text-base text-foreground">
+                            {formatPrice(displayItemPrice, currency)}
+                          </p>
+                        )}
                       </div>
                     </div>
                   );
