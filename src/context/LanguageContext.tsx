@@ -18,15 +18,28 @@ const LanguageContext = createContext<LanguageContextType | undefined>(undefined
 
 export const useLanguage = () => {
   const context = useContext(LanguageContext);
-  if (!context) {
-    throw new Error('useLanguage must be used within a LanguageProvider');
-  }
+  if (!context) throw new Error('useLanguage must be used within a LanguageProvider');
   return context;
 };
 
-interface LanguageProviderProps {
-  children: ReactNode;
+// Países cujo IP mapeia para português
+const PT_COUNTRIES = new Set(['BR', 'PT', 'AO', 'MZ', 'CV', 'ST', 'GW', 'GQ', 'TL']);
+// Países cujo IP mapeia para japonês
+const JA_COUNTRIES = new Set(['JP']);
+
+// ISO code → CountryType da loja
+const COUNTRY_MAP: Record<string, CountryType> = {
+  BR: 'Brasil', JP: 'Japão', PT: 'Portugal',
+  FR: 'França', IT: 'Itália', ES: 'Espanha',
+};
+
+function ipToLanguage(code: string): Language {
+  if (PT_COUNTRIES.has(code)) return 'pt';
+  if (JA_COUNTRIES.has(code)) return 'ja';
+  return 'en';
 }
+
+interface LanguageProviderProps { children: ReactNode; }
 
 export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) => {
   const [language, setLanguageState] = useState<Language>(() => {
@@ -39,9 +52,43 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
     return (stored as CountryType) || 'Brasil';
   });
 
-  // Cotação cambial do dia (¥→R$/€). Carrega 1×; re-renderiza ao atualizar.
+  // Cotação cambial do dia (¥→R$/€)
   const [fxRates, setFxRates] = useState(getRates());
   useEffect(() => { loadFxRates().then(setFxRates); }, []);
+
+  // Auto-detect idioma/país por IP — só na primeira visita (sem preferência salva)
+  useEffect(() => {
+    const hasLang    = safeStorage.getItem('preferred-language');
+    const hasCountry = safeStorage.getItem('sakura_selected_country');
+    if (hasLang && hasCountry) return; // já tem preferências salvas
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 4000);
+
+    fetch('https://ip-api.com/json/?fields=countryCode', { signal: controller.signal })
+      .then(r => r.ok ? r.json() : null)
+      .then((data: { countryCode?: string } | null) => {
+        if (!data?.countryCode) return;
+        const code = data.countryCode.toUpperCase();
+
+        if (!hasLang) {
+          const lang = ipToLanguage(code);
+          setLanguageState(lang);
+          safeStorage.setItem('preferred-language', lang);
+        }
+        if (!hasCountry) {
+          const country = COUNTRY_MAP[code];
+          if (country) {
+            setSelectedCountryState(country);
+            safeStorage.setItem('sakura_selected_country', country);
+          }
+        }
+      })
+      .catch(() => { /* falha silenciosa — mantém defaults */ })
+      .finally(() => clearTimeout(timer));
+
+    return () => { controller.abort(); clearTimeout(timer); };
+  }, []);
 
   const setLanguage = useCallback((lang: Language) => {
     setLanguageState(lang);
@@ -57,8 +104,6 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
     const suffix = selectedCountry === 'Japão' ? 'japan' : 'brazil';
     const dict = translations[language] || translations['pt'];
     const suffixedKey = `${key}.${suffix}`;
-    
-    // Look up suffixed key first, then fall back to normal key, then same for 'pt' default
     return dict[suffixedKey] || dict[key] || translations['pt'][suffixedKey] || translations['pt'][key] || key;
   }, [language, selectedCountry]);
 
@@ -68,4 +113,3 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
     </LanguageContext.Provider>
   );
 };
-

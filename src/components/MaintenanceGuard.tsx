@@ -20,12 +20,22 @@ const MaintenanceGuard: React.FC<Props> = ({ children }) => {
     (p) => location.pathname === p || location.pathname.startsWith(p + '/')
   );
 
-  // Deixa passar: carregando, é admin, é rota de admin/login, ou não está em manutenção
-  if (loading || isAdmin || isOpenPath || !isEnabled) {
+  // Enquanto verifica o estado no Firestore: tela em branco (evita flicker do site)
+  if (loading) {
+    return <div className="min-h-screen bg-background" />;
+  }
+
+  // Admin e rotas abertas: sempre passam
+  if (isAdmin || isOpenPath) {
     return <>{children}</>;
   }
 
-  return <MaintenancePage />;
+  // Manutenção ativa para o público
+  if (isEnabled) {
+    return <MaintenancePage />;
+  }
+
+  return <>{children}</>;
 };
 
 export default MaintenanceGuard;
