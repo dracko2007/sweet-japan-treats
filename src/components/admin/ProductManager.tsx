@@ -94,7 +94,7 @@ const ProductManager: React.FC = () => {
   const [uploading, setUploading] = useState(false);
   const [enriching, setEnriching] = useState(false);
   const [enrichFields, setEnrichFields] = useState({ price: true, images: true, description: true });
-  const [marginPct, setMarginPct] = useState(50);
+  const marginPct = 100;
   const [tagInput, setTagInput] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -107,18 +107,12 @@ const ProductManager: React.FC = () => {
     setEditing(emptyForm());
     setIsNew(true);
     setTagInput('');
-    setMarginPct(50);
-  };
+};
   const openEdit = (p: Product) => {
     const vs = getVariants(p);
     setEditing({ ...p, gallery: p.gallery ? [...p.gallery] : [p.image], variants: vs });
     setIsNew(false);
     setTagInput('');
-    const cost = p.cost || 0;
-    const price = vs[0]?.price || 0;
-    setMarginPct(cost > 0 && price > cost
-      ? Math.round(((price - cost) / cost) * 100)
-      : 50);
   };
 
   // Helpers das variantes de preço
@@ -228,9 +222,6 @@ const ProductManager: React.FC = () => {
             i === 0 ? { ...v, price: data.sellingPriceYen } : v
           );
           updatedEditing.prices = { small: data.sellingPriceYen, large: data.sellingPriceYen };
-          if (data.costYen && data.sellingPriceYen > data.costYen) {
-            setMarginPct(Math.round(((data.sellingPriceYen - data.costYen) / data.costYen) * 100));
-          }
         }
       }
 
@@ -820,31 +811,6 @@ const ProductManager: React.FC = () => {
                       disabled={!canPrice}
                       className="w-full px-3 py-2 rounded-lg border border-amber-300 bg-background disabled:opacity-60 disabled:cursor-not-allowed text-sm"
                     />
-                  </div>
-
-                  {/* Margem % */}
-                  <div className="w-24 shrink-0">
-                    <span className="text-[11px] text-muted-foreground">Margem (%)</span>
-                    <div className="relative flex items-center">
-                      <input
-                        type="number"
-                        min={1}
-                        max={9999}
-                        value={marginPct}
-                        onChange={(e) => {
-                          const pct = Math.max(1, Number(e.target.value) || 1);
-                          setMarginPct(pct);
-                          if (editing.cost && pct > 0) {
-                            const selling = Math.round(editing.cost * (1 + pct / 100));
-                            const vs = variants().map((v, i) => i === 0 ? { ...v, price: selling } : v);
-                            setEditing({ ...editing, variants: vs, prices: { ...editing.prices, small: selling } });
-                          }
-                        }}
-                        disabled={!canPrice}
-                        className="w-full pl-3 pr-7 py-2 rounded-lg border border-amber-300 bg-background disabled:opacity-60 disabled:cursor-not-allowed text-sm"
-                      />
-                      <span className="absolute right-2 text-xs text-muted-foreground pointer-events-none">%</span>
-                    </div>
                   </div>
 
                   {/* Preço de venda calculado */}
