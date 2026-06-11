@@ -26,6 +26,8 @@ const AdminCalculator: React.FC = () => {
   };
 
   const totalYen = useMemo(() => rows.reduce((s, r) => s + sellPrice(r), 0), [rows]);
+  const totalCostYen = useMemo(() => rows.reduce((s, r) => s + (parseFloat(r.costYen) || 0), 0), [rows]);
+  const profitYen = totalYen - totalCostYen;
 
   const addRow = () => {
     setRows(prev => [...prev, { id: nextId.current++, costYen: '', discountPct: '0' }]);
@@ -130,6 +132,25 @@ const AdminCalculator: React.FC = () => {
         <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-2xl p-4 text-center">
           <p className="text-[11px] font-bold text-blue-700 dark:text-blue-400 mb-1 uppercase tracking-wide">Total em Euro</p>
           <p className="text-2xl font-black text-blue-900 dark:text-blue-200">{formatPrice(totalYen * rates.EUR, 'EUR')}</p>
+        </div>
+      </div>
+
+      {/* ── Lucro ── */}
+      <div className="bg-emerald-50 dark:bg-emerald-950/20 border-2 border-emerald-400 dark:border-emerald-700 rounded-2xl p-5">
+        <p className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-wide mb-3">💰 Lucro (venda − custo)</p>
+        <div className="flex flex-wrap gap-6">
+          <div>
+            <p className="text-xs text-emerald-600 dark:text-emerald-400 mb-0.5">Em Ienes</p>
+            <p className="text-3xl font-black text-emerald-800 dark:text-emerald-200">{yenFmt(profitYen)}</p>
+          </div>
+          <div>
+            <p className="text-xs text-emerald-600 dark:text-emerald-400 mb-0.5">Em Reais</p>
+            <p className="text-3xl font-black text-emerald-800 dark:text-emerald-200">{formatPrice(profitYen * rates.BRL, 'BRL')}</p>
+          </div>
+          <div>
+            <p className="text-xs text-emerald-600 dark:text-emerald-400 mb-0.5">Em Euro</p>
+            <p className="text-3xl font-black text-emerald-800 dark:text-emerald-200">{formatPrice(profitYen * rates.EUR, 'EUR')}</p>
+          </div>
         </div>
       </div>
 
