@@ -14,6 +14,7 @@ interface ProductRow {
 const AdminCalculator: React.FC = () => {
   const nextId = useRef(2);
   const [rows, setRows] = useState<ProductRow[]>([{ id: 1, costYen: '', discountPct: '0' }]);
+  const [psQty, setPsQty] = useState('');
   const [weightKg, setWeightKg] = useState('');
   const [zone, setZone] = useState<JapanPostZone>(5);
 
@@ -27,7 +28,9 @@ const AdminCalculator: React.FC = () => {
 
   const totalYen = useMemo(() => rows.reduce((s, r) => s + sellPrice(r), 0), [rows]);
   const totalCostYen = useMemo(() => rows.reduce((s, r) => s + (parseFloat(r.costYen) || 0), 0), [rows]);
-  const profitYen = totalYen - totalCostYen;
+  const psFeeYen = (parseInt(psQty) || 0) * 1000;
+  const grandTotalYen = totalYen + psFeeYen;
+  const profitYen = grandTotalYen - totalCostYen;
 
   const addRow = () => {
     setRows(prev => [...prev, { id: nextId.current++, costYen: '', discountPct: '0' }]);
@@ -44,6 +47,11 @@ const AdminCalculator: React.FC = () => {
   const kSalYen = !isLight && weightG > 2000 && !overLimit ? getKozutsumiRate(weightG, zone, 'sal') : null;
 
   const yenFmt = (y: number) => `¥${Math.round(y).toLocaleString('ja-JP')}`;
+
+  const shippingOptions: { label: string; yen: number }[] = [];
+  if (eRaitoYen != null) shippingOptions.push({ label: '📦 e-Raito Light', yen: eRaitoYen });
+  if (kAirYen != null) shippingOptions.push({ label: '✈️ Kozutsumi Aéreo', yen: kAirYen });
+  if (kSalYen != null) shippingOptions.push({ label: '🚢 Kozutsumi SAL', yen: kSalYen });
 
   return (
     <div className="space-y-6 pb-8">
@@ -66,7 +74,7 @@ const AdminCalculator: React.FC = () => {
         </div>
 
         <div className="space-y-2">
-          {rows.map((row, idx) => {
+          {rows.map((row) => {
             const sell = sellPrice(row);
             return (
               <div key={row.id} className="grid grid-cols-[1fr_90px_1.6fr_20px] gap-2 items-center">
@@ -119,19 +127,44 @@ const AdminCalculator: React.FC = () => {
         </div>
       </div>
 
-      {/* ── Totais ── */}
+      {/* ── Taxa Personal Shopper ── */}
+      <div className="bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-800 rounded-2xl p-4">
+        <p className="text-[11px] font-bold text-orange-700 dark:text-orange-400 uppercase tracking-wide mb-3">🛍️ Taxa Personal Shopper (¥1.000/item)</p>
+        <div className="flex items-center gap-4 flex-wrap">
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-orange-600 dark:text-orange-400 font-medium">Quantidade de itens</label>
+            <input
+              type="number"
+              min="0"
+              value={psQty}
+              onChange={e => setPsQty(e.target.value)}
+              placeholder="0"
+              className="w-32 border border-orange-300 dark:border-orange-700 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-400"
+            />
+          </div>
+          {psFeeYen > 0 && (
+            <div className="mt-4 flex gap-4 text-sm font-semibold text-orange-700 dark:text-orange-300">
+              <span>{yenFmt(psFeeYen)}</span>
+              <span>{formatPrice(psFeeYen * rates.BRL, 'BRL')}</span>
+              <span>{formatPrice(psFeeYen * rates.EUR, 'EUR')}</span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Totais (produtos + PS fee) ── */}
       <div className="grid grid-cols-3 gap-4">
         <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-2xl p-4 text-center">
           <p className="text-[11px] font-bold text-amber-700 dark:text-amber-400 mb-1 uppercase tracking-wide">Total em Ienes</p>
-          <p className="text-2xl font-black text-amber-900 dark:text-amber-200">{yenFmt(totalYen)}</p>
+          <p className="text-2xl font-black text-amber-900 dark:text-amber-200">{yenFmt(grandTotalYen)}</p>
         </div>
         <div className="bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-2xl p-4 text-center">
           <p className="text-[11px] font-bold text-green-700 dark:text-green-400 mb-1 uppercase tracking-wide">Total em Reais</p>
-          <p className="text-2xl font-black text-green-900 dark:text-green-200">{formatPrice(totalYen * rates.BRL, 'BRL')}</p>
+          <p className="text-2xl font-black text-green-900 dark:text-green-200">{formatPrice(grandTotalYen * rates.BRL, 'BRL')}</p>
         </div>
         <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-2xl p-4 text-center">
           <p className="text-[11px] font-bold text-blue-700 dark:text-blue-400 mb-1 uppercase tracking-wide">Total em Euro</p>
-          <p className="text-2xl font-black text-blue-900 dark:text-blue-200">{formatPrice(totalYen * rates.EUR, 'EUR')}</p>
+          <p className="text-2xl font-black text-blue-900 dark:text-blue-200">{formatPrice(grandTotalYen * rates.EUR, 'EUR')}</p>
         </div>
       </div>
 
@@ -243,6 +276,28 @@ const AdminCalculator: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* ── Total Geral (produtos + PS fee + frete) ── */}
+      {shippingOptions.length > 0 && grandTotalYen > 0 && (
+        <div className="bg-gray-900 dark:bg-gray-950 rounded-2xl p-5 border-2 border-gray-700">
+          <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wide mb-4">🧾 Total Geral (produtos + PS + frete)</p>
+          <div className="space-y-3">
+            {shippingOptions.map(opt => {
+              const total = grandTotalYen + opt.yen;
+              return (
+                <div key={opt.label} className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4">
+                  <span className="text-xs font-bold text-gray-400 w-40 shrink-0">{opt.label}</span>
+                  <div className="flex gap-4 flex-wrap">
+                    <span className="text-xl font-black text-white">{yenFmt(total)}</span>
+                    <span className="text-xl font-black text-green-400">{formatPrice(total * rates.BRL, 'BRL')}</span>
+                    <span className="text-xl font-black text-blue-400">{formatPrice(total * rates.EUR, 'EUR')}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
     </div>
   );
