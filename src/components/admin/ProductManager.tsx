@@ -110,7 +110,14 @@ const ProductManager: React.FC = () => {
 };
   const openEdit = (p: Product) => {
     const vs = getVariants(p);
-    setEditing({ ...p, gallery: p.gallery ? [...p.gallery] : [p.image], variants: vs });
+    const cost = p.cost || 0;
+    const recalcVs = cost > 0
+      ? vs.map((v, i) => i === 0 ? { ...v, price: Math.round(cost * 2) } : v)
+      : vs;
+    const recalcPrices = cost > 0
+      ? { ...p.prices, small: Math.round(cost * 2) }
+      : p.prices;
+    setEditing({ ...p, gallery: p.gallery ? [...p.gallery] : [p.image], variants: recalcVs, prices: recalcPrices });
     setIsNew(false);
     setTagInput('');
   };
@@ -829,9 +836,9 @@ const ProductManager: React.FC = () => {
                 </div>
 
                 <p className="text-xs text-amber-700/80 dark:text-amber-400/80 mt-1.5">
-                  {editing.cost && variants()[0]?.price
-                    ? `Lucro: ¥${(variants()[0].price - (editing.cost || 0)).toLocaleString()} · markup real ${Math.round(((variants()[0].price - (editing.cost || 0)) / (editing.cost || 1)) * 100)}% · O cliente NUNCA vê o custo.`
-                    : 'Preencha custo + margem para calcular o preço de venda automaticamente.'}
+                  {editing.cost
+                    ? `Lucro: ¥${Math.round(editing.cost).toLocaleString()} · markup fixo 100% · O cliente NUNCA vê o custo.`
+                    : 'Preencha o custo para calcular o preço de venda automaticamente.'}
                 </p>
               </div>
 
