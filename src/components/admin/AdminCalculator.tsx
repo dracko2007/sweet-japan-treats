@@ -22,7 +22,7 @@ const AdminCalculator: React.FC = () => {
 
   const sellPrice = (row: ProductRow) => {
     const cost = parseFloat(row.costYen) || 0;
-    const disc = Math.min(Math.max(parseFloat(row.discountPct) || 0, 0), 100);
+    const disc = Math.min(Math.max(parseFloat(row.discountPct) || 0, 0), 50);
     return cost * 2 * (1 - disc / 100);
   };
 
@@ -68,7 +68,7 @@ const AdminCalculator: React.FC = () => {
         {/* Cabeçalho das colunas */}
         <div className="grid grid-cols-[1fr_90px_1.6fr_20px] gap-2 mb-1 px-1">
           <span className="text-[11px] font-bold text-muted-foreground uppercase">Custo (¥)</span>
-          <span className="text-[11px] font-bold text-muted-foreground uppercase">Desconto</span>
+          <span className="text-[11px] font-bold text-muted-foreground uppercase">Desconto (máx 50%)</span>
           <span className="text-[11px] font-bold text-muted-foreground uppercase">Preço de venda</span>
           <span />
         </div>
@@ -93,7 +93,7 @@ const AdminCalculator: React.FC = () => {
                   <input
                     type="number"
                     min="0"
-                    max="100"
+                    max="50"
                     placeholder="0"
                     value={row.discountPct}
                     onChange={e => updateRow(row.id, 'discountPct', e.target.value)}
