@@ -28,12 +28,12 @@ const Header: React.FC = () => {
         { label: t('nav.products.doces'), href: '/produtos/doces' },
       ]
     },
-    { label: 'Ofertas', href: '/ofertas' },
+    { label: t('nav.offers'), href: '/ofertas' },
     { label: t('nav.vlog'), href: '/vlog' },
     { label: t('nav.shipping'), href: '/frete' },
-    { label: 'Como Funciona', href: '/como-funciona' },
-    { label: 'Faça seu Pedido', href: '/faca-seu-pedido' },
-    { label: 'Empresas', href: '/empresas' },
+    { label: t('nav.howItWorks'), href: '/como-funciona' },
+    { label: t('nav.customRequest'), href: '/faca-seu-pedido' },
+    { label: t('nav.business'), href: '/empresas' },
     { label: t('nav.about'), href: '/sobre' },
   ];
 
