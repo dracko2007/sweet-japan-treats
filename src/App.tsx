@@ -81,7 +81,6 @@ const isAdminLoggedIn = (): boolean => {
 
 // Shell da app com providers pesados — só monta se NÃO estiver em manutenção
 const FullApp: React.FC = () => (
-  <LanguageProvider>
   <QueryClientProvider client={queryClient}>
     <UserProvider>
       <ProductsProvider>
@@ -135,7 +134,6 @@ const FullApp: React.FC = () => (
       </ProductsProvider>
     </UserProvider>
   </QueryClientProvider>
-  </LanguageProvider>
 );
 
 // Camada de manutenção: decide o que renderizar ANTES de montar providers pesados
@@ -177,9 +175,11 @@ const MaintenanceShell: React.FC = () => {
 // CookieBanner e InstallPrompt ficam FORA do MaintenanceShell — aparecem em qualquer estado
 const App = () => (
   <BrowserRouter>
-    <CookieBanner />
-    <InstallPrompt />
-    <MaintenanceShell />
+    <LanguageProvider>
+      <CookieBanner />
+      <InstallPrompt />
+      <MaintenanceShell />
+    </LanguageProvider>
   </BrowserRouter>
 );
 
