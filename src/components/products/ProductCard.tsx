@@ -132,7 +132,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
           <>
             {/* Poster sempre visível — vídeo só carrega/toca no hover para não travar a página */}
             <img
-              src={product.image}
+              src={product.thumbnail || product.image}
               alt={translatedName}
               loading="lazy"
               decoding="async"
@@ -153,9 +153,9 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
               />
             )}
           </>
-        ) : product.image ? (
+        ) : (product.thumbnail || product.image) ? (
           <img
-            src={product.image}
+            src={product.thumbnail || product.image}
             alt={translatedName}
             loading="lazy"
             decoding="async"

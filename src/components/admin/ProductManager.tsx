@@ -356,10 +356,17 @@ const ProductManager: React.FC = () => {
       const small = priceVals.length ? Math.min(...priceVals) : Number(editing.prices?.small) || 0;
       const large = priceVals.length ? Math.max(...priceVals) : Number(editing.prices?.large) || small;
       const packageDimensionsCm = sanitizePackageDimensions(editing.packageDimensionsCm);
+      const coverImage = gallery[0] || editing.image || '';
+      // Gera thumbnail 300px WebP ~20-40KB a partir da capa (evita carregar 800px nos cards de lista)
+      let thumbnail = editing.thumbnail || '';
+      if (coverImage && (coverImage !== editing.image || !thumbnail)) {
+        try { thumbnail = await urlToCompressedDataURL(coverImage, 300, 0.60); } catch { thumbnail = ''; }
+      }
       const product: Product = {
         ...editing,
         id,
-        image: gallery[0] || editing.image || '',
+        image: coverImage,
+        thumbnail: thumbnail || undefined,
         gallery,
         cost: Number(editing.cost) || 0,
         variants: cleanVariants.length ? cleanVariants : undefined,

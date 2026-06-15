@@ -63,7 +63,7 @@ const FeaturedProducts: React.FC = () => {
                 {/* Image Section */}
                 <div className="aspect-square bg-white relative overflow-hidden">
                   <img
-                    src={product.image}
+                    src={product.thumbnail || product.image}
                     alt={productEnglishName(product)}
                     loading="lazy"
                     className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"

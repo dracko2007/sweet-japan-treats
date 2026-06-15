@@ -26,6 +26,7 @@ export interface Product {
   variants?: ProductVariant[]; // se presente, substitui prices (vários tamanhos/kits)
   cost?: number; // Custo de aquisição em ¥ (só admin — NÃO aparece para o cliente)
   image: string;
+  thumbnail?: string; // WebP 300px ~30KB — usado nos cards de lista
   gallery?: string[]; // Múltiplas imagens do produto
   video?: string; // Vídeo do produto (opcional)
   flavor: string;
