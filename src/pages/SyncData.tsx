@@ -13,7 +13,7 @@ const SyncData: React.FC = () => {
 
   React.useEffect(() => {
     // Count local users
-    const usersData = safeStorage.getItem('sweet-japan-users');
+    const usersData = safeStorage.getItem('japan-express-users');
     if (usersData) {
       const users = JSON.parse(usersData);
       setLocalUsers(Object.keys(users).length);

@@ -67,26 +67,38 @@ const Admin: React.FC = () => {
   const ADMIN_EMAIL = 'dracko2007@gmail.com';
 
   useEffect(() => {
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    let lastRefresh = 0;
+    const MIN_INTERVAL_MS = 10_000; // no mínimo 10s entre refreshes
+
     const refresh = () => {
+      const now = Date.now();
+      if (now - lastRefresh < MIN_INTERVAL_MS) return; // throttle
+      lastRefresh = now;
       loadOrders();
       loadCustomers();
     };
+
+    const debouncedRefresh = () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(refresh, 300);
+    };
+
     refresh();
 
-    // Auto-refresh a cada 30s
     const interval = setInterval(refresh, 30000);
 
-    // Recarrega na hora ao voltar para a aba/janela (ex: após fazer um pedido)
     const onVisible = () => {
-      if (document.visibilityState === 'visible') refresh();
+      if (document.visibilityState === 'visible') debouncedRefresh();
     };
     document.addEventListener('visibilitychange', onVisible);
-    window.addEventListener('focus', refresh);
+    window.addEventListener('focus', debouncedRefresh);
 
     return () => {
       clearInterval(interval);
+      if (debounceTimer) clearTimeout(debounceTimer);
       document.removeEventListener('visibilitychange', onVisible);
-      window.removeEventListener('focus', refresh);
+      window.removeEventListener('focus', debouncedRefresh);
     };
   }, [user, navigate]);
 

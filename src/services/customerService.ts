@@ -36,7 +36,7 @@ export interface CustomerStats {
 export const customerService = {
   // Obtém todos os clientes com suas estatísticas
   getAllCustomers(): CustomerStats[] {
-    const usersData = safeStorage.getItem('sweet-japan-users');
+    const usersData = safeStorage.getItem('japan-express-users');
     if (!usersData) return [];
 
     const users = JSON.parse(usersData);
@@ -283,12 +283,12 @@ export const customerService = {
   async deleteCustomer(email: string): Promise<boolean> {
     let deletedLocal = false;
     try {
-      const usersData = safeStorage.getItem('sweet-japan-users');
+      const usersData = safeStorage.getItem('japan-express-users');
       if (usersData) {
         const users = JSON.parse(usersData);
         if (users[email]) {
           delete users[email];
-          safeStorage.setItem('sweet-japan-users', JSON.stringify(users));
+          safeStorage.setItem('japan-express-users', JSON.stringify(users));
           deletedLocal = true;
         }
       }
@@ -312,12 +312,12 @@ export const customerService = {
   async deleteCustomerOrders(email: string): Promise<boolean> {
     let updatedLocal = false;
     try {
-      const usersData = safeStorage.getItem('sweet-japan-users');
+      const usersData = safeStorage.getItem('japan-express-users');
       if (usersData) {
         const users = JSON.parse(usersData);
         if (users[email]) {
           users[email].orders = [];
-          safeStorage.setItem('sweet-japan-users', JSON.stringify(users));
+          safeStorage.setItem('japan-express-users', JSON.stringify(users));
           updatedLocal = true;
         }
       }
@@ -340,7 +340,7 @@ export const customerService = {
   // Delete todos os clientes (localStorage + Firestore)
   async deleteAllCustomers(): Promise<boolean> {
     try {
-      safeStorage.setItem('sweet-japan-users', JSON.stringify({}));
+      safeStorage.setItem('japan-express-users', JSON.stringify({}));
     } catch (error) {
       devError('❌ Erro ao deletar todos os clientes (local):', error);
     }
@@ -356,13 +356,13 @@ export const customerService = {
   // Delete todo o histórico (pedidos de todos os clientes, localStorage + Firestore)
   async deleteAllOrderHistory(): Promise<boolean> {
     try {
-      const usersData = safeStorage.getItem('sweet-japan-users');
+      const usersData = safeStorage.getItem('japan-express-users');
       if (usersData) {
         const users = JSON.parse(usersData);
         Object.keys(users).forEach(email => {
           users[email].orders = [];
         });
-        safeStorage.setItem('sweet-japan-users', JSON.stringify(users));
+        safeStorage.setItem('japan-express-users', JSON.stringify(users));
       }
     } catch (error) {
       devError('❌ Erro ao deletar histórico (local):', error);

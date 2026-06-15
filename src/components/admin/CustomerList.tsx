@@ -126,11 +126,21 @@ const CustomerList: React.FC = () => {
     loadCustomers();
   }, []);
 
+  const withTimeout = <T,>(p: Promise<T>, ms: number, fallback: T): Promise<T> =>
+    Promise.race([p, new Promise<T>((res) => setTimeout(() => res(fallback), ms))]);
+
   const loadCustomers = async () => {
-    const allCustomers = await customerService.getAllCustomersAsync();
-    const stats = await customerService.getCustomerOverviewAsync();
-    setCustomers(allCustomers);
-    setOverview(stats);
+    try {
+      const [allCustomers, stats] = await Promise.all([
+        withTimeout(customerService.getAllCustomersAsync(), 8_000, []),
+        withTimeout(customerService.getCustomerOverviewAsync(), 8_000, null),
+      ]);
+      setCustomers(allCustomers);
+      setOverview(stats);
+    } catch {
+      setCustomers([]);
+      setOverview(null);
+    }
   };
 
   const formatCurrency = (value: number) => {
@@ -259,9 +269,16 @@ const CustomerList: React.FC = () => {
     }
   };
 
-  if (!overview) {
-    return <div className="text-center py-8">Carregando...</div>;
-  }
+  // overview pode ser null se Firestore travou — usa objeto vazio para não quebrar a UI
+  const ov = overview ?? {
+    totalCustomers: customers.length,
+    activeCustomers: 0,
+    inactiveCustomers: 0,
+    totalRevenue: 0,
+    totalOrders: 0,
+    averageRevenuePerCustomer: 0,
+    averageOrdersPerCustomer: 0,
+  };
 
   return (
     <div className="space-y-6">
@@ -343,9 +360,9 @@ const CustomerList: React.FC = () => {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{overview.totalCustomers}</div>
+            <div className="text-2xl font-bold">{ov.totalCustomers}</div>
             <p className="text-xs text-muted-foreground">
-              {overview.activeCustomers} ativos · {overview.inactiveCustomers} inativos
+              {ov.activeCustomers} ativos · {ov.inactiveCustomers} inativos
             </p>
           </CardContent>
         </Card>
@@ -356,9 +373,9 @@ const CustomerList: React.FC = () => {
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(overview.totalRevenue)}</div>
+            <div className="text-2xl font-bold">{formatCurrency(ov.totalRevenue)}</div>
             <p className="text-xs text-muted-foreground">
-              {overview.totalOrders} pedidos
+              {ov.totalOrders} pedidos
             </p>
           </CardContent>
         </Card>
@@ -369,9 +386,9 @@ const CustomerList: React.FC = () => {
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(overview.averageRevenuePerCustomer)}</div>
+            <div className="text-2xl font-bold">{formatCurrency(ov.averageRevenuePerCustomer)}</div>
             <p className="text-xs text-muted-foreground">
-              {overview.averageOrdersPerCustomer.toFixed(1)} pedidos/cliente
+              {ov.averageOrdersPerCustomer.toFixed(1)} pedidos/cliente
             </p>
           </CardContent>
         </Card>
@@ -382,9 +399,9 @@ const CustomerList: React.FC = () => {
             <ShoppingBag className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{overview.activeCustomers}</div>
+            <div className="text-2xl font-bold">{ov.activeCustomers}</div>
             <p className="text-xs text-muted-foreground">
-              {((overview.activeCustomers / overview.totalCustomers) * 100).toFixed(0)}% do total
+              {((ov.activeCustomers / ov.totalCustomers) * 100).toFixed(0)}% do total
             </p>
           </CardContent>
         </Card>

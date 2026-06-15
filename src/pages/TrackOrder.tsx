@@ -52,7 +52,7 @@ const TrackOrder: React.FC = () => {
     setIsSearching(true);
 
     // 1. Buscar no safeStorage (usuários locais)
-    const usersData = safeStorage.getItem('sweet-japan-users');
+    const usersData = safeStorage.getItem('japan-express-users');
     let order = null;
     
     if (usersData) {

@@ -18,7 +18,7 @@ export interface WishlistItem {
   addedAt: string;
 }
 
-const STORAGE_KEY = 'sweet-japan-wishlist';
+const STORAGE_KEY = 'japan-express-wishlist';
 
 export const wishlistService = {
   // Get user's wishlist

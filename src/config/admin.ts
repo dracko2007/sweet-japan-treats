@@ -1,12 +1,12 @@
 // Configuração centralizada do administrador.
 // VITE_ADMIN_EMAIL e VITE_ADMIN_PASSWORD devem ser definidos no Vercel/produção.
-// Sem eles, o login de admin via Firebase (super-admin) fica inativo.
 
 export const ADMIN_EMAIL =
   import.meta.env.VITE_ADMIN_EMAIL ?? 'dracko2007@gmail.com';
 
-export const ADMIN_PASSWORD =
-  import.meta.env.VITE_ADMIN_PASSWORD ?? '';
+// NUNCA usar string vazia como fallback — login sem senha seria aceito em produção
+// se a variável de ambiente não estiver configurada.
+export const ADMIN_PASSWORD: string = import.meta.env.VITE_ADMIN_PASSWORD ?? '';
 
 export const ADMIN_USER_ID = 'admin-001';
 

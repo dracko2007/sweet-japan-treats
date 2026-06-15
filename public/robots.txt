@@ -39,3 +39,5 @@ Disallow: /sync-data
 Disallow: /limpar-dados.html
 Disallow: /firebase-sync.html
 Disallow: /clear-storage.html
+
+Sitemap: https://japanexpress-store.com/sitemap.xml

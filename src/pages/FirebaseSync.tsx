@@ -64,7 +64,7 @@ export default function FirebaseSync() {
       addLog('✅ Firestore conectado!', '#22c55e');
       addLog('✅ Authentication conectado!', '#22c55e');
 
-      const usersData = safeStorage.getItem('sweet-japan-users');
+      const usersData = safeStorage.getItem('japan-express-users');
       if (usersData) {
         const users = JSON.parse(usersData);
         const userCount = Object.keys(users).length;
@@ -91,7 +91,7 @@ export default function FirebaseSync() {
       addLog('🔄 Iniciando migração de dados...', '#3b82f6');
       showStatus('🔄 Migrando dados...', 'info');
 
-      const usersData = safeStorage.getItem('sweet-japan-users');
+      const usersData = safeStorage.getItem('japan-express-users');
       if (!usersData) {
         addLog('⚠️ Nenhum dado para migrar', '#f59e0b');
         showStatus('⚠️ Nenhum dado encontrado no safeStorage', 'warning');
@@ -144,8 +144,8 @@ export default function FirebaseSync() {
   const debugLocalStorage = () => {
     addLog('🔍 Debugando safeStorage...', '#3b82f6');
     
-    const usersData = safeStorage.getItem('sweet-japan-users');
-    addLog(`📦 sweet-japan-users existe? ${!!usersData}`, '#06b6d4');
+    const usersData = safeStorage.getItem('japan-express-users');
+    addLog(`📦 japan-express-users existe? ${!!usersData}`, '#06b6d4');
     
     if (usersData) {
       const users = JSON.parse(usersData);

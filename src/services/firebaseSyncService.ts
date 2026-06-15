@@ -534,7 +534,7 @@ export const firebaseSyncService = {
     try {
       devLog('🔄 [FIREBASE] Starting migration from safeStorage...');
       
-      const usersData = safeStorage.getItem('sweet-japan-users');
+      const usersData = safeStorage.getItem('japan-express-users');
       if (!usersData) {
         devLog('⚠️ [FIREBASE] No users in safeStorage to migrate');
         return { success: true, migrated: 0 };

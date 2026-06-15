@@ -7,7 +7,7 @@ const devWarn = isDev ? console.warn.bind(console) : () => {};
 const devError = isDev ? console.error.bind(console) : () => {};
 
 
-const STORAGE_KEY = 'sweet-japan-coupons';
+const STORAGE_KEY = 'japan-express-coupons';
 const FIRESTORE_COUPONS = 'coupons';
 const FIRESTORE_USAGE = 'coupon_usage';
 

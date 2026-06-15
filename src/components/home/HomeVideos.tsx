@@ -1,10 +1,55 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { PlayCircle } from 'lucide-react';
 import { siteContentService, HomeContent } from '@/services/siteContentService';
+import { getCookieConsent } from '@/hooks/useCookieConsent';
 
-function getYouTubeEmbed(url: string): string | null {
+function getYouTubeId(url: string): string | null {
   const m = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([\w-]{11})/);
-  return m ? `https://www.youtube.com/embed/${m[1]}` : null;
+  return m ? m[1] : null;
+}
+
+function YouTubeLazyEmbed({ videoId, title }: { videoId: string; title: string }) {
+  const [active, setActive] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) { observer.disconnect(); } },
+      { rootMargin: '200px' }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  const thumb = `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
+
+  return (
+    <div ref={ref} className="absolute inset-0 bg-black cursor-pointer" onClick={() => setActive(true)}>
+      {active ? (
+        <iframe
+          src={`https://${getCookieConsent() === 'accepted' ? 'www.youtube.com' : 'www.youtube-nocookie.com'}/embed/${videoId}?autoplay=1`}
+          title={title}
+          className="absolute inset-0 w-full h-full"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowFullScreen
+        />
+      ) : (
+        <>
+          <img
+            src={thumb}
+            alt={title}
+            loading="lazy"
+            className="absolute inset-0 w-full h-full object-cover"
+          />
+          <div className="absolute inset-0 flex items-center justify-center bg-black/20 hover:bg-black/30 transition">
+            <PlayCircle className="w-16 h-16 text-white drop-shadow-lg" />
+          </div>
+        </>
+      )}
+    </div>
+  );
 }
 
 const HomeVideos: React.FC = () => {
@@ -30,18 +75,12 @@ const HomeVideos: React.FC = () => {
 
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {content.videos.map((v) => {
-            const embed = getYouTubeEmbed(v.url);
+            const videoId = getYouTubeId(v.url);
             return (
               <div key={v.id} className="rounded-2xl overflow-hidden bg-card border border-border shadow-card">
                 <div className="aspect-video bg-black relative">
-                  {embed ? (
-                    <iframe
-                      src={embed}
-                      title={v.title}
-                      className="absolute inset-0 w-full h-full"
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                      allowFullScreen
-                    />
+                  {videoId ? (
+                    <YouTubeLazyEmbed videoId={videoId} title={v.title} />
                   ) : (
                     <a
                       href={v.url}

@@ -129,30 +129,34 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
         onClick={() => navigate(`/produto/${product.id}`)}
       >
         {product.video ? (
-          <video 
-            key={product.video}
-            src={product.video} 
-            autoPlay 
-            loop 
-            muted 
-            playsInline
-            poster={product.image}
-            className="absolute inset-0 w-full h-full object-cover"
-            onError={(e) => {
-              const videoElement = e.target as HTMLVideoElement;
-              videoElement.style.display = 'none';
-              const imgElement = document.createElement('img');
-              imgElement.src = product.image;
-              imgElement.alt = translatedName;
-              imgElement.className = 'absolute inset-0 w-full h-full object-cover';
-              videoElement.parentElement?.appendChild(imgElement);
-            }}
-          />
+          <>
+            {/* Poster sempre visível — vídeo só carrega/toca no hover para não travar a página */}
+            <img
+              src={product.image}
+              alt={translatedName}
+              loading="lazy"
+              decoding="async"
+              className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-200 ${isHovered ? 'opacity-0' : 'opacity-100'}`}
+            />
+            {isHovered && (
+              <video
+                key={product.video}
+                src={product.video}
+                autoPlay
+                loop
+                muted
+                playsInline
+                className="absolute inset-0 w-full h-full object-cover"
+                onError={(e) => { (e.target as HTMLVideoElement).style.display = 'none'; }}
+              />
+            )}
+          </>
         ) : product.image ? (
           <img
             src={product.image}
             alt={translatedName}
             loading="lazy"
+            decoding="async"
             className="absolute inset-0 w-full h-full object-cover"
           />
         ) : (

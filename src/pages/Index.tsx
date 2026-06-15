@@ -4,6 +4,7 @@ import HeroSection from '@/components/home/HeroSection';
 import FeaturedProducts from '@/components/home/FeaturedProducts';
 import HomeVideos from '@/components/home/HomeVideos';
 import ShippingBanner from '@/components/home/ShippingBanner';
+import AppDownloadSection from '@/components/AppDownloadSection';
 import { useLanguage } from '@/context/LanguageContext';
 import FlagIcon from '@/components/FlagIcon';
 
@@ -16,7 +17,8 @@ const Index: React.FC = () => {
       <FeaturedProducts />
       <HomeVideos />
       <ShippingBanner />
-      
+      <AppDownloadSection />
+
       {/* About Preview */}
       <section className="py-20 bg-background">
         <div className="container mx-auto px-4">

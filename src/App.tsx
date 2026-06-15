@@ -1,52 +1,86 @@
+import React, { Suspense, lazy, useEffect } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { CartProvider } from "@/context/CartContext";
 import { UserProvider } from "@/context/UserContext";
 import { LanguageProvider } from "@/context/LanguageContext";
 import { ProductsProvider } from "@/context/ProductsContext";
-import { firebaseConfigReady, firebaseConfigSource } from "@/config/firebase";
-import Index from "./pages/Index";
-import Products from "./pages/Products";
-import Cart from "./pages/Cart";
-import Checkout from "./pages/Checkout";
-import OrderReview from "./pages/OrderReview";
-import OrderConfirmation from "./pages/OrderConfirmation";
-import Register from "./pages/Register";
-import Login from "./pages/Login";
-import Profile from "./pages/Profile";
-import Shipping from "./pages/Shipping";
-import Offers from "./pages/Offers";
-import HowItWorks from "./pages/HowItWorks";
-import About from "./pages/About";
-import Vlog from "./pages/Vlog";
-import Admin from "./pages/Admin";
-import Wishlist from "./pages/Wishlist";
-import TrackOrder from "./pages/TrackOrder";
-import ProductDetail from "./pages/ProductDetail";
-import AffiliatePage from "./pages/Affiliate";
-import CustomRequest from "./pages/CustomRequest";
-import Business from "./pages/Business";
-import NotFound from "./pages/NotFound";
-import FirebaseSync from "./pages/FirebaseSync";
-import SyncData from "./pages/SyncData";
+import { firebaseConfigReady, firebaseConfigSource, app } from "@/config/firebase";
+import { useCookieConsent } from "@/hooks/useCookieConsent";
+import { useMaintenanceMode } from "@/hooks/useMaintenanceMode";
+import { ADMIN_EMAIL, ADMIN_USER_ID } from "@/config/admin";
 import ScrollToTop from "./components/ScrollToTop";
 import ErrorBoundary from "./components/ErrorBoundary";
 import RequireAdmin from "./components/RequireAdmin";
-import MaintenanceGuard from "./components/MaintenanceGuard";
+import CookieBanner from "./components/CookieBanner";
+import InstallPrompt from "./components/InstallPrompt";
+import MaintenancePage from "./pages/Maintenance";
+
+// Code splitting: cada página carregada apenas quando necessária
+const Index            = lazy(() => import("./pages/Index"));
+const Products         = lazy(() => import("./pages/Products"));
+const Cart             = lazy(() => import("./pages/Cart"));
+const Checkout         = lazy(() => import("./pages/Checkout"));
+const OrderReview      = lazy(() => import("./pages/OrderReview"));
+const OrderConfirmation= lazy(() => import("./pages/OrderConfirmation"));
+const Register         = lazy(() => import("./pages/Register"));
+const Login            = lazy(() => import("./pages/Login"));
+const Profile          = lazy(() => import("./pages/Profile"));
+const Shipping         = lazy(() => import("./pages/Shipping"));
+const Offers           = lazy(() => import("./pages/Offers"));
+const HowItWorks       = lazy(() => import("./pages/HowItWorks"));
+const About            = lazy(() => import("./pages/About"));
+const Vlog             = lazy(() => import("./pages/Vlog"));
+const Admin            = lazy(() => import("./pages/Admin"));
+const Wishlist         = lazy(() => import("./pages/Wishlist"));
+const TrackOrder       = lazy(() => import("./pages/TrackOrder"));
+const ProductDetail    = lazy(() => import("./pages/ProductDetail"));
+const AffiliatePage    = lazy(() => import("./pages/Affiliate"));
+const CustomRequest    = lazy(() => import("./pages/CustomRequest"));
+const Business         = lazy(() => import("./pages/Business"));
+const NotFound         = lazy(() => import("./pages/NotFound"));
+const PrivacyPolicy    = lazy(() => import("./pages/PrivacyPolicy"));
+const TermsOfService   = lazy(() => import("./pages/TermsOfService"));
+const CookiePolicy     = lazy(() => import("./pages/CookiePolicy"));
+const FirebaseSync     = lazy(() => import("./pages/FirebaseSync"));
+const SyncData         = lazy(() => import("./pages/SyncData"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
-    queries: {
-      retry: 2,
-      staleTime: 5 * 60 * 1000,
-    },
+    queries: { retry: 2, staleTime: 5 * 60 * 1000 },
   },
 });
 
-const App = () => (
+// Analytics só carrega após consentimento
+const AnalyticsLoader: React.FC = () => {
+  const { consent } = useCookieConsent();
+  useEffect(() => {
+    if (consent !== 'accepted' || !app) return;
+    import('firebase/analytics').then(({ getAnalytics }) => {
+      try { getAnalytics(app!); } catch { /* já inicializado */ }
+    });
+  }, [consent]);
+  return null;
+};
+
+// Rotas sempre acessíveis mesmo em manutenção
+const OPEN_PATHS = ['/admin', '/login', '/firebase-sync', '/sync-data'];
+
+// Verifica se há um admin logado via localStorage (sem precisar do UserProvider)
+const isAdminLoggedIn = (): boolean => {
+  try {
+    const raw = localStorage.getItem('user');
+    if (!raw) return false;
+    const u = JSON.parse(raw);
+    return u?.id === ADMIN_USER_ID || u?.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+  } catch { return false; }
+};
+
+// Shell da app com providers pesados — só monta se NÃO estiver em manutenção
+const FullApp: React.FC = () => (
   <LanguageProvider>
   <QueryClientProvider client={queryClient}>
     <UserProvider>
@@ -55,15 +89,15 @@ const App = () => (
         <TooltipProvider>
           {!firebaseConfigReady && (
             <div className="bg-red-600 text-white text-sm text-center py-2 px-4">
-              Firebase não configurado. Fonte: {firebaseConfigSource}. Verifique as variáveis VITE_FIREBASE_* no Vercel e faça redeploy.
+              Firebase não configurado. Verifique as variáveis VITE_FIREBASE_* no Vercel e faça redeploy.
             </div>
           )}
+          <AnalyticsLoader />
           <Toaster />
           <Sonner />
-          <BrowserRouter>
-            <ScrollToTop />
-            <ErrorBoundary>
-              <MaintenanceGuard>
+          <ScrollToTop />
+          <ErrorBoundary>
+            <Suspense fallback={null}>
               <Routes>
                 <Route path="/" element={<Index />} />
                 <Route path="/produtos" element={<Products />} />
@@ -89,18 +123,64 @@ const App = () => (
                 <Route path="/rastrear" element={<TrackOrder />} />
                 <Route path="/firebase-sync" element={<RequireAdmin><FirebaseSync /></RequireAdmin>} />
                 <Route path="/sync-data" element={<RequireAdmin><SyncData /></RequireAdmin>} />
-                {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+                <Route path="/privacidade" element={<PrivacyPolicy />} />
+                <Route path="/termos" element={<TermsOfService />} />
+                <Route path="/cookies" element={<CookiePolicy />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
-              </MaintenanceGuard>
-            </ErrorBoundary>
-          </BrowserRouter>
+            </Suspense>
+          </ErrorBoundary>
         </TooltipProvider>
       </CartProvider>
       </ProductsProvider>
     </UserProvider>
   </QueryClientProvider>
   </LanguageProvider>
+);
+
+// Camada de manutenção: decide o que renderizar ANTES de montar providers pesados
+// Tela leve exibida na primeira visita ever (sem cache).
+// Zero Firebase, zero providers pesados — apenas logo + fundo enquanto o fetch REST (~1.5s) confirma o estado.
+const CheckingScreen: React.FC = () => (
+  <div className="min-h-screen bg-gradient-to-b from-pink-100 via-pink-50 to-white flex items-center justify-center">
+    <div className="flex flex-col items-center gap-4">
+      <img src="/logo.jpg" alt="Japan Express" className="w-20 h-20 rounded-full object-cover shadow-lg animate-pulse" />
+      <div className="flex gap-1.5">
+        <span className="w-2 h-2 rounded-full bg-primary/60 animate-bounce [animation-delay:0ms]" />
+        <span className="w-2 h-2 rounded-full bg-primary/60 animate-bounce [animation-delay:150ms]" />
+        <span className="w-2 h-2 rounded-full bg-primary/60 animate-bounce [animation-delay:300ms]" />
+      </div>
+    </div>
+  </div>
+);
+
+const MaintenanceShell: React.FC = () => {
+  const { isEnabled, checking } = useMaintenanceMode();
+  const location = useLocation();
+  const isOpenPath = OPEN_PATHS.some(
+    p => location.pathname === p || location.pathname.startsWith(p + '/')
+  );
+
+  // Admin e rotas de admin sempre veem o app completo (mesmo em manutenção)
+  if (isOpenPath || isAdminLoggedIn()) return <FullApp />;
+
+  // Manutenção confirmada (cache instantâneo ou fetch concluído)
+  if (isEnabled) return <MaintenancePage />;
+
+  // Primeira visita sem cache: mostra tela leve enquanto o fetch confirma (máx 1.5s)
+  if (checking) return <CheckingScreen />;
+
+  // Site normal
+  return <FullApp />;
+};
+
+// CookieBanner e InstallPrompt ficam FORA do MaintenanceShell — aparecem em qualquer estado
+const App = () => (
+  <BrowserRouter>
+    <CookieBanner />
+    <InstallPrompt />
+    <MaintenanceShell />
+  </BrowserRouter>
 );
 
 export default App;

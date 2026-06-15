@@ -35,10 +35,10 @@ const Vlog: React.FC = () => {
 
   // Vídeos padrão (fallback quando o admin ainda não cadastrou nada)
   const defaultVideos = [
-    { id: 1, titleKey: 'vlog.video1.title', descKey: 'vlog.video1.desc', thumbnail: '/video/thumb_simples_recebendo.png', videoUrl: 'tYcA1j-fcKg', duration: '14:02', date: '2026-05-15', views: '12.5K' },
-    { id: 2, titleKey: 'vlog.video2.title', descKey: 'vlog.video2.desc', thumbnail: '/video/thumb_simples_abrindo.png', videoUrl: '1xN5_p-lU0Y', duration: '12:45', date: '2026-05-08', views: '8.2K' },
-    { id: 3, titleKey: 'vlog.video3.title', descKey: 'vlog.video3.desc', thumbnail: '/video/thumb_simples_provando.png', videoUrl: 'S7R97sV1w8k', duration: '13:28', date: '2026-05-01', views: '9.8K' },
-    { id: 4, titleKey: 'vlog.video4.title', descKey: 'vlog.video4.desc', thumbnail: '/video/thumb_simples_cosmetico.png', videoUrl: '1xN5_p-lU0Y', duration: '12:45', date: '2026-04-20', views: '14.1K' },
+    { id: 1, titleKey: 'vlog.video1.title', descKey: 'vlog.video1.desc', thumbnail: '', videoUrl: 'tYcA1j-fcKg', duration: '14:02', date: '2026-05-15', views: '12.5K' },
+    { id: 2, titleKey: 'vlog.video2.title', descKey: 'vlog.video2.desc', thumbnail: '', videoUrl: '1xN5_p-lU0Y', duration: '12:45', date: '2026-05-08', views: '8.2K' },
+    { id: 3, titleKey: 'vlog.video3.title', descKey: 'vlog.video3.desc', thumbnail: '', videoUrl: 'S7R97sV1w8k', duration: '13:28', date: '2026-05-01', views: '9.8K' },
+    { id: 4, titleKey: 'vlog.video4.title', descKey: 'vlog.video4.desc', thumbnail: '', videoUrl: '1xN5_p-lU0Y', duration: '12:45', date: '2026-04-20', views: '14.1K' },
     { id: 5, titleKey: 'vlog.video5.title', descKey: 'vlog.video5.desc', thumbnail: '', videoUrl: 'tYcA1j-fcKg', duration: '14:02', date: '2026-04-10', views: '4.9K' },
     { id: 6, titleKey: 'vlog.video6.title', descKey: 'vlog.video6.desc', thumbnail: '', videoUrl: 'S7R97sV1w8k', duration: '13:28', date: '2026-04-01', views: '3.5K' },
   ];

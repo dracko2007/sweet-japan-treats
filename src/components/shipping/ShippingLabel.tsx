@@ -48,6 +48,14 @@ const ShippingLabel: React.FC<ShippingLabelProps> = ({
     deliveryTime: deliveryTime || 'Qualquer horário'
   });
 
+  const escapeHtml = (value: string) =>
+    String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+
   const handlePrint = () => {
     const printContent = labelRef.current;
     if (!printContent) return;
@@ -58,7 +66,7 @@ const ShippingLabel: React.FC<ShippingLabelProps> = ({
     printWindow.document.write(`
       <html>
         <head>
-          <title>Etiqueta de Envio - ${orderNumber}</title>
+          <title>Etiqueta de Envio - ${escapeHtml(orderNumber)}</title>
           <style>
             @media print {
               @page {

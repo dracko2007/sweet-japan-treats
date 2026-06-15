@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Instagram, Facebook, Mail, MapPin, MessageCircle } from 'lucide-react';
+import { Instagram, Facebook, Mail, MapPin, MessageCircle, Smartphone } from 'lucide-react';
+import { usePWAInstall } from '@/hooks/usePWAInstall';
 
 const WHATSAPP_NUMBER = '817013671679'; // +81 70-1367-1679
 const WHATSAPP_LINK = `https://wa.me/${WHATSAPP_NUMBER}`;
@@ -11,6 +12,13 @@ import JapanExpressLogo from '@/components/JapanExpressLogo';
 const Footer: React.FC = () => {
   const { t, selectedCountry } = useLanguage();
   const isJapan = selectedCountry === 'Japão';
+  const { platform, isInstalled, install } = usePWAInstall();
+  const [showIOSHint, setShowIOSHint] = useState(false);
+
+  const handleInstallClick = async () => {
+    const result = await install();
+    if (result === 'ios' || result === 'desktop') setShowIOSHint(true);
+  };
 
   return (
     <footer className="bg-accent text-accent-foreground">
@@ -88,6 +96,27 @@ const Footer: React.FC = () => {
                   Programa de Afiliados
                 </Link>
               </li>
+              {!isInstalled && (
+                <li className="pt-1">
+                  <button
+                    onClick={handleInstallClick}
+                    className="flex items-center gap-1.5 text-sm text-orange-300 hover:text-orange-200 font-semibold transition-colors"
+                  >
+                    <Smartphone className="w-3.5 h-3.5" />
+                    {platform === 'ios' ? 'Instalar no iPhone' : 'Instalar o App'}
+                  </button>
+                  {showIOSHint && (
+                    <p className="text-xs text-accent-foreground/50 mt-1 leading-snug">
+                      No Safari: Compartilhar → Adicionar à Tela de Início
+                    </p>
+                  )}
+                </li>
+              )}
+              {isInstalled && (
+                <li className="pt-1">
+                  <span className="text-xs text-green-400 flex items-center gap-1">✓ App instalado</span>
+                </li>
+              )}
             </ul>
           </div>
 
@@ -117,10 +146,21 @@ const Footer: React.FC = () => {
           </div>
         </div>
 
-        <div className="border-t border-accent-foreground/10 mt-10 pt-6 text-center">
+        <div className="border-t border-accent-foreground/10 mt-10 pt-6 flex flex-col sm:flex-row items-center justify-between gap-3">
           <p className="text-sm text-accent-foreground/60">
             © {new Date().getFullYear()} Japan Express. {t('footer.rights')}
           </p>
+          <div className="flex items-center gap-4 flex-wrap justify-center">
+            <Link to="/privacidade" className="text-xs text-accent-foreground/50 hover:text-accent-foreground/80 transition-colors">
+              Privacidade
+            </Link>
+            <Link to="/termos" className="text-xs text-accent-foreground/50 hover:text-accent-foreground/80 transition-colors">
+              Termos de Uso
+            </Link>
+            <Link to="/cookies" className="text-xs text-accent-foreground/50 hover:text-accent-foreground/80 transition-colors">
+              Cookies
+            </Link>
+          </div>
         </div>
       </div>
     </footer>

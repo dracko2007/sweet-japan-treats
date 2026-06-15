@@ -156,8 +156,18 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     return safe as UserProfile;
   };
 
-  const canRestoreStoredSession = (u: Partial<UserProfile>): boolean =>
-    u.id === ADMIN_USER_ID || isAdminEmail(u.email) || (!firebaseConfigReady && allowLocalOnly);
+  const canRestoreStoredSession = (u: Partial<UserProfile>): boolean => {
+    const isAdminUser = u.id === ADMIN_USER_ID || isAdminEmail(u.email);
+    if (isAdminUser) {
+      // Admin session from localStorage só é confiada quando:
+      // 1. Firebase configurado E senha não vazia (re-auth vai verificar logo após)
+      // 2. OU modo local-only sem Firebase (ambiente sem credenciais)
+      // Sem isso, qualquer pessoa poderia injetar dados de admin via DevTools
+      if (!ADMIN_PASSWORD) return false; // senha não configurada → não restaurar
+      return firebaseConfigReady || (!firebaseConfigReady && allowLocalOnly);
+    }
+    return !firebaseConfigReady && allowLocalOnly;
+  };
 
   const clearCurrentSession = () => {
     setUser(null);
@@ -171,7 +181,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
 
   // Helper functions for users database
   const getAllUsers = (): UserProfile[] => {
-    const usersData = safeStorage.getItem('sweet-japan-users');
+    const usersData = safeStorage.getItem('japan-express-users');
     if (!usersData) return [];
     
     const usersObj = JSON.parse(usersData);
@@ -184,7 +194,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     users.forEach(u => {
       usersObj[u.email] = stripSensitive(u);
     });
-    safeStorage.setItem('sweet-japan-users', JSON.stringify(usersObj));
+    safeStorage.setItem('japan-express-users', JSON.stringify(usersObj));
   };
 
   const getUserCoupons = (userId: string): Coupon[] => {
@@ -277,7 +287,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
 
     try {
       const normalizedEmail = email ? normalizeEmail(email) : '';
-      const users = JSON.parse(safeStorage.getItem('sweet-japan-users') || '{}');
+      const users = JSON.parse(safeStorage.getItem('japan-express-users') || '{}');
       addOrders(users[normalizedEmail]?.orders || users[email || '']?.orders);
     } catch {
       // Ignore malformed local users backup.
@@ -423,13 +433,16 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
         setCoupons(userCoupons);
         setOrders(userOrders);
 
-        // Se a sessão restaurada for do admin, reautentica no Firebase para liberar
-        // a escrita no painel (produtos) — necessário para sessões antigas.
+        // Se a sessão restaurada for do admin, reautentica no Firebase para confirmar.
+        // Se a verificação falhar, a sessão é encerrada — não basta ter dados no localStorage.
         const isAdminSession = userData.id === ADMIN_USER_ID || isAdminEmail(userData.email);
         if (isAdminSession && auth && !auth.currentUser) {
           signInWithEmailAndPassword(auth, ADMIN_EMAIL, ADMIN_PASSWORD)
             .then(() => devLog('✅ Admin reautenticado no Firebase (sessão restaurada)'))
-            .catch((err) => devWarn('⚠️ Falha ao reautenticar admin no Firebase:', err?.code));
+            .catch((err) => {
+              devWarn('⚠️ Admin Firebase re-auth falhou — sessão encerrada:', err?.code);
+              clearCurrentSession();
+            });
           }
         } else {
           devLog('[INIT] Ignoring customer safeStorage session until Firebase verifies email:', userData.email);
@@ -941,9 +954,11 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     }
   };
 
+  const MAX_POINTS = 1_000_000;
+
   const addPoints = (amount: number) => {
     if (!user || amount === 0) return;
-    const newTotal = Math.max(0, (user.points || 0) + amount); // amount<0 = resgate
+    const newTotal = Math.min(MAX_POINTS, Math.max(0, (user.points || 0) + amount)); // amount<0 = resgate
     const updatedUser: UserProfile = { ...user, points: newTotal };
     setUser(updatedUser);
 
@@ -1049,7 +1064,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     
     // Também atualiza na base global de usuários (safeStorage backup)
     if (user) {
-      const usersData = safeStorage.getItem('sweet-japan-users');
+      const usersData = safeStorage.getItem('japan-express-users');
       if (usersData) {
         const users = JSON.parse(usersData);
         const customerEmail = normalizeEmail((orderData as any).customerEmail || user.email);
@@ -1063,7 +1078,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
             orderDate: newOrder.date,
             totalPrice: newOrder.totalAmount,
           });
-          safeStorage.setItem('sweet-japan-users', JSON.stringify(users));
+          safeStorage.setItem('japan-express-users', JSON.stringify(users));
         }
       }
     }

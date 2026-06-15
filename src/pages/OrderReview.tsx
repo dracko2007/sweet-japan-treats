@@ -1,5 +1,6 @@
 import { safeStorage } from '@/utils/storage';
 import React, { useState, useEffect } from 'react';
+import { emailServiceSimple } from '@/services/emailServiceSimple';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Package, ArrowRight, Printer, CreditCard, Landmark, Smartphone, MapPin, User, Phone, Mail, CheckCircle } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
@@ -306,6 +307,29 @@ const OrderReview: React.FC = () => {
     // Clear cart upon final purchase order creation
     clearCart();
     safeStorage.removeItem('redeem_points');
+
+    // E-mail automático de confirmação (fire-and-forget — não trava a navegação)
+    void emailServiceSimple.sendOrderConfirmation({
+      formData: {
+        name: formData.name,
+        email: customerEmail,
+        phone: formData.phone || '',
+        postalCode: formData.postalCode || '',
+        prefecture: formData.prefecture || formData.state || '',
+        city: formData.city || '',
+        address: formData.address || '',
+        building: formData.building || '',
+      },
+      items: mockOrder.items.map((it: any) => ({
+        name: it.name,
+        quantity: it.quantity,
+        price: it.price,
+        size: it.size,
+      })),
+      totalPrice: grandTotal,
+      orderNumber: orderId,
+      paymentMethod,
+    });
 
     // Navigate to confirmation page
     navigate('/order-confirmation', {
@@ -676,6 +700,29 @@ const OrderReview: React.FC = () => {
                   )}
                 </div>
               </RadioGroup>
+            </div>
+
+            {/* Selos de segurança */}
+            <div className="flex flex-wrap items-center justify-center gap-4 py-4 px-6 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-2xl print:hidden">
+              <div className="flex items-center gap-2 text-green-700 dark:text-green-400">
+                <span className="text-lg">🔒</span>
+                <span className="text-xs font-semibold">Conexão segura HTTPS</span>
+              </div>
+              <div className="hidden sm:block w-px h-5 bg-green-300" />
+              <div className="flex items-center gap-2 text-green-700 dark:text-green-400">
+                <span className="text-lg">🛡️</span>
+                <span className="text-xs font-semibold">Dados protegidos pela LGPD</span>
+              </div>
+              <div className="hidden sm:block w-px h-5 bg-green-300" />
+              <div className="flex items-center gap-2 text-green-700 dark:text-green-400">
+                <span className="text-lg">✅</span>
+                <span className="text-xs font-semibold">Compra 100% garantida</span>
+              </div>
+              <div className="hidden sm:block w-px h-5 bg-green-300" />
+              <div className="flex items-center gap-2 text-green-700 dark:text-green-400">
+                <span className="text-lg">📦</span>
+                <span className="text-xs font-semibold">Rastreamento por e-mail</span>
+              </div>
             </div>
 
             {/* Action Buttons */}

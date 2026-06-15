@@ -2,6 +2,7 @@ import React from 'react';
 import { useLocation } from 'react-router-dom';
 import Header from './Header';
 import Footer from './Footer';
+import AdminPreviewBar from './AdminPreviewBar';
 import KimiClawAssistant from '../KimiClawAssistant';
 import { useBirthdayBonus } from '@/hooks/useBirthdayBonus';
 
@@ -21,6 +22,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       </main>
       <Footer />
       {!isAdminPage && <KimiClawAssistant />}
+      <AdminPreviewBar />
     </div>
   );
 };

@@ -35,6 +35,11 @@ export const adminService = {
   async authenticate(identifier: string, password: string): Promise<AdminEntry | null> {
     const id = slug(identifier);
     if (id === SUPER) {
+      // Rejeitar se ADMIN_PASSWORD não estiver configurada (evita login com senha vazia)
+      if (!ADMIN_PASSWORD) {
+        devWarn('[admin] Login do super-admin bloqueado: VITE_ADMIN_PASSWORD não configurada');
+        return null;
+      }
       return password === ADMIN_PASSWORD ? { username: SUPER, name: 'Administrador', role: 3 } : null;
     }
     if (!db) return null;

@@ -30,6 +30,11 @@ interface FinanceSummary {
 
 const Dashboard: React.FC = () => {
   const { products } = useProducts();
+  const EMPTY_STATS: OrderStatistics = {
+    totalOrders: 0, pendingOrders: 0, shippedOrders: 0, deliveredOrders: 0,
+    cancelledOrders: 0, totalRevenue: 0, revenueThisMonth: 0, revenueLastMonth: 0,
+    ordersThisMonth: 0, ordersLastMonth: 0,
+  };
   const [stats, setStats] = useState<OrderStatistics | null>(null);
   const [finance, setFinance] = useState<FinanceSummary>({ receitaComFrete: 0, receitaSemFrete: 0, custo: 0, lucro: 0 });
   const [monthlyData, setMonthlyData] = useState<MonthlyFin[]>([]);
@@ -55,7 +60,16 @@ const Dashboard: React.FC = () => {
     }, 0);
 
   const loadData = async () => {
-    const orders: Order[] = await orderService.getAllOrdersAsync();
+    // Timeout de 8s: se Firestore travar, usa [] e o dashboard ainda renderiza
+    const withTimeout = <T,>(p: Promise<T>, ms: number, fallback: T): Promise<T> =>
+      Promise.race([p, new Promise<T>((res) => setTimeout(() => res(fallback), ms))]);
+
+    let orders: Order[] = [];
+    try {
+      orders = await withTimeout(orderService.getAllOrdersAsync(), 8_000, []);
+    } catch {
+      orders = [];
+    }
     const statistics = orderService.getStatistics(orders);
     const active = orders.filter((o) => o.status !== 'cancelled');
 

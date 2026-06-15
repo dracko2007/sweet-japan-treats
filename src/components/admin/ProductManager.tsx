@@ -376,7 +376,7 @@ const ProductManager: React.FC = () => {
                   <div key={p.id} className={`bg-card border rounded-xl overflow-hidden flex shadow-sm ${p.hidden ? 'border-dashed border-gray-300 opacity-70' : 'border-border'}`}>
                     <div className="w-24 h-24 bg-secondary/40 flex-shrink-0 relative">
                       {p.image ? (
-                        <img src={p.image} alt={p.name} className="w-full h-full object-cover" />
+                        <img src={p.image} alt={p.name} loading="lazy" decoding="async" className="w-full h-full object-cover" />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center text-muted-foreground">
                           <ImageIcon className="w-6 h-6" />
@@ -919,7 +919,7 @@ const ProductManager: React.FC = () => {
                       )}
                       title="Arraste para reordenar"
                     >
-                      <img src={img} alt="" className="w-full h-full object-cover pointer-events-none" />
+                      <img src={img} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover pointer-events-none" />
                       {idx === 0 ? (
                         <span className="absolute top-0 left-0 bg-primary text-primary-foreground text-[9px] px-1 rounded-br font-bold">Capa</span>
                       ) : (
