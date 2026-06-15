@@ -39,8 +39,9 @@ const slugify = (s: string) =>
     .replace(/(^-|-$)/g, '')
     .slice(0, 40) || `produto-${Date.now()}`;
 
-// Redimensiona/comprime uma imagem para data URL JPEG (~600px) para caber no Firestore.
-function fileToCompressedDataURL(file: File, maxSize = 600, quality = 0.7): Promise<string> {
+// Redimensiona e converte para WebP — muito mais leve que JPEG para o mesmo tamanho.
+// maxSize=800 para galeria, 300 para thumbnails de lista.
+function fileToCompressedDataURL(file: File, maxSize = 800, quality = 0.72): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -60,13 +61,51 @@ function fileToCompressedDataURL(file: File, maxSize = 600, quality = 0.7): Prom
         const ctx = canvas.getContext('2d');
         if (!ctx) return reject(new Error('canvas'));
         ctx.drawImage(img, 0, 0, width, height);
-        resolve(canvas.toDataURL('image/jpeg', quality));
+        // WebP é ~30% menor que JPEG com qualidade equivalente
+        const webp = canvas.toDataURL('image/webp', quality);
+        // Fallback para JPEG se o browser não suportar WebP (raro em 2025)
+        resolve(webp.startsWith('data:image/webp') ? webp : canvas.toDataURL('image/jpeg', quality));
       };
       img.onerror = reject;
       img.src = e.target?.result as string;
     };
     reader.onerror = reject;
     reader.readAsDataURL(file);
+  });
+}
+
+// Versão para thumbnail de lista (menor, mais agressiva)
+function fileToThumbnailDataURL(file: File): Promise<string> {
+  return fileToCompressedDataURL(file, 300, 0.65);
+}
+
+// Baixa uma imagem por URL e converte para WebP comprimido via canvas.
+// Usada para imagens externas (Yahoo/Rakuten) que chegam em resolução full.
+function urlToCompressedDataURL(url: string, maxSize = 800, quality = 0.72): Promise<string> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      let { width, height } = img;
+      if (width > height && width > maxSize) {
+        height = Math.round((height * maxSize) / width);
+        width = maxSize;
+      } else if (height > maxSize) {
+        width = Math.round((width * maxSize) / height);
+        height = maxSize;
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) { resolve(url); return; }
+      ctx.drawImage(img, 0, 0, width, height);
+      const webp = canvas.toDataURL('image/webp', quality);
+      resolve(webp.startsWith('data:image/webp') ? webp : canvas.toDataURL('image/jpeg', quality));
+    };
+    // Se falhar (CORS, etc.), mantém a URL original
+    img.onerror = () => resolve(url);
+    img.src = url;
   });
 }
 
@@ -232,11 +271,13 @@ const ProductManager: React.FC = () => {
         }
       }
 
-      // Fotos do Yahoo/Rakuten substituem as antigas para evitar cache visual de imagens removidas.
+      // Fotos do Yahoo/Rakuten — comprime para WebP antes de salvar (evita thumbnails de 6MB)
       if (enrichFields.images && Array.isArray(data.images) && data.images.length > 0) {
-        const merged = [...new Set(data.images.filter(Boolean))].slice(0, MAX_PHOTOS);
-        updatedEditing.gallery = merged;
-        updatedEditing.image   = merged[0] || updatedEditing.image;
+        const urls = [...new Set(data.images.filter(Boolean))].slice(0, MAX_PHOTOS) as string[];
+        // Comprime em paralelo; fallback para URL original se CORS bloquear
+        const compressed = await Promise.all(urls.map((u) => urlToCompressedDataURL(u)));
+        updatedEditing.gallery = compressed;
+        updatedEditing.image   = compressed[0] || updatedEditing.image;
       }
 
       setEditing(updatedEditing);

@@ -136,6 +136,8 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
               alt={translatedName}
               loading="lazy"
               decoding="async"
+              width={300}
+              height={300}
               className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-200 ${isHovered ? 'opacity-0' : 'opacity-100'}`}
             />
             {isHovered && (
@@ -157,6 +159,8 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
             alt={translatedName}
             loading="lazy"
             decoding="async"
+            width={300}
+            height={300}
             className="absolute inset-0 w-full h-full object-cover"
           />
         ) : (
