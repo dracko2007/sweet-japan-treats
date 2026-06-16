@@ -3,10 +3,7 @@ import { Product } from '@/types';
 import { productService } from '@/services/productService';
 
 const isDev = import.meta.env.DEV;
-const devLog = isDev ? console.log.bind(console) : () => {};
 const devWarn = isDev ? console.warn.bind(console) : () => {};
-const devError = isDev ? console.error.bind(console) : () => {};
-
 
 interface ProductsContextValue {
   products: Product[];
@@ -32,32 +29,41 @@ export const ProductsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       setProducts(merged);
     } catch (e) {
       devWarn('ProductsContext refresh falhou:', e);
-      setProducts([]);
     } finally {
       setLoading(false);
     }
   }, []);
 
-  // Carregamento inicial: tenta cache (instantâneo); se vazio ou expirado vai ao Firestore
+  // Carregamento inicial: tenta cache primeiro (instantâneo).
+  // Se retornar vazio (auth Firebase ainda não pronta), tenta de novo em 3s.
   useEffect(() => {
     let cancelled = false;
-    const load = async () => {
-      setLoading(true);
+
+    const load = async (attempt = 0) => {
+      if (attempt === 0) setLoading(true);
       try {
-        const merged = await productService.getMerged(false); // usa cache se disponível
-        if (!cancelled) setProducts(merged);
-        // Se cache retornou 0 produtos, força fetch no Firestore
-        if (!cancelled && merged.length === 0) {
-          const fresh = await productService.getMerged(true);
-          if (!cancelled) setProducts(fresh);
+        const merged = await productService.getMerged(attempt > 0);
+        if (cancelled) return;
+        if (merged.length > 0) {
+          setProducts(merged);
+          setLoading(false);
+        } else if (attempt === 0) {
+          // Vazio na 1ª tentativa → Firebase Auth pode não estar pronta ainda, tenta em 3s
+          setTimeout(() => { if (!cancelled) load(1); }, 3000);
+        } else {
+          setLoading(false);
         }
-      } catch (e) {
-        devWarn('ProductsContext load falhou:', e);
-        if (!cancelled) setProducts([]);
-      } finally {
-        if (!cancelled) setLoading(false);
+      } catch {
+        if (cancelled) return;
+        if (attempt === 0) {
+          // Erro na 1ª tentativa → Firebase Auth pode não estar pronta, tenta em 3s
+          setTimeout(() => { if (!cancelled) load(1); }, 3000);
+        } else {
+          setLoading(false);
+        }
       }
     };
+
     load();
     return () => { cancelled = true; };
   }, []);

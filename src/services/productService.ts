@@ -99,28 +99,42 @@ export const productService = {
     }
   },
 
-  /** Lista final vinda do Firestore (fonte de verdade única).
-   *  Usa cache de 5 min no localStorage — evita re-fetch a cada navegação.
-   *  defaultProducts só são usados como fallback se o Firestore estiver inacessível
-   *  e não houver nenhum dado ainda. */
+  /** Lista final: Firestore é fonte de verdade. defaultProducts entram só para IDs
+   *  que o Firestore não tem (evita tela vazia em erros parciais).
+   *  Usa cache de 5 min no localStorage para evitar re-fetch a cada navegação. */
   async getMerged(forceRefresh = false): Promise<Product[]> {
     if (!forceRefresh) {
       const cached = getCache();
       if (cached) return cached;
     }
 
-    const { items, deleted } = await this.getOverrides();
+    let items: Product[] = [];
+    let deleted: string[] = [];
+    try {
+      ({ items, deleted } = await this.getOverrides());
+    } catch {
+      // Firestore inacessível (auth não pronta, offline, etc.) — usa defaults como fallback
+      return defaultProducts;
+    }
 
-    // Firestore é a fonte de verdade — não mistura com defaultProducts
-    // para evitar flash de imagens antigas hardcoded no código.
+    // Firestore tem dados → ele é a fonte de verdade
+    // IDs do Firestore sobrepõem defaults; defaults preenchem o que o Firestore não tem
     if (items.length > 0 || deleted.length > 0) {
-      // Firestore tem dados: usa SOMENTE o que está lá
-      const result = items.filter((p) => !deleted.includes(p.id));
+      const map = new Map<string, Product>();
+      // Começa com defaults SEM imagens próprias (só como esqueleto de fallback)
+      for (const p of defaultProducts) {
+        map.set(p.id, { ...p, image: '', gallery: [], thumbnail: undefined });
+      }
+      // Firestore sobrepõe (com imagens reais)
+      for (const p of items) map.set(p.id, p);
+      // Remove deletados
+      for (const id of deleted) map.delete(id);
+      const result = Array.from(map.values()).filter((p) => p.image); // só mostra quem tem imagem
       setCache(result);
       return result;
     }
 
-    // Firestore ainda vazio (loja nova / sem produtos cadastrados): mostra defaults
+    // Firestore vazio (loja nova): usa defaults
     setCache(defaultProducts);
     return defaultProducts;
   },
