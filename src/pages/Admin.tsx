@@ -1,7 +1,7 @@
 import { safeStorage } from '@/utils/storage';
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Package, Printer, ShoppingBag, User, MapPin, Phone, Mail, Calendar, TestTube, Tag, Truck, CheckCircle, XCircle, Trash2, BarChart3, Users, PackagePlus, Video, Megaphone, Clapperboard, Building2, Sparkles, ShieldCheck, Calculator } from 'lucide-react';
+import { Package, Printer, ShoppingBag, User, MapPin, Phone, Mail, Calendar, TestTube, Tag, Truck, CheckCircle, XCircle, Trash2, BarChart3, Users, PackagePlus, Video, Megaphone, Clapperboard, Building2, Sparkles, ShieldCheck, Calculator, CloudUpload } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { useUser } from '@/context/UserContext';
@@ -21,6 +21,7 @@ import CustomRequestManager from '@/components/admin/CustomRequestManager';
 import B2BRequestManager from '@/components/admin/B2BRequestManager';
 import AdminAccessManager from '@/components/admin/AdminAccessManager';
 import VideoReviewManager from '@/components/admin/VideoReviewManager';
+import ImageMigration from '@/components/admin/ImageMigration';
 import TrackingModal from '@/components/admin/TrackingModal';
 import AdminCalculator from '@/components/admin/AdminCalculator';
 import { orderService } from '@/services/orderService';
@@ -38,7 +39,7 @@ const devError = isDev ? console.error.bind(console) : () => {};
 type AdminTab =
   | 'orders' | 'coupons' | 'dashboard' | 'customers' | 'products'
   | 'home' | 'vlog' | 'affiliates' | 'requests' | 'b2b' | 'admins' | 'videos'
-  | 'calculator';
+  | 'calculator' | 'migration';
 
 interface AdminTabItem {
   id: AdminTab;
@@ -440,6 +441,7 @@ _This is an automated test message_
     ] },
     { title: 'Ferramentas', items: [
       { id: 'calculator', label: 'Calculadora', icon: Calculator },
+      { id: 'migration', label: 'Migrar Imagens', icon: CloudUpload },
     ] },
     // Só nível 3 vê o gerenciamento de administradores
     ...(permissions.canManageAdmins
@@ -844,6 +846,8 @@ _This is an automated test message_
               <AdminAccessManager />
             ) : activeTab === 'calculator' ? (
               <AdminCalculator />
+            ) : activeTab === 'migration' ? (
+              <ImageMigration />
             ) : (
               <CustomerList />
             )}

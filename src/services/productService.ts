@@ -1,8 +1,8 @@
-// Serviço de produtos com persistência no Firestore.
-// Os 8 produtos de `data/products.ts` são a base (defaults).
-// O admin pode criar/editar/remover; as mudanças ficam no Firestore (collection "products")
-// e são mescladas por cima dos defaults. Fotos são guardadas como data URL (base64) dentro
-// do documento, pois o Firebase Storage não está provisionado neste projeto.
+// Serviço de produtos com persistência no Firestore + Firebase Storage para imagens.
+// Os produtos de `data/products.ts` são a base (defaults).
+// O admin pode criar/editar/remover; as mudanças ficam no Firestore (collection "products").
+// Imagens ficam no Firebase Storage (CDN Google) — Firestore guarda só as URLs.
+// Cache localStorage de 5 min evita re-fetch a cada navegação.
 
 import { db } from '@/config/firebase';
 import {
@@ -26,6 +26,33 @@ const devError = isDev ? console.error.bind(console) : () => {};
 
 
 const COL = 'products';
+
+// ─── Cache localStorage ────────────────────────────────────────────────────
+const CACHE_KEY = 'jp_products_v2';
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutos
+
+interface ProductCache { products: Product[]; ts: number; }
+
+function getCache(): Product[] | null {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    if (!raw) return null;
+    const { products, ts } = JSON.parse(raw) as ProductCache;
+    if (Date.now() - ts > CACHE_TTL) return null;
+    return products;
+  } catch { return null; }
+}
+
+function setCache(products: Product[]): void {
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify({ products, ts: Date.now() } satisfies ProductCache));
+  } catch { /* storage cheio — silencia */ }
+}
+
+export function invalidateProductCache(): void {
+  try { localStorage.removeItem(CACHE_KEY); } catch {}
+}
+// ──────────────────────────────────────────────────────────────────────────
 
 const stripUndefined = (value: unknown): unknown => {
   if (value === undefined) return undefined;
@@ -72,20 +99,31 @@ export const productService = {
     }
   },
 
-  /** Lista final: defaults + criados no admin, com edições aplicadas e removidos escondidos. */
-  async getMerged(): Promise<Product[]> {
+  /** Lista final: defaults + criados no admin, com edições aplicadas e removidos escondidos.
+   *  Usa cache de 5 min no localStorage — evita re-fetch a cada navegação. */
+  async getMerged(forceRefresh = false): Promise<Product[]> {
+    if (!forceRefresh) {
+      const cached = getCache();
+      if (cached) return cached;
+    }
+
     const { items, deleted } = await this.getOverrides();
     const hasFirestoreCatalog = items.length > 0 || deleted.length > 0;
-    if (!hasFirestoreCatalog) return defaultProducts;
+    if (!hasFirestoreCatalog) {
+      setCache(defaultProducts);
+      return defaultProducts;
+    }
 
     const map = new Map<string, Product>();
     for (const p of defaultProducts) map.set(p.id, p);
     for (const p of items) map.set(p.id, p);
     for (const id of deleted) map.delete(id);
-    return Array.from(map.values());
+    const result = Array.from(map.values());
+    setCache(result);
+    return result;
   },
 
-  /** Cria ou atualiza um produto. */
+  /** Cria ou atualiza um produto. Invalida o cache local automaticamente. */
   async save(product: Product): Promise<void> {
     if (!db) throw new Error('Firebase indisponível');
     await ensureAdminAuth();
@@ -99,6 +137,7 @@ export const productService = {
       { ...cleanRest, __deleted: false, updatedAt: serverTimestamp() },
       { merge: true }
     );
+    invalidateProductCache();
   },
 
   /** Decrementa o estoque ao confirmar uma venda. No-op se produto não existe ou é ilimitado. */
@@ -113,7 +152,7 @@ export const productService = {
     }
   },
 
-  /** Esconde um produto (soft-delete) — funciona inclusive para os 8 defaults. */
+  /** Esconde um produto (soft-delete) — funciona inclusive para os defaults. */
   async remove(id: string): Promise<void> {
     if (!db) throw new Error('Firebase indisponível');
     await ensureAdminAuth();
@@ -122,5 +161,6 @@ export const productService = {
       { __deleted: true, updatedAt: serverTimestamp() },
       { merge: true }
     );
+    invalidateProductCache();
   },
 };

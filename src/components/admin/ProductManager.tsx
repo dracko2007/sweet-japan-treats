@@ -10,6 +10,7 @@ const VARIANT_PRESETS = ['Pequeno', 'Médio', 'Grande', 'Kit'];
 const MAX_PHOTOS = 9; // capa + até 8 fotos extras
 import { useProducts } from '@/context/ProductsContext';
 import { productService } from '@/services/productService';
+import { storageService } from '@/services/storageService';
 import { useToast } from '@/hooks/use-toast';
 import { useUser } from '@/context/UserContext';
 import { PACKAGE_SAFETY_MARGIN_CM, sanitizePackageDimensions } from '@/utils/shippingDimensions';
@@ -346,28 +347,57 @@ const ProductManager: React.FC = () => {
     setSaving(true);
     try {
       const id = isNew ? slugify(editing.name) + '-' + Date.now().toString(36).slice(-4) : editing.id;
-      const gallery = editing.gallery && editing.gallery.length > 0 ? editing.gallery : [editing.image].filter(Boolean);
-      // Variantes válidas (com label e preço > 0)
+      const rawGallery = editing.gallery && editing.gallery.length > 0 ? editing.gallery : [editing.image].filter(Boolean);
+
+      // ── Upload de imagens para Firebase Storage ──────────────────────────
+      // Converte data URLs e URLs externas → Storage URL (CDN Google).
+      // URLs que já estão no Storage são reutilizadas sem re-upload.
+      const toStorageUrl = async (imgStr: string, slot: string): Promise<string> => {
+        if (!imgStr) return '';
+        if (storageService.isStorageUrl(imgStr)) return imgStr;
+        let dataUrl = imgStr;
+        if (storageService.isExternalUrl(imgStr)) {
+          dataUrl = await urlToCompressedDataURL(imgStr, 800, 0.72);
+        }
+        return storageService.uploadImage(id, dataUrl, slot);
+      };
+
+      // Capa primeiro (precisamos do data URL ainda em memória para o thumb)
+      const rawCover = rawGallery[0] || '';
+      const coverUrl = await toStorageUrl(rawCover, 'cover');
+
+      // Thumbnail 300px a partir do data URL original (antes de fazer upload da capa)
+      let thumbnailUrl = editing.thumbnail || '';
+      const needNewThumb = rawCover && !storageService.isStorageUrl(rawCover);
+      if (needNewThumb) {
+        const thumbData = await urlToCompressedDataURL(
+          storageService.isDataUrl(rawCover) ? rawCover : coverUrl,
+          300,
+          0.60
+        );
+        thumbnailUrl = await storageService.uploadImage(id, thumbData, 'thumb');
+      }
+
+      // Demais fotos da galeria
+      const galleryUrls = await Promise.all(
+        rawGallery.map((img, i) => i === 0 ? Promise.resolve(coverUrl) : toStorageUrl(img, `gallery_${i}`))
+      );
+      // ─────────────────────────────────────────────────────────────────────
+
       const cleanVariants: ProductVariant[] = (editing.variants || [])
         .filter((v) => v.label.trim() && Number(v.price) > 0)
         .map((v) => ({ id: v.id, label: v.label.trim(), price: Number(v.price) }));
-      // Legado: prices.small = menor, prices.large = maior (mantém compatibilidade)
       const priceVals = cleanVariants.map((v) => v.price);
       const small = priceVals.length ? Math.min(...priceVals) : Number(editing.prices?.small) || 0;
       const large = priceVals.length ? Math.max(...priceVals) : Number(editing.prices?.large) || small;
       const packageDimensionsCm = sanitizePackageDimensions(editing.packageDimensionsCm);
-      const coverImage = gallery[0] || editing.image || '';
-      // Gera thumbnail 300px WebP ~20-40KB a partir da capa (evita carregar 800px nos cards de lista)
-      let thumbnail = editing.thumbnail || '';
-      if (coverImage && (coverImage !== editing.image || !thumbnail)) {
-        try { thumbnail = await urlToCompressedDataURL(coverImage, 300, 0.60); } catch { thumbnail = ''; }
-      }
+
       const product: Product = {
         ...editing,
         id,
-        image: coverImage,
-        thumbnail: thumbnail || undefined,
-        gallery,
+        image: coverUrl || editing.image || '',
+        thumbnail: thumbnailUrl || undefined,
+        gallery: galleryUrls.filter(Boolean),
         cost: Number(editing.cost) || 0,
         variants: cleanVariants.length ? cleanVariants : undefined,
         prices: { small, large },
