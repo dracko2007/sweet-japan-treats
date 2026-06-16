@@ -22,6 +22,7 @@ import B2BRequestManager from '@/components/admin/B2BRequestManager';
 import AdminAccessManager from '@/components/admin/AdminAccessManager';
 import VideoReviewManager from '@/components/admin/VideoReviewManager';
 import ImageMigration from '@/components/admin/ImageMigration';
+import PromotionManager from '@/components/admin/PromotionManager';
 import TrackingModal from '@/components/admin/TrackingModal';
 import AdminCalculator from '@/components/admin/AdminCalculator';
 import { orderService } from '@/services/orderService';
@@ -39,7 +40,7 @@ const devError = isDev ? console.error.bind(console) : () => {};
 type AdminTab =
   | 'orders' | 'coupons' | 'dashboard' | 'customers' | 'products'
   | 'home' | 'vlog' | 'affiliates' | 'requests' | 'b2b' | 'admins' | 'videos'
-  | 'calculator' | 'migration';
+  | 'calculator' | 'migration' | 'promotion';
 
 interface AdminTabItem {
   id: AdminTab;
@@ -440,6 +441,7 @@ _This is an automated test message_
       { id: 'vlog', label: 'Vlog', icon: Clapperboard },
     ] },
     { title: 'Ferramentas', items: [
+      { id: 'promotion', label: 'Promoção Início', icon: Sparkles },
       { id: 'calculator', label: 'Calculadora', icon: Calculator },
       { id: 'migration', label: 'Migrar Imagens', icon: CloudUpload },
     ] },
@@ -844,6 +846,8 @@ _This is an automated test message_
               <VideoReviewManager />
             ) : activeTab === 'admins' ? (
               <AdminAccessManager />
+            ) : activeTab === 'promotion' ? (
+              <PromotionManager />
             ) : activeTab === 'calculator' ? (
               <AdminCalculator />
             ) : activeTab === 'migration' ? (

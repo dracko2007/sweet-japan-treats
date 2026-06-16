@@ -1,11 +1,34 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, ShieldCheck, Sparkles, PlaneTakeoff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useLanguage } from '@/context/LanguageContext';
+import { db } from '@/config/firebase';
+import { doc, getDoc } from 'firebase/firestore';
+
+interface ActivePromo { type: string; productId: string; productName: string; productImage: string; }
+
+const PROMO_LABELS: Record<string, string> = {
+  abertura: 'Promoção de Abertura',
+  mes: 'Promoção do Mês',
+  lancamento: 'Promoção de Lançamento',
+  temporada: 'Promoção de Temporada',
+  relampago: 'Promoção Relâmpago',
+  especial: 'Promoção Especial',
+  exclusiva: 'Exclusiva Online',
+  frete: 'Frete Grátis',
+};
 
 const HeroSection: React.FC = () => {
   const { t } = useLanguage();
+  const [promo, setPromo] = useState<ActivePromo | null | undefined>(undefined);
+
+  useEffect(() => {
+    if (!db) { setPromo(null); return; }
+    getDoc(doc(db, 'siteContent', 'homePromotion'))
+      .then((snap) => setPromo(snap.exists() ? (snap.data() as ActivePromo) : null))
+      .catch(() => setPromo(null));
+  }, []);
 
   return (
     <section className="relative min-h-[85vh] bg-gradient-to-b from-pink-100 via-pink-50/60 to-white overflow-hidden pt-12">
@@ -110,10 +133,21 @@ const HeroSection: React.FC = () => {
               </div>
             </div>
             
-            {/* Sakura flower petal effect overlay */}
-            <div className="absolute top-4 right-4 bg-yellow-400 text-gray-900 text-[10px] font-black uppercase px-2.5 py-1 rounded shadow-sm flex items-center gap-1">
-              <Sparkles className="w-3.5 h-3.5 animate-spin" style={{ animationDuration: '3s' }} /> Promoção de Abertura
-            </div>
+            {/* Banner de promoção dinâmico (configurado no painel admin) */}
+            {promo && (
+              <Link
+                to={`/produtos/${promo.productId}`}
+                className="absolute top-4 right-4 flex items-center gap-2 bg-yellow-400 hover:bg-yellow-300 transition-colors text-gray-900 text-[10px] font-black uppercase px-2.5 py-1.5 rounded shadow-sm max-w-[180px]"
+              >
+                {promo.productImage && (
+                  <img src={promo.productImage} alt={promo.productName} className="w-6 h-6 rounded object-cover shrink-0" />
+                )}
+                <span className="flex items-center gap-1 truncate">
+                  <Sparkles className="w-3 h-3 animate-spin shrink-0" style={{ animationDuration: '3s' }} />
+                  {PROMO_LABELS[promo.type] ?? promo.type}
+                </span>
+              </Link>
+            )}
           </div>
 
         </div>
