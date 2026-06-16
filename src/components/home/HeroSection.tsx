@@ -99,11 +99,19 @@ const HeroSection: React.FC = () => {
           {/* Right Column: Visual Banner */}
           <div className="lg:col-span-5 relative animate-fade-in">
             <div className="relative aspect-[4/3] rounded-3xl overflow-hidden shadow-elevated border-4 border-white bg-gray-100">
-              <img 
-                src="https://images.unsplash.com/photo-1540959733332-eab4deceeaf7?q=80&w=800&auto=format&fit=crop" 
-                alt="Japanese Shopping District"
-                className="w-full h-full object-cover"
-              />
+              {promo?.productImage ? (
+                <img
+                  src={promo.productImage}
+                  alt={promo.productName}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <img
+                  src="https://images.unsplash.com/photo-1540959733332-eab4deceeaf7?q=80&w=800&auto=format&fit=crop"
+                  alt="Japanese Shopping District"
+                  className="w-full h-full object-cover"
+                />
+              )}
               <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent pointer-events-none" />
             </div>
 
@@ -136,16 +144,11 @@ const HeroSection: React.FC = () => {
             {/* Banner de promoção dinâmico (configurado no painel admin) */}
             {promo && (
               <Link
-                to={`/produtos/${promo.productId}`}
-                className="absolute top-4 right-4 flex items-center gap-2 bg-yellow-400 hover:bg-yellow-300 transition-colors text-gray-900 text-[10px] font-black uppercase px-2.5 py-1.5 rounded shadow-sm max-w-[180px]"
+                to="/promocao"
+                className="absolute top-4 right-4 flex items-center gap-1.5 bg-yellow-400 hover:bg-yellow-300 transition-colors text-gray-900 text-[10px] font-black uppercase px-2.5 py-1.5 rounded shadow-sm"
               >
-                {promo.productImage && (
-                  <img src={promo.productImage} alt={promo.productName} className="w-6 h-6 rounded object-cover shrink-0" />
-                )}
-                <span className="flex items-center gap-1 truncate">
-                  <Sparkles className="w-3 h-3 animate-spin shrink-0" style={{ animationDuration: '3s' }} />
-                  {PROMO_LABELS[promo.type] ?? promo.type}
-                </span>
+                <Sparkles className="w-3.5 h-3.5 animate-spin shrink-0" style={{ animationDuration: '3s' }} />
+                {PROMO_LABELS[promo.type] ?? promo.type}
               </Link>
             )}
           </div>

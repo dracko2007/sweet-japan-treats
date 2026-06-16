@@ -47,6 +47,7 @@ const TermsOfService   = lazy(() => import("./pages/TermsOfService"));
 const CookiePolicy     = lazy(() => import("./pages/CookiePolicy"));
 const FirebaseSync     = lazy(() => import("./pages/FirebaseSync"));
 const SyncData         = lazy(() => import("./pages/SyncData"));
+const Promotion        = lazy(() => import("./pages/Promotion"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -125,6 +126,7 @@ const FullApp: React.FC = () => (
                 <Route path="/privacidade" element={<PrivacyPolicy />} />
                 <Route path="/termos" element={<TermsOfService />} />
                 <Route path="/cookies" element={<CookiePolicy />} />
+                <Route path="/promocao" element={<Promotion />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </Suspense>
