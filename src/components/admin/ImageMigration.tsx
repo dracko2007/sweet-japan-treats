@@ -1,18 +1,18 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { CheckCircle, CloudUpload, AlertTriangle, RefreshCw, Image as ImageIcon, ShieldAlert } from 'lucide-react';
+import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { Button } from '@/components/ui/button';
 import { useProducts } from '@/context/ProductsContext';
 import { productService } from '@/services/productService';
 import { storageService } from '@/services/storageService';
+import { storage } from '@/config/firebase';
+import { ensureAdminAuth } from '@/utils/adminAuth';
 import { Product } from '@/types';
 
 const CONCURRENCY = 5;
 
-// Pixel 1×1 WebP para teste de permissão
-const TEST_PIXEL = 'data:image/webp;base64,UklGRlYAAABXRUJQVlA4IEoAAADQAQCdASoBAAEAAkA4JZACdAEO/gHOAAD++P/////8AAA=';
+const TEST_PIXEL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
 
-// Comprime qualquer imagem (data URL ou URL) para WebP via canvas
-// Isso reduz de 5MB → ~150KB antes de fazer upload
 function compressToWebp(src: string, maxSize: number, quality: number): Promise<string> {
   return new Promise((resolve) => {
     const img = new Image();
@@ -36,27 +36,39 @@ function compressToWebp(src: string, maxSize: number, quality: number): Promise<
   });
 }
 
-// Converte data URL → Blob usando fetch (nativo, muito mais rápido que loop manual)
 async function dataUrlToBlob(dataUrl: string): Promise<Blob> {
   const res = await fetch(dataUrl);
   return res.blob();
 }
 
+// Timeout wrapper para qualquer Promise
+function withTimeout<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
+  return Promise.race([p, new Promise<T>((res) => setTimeout(() => res(fallback), ms))]);
+}
+
 async function testStorageAccess(): Promise<{ ok: boolean; error?: string }> {
   try {
-    const blob = await dataUrlToBlob(TEST_PIXEL);
-    const { ref, uploadBytes, deleteObject } = await import('firebase/storage');
-    const { storage } = await import('@/config/firebase');
     if (!storage) return { ok: false, error: 'Firebase Storage não inicializado.' };
-    const { ensureAdminAuth } = await import('@/utils/adminAuth');
     await ensureAdminAuth();
-    const fileRef = ref(storage, 'products/__test__/ping.webp');
-    await uploadBytes(fileRef, blob);
+    const blob = await fetch(TEST_PIXEL).then((r) => r.blob());
+    const fileRef = ref(storage, 'products/__test__/ping.png');
+    // Timeout de 10s — se travar, avisa em vez de ficar preso
+    const result = await withTimeout(
+      uploadBytes(fileRef, blob).then(() => ({ ok: true as const })),
+      10000,
+      { ok: false as const, timedOut: true }
+    );
+    if ('timedOut' in result && result.timedOut) {
+      return { ok: false, error: 'Timeout ao conectar ao Firebase Storage (>10s). Verifique sua conexão ou as regras do Storage.' };
+    }
     try { await deleteObject(fileRef); } catch {}
     return { ok: true };
   } catch (e: any) {
-    const msg = e?.code === 'storage/unauthorized'
-      ? 'Permissão negada — atualize as regras do Firebase Storage.'
+    const code = e?.code || '';
+    const msg = code === 'storage/unauthorized'
+      ? 'Permissão negada — atualize as regras do Firebase Storage (veja abaixo).'
+      : code === 'storage/unknown'
+      ? 'Erro desconhecido do Storage. Verifique as regras e tente novamente.'
       : (e?.message || String(e));
     return { ok: false, error: msg };
   }
@@ -67,56 +79,42 @@ function needsMigration(p: Product): boolean {
   return isBase64(p.image) || isBase64(p.thumbnail) || (p.gallery?.some(isBase64) ?? false);
 }
 
+async function uploadCompressed(productId: string, imgStr: string, slot: string): Promise<string> {
+  if (!imgStr) return '';
+  if (storageService.isStorageUrl(imgStr)) return imgStr;
+  if (!storage) throw new Error('Storage não inicializado');
+
+  const compressed = await compressToWebp(imgStr, 800, 0.72);
+  if (!compressed) return imgStr; // CORS/timeout — mantém original
+
+  await ensureAdminAuth();
+  const blob = await dataUrlToBlob(compressed);
+  const ts = Date.now().toString(36);
+  const ext = blob.type === 'image/webp' ? 'webp' : 'jpg';
+  const fileRef = ref(storage, `products/${productId}/${slot}_${ts}.${ext}`);
+  const snap = await uploadBytes(fileRef, blob, { contentType: blob.type, cacheControl: 'public,max-age=31536000,immutable' });
+  return getDownloadURL(snap.ref);
+}
+
 async function migrateProduct(p: Product): Promise<Product> {
-  const processAndUpload = async (imgStr: string, slot: string): Promise<string> => {
-    if (!imgStr) return '';
-    if (storageService.isStorageUrl(imgStr)) return imgStr;
-
-    // Comprime ANTES de subir: base64 5MB → WebP ~150KB
-    const compressed = await compressToWebp(imgStr, 800, 0.72);
-    if (!compressed) return imgStr; // CORS ou timeout — mantém original
-
-    const blob = await dataUrlToBlob(compressed);
-    const { ref, uploadBytes, getDownloadURL } = await import('firebase/storage');
-    const { storage } = await import('@/config/firebase');
-    const { ensureAdminAuth } = await import('@/utils/adminAuth');
-    if (!storage) throw new Error('Storage não inicializado');
-    await ensureAdminAuth();
-    const ts = Date.now().toString(36);
-    const ext = blob.type === 'image/webp' ? 'webp' : 'jpg';
-    const fileRef = ref(storage, `products/${p.id}/${slot}_${ts}.${ext}`);
-    const snapshot = await uploadBytes(fileRef, blob, {
-      contentType: blob.type,
-      cacheControl: 'public,max-age=31536000,immutable',
-    });
-    return getDownloadURL(snapshot.ref);
-  };
-
   const rawGallery = (p.gallery && p.gallery.length > 0) ? p.gallery : [p.image].filter(Boolean);
 
-  // Cover + gallery em paralelo
   const galleryUrls = await Promise.all(
-    rawGallery.map((img, i) => processAndUpload(img, i === 0 ? 'cover' : `gallery_${i}`))
+    rawGallery.map((img, i) => uploadCompressed(p.id, img, i === 0 ? 'cover' : `gallery_${i}`))
   );
   const coverUrl = galleryUrls[0] || p.image;
 
-  // Thumbnail 300px a partir da capa
   let thumbUrl = p.thumbnail || '';
-  const coverRaw = rawGallery[0] || '';
   if (!thumbUrl || storageService.isDataUrl(thumbUrl)) {
+    const coverRaw = rawGallery[0] || '';
     const thumbCompressed = await compressToWebp(coverRaw || coverUrl, 300, 0.60);
-    if (thumbCompressed) {
+    if (thumbCompressed && storage) {
+      await ensureAdminAuth();
       const blob = await dataUrlToBlob(thumbCompressed);
-      const { ref, uploadBytes, getDownloadURL } = await import('firebase/storage');
-      const { storage } = await import('@/config/firebase');
-      const { ensureAdminAuth } = await import('@/utils/adminAuth');
-      if (storage) {
-        await ensureAdminAuth();
-        const ts = Date.now().toString(36);
-        const fileRef = ref(storage, `products/${p.id}/thumb_${ts}.webp`);
-        const snap = await uploadBytes(fileRef, blob, { contentType: 'image/webp', cacheControl: 'public,max-age=31536000,immutable' });
-        thumbUrl = await getDownloadURL(snap.ref);
-      }
+      const ts = Date.now().toString(36);
+      const fileRef = ref(storage, `products/${p.id}/thumb_${ts}.webp`);
+      const snap = await uploadBytes(fileRef, blob, { contentType: 'image/webp', cacheControl: 'public,max-age=31536000,immutable' });
+      thumbUrl = await getDownloadURL(snap.ref);
     }
   }
 
