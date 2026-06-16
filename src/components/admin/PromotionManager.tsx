@@ -1,11 +1,12 @@
-import React, { useState, useEffect } from 'react';
-import { Sparkles, Tag, Trash2, Save, Search, Users, DollarSign } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Sparkles, Tag, Trash2, Save, Search, Users, Clock, CalendarClock, ChevronDown, ChevronUp, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useProducts } from '@/context/ProductsContext';
 import { db } from '@/config/firebase';
 import { doc, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
 import { ensureAdminAuth } from '@/utils/adminAuth';
 import { useToast } from '@/hooks/use-toast';
+import { convertYen } from '@/services/fxService';
 
 export const PROMO_TYPES = [
   { value: 'abertura',   label: '🎉 Promoção de Abertura' },
@@ -18,15 +19,158 @@ export const PROMO_TYPES = [
   { value: 'frete',      label: '🚚 Frete Grátis' },
 ];
 
+export interface ScheduledNextPromo {
+  type: string;
+  productId: string;
+  productName: string;
+  productImage: string;
+  originalPriceYen: number;
+  promoPriceYen: number;
+  discountPct: number;
+  limitPerPerson: number;
+  durationDays: number | null;
+}
+
 export interface ActivePromo {
   type: string;
   productId: string;
   productName: string;
   productImage: string;
-  originalPrice: number;
-  promoPrice: number;
+  originalPriceYen: number;
+  promoPriceYen: number;
+  discountPct: number;
   limitPerPerson: number;
+  expiresAt: number | null;
+  nextPromo: ScheduledNextPromo | null;
 }
+
+// ── Bloco de formulário reutilizável (promoção atual e próxima) ──────────────
+interface PromoFormProps {
+  label: string;
+  products: ReturnType<typeof useProducts>['products'];
+  value: Partial<ActivePromo & ScheduledNextPromo>;
+  onChange: (v: Partial<ActivePromo & ScheduledNextPromo>) => void;
+  showDuration?: boolean;
+}
+
+const PromoForm: React.FC<PromoFormProps> = ({ label, products, value, onChange, showDuration = false }) => {
+  const [search, setSearch] = useState('');
+  const filtered = products.filter(p => p.name.toLowerCase().includes(search.toLowerCase()));
+  const selected = products.find(p => p.id === value.productId);
+
+  const setOriginalYen = (yen: number) => {
+    const pct = value.discountPct ?? 0;
+    onChange({ ...value, originalPriceYen: yen, promoPriceYen: Math.round(yen * (1 - pct / 100)) });
+  };
+  const setDiscountPct = (pct: number) => {
+    const oy = value.originalPriceYen ?? 0;
+    onChange({ ...value, discountPct: pct, promoPriceYen: Math.round(oy * (1 - pct / 100)) });
+  };
+  const setPromoYen = (yen: number) => {
+    const oy = value.originalPriceYen ?? 0;
+    const pct = oy > 0 ? Math.round((1 - yen / oy) * 100) : 0;
+    onChange({ ...value, promoPriceYen: yen, discountPct: pct });
+  };
+  const selectProduct = (id: string) => {
+    const p = products.find(x => x.id === id);
+    if (!p) return;
+    const oy = p.prices?.small ?? 0;
+    const pct = value.discountPct ?? 0;
+    onChange({ ...value, productId: id, productName: p.name, productImage: p.thumbnail || p.image || '', originalPriceYen: oy, promoPriceYen: Math.round(oy * (1 - pct / 100)) });
+    setSearch('');
+  };
+
+  const brl = convertYen(value.promoPriceYen ?? 0, 'BRL');
+  const originalBrl = convertYen(value.originalPriceYen ?? 0, 'BRL');
+
+  return (
+    <div className="space-y-4">
+      <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">{label}</p>
+
+      {/* Tipo */}
+      <div className="space-y-1">
+        <label className="text-sm font-medium">Tipo de promoção</label>
+        <select value={value.type ?? 'abertura'} onChange={e => onChange({ ...value, type: e.target.value })}
+          className="w-full border border-border rounded-lg px-3 py-2 bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary">
+          {PROMO_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+        </select>
+      </div>
+
+      {/* Produto */}
+      <div className="space-y-1">
+        <label className="text-sm font-medium">Produto</label>
+        {selected && (
+          <div className="flex items-center gap-2 p-2 bg-primary/5 rounded-lg border border-primary/20 mb-1">
+            {selected.thumbnail && <img src={selected.thumbnail} alt="" className="w-8 h-8 rounded object-cover" />}
+            <span className="text-sm font-medium flex-1 truncate">{selected.name}</span>
+            <button onClick={() => onChange({ ...value, productId: '', productName: '', productImage: '' })} className="text-muted-foreground hover:text-destructive text-xs">✕</button>
+          </div>
+        )}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <input type="text" placeholder="Buscar produto..." value={search} onChange={e => setSearch(e.target.value)}
+            className="w-full pl-9 pr-4 py-2 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
+        </div>
+        {search && (
+          <div className="border border-border rounded-lg overflow-hidden max-h-40 overflow-y-auto">
+            {filtered.slice(0, 20).map(p => (
+              <button key={p.id} onClick={() => selectProduct(p.id)}
+                className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-secondary text-sm">
+                {p.thumbnail && <img src={p.thumbnail} alt="" className="w-7 h-7 rounded object-cover shrink-0" />}
+                <span className="flex-1 truncate">{p.name}</span>
+                <span className="text-xs text-muted-foreground shrink-0">¥{p.prices?.small ?? 0}</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Preços em ¥ */}
+      <div className="grid grid-cols-3 gap-3">
+        <div className="space-y-1">
+          <label className="text-xs font-medium text-muted-foreground">Preço original (¥)</label>
+          <input type="number" min="0" value={value.originalPriceYen ?? ''} onChange={e => setOriginalYen(Number(e.target.value))}
+            className="w-full border border-border rounded-lg px-3 py-2 bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
+          {(value.originalPriceYen ?? 0) > 0 && <div className="text-[10px] text-muted-foreground">≈ R$ {originalBrl.toFixed(2)}</div>}
+        </div>
+        <div className="space-y-1">
+          <label className="text-xs font-medium text-muted-foreground">Desconto (%)</label>
+          <input type="number" min="0" max="100" value={value.discountPct ?? ''} onChange={e => setDiscountPct(Number(e.target.value))}
+            className="w-full border border-border rounded-lg px-3 py-2 bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary" placeholder="0" />
+        </div>
+        <div className="space-y-1">
+          <label className="text-xs font-medium text-muted-foreground">Preço promo (¥)</label>
+          <input type="number" min="0" value={value.promoPriceYen ?? ''} onChange={e => setPromoYen(Number(e.target.value))}
+            className="w-full border border-border rounded-lg px-3 py-2 bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
+          {(value.promoPriceYen ?? 0) > 0 && <div className="text-[10px] text-green-600 font-semibold">≈ R$ {brl.toFixed(2)}</div>}
+        </div>
+      </div>
+
+      {/* Duração e limite */}
+      <div className="grid grid-cols-2 gap-3">
+        {showDuration && (
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-muted-foreground flex items-center gap-1"><Clock className="w-3 h-3" /> Duração (dias)</label>
+            <input type="number" min="1" max="365" value={value.durationDays ?? ''} onChange={e => onChange({ ...value, durationDays: e.target.value ? Number(e.target.value) : null })}
+              className="w-full border border-border rounded-lg px-3 py-2 bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary" placeholder="Sem limite" />
+          </div>
+        )}
+        <div className="space-y-1">
+          <label className="text-xs font-medium text-muted-foreground flex items-center gap-1"><Users className="w-3 h-3" /> Limite/pessoa</label>
+          <input type="number" min="1" max="99" value={value.limitPerPerson ?? 1} onChange={e => onChange({ ...value, limitPerPerson: Number(e.target.value) })}
+            className="w-full border border-border rounded-lg px-3 py-2 bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ── Componente principal ──────────────────────────────────────────────────────
+const emptyForm = (): Partial<ActivePromo & ScheduledNextPromo> => ({
+  type: 'abertura', productId: '', productName: '', productImage: '',
+  originalPriceYen: 0, promoPriceYen: 0, discountPct: 0, limitPerPerson: 1,
+  durationDays: null,
+});
 
 const PromotionManager: React.FC = () => {
   const { products } = useProducts();
@@ -34,77 +178,95 @@ const PromotionManager: React.FC = () => {
   const [active, setActive] = useState<ActivePromo | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [search, setSearch] = useState('');
+  const [form, setForm] = useState<Partial<ActivePromo & ScheduledNextPromo>>(emptyForm());
+  const [showNext, setShowNext] = useState(false);
+  const [nextForm, setNextForm] = useState<Partial<ScheduledNextPromo>>(emptyForm());
+  const [timeLeft, setTimeLeft] = useState('');
 
-  const [selectedType, setSelectedType] = useState('abertura');
-  const [selectedProductId, setSelectedProductId] = useState('');
-  const [promoPrice, setPromoPrice] = useState('');
-  const [limitPerPerson, setLimitPerPerson] = useState('1');
-
+  // Carrega promoção ativa
   useEffect(() => {
-    if (!db) return;
-    getDoc(doc(db, 'siteContent', 'homePromotion'))
-      .then((snap) => { if (snap.exists()) setActive(snap.data() as ActivePromo); })
-      .finally(() => setLoading(false));
+    if (!db) { setLoading(false); return; }
+    getDoc(doc(db, 'siteContent', 'homePromotion')).then(snap => {
+      if (snap.exists()) {
+        const data = snap.data() as ActivePromo;
+        // Auto-ativa próxima se expirada
+        if (data.expiresAt && data.expiresAt < Date.now()) {
+          if (data.nextPromo) activateNext(data.nextPromo);
+          else removePromo(true);
+        } else {
+          setActive(data);
+        }
+      }
+    }).finally(() => setLoading(false));
   }, []);
 
-  const filtered = products.filter((p) =>
-    p.name.toLowerCase().includes(search.toLowerCase())
-  );
+  // Countdown timer
+  useEffect(() => {
+    if (!active?.expiresAt) { setTimeLeft(''); return; }
+    const update = () => {
+      const diff = active.expiresAt! - Date.now();
+      if (diff <= 0) { setTimeLeft('Encerrada'); return; }
+      const d = Math.floor(diff / 86400000);
+      const h = Math.floor((diff % 86400000) / 3600000);
+      const m = Math.floor((diff % 3600000) / 60000);
+      const s = Math.floor((diff % 60000) / 1000);
+      setTimeLeft(`${d}d ${h}h ${m}m ${s}s`);
+    };
+    update();
+    const t = setInterval(update, 1000);
+    return () => clearInterval(t);
+  }, [active?.expiresAt]);
 
-  const selectedProduct = products.find((p) => p.id === selectedProductId);
-
-  // Preenche preço original ao selecionar produto
-  const selectProduct = (id: string) => {
-    setSelectedProductId(id);
-    const p = products.find((x) => x.id === id);
-    if (p && !promoPrice) setPromoPrice(String(p.prices?.small || ''));
-  };
-
-  const save = async () => {
-    if (!selectedProductId || !db) return;
-    const product = products.find((p) => p.id === selectedProductId);
-    if (!product) return;
-    const promoPriceNum = parseFloat(promoPrice.replace(',', '.'));
-    if (!promoPriceNum || promoPriceNum <= 0) {
-      toast({ title: 'Informe o preço da promoção', variant: 'destructive' });
-      return;
-    }
-    setSaving(true);
+  const activateNext = async (next: ScheduledNextPromo) => {
+    if (!db) return;
     try {
       await ensureAdminAuth();
-      const promo: ActivePromo = {
-        type: selectedType,
-        productId: product.id,
-        productName: product.name,
-        productImage: product.thumbnail || product.image || '',
-        originalPrice: product.prices?.small || 0,
-        promoPrice: promoPriceNum,
-        limitPerPerson: parseInt(limitPerPerson) || 1,
-      };
-      await setDoc(doc(db, 'siteContent', 'homePromotion'), promo);
-      setActive(promo);
-      toast({ title: 'Promoção ativada!', description: `${product.name} — R$ ${promoPriceNum.toFixed(2)}` });
-    } catch (e: any) {
-      toast({ title: 'Erro ao salvar', description: e?.message, variant: 'destructive' });
-    } finally {
-      setSaving(false);
-    }
+      const expiresAt = next.durationDays ? Date.now() + next.durationDays * 86400000 : null;
+      const newActive: ActivePromo = { ...next, expiresAt, nextPromo: null };
+      await setDoc(doc(db, 'siteContent', 'homePromotion'), newActive);
+      setActive(newActive);
+    } catch { /* silencia */ }
   };
 
-  const remove = async () => {
+  const removePromo = async (silent = false) => {
     if (!db) return;
     setSaving(true);
     try {
       await ensureAdminAuth();
       await deleteDoc(doc(db, 'siteContent', 'homePromotion'));
       setActive(null);
-      toast({ title: 'Promoção removida da página inicial.' });
+      if (!silent) toast({ title: 'Promoção removida.' });
     } catch (e: any) {
-      toast({ title: 'Erro ao remover', description: e?.message, variant: 'destructive' });
-    } finally {
-      setSaving(false);
+      if (!silent) toast({ title: 'Erro', description: e?.message, variant: 'destructive' });
+    } finally { setSaving(false); }
+  };
+
+  const save = async () => {
+    if (!form.productId || !db) return;
+    if (!form.promoPriceYen || form.promoPriceYen <= 0) {
+      toast({ title: 'Informe o preço da promoção em ¥', variant: 'destructive' }); return;
     }
+    setSaving(true);
+    try {
+      await ensureAdminAuth();
+      const expiresAt = form.durationDays ? Date.now() + form.durationDays * 86400000 : null;
+      const nextPromo: ScheduledNextPromo | null = (showNext && nextForm.productId)
+        ? { type: nextForm.type ?? 'abertura', productId: nextForm.productId!, productName: nextForm.productName!, productImage: nextForm.productImage ?? '', originalPriceYen: nextForm.originalPriceYen ?? 0, promoPriceYen: nextForm.promoPriceYen ?? 0, discountPct: nextForm.discountPct ?? 0, limitPerPerson: nextForm.limitPerPerson ?? 1, durationDays: nextForm.durationDays ?? null }
+        : null;
+      const promo: ActivePromo = {
+        type: form.type!, productId: form.productId!, productName: form.productName!, productImage: form.productImage ?? '',
+        originalPriceYen: form.originalPriceYen ?? 0, promoPriceYen: form.promoPriceYen!, discountPct: form.discountPct ?? 0,
+        limitPerPerson: form.limitPerPerson ?? 1, expiresAt, nextPromo,
+      };
+      await setDoc(doc(db, 'siteContent', 'homePromotion'), promo);
+      setActive(promo);
+      setForm(emptyForm());
+      setNextForm(emptyForm());
+      setShowNext(false);
+      toast({ title: 'Promoção ativada!', description: `${form.productName} — ¥${form.promoPriceYen}` });
+    } catch (e: any) {
+      toast({ title: 'Erro', description: e?.message, variant: 'destructive' });
+    } finally { setSaving(false); }
   };
 
   if (loading) return <div className="p-6 text-muted-foreground animate-pulse">Carregando...</div>;
@@ -112,140 +274,67 @@ const PromotionManager: React.FC = () => {
   return (
     <div className="max-w-2xl mx-auto p-6 space-y-8">
       <div>
-        <h2 className="text-xl font-bold flex items-center gap-2">
-          <Sparkles className="w-5 h-5 text-primary" /> Promoção na Página Inicial
-        </h2>
-        <p className="text-sm text-muted-foreground mt-1">
-          Banner no Hero → página dedicada com preço especial. O produto continua no catálogo com preço original.
-        </p>
+        <h2 className="text-xl font-bold flex items-center gap-2"><Sparkles className="w-5 h-5 text-primary" /> Promoção na Página Inicial</h2>
+        <p className="text-sm text-muted-foreground mt-1">Preços em ¥ — convertidos automaticamente para R$/€ conforme o país do cliente.</p>
       </div>
 
       {/* Promoção ativa */}
       {active ? (
         <div className="rounded-xl border border-green-200 bg-green-50 dark:bg-green-950/30 p-4 space-y-3">
-          <div className="flex items-center gap-4">
-            {active.productImage && (
-              <img src={active.productImage} alt={active.productName} className="w-14 h-14 rounded-lg object-cover border border-border shrink-0" />
-            )}
+          <div className="flex items-center gap-3">
+            {active.productImage && <img src={active.productImage} alt="" className="w-14 h-14 rounded-lg object-cover border border-border shrink-0" />}
             <div className="flex-1 min-w-0">
-              <div className="text-xs font-bold text-green-600 uppercase tracking-wide mb-0.5">
-                {PROMO_TYPES.find(t => t.value === active.type)?.label ?? active.type}
+              <div className="text-xs font-bold text-green-600 uppercase">{PROMO_TYPES.find(t => t.value === active.type)?.label}</div>
+              <div className="font-semibold truncate">{active.productName}</div>
+              <div className="flex items-center gap-3 text-sm mt-0.5">
+                <span className="line-through text-muted-foreground">¥{active.originalPriceYen} · R${convertYen(active.originalPriceYen, 'BRL').toFixed(2)}</span>
+                <span className="font-bold text-green-700">¥{active.promoPriceYen} · R${convertYen(active.promoPriceYen, 'BRL').toFixed(2)}</span>
+                {active.discountPct > 0 && <span className="bg-red-100 text-red-700 text-xs font-bold px-1.5 py-0.5 rounded-full">-{active.discountPct}%</span>}
               </div>
-              <div className="font-semibold text-foreground truncate">{active.productName}</div>
-              <div className="flex items-center gap-3 mt-1 text-sm">
-                <span className="text-muted-foreground line-through">R$ {active.originalPrice?.toFixed(2)}</span>
-                <span className="font-bold text-green-700">R$ {active.promoPrice?.toFixed(2)}</span>
-                <span className="text-xs text-muted-foreground">· máx. {active.limitPerPerson}x/pessoa</span>
-              </div>
+              <div className="text-xs text-muted-foreground mt-0.5">Limite: {active.limitPerPerson}x/pessoa</div>
             </div>
-            <Button variant="destructive" size="sm" onClick={remove} disabled={saving} className="shrink-0 gap-1">
-              <Trash2 className="w-4 h-4" /> Remover
-            </Button>
+            <Button variant="destructive" size="sm" onClick={() => removePromo()} disabled={saving} className="shrink-0"><Trash2 className="w-4 h-4" /></Button>
           </div>
-          <a href="/promocao" target="_blank" rel="noopener noreferrer" className="text-xs text-primary underline">
-            Ver página da promoção →
-          </a>
+          {active.expiresAt && (
+            <div className={`flex items-center gap-2 text-sm font-medium ${timeLeft === 'Encerrada' ? 'text-red-600' : 'text-orange-600'}`}>
+              <Clock className="w-4 h-4 shrink-0" />
+              {timeLeft === 'Encerrada' ? 'Promoção encerrada' : `Encerra em: ${timeLeft}`}
+              <span className="text-xs text-muted-foreground font-normal">({new Date(active.expiresAt).toLocaleDateString('pt-BR')})</span>
+            </div>
+          )}
+          {active.nextPromo && (
+            <div className="text-xs text-blue-600 bg-blue-50 dark:bg-blue-950/30 rounded-lg p-2 flex items-center gap-2">
+              <CalendarClock className="w-3.5 h-3.5 shrink-0" />
+              Próxima: {PROMO_TYPES.find(t => t.value === active.nextPromo!.type)?.label} — {active.nextPromo.productName} (¥{active.nextPromo.promoPriceYen})
+            </div>
+          )}
+          <a href="/promocao" target="_blank" rel="noopener noreferrer" className="text-xs text-primary underline">Ver página da promoção →</a>
         </div>
       ) : (
-        <div className="rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground text-center">
-          Nenhuma promoção ativa na página inicial.
-        </div>
+        <div className="rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground text-center">Nenhuma promoção ativa.</div>
       )}
 
-      <div className="border border-border rounded-xl p-5 space-y-5">
-        <h3 className="font-semibold text-foreground flex items-center gap-2"><Tag className="w-4 h-4" /> Nova promoção</h3>
+      {/* Formulário nova promoção */}
+      <div className="border border-border rounded-xl p-5 space-y-6">
+        <h3 className="font-semibold flex items-center gap-2"><Tag className="w-4 h-4" /> Nova promoção</h3>
+        <PromoForm label="Promoção atual" products={products} value={form} onChange={setForm} showDuration />
 
-        {/* Tipo */}
-        <div className="space-y-1.5">
-          <label className="text-sm font-medium text-foreground">Tipo de promoção</label>
-          <select
-            value={selectedType}
-            onChange={(e) => setSelectedType(e.target.value)}
-            className="w-full border border-border rounded-lg px-3 py-2 bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-          >
-            {PROMO_TYPES.map((t) => (
-              <option key={t.value} value={t.value}>{t.label}</option>
-            ))}
-          </select>
+        {/* Próxima promoção (pré-programada) */}
+        <div className="border-t border-border pt-4">
+          <button onClick={() => setShowNext(s => !s)} className="flex items-center gap-2 text-sm font-medium text-primary hover:text-primary/80">
+            <CalendarClock className="w-4 h-4" />
+            {showNext ? 'Remover próxima promoção' : 'Pré-programar próxima promoção'}
+            {showNext ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+          </button>
+          {showNext && (
+            <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-950/20 rounded-xl border border-blue-200 space-y-4">
+              <p className="text-xs text-blue-600 font-medium">Ativa automaticamente quando a promoção atual expirar.</p>
+              <PromoForm label="Próxima promoção" products={products} value={nextForm} onChange={setNextForm} showDuration />
+            </div>
+          )}
         </div>
 
-        {/* Busca de produto */}
-        <div className="space-y-1.5">
-          <label className="text-sm font-medium text-foreground">Produto em promoção</label>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <input
-              type="text"
-              placeholder="Buscar produto..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-            />
-          </div>
-          <div className="border border-border rounded-lg overflow-hidden max-h-48 overflow-y-auto">
-            {filtered.length === 0 ? (
-              <div className="p-4 text-sm text-muted-foreground text-center">Nenhum produto encontrado.</div>
-            ) : (
-              <div className="divide-y divide-border">
-                {filtered.map((p) => (
-                  <button
-                    key={p.id}
-                    onClick={() => selectProduct(p.id)}
-                    className={`w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-secondary transition-colors ${selectedProductId === p.id ? 'bg-primary/10' : ''}`}
-                  >
-                    {(p.thumbnail || p.image) && (
-                      <img src={p.thumbnail || p.image} alt={p.name} className="w-9 h-9 rounded-lg object-cover shrink-0 border border-border" />
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm truncate">{p.name}</div>
-                      <div className="text-xs text-muted-foreground">R$ {(p.prices?.small || 0).toFixed(2)}</div>
-                    </div>
-                    {selectedProductId === p.id && <span className="text-xs text-primary font-semibold shrink-0">✓</span>}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Preço e limite */}
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium text-foreground flex items-center gap-1.5">
-              <DollarSign className="w-3.5 h-3.5" /> Preço da promoção (R$)
-            </label>
-            <input
-              type="number"
-              min="0"
-              step="0.01"
-              placeholder={selectedProduct ? String(selectedProduct.prices?.small || '') : '0.00'}
-              value={promoPrice}
-              onChange={(e) => setPromoPrice(e.target.value)}
-              className="w-full border border-border rounded-lg px-3 py-2 bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-            />
-            {selectedProduct && promoPrice && (
-              <div className="text-xs text-green-600 font-medium">
-                {Math.round((1 - parseFloat(promoPrice) / (selectedProduct.prices?.small || 1)) * 100)}% de desconto
-              </div>
-            )}
-          </div>
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium text-foreground flex items-center gap-1.5">
-              <Users className="w-3.5 h-3.5" /> Limite por pessoa
-            </label>
-            <input
-              type="number"
-              min="1"
-              max="99"
-              value={limitPerPerson}
-              onChange={(e) => setLimitPerPerson(e.target.value)}
-              className="w-full border border-border rounded-lg px-3 py-2 bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-            />
-            <div className="text-xs text-muted-foreground">unidades máx. por compra</div>
-          </div>
-        </div>
-
-        <Button onClick={save} disabled={!selectedProductId || !promoPrice || saving} className="w-full gap-2">
+        <Button onClick={save} disabled={!form.productId || !form.promoPriceYen || saving} className="w-full gap-2">
           <Save className="w-4 h-4" />
           {saving ? 'Salvando...' : 'Ativar promoção na página inicial'}
         </Button>

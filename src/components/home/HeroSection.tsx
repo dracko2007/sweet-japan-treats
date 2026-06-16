@@ -98,22 +98,19 @@ const HeroSection: React.FC = () => {
 
           {/* Right Column: Visual Banner */}
           <div className="lg:col-span-5 relative animate-fade-in">
-            <div className="relative aspect-[4/3] rounded-3xl overflow-hidden shadow-elevated border-4 border-white bg-gray-100">
+            <Link to={promo ? '/promocao' : '#'} className={`relative aspect-[4/3] rounded-3xl overflow-hidden shadow-elevated border-4 border-white bg-gray-100 block ${promo ? 'cursor-pointer' : 'cursor-default'}`}>
               {promo?.productImage ? (
-                <img
-                  src={promo.productImage}
-                  alt={promo.productName}
-                  className="w-full h-full object-cover"
-                />
+                <img src={promo.productImage} alt={promo.productName} className="w-full h-full object-cover hover:scale-105 transition-transform duration-500" />
               ) : (
-                <img
-                  src="https://images.unsplash.com/photo-1540959733332-eab4deceeaf7?q=80&w=800&auto=format&fit=crop"
-                  alt="Japanese Shopping District"
-                  className="w-full h-full object-cover"
-                />
+                <img src="https://images.unsplash.com/photo-1540959733332-eab4deceeaf7?q=80&w=800&auto=format&fit=crop" alt="Japanese Shopping District" className="w-full h-full object-cover" />
               )}
               <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent pointer-events-none" />
-            </div>
+              {promo && (
+                <div className="absolute inset-0 flex items-end justify-center pb-5 opacity-0 hover:opacity-100 transition-opacity">
+                  <span className="bg-white/90 text-gray-900 text-xs font-bold px-4 py-2 rounded-full shadow">Ver promoção →</span>
+                </div>
+              )}
+            </Link>
 
             {/* Trust badge 1: Remessa Conforme */}
             <div className="absolute -top-4 -left-4 bg-white rounded-2xl shadow-card p-3 border border-gray-100 animate-float">
