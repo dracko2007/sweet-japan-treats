@@ -7,11 +7,11 @@ import { useCart } from '@/context/CartContext';
 import { useProducts } from '@/context/ProductsContext';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/config/firebase';
-import { doc, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { useLanguage } from '@/context/LanguageContext';
 import { getCurrencyByCountry, formatPrice } from '@/utils/currency';
 import { convertYen } from '@/services/fxService';
-import { ActivePromo, ScheduledNextPromo, PROMO_TYPES } from '@/components/admin/PromotionManager';
+import { ActivePromo, ScheduledNextPromo, PROMO_TYPES } from '@/types/promotion';
 
 const BOUGHT_KEY = (id: string) => `promo_bought_${id}`;
 
