@@ -21,14 +21,14 @@ const ProductsContext = createContext<ProductsContextValue>({
 });
 
 export const ProductsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Evita piscar o catalogo antigo local enquanto o Firestore carrega.
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // refresh() sempre vai ao Firestore (ignora cache) — usado por botões manuais e após salvar
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      const merged = await productService.getMerged();
+      const merged = await productService.getMerged(true);
       setProducts(merged);
     } catch (e) {
       devWarn('ProductsContext refresh falhou:', e);
@@ -38,9 +38,29 @@ export const ProductsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
   }, []);
 
+  // Carregamento inicial: tenta cache (instantâneo); se vazio ou expirado vai ao Firestore
   useEffect(() => {
-    refresh();
-  }, [refresh]);
+    let cancelled = false;
+    const load = async () => {
+      setLoading(true);
+      try {
+        const merged = await productService.getMerged(false); // usa cache se disponível
+        if (!cancelled) setProducts(merged);
+        // Se cache retornou 0 produtos, força fetch no Firestore
+        if (!cancelled && merged.length === 0) {
+          const fresh = await productService.getMerged(true);
+          if (!cancelled) setProducts(fresh);
+        }
+      } catch (e) {
+        devWarn('ProductsContext load falhou:', e);
+        if (!cancelled) setProducts([]);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    load();
+    return () => { cancelled = true; };
+  }, []);
 
   return (
     <ProductsContext.Provider value={{ products, loading, refresh }}>
