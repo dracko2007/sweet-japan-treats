@@ -28,7 +28,7 @@ const devError = isDev ? console.error.bind(console) : () => {};
 const COL = 'products';
 
 // ─── Cache localStorage ────────────────────────────────────────────────────
-const CACHE_KEY = 'jp_products_v2';
+const CACHE_KEY = 'jp_products_v3'; // v3: Firestore-only, sem merge com defaultProducts
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutos
 
 interface ProductCache { products: Product[]; ts: number; }
@@ -99,8 +99,10 @@ export const productService = {
     }
   },
 
-  /** Lista final: defaults + criados no admin, com edições aplicadas e removidos escondidos.
-   *  Usa cache de 5 min no localStorage — evita re-fetch a cada navegação. */
+  /** Lista final vinda do Firestore (fonte de verdade única).
+   *  Usa cache de 5 min no localStorage — evita re-fetch a cada navegação.
+   *  defaultProducts só são usados como fallback se o Firestore estiver inacessível
+   *  e não houver nenhum dado ainda. */
   async getMerged(forceRefresh = false): Promise<Product[]> {
     if (!forceRefresh) {
       const cached = getCache();
@@ -108,19 +110,19 @@ export const productService = {
     }
 
     const { items, deleted } = await this.getOverrides();
-    const hasFirestoreCatalog = items.length > 0 || deleted.length > 0;
-    if (!hasFirestoreCatalog) {
-      setCache(defaultProducts);
-      return defaultProducts;
+
+    // Firestore é a fonte de verdade — não mistura com defaultProducts
+    // para evitar flash de imagens antigas hardcoded no código.
+    if (items.length > 0 || deleted.length > 0) {
+      // Firestore tem dados: usa SOMENTE o que está lá
+      const result = items.filter((p) => !deleted.includes(p.id));
+      setCache(result);
+      return result;
     }
 
-    const map = new Map<string, Product>();
-    for (const p of defaultProducts) map.set(p.id, p);
-    for (const p of items) map.set(p.id, p);
-    for (const id of deleted) map.delete(id);
-    const result = Array.from(map.values());
-    setCache(result);
-    return result;
+    // Firestore ainda vazio (loja nova / sem produtos cadastrados): mostra defaults
+    setCache(defaultProducts);
+    return defaultProducts;
   },
 
   /** Cria ou atualiza um produto. Invalida o cache local automaticamente. */
