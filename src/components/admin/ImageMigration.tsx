@@ -38,7 +38,7 @@ function needsMigration(p: Product): boolean {
 
 async function uploadImage(dataUrl: string, folder: string): Promise<string> {
   // Comprime antes de enviar (5MB base64 → ~150KB WebP)
-  const compressed = await compressToWebp(dataUrl, 800, 0.75);
+  const compressed = await compressToWebp(dataUrl, 1200, 0.88);
   return cloudinaryService.uploadDataUrl(compressed || dataUrl, folder);
 }
 
@@ -59,7 +59,7 @@ async function migrateProduct(p: Product): Promise<Product> {
   if (!thumbUrl || thumbUrl.startsWith('data:')) {
     const rawCover = rawGallery[0] || '';
     if (rawCover.startsWith('data:')) {
-      const thumbCompressed = await compressToWebp(rawCover, 300, 0.65);
+      const thumbCompressed = await compressToWebp(rawCover, 400, 0.78);
       thumbUrl = await cloudinaryService.uploadDataUrl(thumbCompressed || rawCover, folder);
     } else {
       thumbUrl = coverUrl;

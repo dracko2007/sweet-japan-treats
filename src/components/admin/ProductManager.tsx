@@ -357,7 +357,7 @@ const ProductManager: React.FC = () => {
         if (cloudinaryService.isCloudinaryUrl(imgStr)) return imgStr;
         let dataUrl = imgStr;
         if (cloudinaryService.isExternalUrl(imgStr)) {
-          dataUrl = await urlToCompressedDataURL(imgStr, 800, 0.72);
+          dataUrl = await urlToCompressedDataURL(imgStr, 1200, 0.88);
         }
         return cloudinaryService.uploadDataUrl(dataUrl, folder);
       };
@@ -372,8 +372,8 @@ const ProductManager: React.FC = () => {
       if (needNewThumb) {
         const thumbData = await urlToCompressedDataURL(
           cloudinaryService.isDataUrl(rawCover) ? rawCover : coverUrl,
-          300,
-          0.60
+          400,
+          0.78
         );
         thumbnailUrl = await cloudinaryService.uploadDataUrl(thumbData, folder);
       }
