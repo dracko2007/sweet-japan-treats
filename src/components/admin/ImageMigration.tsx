@@ -49,27 +49,35 @@ function withTimeout<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
 async function testStorageAccess(): Promise<{ ok: boolean; error?: string }> {
   try {
     if (!storage) return { ok: false, error: 'Firebase Storage não inicializado.' };
-    await ensureAdminAuth();
+
+    // 1. Verifica / estabelece auth Firebase
+    await withTimeout(ensureAdminAuth(), 8000, undefined);
+    const { auth } = await import('@/config/firebase');
+    const authUser = auth?.currentUser?.email ?? null;
+    if (!authUser) {
+      return { ok: false, error: `Autenticação Firebase não estabelecida (currentUser = null). Verifique se VITE_ADMIN_PASSWORD está configurada no Vercel e faça redeploy.` };
+    }
+
+    // 2. Testa upload de 1×1 pixel com timeout de 15s
     const blob = await fetch(TEST_PIXEL).then((r) => r.blob());
     const fileRef = ref(storage, 'products/__test__/ping.png');
-    // Timeout de 10s — se travar, avisa em vez de ficar preso
     const result = await withTimeout(
       uploadBytes(fileRef, blob).then(() => ({ ok: true as const })),
-      10000,
+      15000,
       { ok: false as const, timedOut: true }
     );
     if ('timedOut' in result && result.timedOut) {
-      return { ok: false, error: 'Timeout ao conectar ao Firebase Storage (>10s). Verifique sua conexão ou as regras do Storage.' };
+      return { ok: false, error: `Auth OK (${authUser}) mas upload travou >15s. Verifique as Rules do Firebase Storage — em Firebase Console → Storage → Rules, confirme que "allow write: if request.auth != null" foi publicado.` };
     }
     try { await deleteObject(fileRef); } catch {}
     return { ok: true };
   } catch (e: any) {
     const code = e?.code || '';
     const msg = code === 'storage/unauthorized'
-      ? 'Permissão negada — atualize as regras do Firebase Storage (veja abaixo).'
+      ? 'Permissão negada (storage/unauthorized) — as Rules ainda não foram salvas/publicadas no Firebase Console.'
       : code === 'storage/unknown'
-      ? 'Erro desconhecido do Storage. Verifique as regras e tente novamente.'
-      : (e?.message || String(e));
+      ? `Erro desconhecido do Storage (${e?.message}). Verifique as regras e conexão.`
+      : `${code ? `[${code}] ` : ''}${e?.message || String(e)}`;
     return { ok: false, error: msg };
   }
 }
