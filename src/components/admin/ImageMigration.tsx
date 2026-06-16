@@ -1,17 +1,12 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { CheckCircle, CloudUpload, AlertTriangle, RefreshCw, Image as ImageIcon, ShieldAlert } from 'lucide-react';
-import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+import { CheckCircle, CloudUpload, AlertTriangle, RefreshCw, Image as ImageIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useProducts } from '@/context/ProductsContext';
 import { productService } from '@/services/productService';
-import { storageService } from '@/services/storageService';
-import { storage } from '@/config/firebase';
-import { ensureAdminAuth } from '@/utils/adminAuth';
+import { cloudinaryService } from '@/services/cloudinaryService';
 import { Product } from '@/types';
 
-const CONCURRENCY = 5;
-
-const TEST_PIXEL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+const CONCURRENCY = 3;
 
 function compressToWebp(src: string, maxSize: number, quality: number): Promise<string> {
   return new Promise((resolve) => {
@@ -36,93 +31,38 @@ function compressToWebp(src: string, maxSize: number, quality: number): Promise<
   });
 }
 
-async function dataUrlToBlob(dataUrl: string): Promise<Blob> {
-  const res = await fetch(dataUrl);
-  return res.blob();
-}
-
-// Timeout wrapper para qualquer Promise
-function withTimeout<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
-  return Promise.race([p, new Promise<T>((res) => setTimeout(() => res(fallback), ms))]);
-}
-
-async function testStorageAccess(): Promise<{ ok: boolean; error?: string }> {
-  try {
-    if (!storage) return { ok: false, error: 'Firebase Storage não inicializado.' };
-
-    // 1. Verifica / estabelece auth Firebase
-    await withTimeout(ensureAdminAuth(), 8000, undefined);
-    const { auth } = await import('@/config/firebase');
-    const authUser = auth?.currentUser?.email ?? null;
-    if (!authUser) {
-      return { ok: false, error: `Autenticação Firebase não estabelecida (currentUser = null). Verifique se VITE_ADMIN_PASSWORD está configurada no Vercel e faça redeploy.` };
-    }
-
-    // 2. Testa upload de 1×1 pixel com timeout de 15s
-    const blob = await fetch(TEST_PIXEL).then((r) => r.blob());
-    const fileRef = ref(storage, 'products/__test__/ping.png');
-    const result = await withTimeout(
-      uploadBytes(fileRef, blob).then(() => ({ ok: true as const })),
-      15000,
-      { ok: false as const, timedOut: true }
-    );
-    if ('timedOut' in result && result.timedOut) {
-      return { ok: false, error: `Auth OK (${authUser}) mas upload travou >15s. Verifique as Rules do Firebase Storage — em Firebase Console → Storage → Rules, confirme que "allow write: if request.auth != null" foi publicado.` };
-    }
-    try { await deleteObject(fileRef); } catch {}
-    return { ok: true };
-  } catch (e: any) {
-    const code = e?.code || '';
-    const msg = code === 'storage/unauthorized'
-      ? 'Permissão negada (storage/unauthorized) — as Rules ainda não foram salvas/publicadas no Firebase Console.'
-      : code === 'storage/unknown'
-      ? `Erro desconhecido do Storage (${e?.message}). Verifique as regras e conexão.`
-      : `${code ? `[${code}] ` : ''}${e?.message || String(e)}`;
-    return { ok: false, error: msg };
-  }
-}
-
 function needsMigration(p: Product): boolean {
   const isBase64 = (s?: string) => typeof s === 'string' && s.startsWith('data:');
   return isBase64(p.image) || isBase64(p.thumbnail) || (p.gallery?.some(isBase64) ?? false);
 }
 
-async function uploadCompressed(productId: string, imgStr: string, slot: string): Promise<string> {
-  if (!imgStr) return '';
-  if (storageService.isStorageUrl(imgStr)) return imgStr;
-  if (!storage) throw new Error('Storage não inicializado');
-
-  const compressed = await compressToWebp(imgStr, 800, 0.72);
-  if (!compressed) return imgStr; // CORS/timeout — mantém original
-
-  await ensureAdminAuth();
-  const blob = await dataUrlToBlob(compressed);
-  const ts = Date.now().toString(36);
-  const ext = blob.type === 'image/webp' ? 'webp' : 'jpg';
-  const fileRef = ref(storage, `products/${productId}/${slot}_${ts}.${ext}`);
-  const snap = await uploadBytes(fileRef, blob, { contentType: blob.type, cacheControl: 'public,max-age=31536000,immutable' });
-  return getDownloadURL(snap.ref);
+async function uploadImage(dataUrl: string, folder: string): Promise<string> {
+  // Comprime antes de enviar (5MB base64 → ~150KB WebP)
+  const compressed = await compressToWebp(dataUrl, 800, 0.75);
+  return cloudinaryService.uploadDataUrl(compressed || dataUrl, folder);
 }
 
 async function migrateProduct(p: Product): Promise<Product> {
-  const rawGallery = (p.gallery && p.gallery.length > 0) ? p.gallery : [p.image].filter(Boolean);
+  const folder = `japanexpress/products/${p.id}`;
+  const rawGallery = (p.gallery && p.gallery.length > 0) ? p.gallery : [p.image].filter(Boolean) as string[];
 
+  // Upload da galeria em paralelo
   const galleryUrls = await Promise.all(
-    rawGallery.map((img, i) => uploadCompressed(p.id, img, i === 0 ? 'cover' : `gallery_${i}`))
+    rawGallery.map((img) =>
+      img.startsWith('data:') ? uploadImage(img, folder) : Promise.resolve(img)
+    )
   );
   const coverUrl = galleryUrls[0] || p.image;
 
+  // Thumbnail: comprime mais (300px) e faz upload separado
   let thumbUrl = p.thumbnail || '';
-  if (!thumbUrl || storageService.isDataUrl(thumbUrl)) {
-    const coverRaw = rawGallery[0] || '';
-    const thumbCompressed = await compressToWebp(coverRaw || coverUrl, 300, 0.60);
-    if (thumbCompressed && storage) {
-      await ensureAdminAuth();
-      const blob = await dataUrlToBlob(thumbCompressed);
-      const ts = Date.now().toString(36);
-      const fileRef = ref(storage, `products/${p.id}/thumb_${ts}.webp`);
-      const snap = await uploadBytes(fileRef, blob, { contentType: 'image/webp', cacheControl: 'public,max-age=31536000,immutable' });
-      thumbUrl = await getDownloadURL(snap.ref);
+  if (!thumbUrl || thumbUrl.startsWith('data:')) {
+    const rawCover = rawGallery[0] || '';
+    if (rawCover.startsWith('data:')) {
+      const thumbCompressed = await compressToWebp(rawCover, 300, 0.65);
+      thumbUrl = await cloudinaryService.uploadDataUrl(thumbCompressed || rawCover, folder);
+    } else {
+      thumbUrl = coverUrl;
     }
   }
 
@@ -142,13 +82,19 @@ interface MigState { status: 'idle' | 'running' | 'done' | 'error'; total: numbe
 const ImageMigration: React.FC = () => {
   const { products, refresh } = useProducts();
   const [state, setState] = useState<MigState>({ status: 'idle', total: 0, done: 0, errors: [] });
-  const [storageTest, setStorageTest] = useState<{ checked: boolean; ok: boolean; error?: string }>({ checked: false, ok: false });
+  const [tested, setTested] = useState<'checking' | 'ok' | 'fail'>('checking');
+  const [testError, setTestError] = useState('');
 
   useEffect(() => {
-    testStorageAccess().then((r) => setStorageTest({ checked: true, ...r }));
+    // Testa conexão com Cloudinary enviando pixel mínimo
+    const TEST = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+    cloudinaryService.uploadDataUrl(TEST, 'japanexpress/__test__')
+      .then(() => setTested('ok'))
+      .catch((e) => { setTested('fail'); setTestError(e?.message || String(e)); });
   }, []);
 
   const toMigrate = products.filter(needsMigration);
+  const allMigrated = toMigrate.length === 0;
 
   const runMigration = useCallback(async () => {
     if (toMigrate.length === 0) return;
@@ -170,17 +116,16 @@ const ImageMigration: React.FC = () => {
   }, [toMigrate, refresh]);
 
   const pct = state.total > 0 ? Math.round((state.done / state.total) * 100) : 0;
-  const allMigrated = toMigrate.length === 0;
 
   return (
     <div className="max-w-2xl mx-auto p-6 space-y-6">
       <div>
         <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
           <CloudUpload className="w-5 h-5 text-primary" />
-          Migração de Imagens → Firebase Storage
+          Migração de Imagens → Cloudinary CDN
         </h2>
         <p className="text-sm text-muted-foreground mt-1">
-          Comprime imagens (5MB → ~150KB WebP) e envia ao CDN Google. {CONCURRENCY} produtos em paralelo.
+          Comprime imagens (5MB → ~150KB WebP) e envia ao CDN Cloudinary. {CONCURRENCY} produtos em paralelo.
         </p>
       </div>
 
@@ -195,10 +140,28 @@ const ImageMigration: React.FC = () => {
         </div>
         <div className="rounded-xl border border-green-200 bg-green-50 dark:bg-green-950/30 p-4">
           <div className="text-2xl font-bold text-green-600">{products.length - toMigrate.length}</div>
-          <div className="text-xs text-muted-foreground mt-1">Já no Storage</div>
+          <div className="text-xs text-muted-foreground mt-1">Já no CDN</div>
         </div>
       </div>
 
+      {/* Status do teste de conexão */}
+      {tested === 'checking' && (
+        <div className="text-sm text-muted-foreground animate-pulse">Verificando conexão com Cloudinary...</div>
+      )}
+      {tested === 'ok' && state.status === 'idle' && !allMigrated && (
+        <div className="flex items-center gap-2 text-sm text-green-600">
+          <CheckCircle className="w-4 h-4" /> Cloudinary acessível — pronto para migrar.
+        </div>
+      )}
+      {tested === 'fail' && (
+        <div className="p-4 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 space-y-2">
+          <div className="font-semibold text-red-700">Erro ao conectar no Cloudinary</div>
+          <p className="text-sm text-red-600">{testError}</p>
+          <p className="text-xs text-red-500">Verifique se o upload preset "japanexpress" está como Unsigned no Cloudinary.</p>
+        </div>
+      )}
+
+      {/* Progresso */}
       {state.status === 'running' && (
         <div className="space-y-2">
           <div className="flex justify-between text-sm">
@@ -217,7 +180,7 @@ const ImageMigration: React.FC = () => {
           <CheckCircle className="w-5 h-5 text-green-600 shrink-0" />
           <div>
             <div className="font-semibold text-green-700 dark:text-green-400">Migração concluída!</div>
-            <div className="text-sm text-green-600/80">{state.total} produto(s) agora no CDN Google.</div>
+            <div className="text-sm text-green-600/80">{state.total} produto(s) agora no CDN Cloudinary.</div>
           </div>
         </div>
       )}
@@ -236,11 +199,12 @@ const ImageMigration: React.FC = () => {
           <CheckCircle className="w-5 h-5 text-green-600 shrink-0" />
           <div>
             <div className="font-semibold text-green-700 dark:text-green-400">Tudo migrado!</div>
-            <div className="text-sm text-green-600/80">Todas as imagens estão no Firebase Storage (CDN Google).</div>
+            <div className="text-sm text-green-600/80">Todas as imagens estão no CDN Cloudinary.</div>
           </div>
         </div>
       )}
 
+      {/* Lista de produtos pendentes */}
       {toMigrate.length > 0 && state.status === 'idle' && (
         <div className="border border-border rounded-xl overflow-hidden">
           <div className="px-4 py-2 bg-secondary/50 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
@@ -265,34 +229,8 @@ const ImageMigration: React.FC = () => {
         </div>
       )}
 
-      {/* Diagnóstico Storage */}
-      {storageTest.checked && !storageTest.ok && (
-        <div className="p-4 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 space-y-3">
-          <div className="flex items-start gap-2 font-semibold text-red-700"><ShieldAlert className="w-5 h-5 shrink-0 mt-0.5" /> Firebase Storage bloqueado</div>
-          <p className="text-sm text-red-600">{storageTest.error}</p>
-          <div className="text-xs text-red-500 space-y-0.5 bg-red-100 dark:bg-red-900/30 rounded-lg p-3 font-mono">
-            <p className="font-sans font-semibold text-red-700 mb-2">Firebase Console → Storage → Rules:</p>
-            <p>{"rules_version = '2';"}</p>
-            <p>{"service firebase.storage {"}</p>
-            <p>{"  match /b/{bucket}/o {"}</p>
-            <p>{"    match /products/{allPaths=**} {"}</p>
-            <p>{"      allow read: if true;"}</p>
-            <p>{"      allow write: if request.auth != null;"}</p>
-            <p>{"    }"}</p>
-            <p>{"  }"}</p>
-            <p>{"}"}</p>
-          </div>
-        </div>
-      )}
-      {storageTest.checked && storageTest.ok && state.status === 'idle' && !allMigrated && (
-        <div className="flex items-center gap-2 text-sm text-green-600">
-          <CheckCircle className="w-4 h-4" /> Storage acessível.
-        </div>
-      )}
-      {!storageTest.checked && <div className="text-sm text-muted-foreground animate-pulse">Verificando acesso ao Storage...</div>}
-
       <div className="flex gap-3">
-        {!allMigrated && state.status !== 'running' && storageTest.ok && (
+        {!allMigrated && state.status !== 'running' && tested === 'ok' && (
           <Button onClick={runMigration} className="gap-2">
             <CloudUpload className="w-4 h-4" />
             {state.status === 'error' ? `Tentar novamente (${toMigrate.length})` : `Migrar ${toMigrate.length} produto(s)`}

@@ -10,7 +10,7 @@ const VARIANT_PRESETS = ['Pequeno', 'Médio', 'Grande', 'Kit'];
 const MAX_PHOTOS = 9; // capa + até 8 fotos extras
 import { useProducts } from '@/context/ProductsContext';
 import { productService } from '@/services/productService';
-import { storageService } from '@/services/storageService';
+import { cloudinaryService } from '@/services/cloudinaryService';
 import { useToast } from '@/hooks/use-toast';
 import { useUser } from '@/context/UserContext';
 import { PACKAGE_SAFETY_MARGIN_CM, sanitizePackageDimensions } from '@/utils/shippingDimensions';
@@ -349,38 +349,38 @@ const ProductManager: React.FC = () => {
       const id = isNew ? slugify(editing.name) + '-' + Date.now().toString(36).slice(-4) : editing.id;
       const rawGallery = editing.gallery && editing.gallery.length > 0 ? editing.gallery : [editing.image].filter(Boolean);
 
-      // ── Upload de imagens para Firebase Storage ──────────────────────────
-      // Converte data URLs e URLs externas → Storage URL (CDN Google).
-      // URLs que já estão no Storage são reutilizadas sem re-upload.
-      const toStorageUrl = async (imgStr: string, slot: string): Promise<string> => {
+      // ── Upload de imagens para Cloudinary CDN ────────────────────────────
+      const folder = `japanexpress/products/${id}`;
+
+      const toCdnUrl = async (imgStr: string): Promise<string> => {
         if (!imgStr) return '';
-        if (storageService.isStorageUrl(imgStr)) return imgStr;
+        if (cloudinaryService.isCloudinaryUrl(imgStr)) return imgStr;
         let dataUrl = imgStr;
-        if (storageService.isExternalUrl(imgStr)) {
+        if (cloudinaryService.isExternalUrl(imgStr)) {
           dataUrl = await urlToCompressedDataURL(imgStr, 800, 0.72);
         }
-        return storageService.uploadImage(id, dataUrl, slot);
+        return cloudinaryService.uploadDataUrl(dataUrl, folder);
       };
 
       // Capa primeiro (precisamos do data URL ainda em memória para o thumb)
       const rawCover = rawGallery[0] || '';
-      const coverUrl = await toStorageUrl(rawCover, 'cover');
+      const coverUrl = await toCdnUrl(rawCover);
 
-      // Thumbnail 300px a partir do data URL original (antes de fazer upload da capa)
+      // Thumbnail 300px a partir do data URL original
       let thumbnailUrl = editing.thumbnail || '';
-      const needNewThumb = rawCover && !storageService.isStorageUrl(rawCover);
+      const needNewThumb = rawCover && !cloudinaryService.isCloudinaryUrl(rawCover);
       if (needNewThumb) {
         const thumbData = await urlToCompressedDataURL(
-          storageService.isDataUrl(rawCover) ? rawCover : coverUrl,
+          cloudinaryService.isDataUrl(rawCover) ? rawCover : coverUrl,
           300,
           0.60
         );
-        thumbnailUrl = await storageService.uploadImage(id, thumbData, 'thumb');
+        thumbnailUrl = await cloudinaryService.uploadDataUrl(thumbData, folder);
       }
 
       // Demais fotos da galeria
       const galleryUrls = await Promise.all(
-        rawGallery.map((img, i) => i === 0 ? Promise.resolve(coverUrl) : toStorageUrl(img, `gallery_${i}`))
+        rawGallery.map((img, i) => i === 0 ? Promise.resolve(coverUrl) : toCdnUrl(img))
       );
       // ─────────────────────────────────────────────────────────────────────
 
