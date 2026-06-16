@@ -1,5 +1,6 @@
 import { ref, uploadBytes, getDownloadURL, listAll, deleteObject } from 'firebase/storage';
 import { storage } from '@/config/firebase';
+import { ensureAdminAuth } from '@/utils/adminAuth';
 
 function dataUrlToBlob(dataUrl: string): Blob {
   const [header, base64] = dataUrl.split(',');
@@ -23,6 +24,7 @@ export const storageService = {
    */
   async uploadImage(productId: string, dataUrl: string, slot: string): Promise<string> {
     if (!storage) throw new Error('Firebase Storage não inicializado');
+    await ensureAdminAuth(); // Storage rules exigem auth
     const blob = dataUrlToBlob(dataUrl);
     const ext = blob.type === 'image/webp' ? 'webp' : 'jpg';
     // Sufixo de timestamp para invalidar cache do CDN ao atualizar a mesma foto
