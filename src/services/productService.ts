@@ -44,6 +44,11 @@ function getCache(): Product[] | null {
 }
 
 function setCache(products: Product[]): void {
+  // Não cacheia se houver imagens em base64 — estoura o limite de 5MB do localStorage
+  const hasBase64 = products.some(
+    (p) => p.image?.startsWith('data:') || p.thumbnail?.startsWith('data:') || p.gallery?.some((g) => g?.startsWith('data:'))
+  );
+  if (hasBase64) return;
   try {
     localStorage.setItem(CACHE_KEY, JSON.stringify({ products, ts: Date.now() } satisfies ProductCache));
   } catch { /* storage cheio — silencia */ }
