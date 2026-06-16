@@ -1,12 +1,32 @@
-import React, { useState, useCallback } from 'react';
-import { CheckCircle, CloudUpload, AlertTriangle, RefreshCw, Image as ImageIcon } from 'lucide-react';
+import React, { useState, useCallback, useEffect } from 'react';
+import { CheckCircle, CloudUpload, AlertTriangle, RefreshCw, Image as ImageIcon, ShieldAlert } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useProducts } from '@/context/ProductsContext';
 import { productService } from '@/services/productService';
 import { storageService } from '@/services/storageService';
 import { Product } from '@/types';
 
-const CONCURRENCY = 3; // produtos em paralelo
+const CONCURRENCY = 3;
+
+// Pixel 1x1 WebP mínimo para teste de upload
+const TEST_PIXEL = 'data:image/webp;base64,UklGRlYAAABXRUJQVlA4IEoAAADQAQCdASoBAAEAAkA4JZACdAEO/gHOAAD++P/////8AAA=';
+
+async function testStorageAccess(): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const url = await storageService.uploadImage('__test__', TEST_PIXEL, 'ping');
+    if (url) {
+      // Remove o arquivo de teste
+      try { const { ref, deleteObject } = await import('firebase/storage'); const { storage } = await import('@/config/firebase'); if (storage) await deleteObject(ref(storage, 'products/__test__/ping.webp')); } catch {}
+    }
+    return { ok: true };
+  } catch (e: any) {
+    const msg = e?.code === 'storage/unauthorized'
+      ? 'Permissão negada — atualize as regras do Firebase Storage para permitir escrita de admins autenticados.'
+      : e?.code === 'storage/object-not-found' ? 'ok' // deletado antes do check — tudo bem
+      : (e?.message || String(e));
+    return { ok: e?.code === 'storage/object-not-found', error: msg };
+  }
+}
 
 // Converte data URL para blob sem re-encodar (mais rápido)
 function dataUrlToBlob(dataUrl: string): Blob {
@@ -136,6 +156,14 @@ interface MigrationState {
 const ImageMigration: React.FC = () => {
   const { products, refresh } = useProducts();
   const [state, setState] = useState<MigrationState>({ status: 'idle', total: 0, done: 0, errors: [] });
+  const [storageTest, setStorageTest] = useState<{ checked: boolean; ok: boolean; error?: string }>({ checked: false, ok: false });
+
+  // Testa acesso ao Storage ao montar o componente
+  useEffect(() => {
+    testStorageAccess().then((result) => {
+      setStorageTest({ checked: true, ...result });
+    });
+  }, []);
 
   const toMigrate = products.filter(needsMigration);
 
@@ -265,8 +293,39 @@ const ImageMigration: React.FC = () => {
         </div>
       )}
 
+      {/* Diagnóstico do Storage */}
+      {storageTest.checked && !storageTest.ok && (
+        <div className="p-4 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 space-y-3">
+          <div className="flex items-start gap-2 font-semibold text-red-700 dark:text-red-400">
+            <ShieldAlert className="w-5 h-5 shrink-0 mt-0.5" />
+            Firebase Storage bloqueado
+          </div>
+          <p className="text-sm text-red-600">{storageTest.error}</p>
+          <div className="text-xs text-red-500 space-y-1 bg-red-100 dark:bg-red-900/30 rounded-lg p-3 font-mono">
+            <p className="font-sans font-semibold text-red-700 mb-2">Para corrigir — Firebase Console → Storage → Rules:</p>
+            <p>{'rules_version = \'2\';'}</p>
+            <p>{'service firebase.storage {'}</p>
+            <p>{'  match /b/{bucket}/o {'}</p>
+            <p>{'    match /products/{allPaths=**} {'}</p>
+            <p>{'      allow read: if true;'}</p>
+            <p>{'      allow write: if request.auth != null;'}</p>
+            <p>{'    }'}</p>
+            <p>{'  }'}</p>
+            <p>{'}'}</p>
+          </div>
+        </div>
+      )}
+      {storageTest.checked && storageTest.ok && (
+        <div className="flex items-center gap-2 text-sm text-green-600">
+          <CheckCircle className="w-4 h-4" /> Firebase Storage acessível — pode migrar.
+        </div>
+      )}
+      {!storageTest.checked && (
+        <div className="text-sm text-muted-foreground animate-pulse">Verificando acesso ao Firebase Storage...</div>
+      )}
+
       <div className="flex gap-3">
-        {!allMigrated && state.status !== 'running' && (
+        {!allMigrated && state.status !== 'running' && storageTest.ok && (
           <Button onClick={runMigration} className="gap-2">
             <CloudUpload className="w-4 h-4" />
             {state.status === 'error' ? 'Tentar erros novamente' : `Migrar ${toMigrate.length} produto(s)`}
