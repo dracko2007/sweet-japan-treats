@@ -153,7 +153,7 @@ const CheckingScreen: React.FC = () => (
 );
 
 const MaintenanceShell: React.FC = () => {
-  const { isEnabled, checking } = useMaintenanceMode();
+  const { isEnabled, loading } = useMaintenanceMode();
   const location = useLocation();
   const isOpenPath = OPEN_PATHS.some(
     p => location.pathname === p || location.pathname.startsWith(p + '/')
@@ -166,7 +166,7 @@ const MaintenanceShell: React.FC = () => {
   if (isEnabled) return <MaintenancePage />;
 
   // Primeira visita sem cache: mostra tela leve enquanto o fetch confirma (máx 1.5s)
-  if (checking) return <CheckingScreen />;
+  if (loading) return <CheckingScreen />;
 
   // Site normal
   return <FullApp />;
