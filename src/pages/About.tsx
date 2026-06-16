@@ -1,5 +1,5 @@
-import React from 'react';
-import { Heart, Star, Users, Award, MessageCircle } from 'lucide-react';
+import React, { useRef, useState } from 'react';
+import { Heart, Star, Users, Award, MessageCircle, Play, Pause, Volume2, VolumeX } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import { useLanguage } from '@/context/LanguageContext';
 import JapanExpressLogo from '@/components/JapanExpressLogo';
@@ -7,6 +7,21 @@ import JapanExpressLogo from '@/components/JapanExpressLogo';
 const About: React.FC = () => {
   const { t, selectedCountry } = useLanguage();
   const isJapan = selectedCountry === 'Japão';
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [playing, setPlaying] = useState(false);
+  const [muted, setMuted] = useState(false);
+
+  const togglePlay = () => {
+    if (!videoRef.current) return;
+    if (playing) { videoRef.current.pause(); setPlaying(false); }
+    else { videoRef.current.play(); setPlaying(true); }
+  };
+
+  const toggleMute = () => {
+    if (!videoRef.current) return;
+    videoRef.current.muted = !muted;
+    setMuted(!muted);
+  };
 
   const values = [
     { icon: Heart, titleKey: 'aboutPage.value1.title', descKey: 'aboutPage.value1.desc' },
@@ -43,11 +58,38 @@ const About: React.FC = () => {
             </div>
             
             <div className="relative">
-              <div className="aspect-square rounded-3xl bg-gradient-to-br from-caramel-light/40 to-primary/30 flex items-center justify-center shadow-elevated">
-                <div className="text-center">
-                  <JapanExpressLogo size={140} className="mx-auto mb-4 shadow-elevated" />
-                  <p className="font-display text-xl text-foreground">{t('aboutPage.family')}</p>
-                </div>
+              <div className="relative rounded-3xl overflow-hidden shadow-elevated bg-black aspect-video">
+                <video
+                  ref={videoRef}
+                  src="/video-quem-somos.mp4"
+                  className="w-full h-full object-cover"
+                  playsInline
+                  preload="metadata"
+                  onEnded={() => setPlaying(false)}
+                />
+                {/* Overlay play button quando pausado */}
+                {!playing && (
+                  <button
+                    onClick={togglePlay}
+                    className="absolute inset-0 flex items-center justify-center bg-black/30 hover:bg-black/40 transition-colors group"
+                    aria-label="Reproduzir vídeo"
+                  >
+                    <div className="w-20 h-20 rounded-full bg-white/90 flex items-center justify-center shadow-elevated group-hover:scale-110 transition-transform">
+                      <Play className="w-9 h-9 text-primary fill-primary ml-1" />
+                    </div>
+                  </button>
+                )}
+                {/* Controles quando tocando */}
+                {playing && (
+                  <div className="absolute bottom-0 left-0 right-0 p-4 flex items-center gap-3 bg-gradient-to-t from-black/60 to-transparent">
+                    <button onClick={togglePlay} className="text-white hover:text-primary transition-colors" aria-label="Pausar">
+                      <Pause className="w-6 h-6" />
+                    </button>
+                    <button onClick={toggleMute} className="text-white hover:text-primary transition-colors" aria-label="Mudo">
+                      {muted ? <VolumeX className="w-6 h-6" /> : <Volume2 className="w-6 h-6" />}
+                    </button>
+                  </div>
+                )}
               </div>
               <div className="absolute -bottom-6 -right-6 bg-card rounded-2xl shadow-card p-4">
                 <div className="flex items-center gap-3">
