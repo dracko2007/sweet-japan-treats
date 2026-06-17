@@ -113,12 +113,12 @@ const Promotion: React.FC = () => {
       id: promo.productId, name: promo.productName, image: promo.productImage,
       thumbnail: promo.productImage, gallery: [promo.productImage],
       category: 'especial', description: '',
-      prices: { small: originalPriceLocal },
+      prices: { small: promo.originalPriceYen ?? 0 },
     };
 
-    // Adiciona unidades com preço promo (até o limite)
+    // Adiciona unidades com preço promo (até o limite) — preço em ¥ para o carrinho converter corretamente
     if (promoQty > 0) {
-      const promoItem = { ...baseProduct, id: promo.productId + '_promo', name: promo.productName + ' ✨', prices: { small: promoPriceLocal, large: promoPriceLocal } };
+      const promoItem = { ...baseProduct, id: promo.productId + '_promo', name: promo.productName + ' ✨', prices: { small: promo.promoPriceYen ?? 0, large: promo.promoPriceYen ?? 0 } };
       addToCart(promoItem as any, 'small', promoQty);
       localStorage.setItem(boughtKey, String(alreadyBought + promoQty));
     }

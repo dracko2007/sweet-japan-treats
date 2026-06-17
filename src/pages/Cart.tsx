@@ -118,12 +118,23 @@ const Cart: React.FC = () => {
   // Calculations in correct currency
   const isEuro = ['Portugal', 'França', 'Itália', 'Espanha'].includes(selectedCountry);
   const currency = selectedCountry === 'Japão' ? 'JPY' : (isEuro ? 'EUR' : 'BRL');
-  
-  const baseTotalPrice = items.reduce(
-    (sum, item) => item.freeGift ? sum : sum + fxConvert(effectiveYen(item.product, item.size), currency) * item.quantity, 0
+
+  const isPromoItem = (item: (typeof items)[0]) => item.product.id.endsWith('_promo');
+
+  // Subtotal dos itens em promoção (cupom NÃO se aplica a eles)
+  const promoSubtotal = items.reduce(
+    (sum, item) => (!item.freeGift && isPromoItem(item)) ? sum + fxConvert(effectiveYen(item.product, item.size), currency) * item.quantity : sum, 0
+  );
+  // Subtotal dos itens regulares (base do cupom)
+  const regularSubtotal = items.reduce(
+    (sum, item) => (!item.freeGift && !isPromoItem(item)) ? sum + fxConvert(effectiveYen(item.product, item.size), currency) * item.quantity : sum, 0
   );
 
-  const discountAmount = activeCoupon ? computeDiscount(activeCoupon, baseTotalPrice) : 0;
+  const baseTotalPrice = promoSubtotal + regularSubtotal;
+  const hasPromoItems = promoSubtotal > 0;
+
+  // Cupom só entra nos itens sem desconto promocional
+  const discountAmount = activeCoupon ? computeDiscount(activeCoupon, regularSubtotal) : 0;
 
   // Resgate de pontos: 1 ponto = ¥1, limitado ao valor dos produtos (em ¥)
   const convertYen = (yen: number) => fxConvert(yen, currency);
@@ -381,23 +392,35 @@ const Cart: React.FC = () => {
                     </div>
 
                     {activeCoupon && (
-                      <div className="flex justify-between text-sm text-green-600 font-bold bg-green-50/50 p-2 rounded-lg border border-dashed border-green-200">
-                        <span className="flex items-center gap-1">
-                          <Tag className="w-3.5 h-3.5 shrink-0" /> Cupom ({activeCoupon.code})
-                        </span>
-                        <span className="flex items-center gap-1">
-                          {activeCoupon.discountType === 'percentage'
-                            ? `-${activeCoupon.discount}% `
-                            : ''}
-                          (-{formatPrice(discountAmount, currency)})
-                          <button
-                            onClick={handleRemoveCoupon}
-                            className="text-red-500 hover:text-red-700 ml-1 text-xs"
-                            title="Remover cupom"
-                          >
-                            ×
-                          </button>
-                        </span>
+                      <div className="space-y-1.5">
+                        <div className="flex justify-between text-sm text-green-600 font-bold bg-green-50/50 p-2 rounded-lg border border-dashed border-green-200">
+                          <span className="flex items-center gap-1">
+                            <Tag className="w-3.5 h-3.5 shrink-0" /> Cupom ({activeCoupon.code})
+                          </span>
+                          <span className="flex items-center gap-1">
+                            {activeCoupon.discountType === 'percentage'
+                              ? `-${activeCoupon.discount}% `
+                              : ''}
+                            (-{formatPrice(discountAmount, currency)})
+                            <button
+                              onClick={handleRemoveCoupon}
+                              className="text-red-500 hover:text-red-700 ml-1 text-xs"
+                              title="Remover cupom"
+                            >
+                              ×
+                            </button>
+                          </span>
+                        </div>
+                        {hasPromoItems && regularSubtotal === 0 && (
+                          <p className="text-[11px] text-orange-600 font-semibold bg-orange-50 border border-orange-200 rounded-lg px-2 py-1.5 leading-snug">
+                            ⚠️ Todos os itens já têm desconto promocional. O cupom não foi aplicado.
+                          </p>
+                        )}
+                        {hasPromoItems && regularSubtotal > 0 && (
+                          <p className="text-[11px] text-blue-600 font-medium bg-blue-50 border border-blue-200 rounded-lg px-2 py-1.5 leading-snug">
+                            ℹ️ Cupom aplicado apenas aos itens sem promoção ({formatPrice(regularSubtotal, currency)}). Itens com preço promocional não acumulam desconto.
+                          </p>
+                        )}
                       </div>
                     )}
 

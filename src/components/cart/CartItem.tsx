@@ -17,6 +17,7 @@ interface CartItemProps {
 const CartItemComponent: React.FC<CartItemProps> = ({ item }) => {
   const { updateQuantity, removeFromCart } = useCart();
   const { t, selectedCountry } = useLanguage();
+  const isPromo = item.product.id.endsWith('_promo');
   const basePrice = effectiveYen(item.product, item.size);
 
   // Compute translated values
@@ -86,17 +87,23 @@ const CartItemComponent: React.FC<CartItemProps> = ({ item }) => {
             <p className="text-sm text-muted-foreground">
               {productFlavor}
             </p>
-            <span className={`
-              inline-block mt-1 px-2 py-0.5 rounded text-xs font-medium
-              ${item.product.category === 'premium'
-                ? 'bg-gold/20 text-caramel-dark'
-                : 'bg-primary/10 text-primary'
-              }
-            `}>
-              {item.product.category === 'premium' ? 'Premium' :
-               item.product.category === 'artesanal' ? 'Artesanal' :
-               item.product.category.toUpperCase()}
-            </span>
+            {isPromo ? (
+              <span className="inline-block mt-1 px-2 py-0.5 rounded text-xs font-bold bg-green-100 text-green-700">
+                ✨ Preço Promocional
+              </span>
+            ) : (
+              <span className={`
+                inline-block mt-1 px-2 py-0.5 rounded text-xs font-medium
+                ${item.product.category === 'premium'
+                  ? 'bg-gold/20 text-caramel-dark'
+                  : 'bg-primary/10 text-primary'
+                }
+              `}>
+                {item.product.category === 'premium' ? 'Premium' :
+                 item.product.category === 'artesanal' ? 'Artesanal' :
+                 item.product.category.toUpperCase()}
+              </span>
+            )}
           </div>
 
           <button
@@ -127,7 +134,7 @@ const CartItemComponent: React.FC<CartItemProps> = ({ item }) => {
           </div>
 
           {/* Price */}
-          <p className="font-sans text-lg font-extrabold text-primary">
+          <p className={`font-sans text-lg font-extrabold ${isPromo ? 'text-green-600' : 'text-primary'}`}>
             {formatPrice(finalPrice, currency)}
           </p>
         </div>
