@@ -68,7 +68,7 @@ const Promotion: React.FC = () => {
   const [promo, setPromo] = useState<ActivePromo | null | undefined>(undefined);
   const [qty, setQty] = useState(1);
   const [mainImg, setMainImg] = useState(0);
-  const { addToCart } = useCart();
+  const { addToCart, items: cartItems } = useCart();
   const { products } = useProducts();
   const { toast } = useToast();
   const { selectedCountry } = useLanguage();
@@ -117,7 +117,12 @@ const Promotion: React.FC = () => {
 
   const boughtKey = BOUGHT_KEY(promo.productId);
   const alreadyBought = readBought(boughtKey, promo.limitResetAt ?? undefined);
-  const remaining = Math.max(0, promo.limitPerPerson - alreadyBought);
+  // Quantas unidades promo deste produto já estão no carrinho (não confirmadas ainda)
+  const inCartPromoQty = cartItems
+    .filter(i => i.product.id === promo.productId + '_promo')
+    .reduce((sum, i) => sum + i.quantity, 0);
+  // Limite real = limite por pessoa - já comprados (pedidos anteriores) - já no carrinho agora
+  const remaining = Math.max(0, promo.limitPerPerson - alreadyBought - inCartPromoQty);
 
   const gallery: string[] = product?.gallery?.length ? product.gallery : [promo.productImage].filter(Boolean);
 
@@ -129,6 +134,17 @@ const Promotion: React.FC = () => {
 
   const handleAddToCart = () => {
     if (isExpired) { toast({ title: 'Promoção encerrada', variant: 'destructive' }); return; }
+
+    // Se o limite já foi atingido entre pedidos anteriores + carrinho atual, tudo vai como regular
+    if (remaining === 0 && inCartPromoQty > 0) {
+      toast({
+        title: 'Limite promocional atingido',
+        description: `Você já tem ${inCartPromoQty}x no carrinho com preço promocional. Para comprar mais, o preço será o normal.`,
+        variant: 'destructive',
+      });
+      if (product) addToCart(product, 'small', qty);
+      return;
+    }
 
     const baseProduct = product || {
       id: promo.productId, name: promo.productName, image: promo.productImage,
@@ -250,8 +266,18 @@ const Promotion: React.FC = () => {
               {remaining > 0
                 ? <><CheckCircle className="w-4 h-4 shrink-0 mt-0.5" /><span>Preço promocional para as primeiras <strong>{promo.limitPerPerson}</strong> unidade(s) por pessoa. O excedente entra no carrinho pelo preço original.</span></>
                 : <div className="flex-1 flex flex-col gap-1.5">
-                    <div className="flex items-start gap-2"><AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" /><span>Você já atingiu o limite de {promo.limitPerPerson}x desta promoção. Você ainda pode comprar mais unidades pelo preço original.</span></div>
-                    <button onClick={resetPromoLimit} className="self-start text-[11px] underline text-red-500 hover:text-red-700">Sou um cliente diferente / resetar limite</button>
+                    <div className="flex items-start gap-2">
+                      <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                      <span>
+                        {inCartPromoQty > 0
+                          ? `Você já tem ${inCartPromoQty}x no carrinho com preço promocional (limite: ${promo.limitPerPerson}x). Adicionar mais irá usar o preço original.`
+                          : `Você já atingiu o limite de ${promo.limitPerPerson}x desta promoção. Você ainda pode comprar mais unidades pelo preço original.`
+                        }
+                      </span>
+                    </div>
+                    {inCartPromoQty === 0 && (
+                      <button onClick={resetPromoLimit} className="self-start text-[11px] underline text-red-500 hover:text-red-700">Sou um cliente diferente / resetar limite</button>
+                    )}
                   </div>
               }
             </div>
