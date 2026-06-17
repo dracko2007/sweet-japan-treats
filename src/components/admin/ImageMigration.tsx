@@ -69,6 +69,37 @@ async function migrateProduct(p: Product): Promise<Product> {
   return { ...p, image: coverUrl, thumbnail: thumbUrl || undefined, gallery: galleryUrls.filter(Boolean) };
 }
 
+// Re-envia TODAS as imagens (inclusive Cloudinary) em alta qualidade
+async function remigrateProductHD(p: Product): Promise<Product> {
+  const folder = `japanexpress/products/${p.id}`;
+  const rawGallery = (p.gallery && p.gallery.length > 0) ? p.gallery : [p.image].filter(Boolean) as string[];
+
+  const galleryUrls: string[] = [];
+  for (const img of rawGallery) {
+    if (!img) continue;
+    const compressed = await compressToWebp(img, 1920, 0.92);
+    if (!compressed) { galleryUrls.push(img); continue; }
+    try {
+      const url = await cloudinaryService.uploadDataUrl(compressed, folder);
+      galleryUrls.push(url || img);
+    } catch { galleryUrls.push(img); }
+  }
+
+  const coverUrl = galleryUrls[0] || p.image;
+
+  // Thumbnail re-gerado a partir da capa
+  let thumbUrl = p.thumbnail || '';
+  const coverSrc = rawGallery[0] || '';
+  if (coverSrc) {
+    const thumbCompressed = await compressToWebp(coverSrc, 400, 0.80);
+    if (thumbCompressed) {
+      try { thumbUrl = await cloudinaryService.uploadDataUrl(thumbCompressed, folder); } catch { thumbUrl = coverUrl; }
+    }
+  }
+
+  return { ...p, image: coverUrl, thumbnail: thumbUrl || coverUrl, gallery: galleryUrls.filter(Boolean) };
+}
+
 async function runWithConcurrency<T>(
   items: T[], concurrency: number, fn: (item: T) => Promise<void>
 ): Promise<void> {
@@ -82,6 +113,7 @@ interface MigState { status: 'idle' | 'running' | 'done' | 'error'; total: numbe
 const ImageMigration: React.FC = () => {
   const { products, refresh } = useProducts();
   const [state, setState] = useState<MigState>({ status: 'idle', total: 0, done: 0, errors: [] });
+  const [hdState, setHdState] = useState<MigState>({ status: 'idle', total: 0, done: 0, errors: [] });
   const [tested, setTested] = useState<'checking' | 'ok' | 'fail'>('checking');
   const [testError, setTestError] = useState('');
 
@@ -95,6 +127,24 @@ const ImageMigration: React.FC = () => {
 
   const toMigrate = products.filter(needsMigration);
   const allMigrated = toMigrate.length === 0;
+  const productsWithImages = products.filter(p => p.image || (p.gallery && p.gallery.length > 0));
+
+  const runHDRemigration = useCallback(async () => {
+    if (productsWithImages.length === 0) return;
+    const errors: string[] = [];
+    setHdState({ status: 'running', total: productsWithImages.length, done: 0, errors: [] });
+    await runWithConcurrency(productsWithImages, 2, async (p) => {
+      try {
+        const migrated = await remigrateProductHD(p);
+        await productService.save(migrated);
+      } catch (e: any) {
+        errors.push(`${p.name}: ${e?.message || 'erro'}`);
+      }
+      setHdState((s) => ({ ...s, done: s.done + 1, errors: [...errors] }));
+    });
+    await refresh();
+    setHdState((s) => ({ ...s, status: errors.length > 0 ? 'error' : 'done', errors }));
+  }, [productsWithImages, refresh]);
 
   const runMigration = useCallback(async () => {
     if (toMigrate.length === 0) return;
@@ -236,11 +286,61 @@ const ImageMigration: React.FC = () => {
             {state.status === 'error' ? `Tentar novamente (${toMigrate.length})` : `Migrar ${toMigrate.length} produto(s)`}
           </Button>
         )}
-        <Button variant="outline" onClick={refresh} className="gap-2" disabled={state.status === 'running'}>
+        <Button variant="outline" onClick={refresh} className="gap-2" disabled={state.status === 'running' || hdState.status === 'running'}>
           <RefreshCw className="w-4 h-4" />
           Recarregar lista
         </Button>
       </div>
+
+      {/* Re-upload em HD — para imagens já no Cloudinary mas em baixa qualidade */}
+      {tested === 'ok' && (
+        <div className="border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/30 rounded-xl p-5 space-y-3">
+          <div>
+            <h3 className="font-bold text-blue-800 dark:text-blue-300 flex items-center gap-2">
+              <ImageIcon className="w-4 h-4" /> Re-upload em Full HD (1920px / 92%)
+            </h3>
+            <p className="text-xs text-blue-700 dark:text-blue-400 mt-1 leading-relaxed">
+              Re-processa <strong>todas as {productsWithImages.length} imagens</strong> já no Cloudinary, comprimindo para 1920×px WebP com qualidade 92%. Use isso para melhorar imagens que ficaram embaçadas.
+              <br />⚠️ Operação lenta — aprox. {Math.ceil(productsWithImages.length * 5 / 60)} min. Não feche a aba.
+            </p>
+          </div>
+
+          {hdState.status === 'running' && (
+            <div className="space-y-1.5">
+              <div className="flex justify-between text-xs text-blue-700">
+                <span>2 produtos em paralelo · baixando → comprimindo → enviando</span>
+                <span className="font-bold">{hdState.done}/{hdState.total} ({Math.round(hdState.done / hdState.total * 100)}%)</span>
+              </div>
+              <div className="w-full bg-blue-200 rounded-full h-2.5 overflow-hidden">
+                <div className="h-full bg-blue-600 rounded-full transition-all duration-500" style={{ width: `${Math.round(hdState.done / hdState.total * 100)}%` }} />
+              </div>
+            </div>
+          )}
+
+          {hdState.status === 'done' && (
+            <div className="flex items-center gap-2 text-sm text-green-700 font-semibold">
+              <CheckCircle className="w-4 h-4" /> Re-upload concluído! {hdState.total} produto(s) atualizados.
+            </div>
+          )}
+
+          {hdState.status === 'error' && hdState.errors.length > 0 && (
+            <ul className="text-xs text-red-600 list-disc pl-5 max-h-24 overflow-y-auto">
+              {hdState.errors.map((e, i) => <li key={i}>{e}</li>)}
+            </ul>
+          )}
+
+          <Button
+            onClick={runHDRemigration}
+            disabled={hdState.status === 'running' || state.status === 'running' || productsWithImages.length === 0}
+            className="gap-2 bg-blue-600 hover:bg-blue-700 text-white"
+          >
+            <CloudUpload className="w-4 h-4" />
+            {hdState.status === 'running'
+              ? `Processando ${hdState.done}/${hdState.total}...`
+              : hdState.status === 'done' ? 'Re-upload concluído ✓' : `Re-enviar ${productsWithImages.length} produto(s) em HD`}
+          </Button>
+        </div>
+      )}
     </div>
   );
 };
