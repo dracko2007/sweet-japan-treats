@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Sparkles, Tag, Trash2, Save, Search, Users, Clock, CalendarClock, ChevronDown, ChevronUp, Plus } from 'lucide-react';
+import { Sparkles, Tag, Trash2, Save, Search, Users, Clock, CalendarClock, ChevronDown, ChevronUp, Plus, FlaskConical } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useProducts } from '@/context/ProductsContext';
 import { db } from '@/config/firebase';
@@ -184,6 +184,27 @@ const PromotionManager: React.FC = () => {
     return () => clearInterval(t);
   }, [active?.expiresAt]);
 
+  const simulateExpiry = async () => {
+    if (!db || !active) return;
+    setSaving(true);
+    try {
+      await ensureAdminAuth();
+      // Marca como expirada 1s atrás
+      const expired = { ...active, expiresAt: Date.now() - 1000 };
+      await setDoc(doc(db, 'siteContent', 'homePromotion'), expired);
+      if (active.nextPromo) {
+        await activateNext(active.nextPromo);
+        toast({ title: '✅ Promoção expirada', description: `Próxima ativada: ${active.nextPromo.productName} — ¥${active.nextPromo.promoPriceYen}` });
+      } else {
+        await deleteDoc(doc(db, 'siteContent', 'homePromotion'));
+        setActive(null);
+        toast({ title: '✅ Simulação concluída', description: 'Nenhuma próxima promoção configurada — promoção removida.' });
+      }
+    } catch (e: any) {
+      toast({ title: 'Erro na simulação', description: e?.message, variant: 'destructive' });
+    } finally { setSaving(false); }
+  };
+
   const activateNext = async (next: ScheduledNextPromo) => {
     if (!db) return;
     try {
@@ -260,7 +281,12 @@ const PromotionManager: React.FC = () => {
               </div>
               <div className="text-xs text-muted-foreground mt-0.5">Limite: {active.limitPerPerson}x/pessoa</div>
             </div>
-            <Button variant="destructive" size="sm" onClick={() => removePromo()} disabled={saving} className="shrink-0"><Trash2 className="w-4 h-4" /></Button>
+            <div className="flex flex-col gap-1 shrink-0">
+              <Button variant="destructive" size="sm" onClick={() => removePromo()} disabled={saving}><Trash2 className="w-4 h-4" /></Button>
+              <Button variant="outline" size="sm" onClick={simulateExpiry} disabled={saving} title="Simular encerramento agora (teste)" className="border-orange-300 text-orange-600 hover:bg-orange-50 text-[10px] px-2 py-1 h-auto gap-1">
+                <FlaskConical className="w-3 h-3" />Simular
+              </Button>
+            </div>
           </div>
           {active.expiresAt && (
             <div className={`flex items-center gap-2 text-sm font-medium ${timeLeft === 'Encerrada' ? 'text-red-600' : 'text-orange-600'}`}>
