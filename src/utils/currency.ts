@@ -32,16 +32,17 @@ export const toYen = (amount: number, currency?: string): number => {
  */
 export const formatPrice = (price: number, currency: 'BRL' | 'JPY' | 'EUR' | string, noConvert = false): string => {
   if (currency === 'JPY') {
-    // No Japão já estamos em ienes — mostra só ¥, sem converter para R$.
     return `¥ ${Math.round(price).toLocaleString()}`;
   }
   if (currency === 'EUR') {
-    const mainStr = `€ ${price.toFixed(2)}`;
+    const rounded = Math.round(price);
+    const mainStr = `€ ${rounded.toLocaleString('pt-BR')}`;
     if (noConvert) return mainStr;
     return `${mainStr} (¥ ${yenRefFromEur(price).toLocaleString()})`;
   }
-  // Default is BRL
-  const mainStr = `R$ ${price.toFixed(2)}`;
+  // BRL — arredonda para inteiro (sem centavos quebrados)
+  const rounded = Math.round(price);
+  const mainStr = `R$ ${rounded.toLocaleString('pt-BR')}`;
   if (noConvert) return mainStr;
   return `${mainStr} (¥ ${yenRefFromBrl(price).toLocaleString()})`;
 };
