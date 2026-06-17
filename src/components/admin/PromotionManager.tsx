@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Sparkles, Tag, Trash2, Save, Search, Users, Clock, CalendarClock, ChevronDown, ChevronUp, Plus, FlaskConical } from 'lucide-react';
+import { Sparkles, Tag, Trash2, Save, Search, Users, Clock, CalendarClock, ChevronDown, ChevronUp, Plus, FlaskConical, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useProducts } from '@/context/ProductsContext';
 import { db } from '@/config/firebase';
@@ -264,9 +264,20 @@ const PromotionManager: React.FC = () => {
 
   return (
     <div className="max-w-2xl mx-auto p-6 space-y-8">
-      <div>
-        <h2 className="text-xl font-bold flex items-center gap-2"><Sparkles className="w-5 h-5 text-primary" /> Promoção na Página Inicial</h2>
-        <p className="text-sm text-muted-foreground mt-1">Preços em ¥ — convertidos automaticamente para R$/€ conforme o país do cliente.</p>
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h2 className="text-xl font-bold flex items-center gap-2"><Sparkles className="w-5 h-5 text-primary" /> Promoção na Página Inicial</h2>
+          <p className="text-sm text-muted-foreground mt-1">Preços em ¥ — convertidos automaticamente para R$/€ conforme o país do cliente.</p>
+        </div>
+        <Button variant="outline" size="sm" className="border-orange-300 text-orange-600 hover:bg-orange-50 gap-1.5 text-xs shrink-0"
+          onClick={() => {
+            const keys = Object.keys(localStorage).filter(k => k.startsWith('promo_bought_'));
+            if (keys.length === 0) { toast({ title: 'Nenhum contador de promoção encontrado.' }); return; }
+            keys.forEach(k => localStorage.removeItem(k));
+            toast({ title: `🔄 ${keys.length} contador(es) resetado(s)`, description: 'Limite de compra por pessoa zerado neste navegador.' });
+          }}>
+          <RotateCcw className="w-3.5 h-3.5" /> Resetar limites de compra
+        </Button>
       </div>
 
       {/* Promoção ativa */}

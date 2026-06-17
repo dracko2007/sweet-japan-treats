@@ -28,6 +28,8 @@ const ResetOrdersButton: React.FC = () => {
     setBusy(true);
     try {
       const removed = await orderService.clearAllOrders();
+      // Limpa também contadores de promoção (promo_bought_*)
+      Object.keys(localStorage).filter(k => k.startsWith('promo_bought_')).forEach(k => localStorage.removeItem(k));
       toast({
         title: '🧹 Histórico resetado',
         description: `${removed} pedido(s) removidos do banco + dados locais limpos. Recarregando...`,
