@@ -38,7 +38,7 @@ function needsMigration(p: Product): boolean {
 
 async function uploadImage(dataUrl: string, folder: string): Promise<string> {
   // Comprime antes de enviar (5MB base64 → ~150KB WebP)
-  const compressed = await compressToWebp(dataUrl, 1200, 0.88);
+  const compressed = await compressToWebp(dataUrl, 2048, 0.92);
   return cloudinaryService.uploadDataUrl(compressed || dataUrl, folder);
 }
 

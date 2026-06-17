@@ -357,7 +357,7 @@ const ProductManager: React.FC = () => {
         if (cloudinaryService.isCloudinaryUrl(imgStr)) return imgStr;
         let dataUrl = imgStr;
         if (cloudinaryService.isExternalUrl(imgStr)) {
-          dataUrl = await urlToCompressedDataURL(imgStr, 1200, 0.88);
+          dataUrl = await urlToCompressedDataURL(imgStr, 2048, 0.92);
         }
         return cloudinaryService.uploadDataUrl(dataUrl, folder);
       };

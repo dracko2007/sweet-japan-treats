@@ -43,7 +43,8 @@ const PromoForm: React.FC<PromoFormProps> = ({ label, products, value, onChange,
     if (!p) return;
     const oy = p.prices?.small ?? 0;
     const pct = value.discountPct ?? 0;
-    onChange({ ...value, productId: id, productName: p.name, productImage: p.thumbnail || p.image || '', originalPriceYen: oy, promoPriceYen: Math.round(oy * (1 - pct / 100)) });
+    const promoImage = p.gallery?.[0] || p.image || p.thumbnail || '';
+    onChange({ ...value, productId: id, productName: p.name, productImage: promoImage, originalPriceYen: oy, promoPriceYen: Math.round(oy * (1 - pct / 100)) });
     setSearch('');
   };
 
@@ -189,12 +190,14 @@ const PromotionManager: React.FC = () => {
     setSaving(true);
     try {
       await ensureAdminAuth();
-      // Marca como expirada 1s atrás
-      const expired = { ...active, expiresAt: Date.now() - 1000 };
-      await setDoc(doc(db, 'siteContent', 'homePromotion'), expired);
       if (active.nextPromo) {
-        await activateNext(active.nextPromo);
-        toast({ title: '✅ Promoção expirada', description: `Próxima ativada: ${active.nextPromo.productName} — ¥${active.nextPromo.promoPriceYen}` });
+        const next = active.nextPromo;
+        const expiresAt = next.durationDays ? Date.now() + next.durationDays * 86400000 : null;
+        const newActive: ActivePromo = { ...next, expiresAt, nextPromo: null };
+        await setDoc(doc(db, 'siteContent', 'homePromotion'), newActive);
+        setActive(newActive);
+        const prazo = expiresAt ? `expira em ${next.durationDays}d` : 'sem prazo';
+        toast({ title: '✅ Próxima promoção ativada!', description: `${next.productName} — ¥${next.promoPriceYen} · ${prazo}` });
       } else {
         await deleteDoc(doc(db, 'siteContent', 'homePromotion'));
         setActive(null);
