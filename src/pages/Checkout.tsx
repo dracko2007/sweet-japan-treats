@@ -58,6 +58,12 @@ const Checkout: React.FC = () => {
   const baseTotalPrice = items.reduce(
     (sum, item) => item.freeGift ? sum : sum + fxConvert(effectiveYen(item.product, item.size), currency) * item.quantity, 0
   );
+  // Cupom não se aplica a itens com preço promocional
+  const regularSubtotalForCoupon = items.reduce(
+    (sum, item) => (!item.freeGift && !item.product.id.endsWith('_promo'))
+      ? sum + fxConvert(effectiveYen(item.product, item.size), currency) * item.quantity
+      : sum, 0
+  );
 
   const [selectedShipping, setSelectedShipping] = useState<{
     carrier: string;
@@ -122,7 +128,7 @@ const Checkout: React.FC = () => {
     if (!cartCouponApplied.current && cartCoupon && baseTotalPrice > 0) {
       cartCouponApplied.current = true;
       setAppliedCoupon(cartCoupon);
-      setCouponDiscount(computeCouponDiscount(cartCoupon, baseTotalPrice));
+      setCouponDiscount(computeCouponDiscount(cartCoupon, regularSubtotalForCoupon));
     }
   }, [location.state, baseTotalPrice]);
 
@@ -725,7 +731,7 @@ const Checkout: React.FC = () => {
 
                   {/* Coupon Selector Widget */}
                   <CouponSelector
-                    totalPrice={baseTotalPrice}
+                    totalPrice={regularSubtotalForCoupon}
                     onCouponApply={handleCouponApply}
                     onCouponRemove={handleCouponRemove}
                     appliedCoupon={appliedCoupon}
