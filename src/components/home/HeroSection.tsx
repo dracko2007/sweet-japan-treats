@@ -19,31 +19,35 @@ const PROMO_LABELS: Record<string, string> = {
   frete: 'Frete Grátis',
 };
 
-// Número mínimo exibido (prova social mesmo sem pedidos reais ainda)
-const BASE_COUNT = 100;
+// Ativa o contador de prova social somente quando há 100+ entregas reais.
+// Antes disso, o bloco fica oculto para não exibir números falsos.
+const MIN_ORDERS_TO_SHOW = 100;
+
+interface SocialProof { avgRating?: number; }
 
 const HeroSection: React.FC = () => {
   const { t } = useLanguage();
   const [promo, setPromo] = useState<ActivePromo | null | undefined>(undefined);
   const [orderCount, setOrderCount] = useState<number | null>(null);
+  const [avgRating, setAvgRating] = useState<number>(5);
 
   useEffect(() => {
     if (!db) { setPromo(null); return; }
     getDoc(doc(db, 'siteContent', 'homePromotion'))
       .then((snap) => setPromo(snap.exists() ? (snap.data() as ActivePromo) : null))
       .catch(() => setPromo(null));
-    // Conta pedidos reais no Firestore (usa aggregation — sem download de docs)
+    // Contagem real de pedidos (aggregation — sem baixar documentos)
     getCountFromServer(collection(db, 'orders'))
       .then((snap) => setOrderCount(snap.data().count))
       .catch(() => setOrderCount(0));
+    // Nota média configurada pelo admin em siteContent/socialProof
+    getDoc(doc(db, 'siteContent', 'socialProof'))
+      .then((snap) => { if (snap.exists()) setAvgRating((snap.data() as SocialProof).avgRating ?? 5); })
+      .catch(() => {});
   }, []);
 
-  const displayCount = orderCount !== null && orderCount >= BASE_COUNT
-    ? orderCount   // número real quando >= 100
-    : BASE_COUNT;  // fallback fictício mas verdadeiro ("mais de 100")
-  const countLabel = orderCount !== null && orderCount >= BASE_COUNT
-    ? `${orderCount}+`
-    : `${BASE_COUNT}+`;
+  // Só exibe quando há 100+ pedidos reais confirmados
+  const showCounter = orderCount !== null && orderCount >= MIN_ORDERS_TO_SHOW;
 
   return (
     <section className="relative min-h-[85vh] bg-gradient-to-b from-pink-100 via-pink-50/60 to-white overflow-hidden pt-12">
@@ -90,27 +94,31 @@ const HeroSection: React.FC = () => {
               </Button>
             </div>
 
-            {/* Social proof counter — destaque máximo */}
-            <div className="pt-6 border-t border-gray-100">
-              <div className="flex items-center gap-4 bg-gradient-to-r from-orange-50 to-pink-50 border border-orange-100 rounded-2xl px-5 py-4">
-                <div className="w-12 h-12 rounded-full bg-orange-500 flex items-center justify-center shrink-0 shadow-md">
-                  <Users className="w-6 h-6 text-white" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-3xl md:text-4xl font-black text-gray-900 leading-none">
-                    {countLabel}
-                    <span className="text-orange-500 text-lg ml-1">✓</span>
-                  </p>
-                  <p className="text-sm font-bold text-gray-600 mt-0.5">clientes felizes no Brasil</p>
-                </div>
-                <div className="text-right shrink-0">
-                  <div className="flex items-center gap-0.5 justify-end">
-                    {[1,2,3,4,5].map(i => <Star key={i} className="w-3.5 h-3.5 fill-yellow-400 text-yellow-400" />)}
+            {/* Contador de prova social — só aparece após 100 entregas reais */}
+            {showCounter && (
+              <div className="pt-6 border-t border-gray-100">
+                <div className="flex items-center gap-4 bg-gradient-to-r from-orange-50 to-pink-50 border border-orange-100 rounded-2xl px-5 py-4">
+                  <div className="w-12 h-12 rounded-full bg-orange-500 flex items-center justify-center shrink-0 shadow-md">
+                    <Users className="w-6 h-6 text-white" />
                   </div>
-                  <p className="text-xs text-gray-500 font-semibold mt-0.5">avaliação média</p>
+                  <div className="flex-1">
+                    <p className="text-3xl md:text-4xl font-black text-gray-900 leading-none">
+                      {orderCount}+
+                      <span className="text-orange-500 text-lg ml-1">✓</span>
+                    </p>
+                    <p className="text-sm font-bold text-gray-600 mt-0.5">entregas realizadas no Brasil</p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <div className="flex items-center gap-0.5 justify-end">
+                      {[1,2,3,4,5].map(i => (
+                        <Star key={i} className={`w-3.5 h-3.5 ${i <= Math.round(avgRating) ? 'fill-yellow-400 text-yellow-400' : 'fill-gray-200 text-gray-200'}`} />
+                      ))}
+                    </div>
+                    <p className="text-xs text-gray-500 font-semibold mt-0.5">{avgRating.toFixed(1)} avaliação média</p>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
           </div>
 
           {/* Right Column: Visual Banner */}
