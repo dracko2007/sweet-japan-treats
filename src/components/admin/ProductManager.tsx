@@ -405,7 +405,10 @@ const ProductManager: React.FC = () => {
       };
       await productService.save(product);
       await refresh();
-      toast({ title: isNew ? '✅ Produto adicionado!' : '✅ Produto atualizado!', description: product.name });
+      toast({
+        title: isNew ? '✅ Produto adicionado!' : '✅ Produto atualizado!',
+        description: `${product.name} · ${product.gallery?.length ?? 0} foto(s) salva(s) no Firestore`,
+      });
       close();
     } catch (e: any) {
       toast({ title: 'Erro ao salvar', description: e?.message, variant: 'destructive' });

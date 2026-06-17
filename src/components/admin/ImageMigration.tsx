@@ -69,7 +69,23 @@ async function migrateProduct(p: Product): Promise<Product> {
   return { ...p, image: coverUrl, thumbnail: thumbUrl || undefined, gallery: galleryUrls.filter(Boolean) };
 }
 
-// Re-envia TODAS as imagens (inclusive Cloudinary) em alta qualidade
+// Baixa qualquer URL (inclusive Cloudinary) como base64 via fetch — sem restrição CORS do canvas
+async function fetchAsDataUrl(src: string): Promise<string> {
+  if (src.startsWith('data:')) return src;
+  try {
+    const res = await fetch(src);
+    if (!res.ok) return '';
+    const blob = await res.blob();
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string || '');
+      reader.onerror = () => resolve('');
+      reader.readAsDataURL(blob);
+    });
+  } catch { return ''; }
+}
+
+// Re-envia TODAS as imagens (inclusive Cloudinary) em alta qualidade usando fetch
 async function remigrateProductHD(p: Product): Promise<Product> {
   const folder = `japanexpress/products/${p.id}`;
   const rawGallery = (p.gallery && p.gallery.length > 0) ? p.gallery : [p.image].filter(Boolean) as string[];
@@ -77,7 +93,10 @@ async function remigrateProductHD(p: Product): Promise<Product> {
   const galleryUrls: string[] = [];
   for (const img of rawGallery) {
     if (!img) continue;
-    const compressed = await compressToWebp(img, 1920, 0.92);
+    // fetch contorna o bloqueio CORS do canvas.toDataURL()
+    const dataUrl = await fetchAsDataUrl(img);
+    if (!dataUrl) { galleryUrls.push(img); continue; }
+    const compressed = await compressToWebp(dataUrl, 1920, 0.92);
     if (!compressed) { galleryUrls.push(img); continue; }
     try {
       const url = await cloudinaryService.uploadDataUrl(compressed, folder);
@@ -87,13 +106,16 @@ async function remigrateProductHD(p: Product): Promise<Product> {
 
   const coverUrl = galleryUrls[0] || p.image;
 
-  // Thumbnail re-gerado a partir da capa
+  // Thumbnail re-gerado a partir da capa original (via fetch também)
   let thumbUrl = p.thumbnail || '';
   const coverSrc = rawGallery[0] || '';
   if (coverSrc) {
-    const thumbCompressed = await compressToWebp(coverSrc, 400, 0.80);
-    if (thumbCompressed) {
-      try { thumbUrl = await cloudinaryService.uploadDataUrl(thumbCompressed, folder); } catch { thumbUrl = coverUrl; }
+    const coverData = await fetchAsDataUrl(coverSrc);
+    if (coverData) {
+      const thumbCompressed = await compressToWebp(coverData, 400, 0.82);
+      if (thumbCompressed) {
+        try { thumbUrl = await cloudinaryService.uploadDataUrl(thumbCompressed, folder); } catch { thumbUrl = coverUrl; }
+      }
     }
   }
 
