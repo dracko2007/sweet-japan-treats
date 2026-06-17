@@ -13,6 +13,7 @@ import { effectiveYen } from '@/utils/pricing';
 import { convertYen as fxConvert } from '@/services/fxService';
 import { POINTS } from '@/services/pointsService';
 import { affiliateService, Affiliate } from '@/services/affiliateService';
+import { couponService as globalCouponService } from '@/services/couponService';
 import { safeStorage } from '@/utils/storage';
 
 // Converte um afiliado num "cupom" aplicável (carrega o código para gerar comissão)
@@ -72,7 +73,24 @@ const Cart: React.FC = () => {
       }
     }
 
-    // 2) Código de afiliado/influencer (público)
+    // 2) Cupom global criado no painel admin (público, carrega do Firestore)
+    const globalResult = await globalCouponService.validateCouponAsync(code, user?.email || undefined, productSubtotalYen);
+    if (globalResult.valid && globalResult.coupon) {
+      const gc = globalResult.coupon;
+      applyCouponObject({
+        id: `global-${gc.code}-${Date.now()}`,
+        code: gc.code,
+        description: gc.description || `Cupom ${gc.code}`,
+        discount: gc.type === 'percent' ? (gc.discountPercent || gc.discount || 0) : gc.discount,
+        discountType: gc.type === 'fixed' ? 'fixed' : 'percentage',
+        expiresAt: gc.expiryDate,
+        isUsed: false,
+        freeShipping: gc.freeShipping,
+      });
+      return;
+    }
+
+    // 3) Código de afiliado/influencer (público)
     const aff = await affiliateService.validate(code);
     if (aff.valid && aff.affiliate) {
       applyCouponObject(affiliateToCoupon(aff.affiliate));
@@ -80,7 +98,7 @@ const Cart: React.FC = () => {
       return;
     }
 
-    // 3) Falhou
+    // 4) Falhou
     setActiveCoupon(null);
     setCouponError(
       isAuthenticated
