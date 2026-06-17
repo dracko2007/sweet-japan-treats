@@ -2,7 +2,8 @@ import { safeStorage } from '@/utils/storage';
 import React, { useState, useEffect } from 'react';
 import { emailServiceSimple } from '@/services/emailServiceSimple';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Package, ArrowRight, Printer, CreditCard, Landmark, Smartphone, MapPin, User, Phone, Mail, CheckCircle } from 'lucide-react';
+import { Package, ArrowRight, Printer, CreditCard, Landmark, Smartphone, MapPin, User, Phone, Mail, CheckCircle, Tag } from 'lucide-react';
+import { couponService as globalCouponService } from '@/services/couponService';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { useCart } from '@/context/CartContext';
@@ -45,8 +46,11 @@ const OrderReview: React.FC = () => {
 
   const formData = location.state?.formData;
   const shipping = location.state?.shipping;
-  const couponDiscount = location.state?.couponDiscount || 0;
-  const appliedCoupon = location.state?.coupon;
+  const [couponDiscount, setCouponDiscount] = useState<number>(location.state?.couponDiscount || 0);
+  const [appliedCoupon, setAppliedCoupon] = useState<any>(location.state?.coupon || null);
+  const [couponInput, setCouponInput] = useState('');
+  const [couponError, setCouponError] = useState('');
+  const [couponLoading, setCouponLoading] = useState(false);
 
   const [paymentMethod, setPaymentMethod] = useState(() => {
     return formData?.country === 'Japão' ? 'paypay' : 'pix';
@@ -129,6 +133,67 @@ const OrderReview: React.FC = () => {
   const finalShippingCost = appliedCoupon?.freeShipping ? 0 : shipping.cost;
   // Grand Total only includes products + shipping (NO TAXES ADDED!)
   const grandTotal = priceAfterPix + finalShippingCost;
+
+  const handleApplyCoupon = async () => {
+    const code = couponInput.trim().toUpperCase();
+    if (!code) return;
+    setCouponError('');
+    setCouponLoading(true);
+    try {
+      // 1. Profile coupon
+      if (user?.coupons) {
+        const found = user.coupons.find((c: any) => c.code?.toUpperCase() === code && !c.isUsed);
+        if (found) {
+          const isPromoItem = (item: any) => item.product.id.endsWith('_promo');
+          const regularSubtotalYen = items.filter(i => !i.freeGift && !isPromoItem(i))
+            .reduce((s, i) => s + effectiveYen(i.product, i.size) * i.quantity, 0);
+          const regularSubtotal = items.filter(i => !i.freeGift && !isPromoItem(i))
+            .reduce((s, i) => s + fxConvert(effectiveYen(i.product, i.size), currency) * i.quantity, 0);
+          let disc = 0;
+          if (found.discountType === 'percentage') disc = Math.round(regularSubtotal * (found.discount / 100) * 100) / 100;
+          else disc = Math.min(found.discount, regularSubtotal);
+          setCouponDiscount(disc);
+          setAppliedCoupon(found);
+          setCouponInput('');
+          toast({ title: `Cupom ${code} aplicado!`, description: `-${formatPrice(disc, currency)}` });
+          return;
+        }
+      }
+      // 2. Global Firestore coupon
+      const isPromoItem = (item: any) => item.product.id.endsWith('_promo');
+      const regularSubtotalYen = items.filter(i => !i.freeGift && !isPromoItem(i))
+        .reduce((s, i) => s + effectiveYen(i.product, i.size) * i.quantity, 0);
+      const globalResult = await globalCouponService.validateCouponAsync(code, user?.email || undefined, regularSubtotalYen);
+      if (globalResult.valid && globalResult.coupon) {
+        const gc = globalResult.coupon;
+        const regularSubtotal = items.filter(i => !i.freeGift && !isPromoItem(i))
+          .reduce((s, i) => s + fxConvert(effectiveYen(i.product, i.size), currency) * i.quantity, 0);
+        let disc = 0;
+        if (gc.type === 'percent') disc = Math.round(regularSubtotal * ((gc.discountPercent || gc.discount || 0) / 100) * 100) / 100;
+        else disc = Math.min(gc.discount || 0, regularSubtotal);
+        const couponObj = {
+          id: `global-${gc.code}-${Date.now()}`,
+          code: gc.code,
+          description: gc.description || `Cupom ${gc.code}`,
+          discount: gc.type === 'percent' ? (gc.discountPercent || gc.discount || 0) : (gc.discount || 0),
+          discountType: gc.type === 'fixed' ? 'fixed' : 'percentage',
+          expiresAt: gc.expiryDate,
+          isUsed: false,
+          freeShipping: gc.freeShipping,
+        };
+        setCouponDiscount(disc);
+        setAppliedCoupon(couponObj);
+        setCouponInput('');
+        toast({ title: `Cupom ${code} aplicado!`, description: `-${formatPrice(disc, currency)}` });
+        return;
+      }
+      setCouponError('Cupom inválido ou expirado.');
+    } catch {
+      setCouponError('Erro ao validar cupom. Tente novamente.');
+    } finally {
+      setCouponLoading(false);
+    }
+  };
 
   const handleConfirmOrder = () => {
     toast({
@@ -437,10 +502,37 @@ const OrderReview: React.FC = () => {
                     <span>Subtotal</span>
                     <span>{formatPrice(baseTotalPrice, currency)}</span>
                   </div>
-                  
+
+                  {/* Coupon input */}
+                  {!appliedCoupon && (
+                    <div className="bg-muted/40 border border-dashed border-border rounded-lg p-3 print:hidden">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Tag className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-sm font-semibold text-foreground">Tem um cupom?</span>
+                      </div>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={couponInput}
+                          onChange={e => { setCouponInput(e.target.value.toUpperCase()); setCouponError(''); }}
+                          onKeyDown={e => e.key === 'Enter' && handleApplyCoupon()}
+                          placeholder="CÓDIGO DO CUPOM"
+                          className="flex-1 px-3 py-1.5 rounded-lg border border-border bg-background text-sm font-mono uppercase"
+                        />
+                        <Button size="sm" variant="outline" onClick={handleApplyCoupon} disabled={couponLoading || !couponInput.trim()}>
+                          {couponLoading ? '...' : 'Aplicar'}
+                        </Button>
+                      </div>
+                      {couponError && <p className="text-xs text-red-500 mt-1">{couponError}</p>}
+                    </div>
+                  )}
+
                   {couponDiscount > 0 && (
                     <div className="flex justify-between text-green-600 font-bold bg-green-50/50 p-2 rounded border border-dashed border-green-200">
-                      <span>Desconto do Cupom {appliedCoupon ? `(${appliedCoupon.code})` : ''}</span>
+                      <span className="flex items-center gap-2">
+                        Desconto do Cupom {appliedCoupon ? `(${appliedCoupon.code})` : ''}
+                        <button type="button" onClick={() => { setCouponDiscount(0); setAppliedCoupon(null); }} className="text-[10px] text-red-400 hover:text-red-600 underline font-normal print:hidden">remover</button>
+                      </span>
                       <span>-{formatPrice(couponDiscount, currency)}</span>
                     </div>
                   )}
