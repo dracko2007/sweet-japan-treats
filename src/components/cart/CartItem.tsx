@@ -12,9 +12,10 @@ import { productEnglishName } from '@/utils/productName';
 
 interface CartItemProps {
   item: CartItemType;
+  couponDiscount?: number; // desconto proporcional do cupom neste item (na moeda exibida)
 }
 
-const CartItemComponent: React.FC<CartItemProps> = ({ item }) => {
+const CartItemComponent: React.FC<CartItemProps> = ({ item, couponDiscount = 0 }) => {
   const { updateQuantity, removeFromCart } = useCart();
   const { t, selectedCountry } = useLanguage();
   const isPromo = item.product.id.endsWith('_promo');
@@ -144,9 +145,14 @@ const CartItemComponent: React.FC<CartItemProps> = ({ item }) => {
           </div>
 
           {/* Price */}
-          <p className={`font-sans text-lg font-extrabold ${isPromo ? 'text-green-600' : 'text-primary'}`}>
-            {formatPrice(finalPrice, currency)}
-          </p>
+          <div className="text-right">
+            {couponDiscount > 0 && (
+              <p className="text-xs text-muted-foreground line-through">{formatPrice(finalPrice, currency)}</p>
+            )}
+            <p className={`font-sans text-lg font-extrabold ${isPromo ? 'text-green-600' : 'text-primary'}`}>
+              {formatPrice(finalPrice - couponDiscount, currency)}
+            </p>
+          </div>
         </div>
       </div>
     </div>

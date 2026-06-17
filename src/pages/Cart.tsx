@@ -253,12 +253,22 @@ const Cart: React.FC = () => {
 
 
 
-                {items.map((item) => (
-                  <CartItemComponent
-                    key={`${item.product.id}-${item.size}${item.freeGift ? '-gift' : ''}`}
-                    item={item}
-                  />
-                ))}
+                {items.map((item) => {
+                  // Desconto proporcional por item regular (cupom não se aplica a itens promo)
+                  const itemIsPromo = item.product.id.endsWith('_promo');
+                  const itemSubtotal = item.freeGift || itemIsPromo ? 0
+                    : fxConvert(effectiveYen(item.product, item.size), currency) * item.quantity;
+                  const itemDiscount = (!itemIsPromo && activeCoupon && regularSubtotal > 0)
+                    ? discountAmount * (itemSubtotal / regularSubtotal)
+                    : 0;
+                  return (
+                    <CartItemComponent
+                      key={`${item.product.id}-${item.size}${item.freeGift ? '-gift' : ''}`}
+                      item={item}
+                      couponDiscount={itemDiscount}
+                    />
+                  );
+                })}
 
                 {/* PromoGift progress reminders */}
                 {items.filter(i => !i.freeGift && (i.product.promoGift?.buyQuantity ?? 0) > 0 && i.product.promoGift?.giftProductId).map(item => {
@@ -404,9 +414,18 @@ const Cart: React.FC = () => {
 
                   {/* Price Summary List */}
                   <div className="space-y-3 pt-2 border-t border-border">
-                    <div className="flex justify-between text-sm">
+
+                    {/* Subtotal com preço riscado quando há cupom */}
+                    <div className="flex justify-between text-sm items-start">
                       <span className="text-muted-foreground">Subtotal dos itens</span>
-                      <span className="font-semibold text-gray-800">{formatPrice(baseTotalPrice, currency)}</span>
+                      <div className="text-right">
+                        {discountAmount > 0 && (
+                          <p className="text-xs text-muted-foreground line-through">{formatPrice(baseTotalPrice, currency)}</p>
+                        )}
+                        <span className="font-semibold text-gray-800">
+                          {formatPrice(baseTotalPrice - discountAmount, currency)}
+                        </span>
+                      </div>
                     </div>
 
                     {activeCoupon && (
@@ -414,12 +433,10 @@ const Cart: React.FC = () => {
                         <div className="flex justify-between text-sm text-green-600 font-bold bg-green-50/50 p-2 rounded-lg border border-dashed border-green-200">
                           <span className="flex items-center gap-1">
                             <Tag className="w-3.5 h-3.5 shrink-0" /> Cupom ({activeCoupon.code})
+                            {activeCoupon.discountType === 'percentage' ? ` −${activeCoupon.discount}%` : ''}
                           </span>
                           <span className="flex items-center gap-1">
-                            {activeCoupon.discountType === 'percentage'
-                              ? `-${activeCoupon.discount}% `
-                              : ''}
-                            (-{formatPrice(discountAmount, currency)})
+                            −{formatPrice(discountAmount, currency)}
                             <button
                               onClick={handleRemoveCoupon}
                               className="text-red-500 hover:text-red-700 ml-1 text-xs"
