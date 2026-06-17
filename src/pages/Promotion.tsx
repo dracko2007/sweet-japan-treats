@@ -126,13 +126,25 @@ const Promotion: React.FC = () => {
     // Adiciona excedente com preço original
     if (overflowQty > 0 && product) {
       addToCart(product, 'small', overflowQty);
-      toast({
-        title: `✨ ${promoQty}x no preço promocional + ${overflowQty}x no preço original`,
-        description: `O excedente ao limite (${promo.limitPerPerson}x/pessoa) foi adicionado com o preço normal.`,
-      });
+      if (promoQty > 0) {
+        toast({
+          title: `✨ ${promoQty}x no preço promocional + ${overflowQty}x no preço original`,
+          description: `O excedente ao limite (${promo.limitPerPerson}x/pessoa) foi adicionado com o preço normal.`,
+        });
+      } else {
+        toast({
+          title: 'Adicionado ao carrinho',
+          description: `${overflowQty}x ${promo.productName} ao preço original — limite da promoção já atingido.`,
+        });
+      }
     } else if (promoQty > 0) {
       toast({ title: 'Adicionado ao carrinho! 🎉', description: `${promoQty}x ${promo.productName}` });
     }
+  };
+
+  const resetPromoLimit = () => {
+    localStorage.removeItem(boughtKey);
+    window.location.reload();
   };
 
   return (
@@ -204,7 +216,10 @@ const Promotion: React.FC = () => {
             <div className={`flex items-start gap-2 text-sm p-3 rounded-lg border ${remaining > 0 ? 'bg-green-50 border-green-200 text-green-700' : 'bg-red-50 border-red-200 text-red-700'}`}>
               {remaining > 0
                 ? <><CheckCircle className="w-4 h-4 shrink-0 mt-0.5" /><span>Preço promocional para as primeiras <strong>{promo.limitPerPerson}</strong> unidade(s) por pessoa. O excedente entra no carrinho pelo preço original.</span></>
-                : <><AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" /><span>Você já atingiu o limite de {promo.limitPerPerson}x desta promoção. Você ainda pode comprar mais unidades pelo preço original.</span></>
+                : <div className="flex-1 flex flex-col gap-1.5">
+                    <div className="flex items-start gap-2"><AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" /><span>Você já atingiu o limite de {promo.limitPerPerson}x desta promoção. Você ainda pode comprar mais unidades pelo preço original.</span></div>
+                    <button onClick={resetPromoLimit} className="self-start text-[11px] underline text-red-500 hover:text-red-700">Sou um cliente diferente / resetar limite</button>
+                  </div>
               }
             </div>
 
