@@ -13,6 +13,7 @@ import { useCookieConsent } from "@/hooks/useCookieConsent";
 import { useMaintenanceMode } from "@/hooks/useMaintenanceMode";
 import { ADMIN_EMAIL, ADMIN_USER_ID } from "@/config/admin";
 import ScrollToTop from "./components/ScrollToTop";
+import { referralService } from "@/services/referralService";
 import ErrorBoundary from "./components/ErrorBoundary";
 import RequireAdmin from "./components/RequireAdmin";
 import CookieBanner from "./components/CookieBanner";
@@ -80,6 +81,12 @@ const isAdminLoggedIn = (): boolean => {
   } catch { return false; }
 };
 
+// Captura referral da URL uma vez ao montar
+const ReferralCapture: React.FC = () => {
+  useEffect(() => { referralService.captureReferral(); }, []);
+  return null;
+};
+
 // Shell da app com providers pesados — só monta se NÃO estiver em manutenção
 const FullApp: React.FC = () => (
   <QueryClientProvider client={queryClient}>
@@ -93,6 +100,7 @@ const FullApp: React.FC = () => (
             </div>
           )}
           <AnalyticsLoader />
+          <ReferralCapture />
           <Toaster />
           <Sonner />
           <ScrollToTop />

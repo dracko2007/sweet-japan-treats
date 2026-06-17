@@ -19,6 +19,8 @@ import { affiliateService, AffiliateRequest } from '@/services/affiliateService'
 import { reviewService } from '@/services/reviewService';
 import ReviewModal from '@/components/products/ReviewModal';
 import { Star } from 'lucide-react';
+import SocialFollowRewards from '@/components/profile/SocialFollowRewards';
+import ReferralCard from '@/components/profile/ReferralCard';
 
 const isDev = import.meta.env.DEV;
 const devLog = isDev ? console.log.bind(console) : () => {};
@@ -268,6 +270,10 @@ const Profile: React.FC = () => {
               </div>
               <div className="text-7xl opacity-80">🎁</div>
             </div>
+
+            <ReferralCard />
+
+            <SocialFollowRewards />
 
             {/* Personal Information */}
             <div className="bg-card rounded-2xl border border-border p-6 lg:p-8">

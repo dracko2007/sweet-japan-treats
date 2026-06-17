@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Instagram, Facebook, Mail, MapPin, MessageCircle, Smartphone } from 'lucide-react';
+import { Instagram, Facebook, Mail, MapPin, MessageCircle, Smartphone, Twitter } from 'lucide-react';
 import { usePWAInstall } from '@/hooks/usePWAInstall';
 
 const WHATSAPP_NUMBER = '817013671679'; // +81 70-1367-1679
+const TIKTOK_URL = 'https://www.tiktok.com/@japan_express_oficial';
+const X_URL = 'https://x.com/japanexpress_br';
 const WHATSAPP_LINK = `https://wa.me/${WHATSAPP_NUMBER}`;
 const CONTACT_EMAIL = 'contato@japanexpress-store.com';
 import { useLanguage } from '@/context/LanguageContext';
@@ -48,6 +50,26 @@ const Footer: React.FC = () => {
               </a>
               <a href="#" className="p-2 rounded-full bg-primary/20 hover:bg-primary/30 transition-colors">
                 <Facebook className="w-5 h-5" />
+              </a>
+              <a
+                href={TIKTOK_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="TikTok @japan_express_oficial"
+                className="p-2 rounded-full bg-primary/20 hover:bg-primary/30 transition-colors"
+              >
+                <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+                  <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.5 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.28 0 .54.04.79.1V9.01a6.33 6.33 0 0 0-.79-.05 6.34 6.34 0 0 0-6.34 6.34 6.34 6.34 0 0 0 6.34 6.34 6.34 6.34 0 0 0 6.33-6.34V8.69a8.18 8.18 0 0 0 4.78 1.52V6.77a4.85 4.85 0 0 1-1.01-.08z"/>
+                </svg>
+              </a>
+              <a
+                href={X_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="X (Twitter) @japanexpress_br"
+                className="p-2 rounded-full bg-primary/20 hover:bg-primary/30 transition-colors"
+              >
+                <Twitter className="w-5 h-5" />
               </a>
               <a
                 href={WHATSAPP_LINK}

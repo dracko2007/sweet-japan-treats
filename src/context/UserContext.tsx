@@ -5,6 +5,7 @@ import { firebaseConfigReady, allowLocalOnly, auth } from '@/config/firebase';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { ADMIN_EMAIL, ADMIN_PASSWORD, ADMIN_USER_ID, isAdminEmail } from '@/config/admin';
 import { adminService } from '@/services/adminService';
+import { referralService } from '@/services/referralService';
 
 const isDev = import.meta.env.DEV;
 const devLog = isDev ? console.log.bind(console) : () => {};
@@ -887,6 +888,14 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       const syncResult = await firebaseSyncService.syncUserToFirestore(newUser.id, newUser);
       if (!syncResult) {
         devWarn('⚠️ [REGISTER] Falha ao sincronizar perfil na nuvem — seguindo com backup local. Sincroniza no próximo login.');
+      }
+
+      // Link referral if someone referred this user
+      const pendingRef = referralService.getPendingReferral();
+      if (pendingRef && pendingRef !== newUser.id) {
+        referralService.linkReferral(newUser.id, pendingRef).then(() => {
+          referralService.clearPendingReferral();
+        });
       }
 
       // Encerra a sessão criada durante o cadastro (login é feito depois)

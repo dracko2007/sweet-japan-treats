@@ -26,6 +26,7 @@ import { cn } from '@/lib/utils';
 import { firebaseSyncService } from '@/services/firebaseSyncService';
 import { paymentSettingsService } from '@/services/paymentSettingsService';
 import { Wallet } from 'lucide-react';
+import { referralService } from '@/services/referralService';
 
 const isDev = import.meta.env.DEV;
 const devLog = isDev ? console.log.bind(console) : () => {};
@@ -393,6 +394,11 @@ const OrderReview: React.FC = () => {
           ].filter(Boolean).join(' · '),
         });
       }
+    }
+
+    // Track referral progress (only when purchase is in BRL)
+    if (user?.id && currency === 'BRL') {
+      referralService.onPurchaseCompleted(user.id, grandTotal).catch(() => {});
     }
 
     // Registra itens promocionais comprados (só agora, após pedido confirmado)
