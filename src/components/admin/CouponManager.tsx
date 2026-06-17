@@ -8,11 +8,13 @@ import type { Coupon } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { firebaseSyncService } from '@/services/firebaseSyncService';
 import { ensureAdminAuth } from '@/utils/adminAuth';
+import { useUser } from '@/context/UserContext';
 
 const CouponManager: React.FC = () => {
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [isCreating, setIsCreating] = useState(false);
   const { toast } = useToast();
+  const { addCoupon } = useUser();
 
   const [formData, setFormData] = useState({
     code: '',
@@ -206,6 +208,8 @@ const CouponManager: React.FC = () => {
                   isUsed: false,
                 };
                 couponService.create({ code: 'TESTE20', type: 'percent', discountPercent: 20, description: 'Cupom de teste', isActive: true, targetType: 'all', expiryDate: profileCoupon.expiresAt });
+                // Adiciona imediatamente ao perfil do admin logado (sem precisar de reload)
+                addCoupon(profileCoupon as any);
                 const res = await firebaseSyncService.grantCouponToAllUsers(profileCoupon);
                 toast({ title: '🎟️ TESTE20 criado', description: `Concedido a ${res.granted ?? 0} cliente(s). Código: TESTE20 — 20% OFF` });
                 loadCoupons();
