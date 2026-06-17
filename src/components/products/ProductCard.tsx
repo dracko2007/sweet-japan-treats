@@ -297,19 +297,20 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
 
         {/* Quantity selector + Add to cart */}
         {isSoldOut ? (
-          <Button size="sm" disabled className="w-full rounded-lg h-9 bg-red-100 text-red-600 cursor-not-allowed text-xs sm:text-sm font-bold border border-red-300 hover:bg-red-100">
+          <Button size="sm" disabled className="w-full rounded-lg h-9 bg-red-100 text-red-600 cursor-not-allowed text-xs font-bold border border-red-300 hover:bg-red-100">
             Esgotado
           </Button>
         ) : (
-          <div className="flex items-center gap-2">
-            <div className="flex items-center border border-border rounded-lg shrink-0">
+          <div className="flex flex-col gap-1.5">
+            {/* Qty row */}
+            <div className="flex items-center justify-between border border-border rounded-lg overflow-hidden">
               <button
                 onClick={(e) => { e.stopPropagation(); setQuantity(q => Math.max(1, q - 1)); }}
-                className="p-1.5 hover:bg-secondary/50 transition-colors rounded-l-lg"
+                className="flex-1 py-1.5 hover:bg-secondary/50 transition-colors flex items-center justify-center"
               >
                 <Minus className="w-3.5 h-3.5" />
               </button>
-              <span className="w-7 text-center text-sm font-semibold">{quantity}</span>
+              <span className="px-3 text-sm font-semibold border-x border-border">{quantity}</span>
               <button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -317,15 +318,16 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
                   setQuantity(q => Math.min(q + 1, maxQty));
                 }}
                 disabled={!!(product.stock && !product.stock.unlimited && quantity >= product.stock.quantity)}
-                className={cn('p-1.5 hover:bg-secondary/50 transition-colors rounded-r-lg', product.stock && !product.stock.unlimited && quantity >= product.stock.quantity && 'opacity-30 cursor-not-allowed')}
+                className={cn('flex-1 py-1.5 hover:bg-secondary/50 transition-colors flex items-center justify-center', product.stock && !product.stock.unlimited && quantity >= product.stock.quantity && 'opacity-30 cursor-not-allowed')}
               >
                 <Plus className="w-3.5 h-3.5" />
               </button>
             </div>
+            {/* Add button — full width */}
             <Button
               onClick={handleAddToCart}
               size="sm"
-              className={cn('flex-1 rounded-lg transition-all btn-primary text-xs sm:text-sm h-9', added && 'bg-accent hover:bg-accent')}
+              className={cn('w-full rounded-lg transition-all btn-primary text-xs font-bold h-9', added && 'bg-accent hover:bg-accent')}
             >
               {added ? (
                 <><Check className="w-4 h-4 mr-1" /> {t('productDetail.added')}</>
