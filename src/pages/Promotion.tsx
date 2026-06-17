@@ -138,9 +138,18 @@ const Promotion: React.FC = () => {
     };
 
     // Adiciona unidades com preço promo (até o limite) — preço em ¥ para o carrinho converter corretamente
+    // variants: [] força baseYen a usar prices.small em vez de variants do produto original
+    // discountPercent: 0 evita aplicar desconto duplo sobre o preço já reduzido
     // NÃO incrementa o contador aqui — só conta após o pedido ser finalizado (OrderReview)
     if (promoQty > 0) {
-      const promoItem = { ...baseProduct, id: promo.productId + '_promo', name: promo.productName + ' ✨', prices: { small: promo.promoPriceYen ?? 0, large: promo.promoPriceYen ?? 0 } };
+      const promoItem = {
+        ...baseProduct,
+        id: promo.productId + '_promo',
+        name: promo.productName + ' ✨',
+        prices: { small: promo.promoPriceYen ?? 0, large: promo.promoPriceYen ?? 0 },
+        variants: [],
+        discountPercent: 0,
+      };
       addToCart(promoItem as any, 'small', promoQty);
     }
 

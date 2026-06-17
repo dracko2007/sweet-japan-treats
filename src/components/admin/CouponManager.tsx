@@ -191,10 +191,35 @@ const CouponManager: React.FC = () => {
           </div>
           <h2 className="font-display text-2xl font-semibold">Cupons de Desconto</h2>
         </div>
-        <Button onClick={() => setIsCreating(!isCreating)} className="btn-primary">
-          <Plus className="w-4 h-4 mr-2" />
-          Novo Cupom
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" className="text-xs gap-1.5 border-blue-300 text-blue-600 hover:bg-blue-50"
+            onClick={async () => {
+              try {
+                await ensureAdminAuth();
+                const profileCoupon = {
+                  id: `teste20-${Date.now()}`,
+                  code: 'TESTE20',
+                  description: 'Cupom de teste — 20% de desconto',
+                  discount: 20,
+                  discountType: 'percentage' as const,
+                  expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+                  isUsed: false,
+                };
+                couponService.create({ code: 'TESTE20', type: 'percent', discountPercent: 20, description: 'Cupom de teste', isActive: true, targetType: 'all', expiryDate: profileCoupon.expiresAt });
+                const res = await firebaseSyncService.grantCouponToAllUsers(profileCoupon);
+                toast({ title: '🎟️ TESTE20 criado', description: `Concedido a ${res.granted ?? 0} cliente(s). Código: TESTE20 — 20% OFF` });
+                loadCoupons();
+              } catch (e: any) {
+                toast({ title: 'Erro', description: e?.message, variant: 'destructive' });
+              }
+            }}>
+            <Star className="w-3.5 h-3.5" /> TESTE20
+          </Button>
+          <Button onClick={() => setIsCreating(!isCreating)} className="btn-primary">
+            <Plus className="w-4 h-4 mr-2" />
+            Novo Cupom
+          </Button>
+        </div>
       </div>
 
       {isCreating && (
