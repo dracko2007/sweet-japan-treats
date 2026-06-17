@@ -91,6 +91,7 @@ export const calculateCartShippingBoxes = (
   if (items.length === 0) return emptyBoxes();
 
   // Weight estimation: 0.25 g/cm³ for items with dimensions, fallback by size
+  // +100g safety margin per item unit to account for real packaging variance
   let totalWeightG = 200; // packaging overhead
   for (const item of items) {
     const dim = sanitizePackageDimensions(item.product.packageDimensionsCm);
@@ -99,6 +100,7 @@ export const calculateCartShippingBoxes = (
     } else {
       totalWeightG += (item.size === 'small' ? 300 : 600) * item.quantity;
     }
+    totalWeightG += 100 * item.quantity; // 100g safety margin per item
   }
   totalWeightG = Math.max(100, Math.round(totalWeightG));
 

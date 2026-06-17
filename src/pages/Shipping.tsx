@@ -6,6 +6,8 @@ import ShippingCalculator from '@/components/shipping/ShippingCalculator';
 import { Button } from '@/components/ui/button';
 import { useLanguage, CountryType } from '@/context/LanguageContext';
 import { formatPrice } from '@/utils/currency';
+import { getELightRate, getKozutsumiRate, getEmsRate, MAX_DIM_SUM_CM, MAX_WEIGHT_G, type JapanPostZone } from '@/utils/japanPostRates';
+import { convertYen as fxConvert } from '@/services/fxService';
 
 const Shipping: React.FC = () => {
   const { t, selectedCountry } = useLanguage();
@@ -47,17 +49,8 @@ const Shipping: React.FC = () => {
   const billableWeight = Math.max(simWeight, volumetricWeight);
   const dimensionSum = simHeight + simWidth + simDepth;
 
-  // Weight limits based on standard box size category (sum of dimensions H+W+D)
-  const getWeightLimit = (dimSum: number): number => {
-    if (dimSum <= 60) return 2; // Caixa 60 -> Max 2kg
-    if (dimSum <= 80) return 5; // Caixa 80 -> Max 5kg
-    if (dimSum <= 100) return 10; // Caixa 100 -> Max 10kg
-    if (dimSum <= 120) return 15; // Caixa 120 -> Max 15kg
-    return 30; // Max 30kg for international courier packages
-  };
-
-  const maxAllowedWeight = getWeightLimit(dimensionSum);
-  const isWeightExceeded = simWeight > maxAllowedWeight;
+  const isOversize = dimensionSum > MAX_DIM_SUM_CM;
+  const isWeightExceeded = simWeight > MAX_WEIGHT_G / 1000; // 30kg
 
   const setBoxPreset = (h: number, w: number, d: number) => {
     setSimHeightInput(h.toString());
@@ -68,26 +61,35 @@ const Shipping: React.FC = () => {
   const getSimulatorRates = () => {
     if (country === 'Japão') {
       return [
-        { name: 'Japan Post Local 📮', cost: 700 + 150 * billableWeight, time: '1-2 dias' },
-        { name: 'Yamato Transport 🐱', cost: 800 + 180 * billableWeight, time: '1-2 dias' },
-        { name: 'Sagawa Express 🏃‍♂️', cost: 750 + 160 * billableWeight, time: '1-2 dias' }
+        { name: 'Japan Post Local (ゆうパック) 📮', cost: 700 + 150 * billableWeight, time: '1-2 dias' },
+        { name: 'Yamato Transport (宅急便) 🐱', cost: 800 + 180 * billableWeight, time: '1-2 dias' },
+        { name: 'Sagawa Express (飛脚宅配便) 🏃', cost: 750 + 160 * billableWeight, time: '1-2 dias' }
       ];
     }
-    if (['Portugal', 'França', 'Itália', 'Espanha'].includes(country)) {
-      return [
-        { name: 'Local Post (CTT/La Poste) ✉️', cost: 20 + 6 * billableWeight, time: '7-10 dias' },
-        { name: 'Yamato EMS Aéreo ✈️', cost: 35 + 10 * billableWeight, time: '5-8 dias' },
-        { name: 'Sagawa Priority Express ⚡', cost: 55 + 15 * billableWeight, time: '3-6 dias' },
-        { name: 'Encomenda Marítima (Navio) 🚢', cost: 12 + 3 * billableWeight, time: '50-70 dias' }
-      ];
+
+    const isEurope = ['Portugal', 'França', 'Itália', 'Espanha'].includes(country);
+    const zone: JapanPostZone = isEurope ? 3 : 5;
+    const cur = isEurope ? 'EUR' : 'BRL';
+    const billableWeightG = Math.max(1, Math.round(billableWeight * 1000));
+
+    type SimRate = { name: string; cost: number | null; time: string; consultar?: boolean };
+    const rates: SimRate[] = [];
+
+    if (billableWeightG <= 2000) {
+      const yen = getELightRate(billableWeightG, zone);
+      rates.push({ name: 'Japan Post e-Raito ✉️', cost: yen ? fxConvert(yen, cur) : null, time: isEurope ? '7-12 dias' : '10-15 dias' });
+    } else {
+      const salYen = getKozutsumiRate(billableWeightG, zone, 'sal');
+      rates.push({ name: 'Japan Post SAL 📦', cost: salYen ? fxConvert(salYen, cur) : null, time: isEurope ? '15-30 dias' : '20-45 dias' });
+      const airYen = getKozutsumiRate(billableWeightG, zone, 'air');
+      rates.push({ name: 'Japan Post Kozutsumi Aéreo 📦', cost: airYen ? fxConvert(airYen, cur) : null, time: isEurope ? '7-10 dias' : '10-15 dias' });
     }
-    // Brasil
-    return [
-      { name: 'Correios PAC Padrão 📦', cost: 120 + 35 * billableWeight, time: '10-15 dias' },
-      { name: 'Yamato EMS Aéreo ✈️', cost: 220 + 60 * billableWeight, time: '7-12 dias' },
-      { name: 'Sagawa Priority Courier ⚡', cost: 350 + 85 * billableWeight, time: '5-8 dias' },
-      { name: 'Encomenda Marítima (Navio) 🚢', cost: 65 + 15 * billableWeight, time: '60-80 dias' }
-    ];
+
+    const emsYen = getEmsRate(billableWeightG, zone);
+    rates.push({ name: 'Japan Post EMS / DHL ✈️', cost: emsYen ? fxConvert(emsYen, cur) : null, time: isEurope ? '5-8 dias' : '7-12 dias' });
+    rates.push({ name: 'Marítimo (Navio) 🚢', cost: null, time: '60-90 dias', consultar: true });
+
+    return rates;
   };
 
   const getSimulatorTax = () => {
@@ -157,92 +159,98 @@ const Shipping: React.FC = () => {
     }
 
     if (['Portugal', 'França', 'Itália', 'Espanha'].includes(country)) {
-      const localPostNames: Record<string, string> = {
-        Portugal: 'Correios CTT Padrão 🇵🇹',
-        França: 'La Poste Padrão 🇫🇷',
-        Itália: 'Poste Italiane Padrão 🇮🇹',
-        Espanha: 'Correos España Padrão 🇪🇸'
-      };
-      
-      const localPostName = localPostNames[country] || 'Correios Internacional Padrão ✉️';
-
+      const eurELight1kg = fxConvert(getELightRate(1000, 3) ?? 2500, 'EUR');
+      const eurELight2kg = fxConvert(getELightRate(2000, 3) ?? 4300, 'EUR');
+      const eurEms1kg  = fxConvert(getEmsRate(1000, 3) ?? 4000, 'EUR');
+      const eurEms3kg  = fxConvert(getEmsRate(3000, 3) ?? 6600, 'EUR');
+      const eurAir3kg  = fxConvert(getKozutsumiRate(3000, 3, 'air') ?? 8150, 'EUR');
+      const eurAir5kg  = fxConvert(getKozutsumiRate(5000, 3, 'air') ?? 12450, 'EUR');
       return [
         {
-          name: localPostName,
+          name: 'Japan Post e-Raito ✉️',
           logo: '✉️',
-          desc: 'Parceria com o correio estatal do país de destino.',
-          rate60: 159.90 * 0.16,
-          rate80: 349.90 * 0.16,
-          time: '7-10 dias úteis',
-          features: ['Entrega domiciliar', 'Rastreio nos correios locais', 'Entrega segura']
+          desc: 'Econômico para pacotes até 2 kg.',
+          rate60: eurELight1kg,
+          rate80: eurELight2kg,
+          time: '7-12 dias úteis',
+          features: ['Até 2 kg', 'Rastreio básico', 'Mais acessível']
         },
         {
-          name: 'Aéreo Expresso EMS (Tóquio-Europa) ✈️',
+          name: 'Japan Post EMS / DHL ✈️',
           logo: '✈️',
-          desc: 'Voo direto expresso com prioridade máxima.',
-          rate60: 299.90 * 0.16,
-          rate80: 599.90 * 0.16,
+          desc: 'Expresso prioritário via rede DHL.',
+          rate60: eurEms1kg,
+          rate80: eurEms3kg,
           time: '5-8 dias úteis',
           features: ['Despacho prioritário Narita', 'Rastreio em tempo real', 'Trânsito aéreo expresso']
         },
         {
-          name: 'Priority Express Courier (DHL/FedEx) 🏃‍♂️',
-          logo: '⚡',
-          desc: 'Transportadora expressa internacional privada.',
-          rate60: 449.90 * 0.16,
-          rate80: 799.90 * 0.16,
-          time: '3-6 dias úteis',
-          features: ['Desembaraço super rápido', 'Entrega porta a porta', 'Garantia de prazo']
+          name: 'Japan Post Kozutsumi Aéreo 📦',
+          logo: '📦',
+          desc: 'Aéreo para pacotes acima de 2 kg.',
+          rate60: eurAir3kg,
+          rate80: eurAir5kg,
+          time: '7-10 dias úteis',
+          features: ['Até 30 kg', 'Rastreio completo', 'Ótimo custo-benefício']
         },
         {
-          name: 'Encomenda Marítima / Navio 🚢',
+          name: 'Marítimo / Navio 🚢',
           logo: '🚢',
-          desc: 'Opção mais econômica e lenta, via marítima.',
-          rate60: 79.90 * 0.16,
-          rate80: 179.90 * 0.16,
-          time: '50-70 dias úteis',
-          features: ['Custo baixíssimo', 'Ideal para envios pesados', 'Seguro simples']
+          desc: 'Envio por navio cargueiro — consultar disponibilidade.',
+          rate60: null as unknown as number,
+          rate80: null as unknown as number,
+          time: '60-90 dias úteis',
+          features: ['Custo baixo', 'Ideal para volumes grandes', 'Consultar disponibilidade'],
+          consultar: true
         }
       ];
     }
 
-    // Default: Brasil
+    // Brasil — preços calculados com tabelas reais Japan Post (zona 5)
+    // Referência: e-Raito 1kg / 2kg, EMS 1kg / 3kg, Kozutsumi Air 3kg / 5kg
+    const brlELight1kg = fxConvert(getELightRate(1000, 5) ?? 3260, 'BRL');
+    const brlELight2kg = fxConvert(getELightRate(2000, 5) ?? 5860, 'BRL');
+    const brlEms1kg  = fxConvert(getEmsRate(1000, 5) ?? 4700, 'BRL');
+    const brlEms3kg  = fxConvert(getEmsRate(3000, 5) ?? 7800, 'BRL');
+    const brlAir3kg  = fxConvert(getKozutsumiRate(3000, 5, 'air') ?? 9950, 'BRL');
+    const brlAir5kg  = fxConvert(getKozutsumiRate(5000, 5, 'air') ?? 15350, 'BRL');
     return [
       {
-        name: 'Correios PAC Padrão',
-        logo: '📦',
-        desc: 'Opção mais econômica com entrega no Brasil todo.',
-        rate60: 139.90,
-        rate80: 329.90,
+        name: 'Japan Post e-Raito ✉️',
+        logo: '✉️',
+        desc: 'Econômico para pacotes até 2 kg.',
+        rate60: brlELight1kg,
+        rate80: brlELight2kg,
         time: '10-15 dias úteis',
-        features: ['Seguro incluso', 'Rastreio nos Correios', 'Entrega nacional']
+        features: ['Até 2 kg', 'Rastreio básico', 'Mais acessível']
       },
       {
-        name: 'Aéreo Expresso EMS (Tóquio-Brasil)',
+        name: 'Japan Post EMS / DHL ✈️',
         logo: '✈️',
-        desc: 'Voo direto expresso com trâmite prioritário.',
-        rate60: 279.90,
-        rate80: 559.90,
+        desc: 'Expresso prioritário via rede DHL.',
+        rate60: brlEms1kg,
+        rate80: brlEms3kg,
         time: '7-12 dias úteis',
-        features: ['Prioridade na aduana', 'Rastreio internacional', 'Despacho rápido']
+        features: ['Prioridade na aduana', 'Rastreio em tempo real', 'Despacho rápido']
       },
       {
-        name: 'Priority Courier Internacional',
-        logo: '⚡',
-        desc: 'Serviço Courier expresso privado (DHL/FedEx).',
-        rate60: 419.90,
-        rate80: 769.90,
-        time: '5-8 dias úteis',
-        features: ['Coleta no mesmo dia', 'Aduana ultra veloz', 'Entrega agendada']
+        name: 'Japan Post Kozutsumi Aéreo 📦',
+        logo: '📦',
+        desc: 'Aéreo para pacotes acima de 2 kg.',
+        rate60: brlAir3kg,
+        rate80: brlAir5kg,
+        time: '10-15 dias úteis',
+        features: ['Até 30 kg', 'Rastreio completo', 'Ótimo custo-benefício']
       },
       {
-        name: 'Encomenda Marítima / Navio 🚢',
+        name: 'Marítimo / Navio 🚢',
         logo: '🚢',
-        desc: 'Envio de baixo custo via navio cargueiro.',
-        rate60: 79.90,
-        rate80: 179.90,
-        time: '60-80 dias úteis',
-        features: ['Mais econômico', 'Rastreio em alto mar', 'Entrega final Correios']
+        desc: 'Envio por navio cargueiro — consultar disponibilidade.',
+        rate60: null as unknown as number,
+        rate80: null as unknown as number,
+        time: '60-90 dias úteis',
+        features: ['Custo baixo', 'Ideal para volumes grandes', 'Consultar disponibilidade'],
+        consultar: true
       }
     ];
   };
@@ -417,15 +425,24 @@ const Shipping: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Weight limit warning */}
-                {isWeightExceeded && (
+                {/* Dimension/Weight limit warnings */}
+                {isOversize && (
                   <div className="bg-red-50 dark:bg-red-950/20 border border-red-200 rounded-xl p-4 text-xs text-red-800 dark:text-red-300 font-semibold space-y-1">
                     <p className="flex items-center gap-1.5 font-bold text-red-600">
-                      ⚠️ Peso Excedido para esta Caixa
+                      ⚠️ Dimensões Excedem o Limite (A+L+P &gt; 150 cm / 1500 mm)
                     </p>
                     <p className="leading-relaxed">
-                      O peso máximo permitido para uma caixa de dimensões somando <strong>{dimensionSum} cm</strong> é de <strong>{maxAllowedWeight} kg</strong>. 
-                      O peso atual informado é de <strong>{simWeight} kg</strong>. Por favor, aumente o tamanho da caixa ou diminua o peso físico dos produtos para simular o frete.
+                      A soma das dimensões é <strong>{dimensionSum} cm</strong>. O Japan Post não aceita pacotes com soma superior a <strong>150 cm (1500 mm)</strong>. Reduza as dimensões para continuar.
+                    </p>
+                  </div>
+                )}
+                {!isOversize && isWeightExceeded && (
+                  <div className="bg-red-50 dark:bg-red-950/20 border border-red-200 rounded-xl p-4 text-xs text-red-800 dark:text-red-300 font-semibold space-y-1">
+                    <p className="flex items-center gap-1.5 font-bold text-red-600">
+                      ⚠️ Peso Excedido — Limite Máximo: 30 kg
+                    </p>
+                    <p className="leading-relaxed">
+                      O peso físico informado é <strong>{simWeight} kg</strong>. O Japan Post não aceita pacotes acima de <strong>30 kg</strong>. Entre em contato para envio especial.
                     </p>
                   </div>
                 )}
@@ -453,16 +470,20 @@ const Shipping: React.FC = () => {
                 {/* Simulator Results */}
                 <div className="space-y-3 pt-2">
                   <h4 className="text-xs font-bold text-foreground uppercase tracking-wider">Custo do Frete Estimado</h4>
-                  {isWeightExceeded ? (
+                  {(isOversize || isWeightExceeded) ? (
                     <div className="p-6 bg-red-50/20 rounded-xl border border-dashed border-red-200 text-center text-xs text-red-700 dark:text-red-400 font-semibold">
-                      🚫 Cálculo suspenso. Corrija o peso físico ou aumente as dimensões da caixa.
+                      🚫 Cálculo suspenso. Corrija os dados acima para continuar.
                     </div>
                   ) : (
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                       {simRates.map((rate) => (
                         <div key={rate.name} className="p-3 bg-secondary/20 rounded-xl border border-border text-center flex flex-col justify-between">
                           <span className="text-[10px] text-muted-foreground block truncate font-bold">{rate.name}</span>
-                          <span className="text-base font-black text-primary block mt-1">{formatPrice(rate.cost, currency)}</span>
+                          {(rate as any).consultar || rate.cost === null ? (
+                            <span className="text-sm font-black text-muted-foreground block mt-1">Consultar</span>
+                          ) : (
+                            <span className="text-base font-black text-primary block mt-1">{formatPrice(rate.cost as number, currency)}</span>
+                          )}
                           <span className="text-[9px] text-muted-foreground block mt-0.5">Prazo: {rate.time}</span>
                         </div>
                       ))}
@@ -629,15 +650,15 @@ const Shipping: React.FC = () => {
                       
                       <div className="grid grid-cols-2 gap-3 pt-2.5 border-t border-border/80 text-xs">
                         <div className="bg-secondary/40 p-2 rounded-lg text-center">
-                          <span className="text-muted-foreground block text-[10px]">Média Caixa 60cm</span>
+                          <span className="text-muted-foreground block text-[10px]">{(carrier as any).consultar ? 'Caixa 60cm' : 'Média Caixa 60cm'}</span>
                           <span className="font-sans font-black text-sm text-primary">
-                            {formatPrice(carrier.rate60, currency)}
+                            {(carrier as any).consultar ? 'Consultar' : formatPrice(carrier.rate60, currency)}
                           </span>
                         </div>
                         <div className="bg-secondary/40 p-2 rounded-lg text-center">
-                          <span className="text-muted-foreground block text-[10px]">Média Caixa 80cm</span>
+                          <span className="text-muted-foreground block text-[10px]">{(carrier as any).consultar ? 'Caixa 80cm' : 'Média Caixa 80cm'}</span>
                           <span className="font-sans font-black text-sm text-primary">
-                            {formatPrice(carrier.rate80, currency)}
+                            {(carrier as any).consultar ? 'Consultar' : formatPrice(carrier.rate80, currency)}
                           </span>
                         </div>
                       </div>

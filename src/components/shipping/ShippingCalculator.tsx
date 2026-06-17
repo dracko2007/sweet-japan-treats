@@ -7,7 +7,7 @@ import { useLanguage } from '@/context/LanguageContext';
 import { cn } from '@/lib/utils';
 import { formatPrice } from '@/utils/currency';
 import { calculateCartShippingBoxes } from '@/utils/shippingDimensions';
-import { getELightRate, getKozutsumiRate, type JapanPostZone } from '@/utils/japanPostRates';
+import { getELightRate, getKozutsumiRate, getEmsRate, MAX_WEIGHT_G, MAX_DIM_SUM_CM, type JapanPostZone } from '@/utils/japanPostRates';
 
 interface ShippingCalculatorProps {
   selectedPrefecture?: string;
@@ -99,47 +99,79 @@ const ShippingCalculator: React.FC<ShippingCalculatorProps> = ({
     if (weightG <= 0) return [];
     const currency = isEurope ? 'EUR' : 'BRL';
 
+    if (weightG > MAX_WEIGHT_G) return []; // overweight — handled in JSX
+
+    const options: Array<{
+      carrier: string; name: string; logo: string;
+      cost: number; costYen: number | null;
+      originalCost: number | undefined; estimatedDays: string;
+      isConsultar?: boolean;
+    }> = [];
+
     if (weightG <= 2000) {
-      const rateYen = getELightRate(weightG, jpZone);
-      if (!rateYen) return [];
-      return [{
+      const eLightYen = getELightRate(weightG, jpZone);
+      if (eLightYen) options.push({
         carrier: 'eraito',
-        name: `Japan Post e-Raito · 国際eパケットライト`,
+        name: 'Japan Post e-Raito · 国際eパケットライト',
         logo: '✉️',
-        cost: fxConvert(rateYen, currency),
-        costYen: rateYen,
+        cost: fxConvert(eLightYen, currency),
+        costYen: eLightYen,
         originalCost: undefined,
         estimatedDays: isEurope ? '7-12' : '10-15',
-      }];
+      });
+    } else {
+      const salYen = getKozutsumiRate(weightG, jpZone, 'sal');
+      if (salYen) options.push({
+        carrier: 'kozutsumi-sal',
+        name: 'Japan Post SAL · 国際小包 エコノミー航空',
+        logo: '📦',
+        cost: fxConvert(salYen, currency),
+        costYen: salYen,
+        originalCost: undefined,
+        estimatedDays: isEurope ? '15-30' : '20-45',
+      });
+
+      const airYen = getKozutsumiRate(weightG, jpZone, 'air');
+      if (airYen) options.push({
+        carrier: 'kozutsumi-air',
+        name: 'Japan Post Kozutsumi Aéreo · 国際小包 航空便',
+        logo: '📦',
+        cost: fxConvert(airYen, currency),
+        costYen: airYen,
+        originalCost: undefined,
+        estimatedDays: isEurope ? '7-10' : '10-15',
+      });
     }
 
-    if (weightG > 30000) return []; // overweight — handled in JSX
-
-    const airYen = getKozutsumiRate(weightG, jpZone, 'air');
-    const salYen = getKozutsumiRate(weightG, jpZone, 'sal');
-    const options = [];
-
-    if (salYen) options.push({
-      carrier: 'kozutsumi-sal',
-      name: 'Japan Post SAL · 国際小包 エコノミー航空',
-      logo: '📦',
-      cost: fxConvert(salYen, currency),
-      costYen: salYen,
-      originalCost: undefined,
-      estimatedDays: isEurope ? '15-30' : '20-45',
-    });
-
-    if (airYen) options.push({
-      carrier: 'kozutsumi-air',
-      name: 'Japan Post Aéreo · 国際小包 航空便',
+    // EMS available for all weight classes
+    const emsYen = getEmsRate(weightG, jpZone);
+    if (emsYen) options.push({
+      carrier: 'ems',
+      name: 'Japan Post EMS · 国際スピード郵便 (via DHL)',
       logo: '✈️',
-      cost: fxConvert(airYen, currency),
-      costYen: airYen,
+      cost: fxConvert(emsYen, currency),
+      costYen: emsYen,
       originalCost: undefined,
-      estimatedDays: isEurope ? '5-8' : '7-10',
+      estimatedDays: isEurope ? '5-8' : '7-12',
     });
 
-    return options.sort((a, b) => a.cost - b.cost);
+    // Maritime — always show as "Consultar"
+    options.push({
+      carrier: 'maritimo',
+      name: 'Marítimo · Encomenda por Navio',
+      logo: '🚢',
+      cost: 0,
+      costYen: null,
+      originalCost: undefined,
+      estimatedDays: '60-90',
+      isConsultar: true,
+    });
+
+    return options.sort((a, b) => {
+      if (a.isConsultar) return 1;
+      if (b.isConsultar) return -1;
+      return a.cost - b.cost;
+    });
   }, [selectedPref, items, calculateBoxes, isJapan, isEurope, jpZone, isFreeShipping]);
 
   useEffect(() => {
@@ -159,9 +191,8 @@ const ShippingCalculator: React.FC<ShippingCalculatorProps> = ({
   const weightLabel = weightG >= 1000
     ? `${(weightG / 1000).toFixed(2).replace(/\.0+$/, '')} kg`
     : `${weightG} g`;
-  const isOverweight = !isJapan && weightG > 30000;
-  const isOversizeEraito = !isJapan && weightG <= 2000 && calculateBoxes.maxPaddedDimensionSumCm > 90;
-  const isOversizeKozutsumi = !isJapan && weightG > 2000 && calculateBoxes.maxPaddedDimensionSumCm > 150;
+  const isOverweight = !isJapan && weightG > MAX_WEIGHT_G;
+  const isOversize = !isJapan && calculateBoxes.maxPaddedDimensionSumCm > MAX_DIM_SUM_CM;
 
   return (
     <div className={cn("bg-card rounded-2xl border border-border p-6", !onShippingSelect && "lg:p-8")}>
@@ -265,13 +296,12 @@ const ShippingCalculator: React.FC<ShippingCalculatorProps> = ({
           <p className="text-xs text-red-600 dark:text-red-400 mt-1">Entre em contato para envios especiais.</p>
         </div>
       )}
-      {(isOversizeEraito || isOversizeKozutsumi) && (
-        <div className="bg-yellow-50 dark:bg-yellow-950/20 rounded-xl p-4 mb-6 border border-yellow-200">
-          <p className="text-xs font-semibold text-yellow-700 dark:text-yellow-300">
-            ⚠️ Algum item pode exceder o limite de dimensões
-            {isOversizeEraito ? ' (e-Raito: L+C+A ≤ 90 cm)' : ' (Kozutsumi: L+C+A ≤ 150 cm)'}.
-            Confirme as medidas antes de enviar.
+      {isOversize && items.length > 0 && (
+        <div className="bg-red-50 dark:bg-red-950/20 rounded-xl p-4 mb-6 border border-red-200">
+          <p className="text-sm font-bold text-red-700 dark:text-red-300">
+            ⚠️ Dimensões excedem o limite de 150 cm (A+L+P) — Japan Post não aceita.
           </p>
+          <p className="text-xs text-red-600 dark:text-red-400 mt-1">Entre em contato para envio especial via courier privado.</p>
         </div>
       )}
 
@@ -333,7 +363,7 @@ const ShippingCalculator: React.FC<ShippingCalculatorProps> = ({
       )}
 
       {/* Shipping Results */}
-      {items.length > 0 && !isOverweight && shippingOptions.length > 0 && (
+      {items.length > 0 && !isOverweight && !isOversize && shippingOptions.length > 0 && (
         <div className="space-y-3">
           <h3 className="font-bold text-sm text-foreground flex items-center gap-2">
             <Truck className="w-4 h-4" />
@@ -345,72 +375,84 @@ const ShippingCalculator: React.FC<ShippingCalculatorProps> = ({
             <p className="text-sm text-muted-foreground mb-3">Selecione uma província acima.</p>
           )}
 
-          {shippingOptions.map((option, index) => (
-            <div
-              key={option.carrier}
-              onClick={() => onShippingSelect && setSelectedCarrier(option.carrier)}
-              className={cn(
-                "rounded-xl p-4 border transition-all",
-                onShippingSelect ? "cursor-pointer" : "",
-                selectedCarrier === option.carrier
-                  ? "border-primary bg-primary/10 ring-2 ring-primary/20"
-                  : onShippingSelect
-                  ? "border-border hover:border-primary/50"
-                  : index === 0
-                  ? "border-primary bg-primary/5"
-                  : "border-border"
-              )}
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  {onShippingSelect && (
-                    <div className={cn(
-                      "w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all shrink-0",
-                      selectedCarrier === option.carrier ? "border-primary bg-primary" : "border-border"
-                    )}>
-                      {selectedCarrier === option.carrier && <div className="w-2 h-2 rounded-full bg-white" />}
+          {shippingOptions.map((option, index) => {
+            const isConsultar = (option as any).isConsultar;
+            return (
+              <div
+                key={option.carrier}
+                onClick={() => onShippingSelect && !isConsultar && setSelectedCarrier(option.carrier)}
+                className={cn(
+                  "rounded-xl p-4 border transition-all",
+                  onShippingSelect && !isConsultar ? "cursor-pointer" : "",
+                  isConsultar ? "border-dashed border-border opacity-70" :
+                  selectedCarrier === option.carrier
+                    ? "border-primary bg-primary/10 ring-2 ring-primary/20"
+                    : onShippingSelect
+                    ? "border-border hover:border-primary/50"
+                    : index === 0
+                    ? "border-primary bg-primary/5"
+                    : "border-border"
+                )}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    {onShippingSelect && !isConsultar && (
+                      <div className={cn(
+                        "w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all shrink-0",
+                        selectedCarrier === option.carrier ? "border-primary bg-primary" : "border-border"
+                      )}>
+                        {selectedCarrier === option.carrier && <div className="w-2 h-2 rounded-full bg-white" />}
+                      </div>
+                    )}
+                    <span className="text-2xl">{option.logo}</span>
+                    <div>
+                      <p className="font-bold text-sm text-foreground">{option.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {option.costYen ? `¥${option.costYen.toLocaleString()} · ` : ''}
+                        {isConsultar ? 'Prazo variável conforme rota' : `Entrega em ${option.estimatedDays} dias úteis`}
+                      </p>
                     </div>
-                  )}
-                  <span className="text-2xl">{option.logo}</span>
-                  <div>
-                    <p className="font-bold text-sm text-foreground">{option.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {option.costYen ? `¥${option.costYen.toLocaleString()} · ` : ''}
-                      Entrega em {option.estimatedDays} dias úteis
-                    </p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    {isConsultar ? (
+                      <p className="font-sans text-sm font-black text-muted-foreground">Consultar</p>
+                    ) : (
+                      <p className={cn(
+                        "font-sans text-lg font-black",
+                        option.cost === 0 ? "text-green-600" : "text-primary"
+                      )}>
+                        {option.cost === 0 ? 'Grátis' : formatPrice(option.cost, currency)}
+                      </p>
+                    )}
+                    {option.originalCost && option.originalCost > 0 && (
+                      <p className="text-xs text-muted-foreground line-through">{formatPrice(option.originalCost, currency)}</p>
+                    )}
+                    {!onShippingSelect && !isConsultar && index === 0 && (
+                      <span className="text-xs text-primary font-bold">Melhor Opção</span>
+                    )}
+                    {selectedCarrier === option.carrier && !isConsultar && (
+                      <span className="text-xs text-primary font-bold">{t('calc.selected')}</span>
+                    )}
                   </div>
                 </div>
-                <div className="text-right shrink-0">
-                  <p className={cn(
-                    "font-sans text-lg font-black",
-                    option.cost === 0 ? "text-green-600" : "text-primary"
-                  )}>
-                    {option.cost === 0 ? 'Grátis' : formatPrice(option.cost, currency)}
-                  </p>
-                  {option.originalCost && option.originalCost > 0 && (
-                    <p className="text-xs text-muted-foreground line-through">{formatPrice(option.originalCost, currency)}</p>
-                  )}
-                  {!onShippingSelect && index === 0 && (
-                    <span className="text-xs text-primary font-bold">Melhor Opção</span>
-                  )}
-                  {selectedCarrier === option.carrier && (
-                    <span className="text-xs text-primary font-bold">{t('calc.selected')}</span>
-                  )}
+              </div>
+            );
+          })}
+
+          {!onShippingSelect && (() => {
+            const best = shippingOptions.find(o => !(o as any).isConsultar);
+            if (!best) return null;
+            return (
+              <div className="bg-primary text-primary-foreground rounded-xl p-4 mt-4">
+                <div className="flex justify-between items-center">
+                  <span className="font-bold">{t('calc.totalBest')}</span>
+                  <span className="font-sans text-2xl font-black">
+                    {formatPrice(displaySubtotal + best.cost, currency)}
+                  </span>
                 </div>
               </div>
-            </div>
-          ))}
-
-          {!onShippingSelect && (
-            <div className="bg-primary text-primary-foreground rounded-xl p-4 mt-4">
-              <div className="flex justify-between items-center">
-                <span className="font-bold">{t('calc.totalBest')}</span>
-                <span className="font-sans text-2xl font-black">
-                  {formatPrice(displaySubtotal + shippingOptions[0].cost, currency)}
-                </span>
-              </div>
-            </div>
-          )}
+            );
+          })()}
         </div>
       )}
 

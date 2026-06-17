@@ -8,6 +8,27 @@ const E_LIGHT: Record<JapanPostZone, number[]> = {
   5: [920,1180,1440,1700,1960,2220,2480,2740,3000,3260,3520,3780,4040,4300,4560,4820,5080,5340,5600,5860],
 };
 
+// EMS (Express Mail Service) — rates in ¥ per 500g bracket (index 0 = ≤500g, index 59 = ≤30000g)
+// Zone 3 = Europe, Zone 5 = Brazil/South America (Japan Post official rates 2024)
+const EMS: Record<JapanPostZone, number[]> = {
+  5: [
+    3100,4700,5500,6300,7000,7800,8500,9300,10000,10800,
+    11500,12200,12950,13700,14400,15100,15800,16500,17250,18000,
+    18690,19380,20070,20760,21450,22140,22830,23520,24210,24900,
+    25590,26280,26970,27660,28350,29040,29730,30420,31110,31800,
+    32490,33180,33870,34560,35250,35940,36630,37320,38010,38700,
+    39390,40080,40770,41460,42150,42840,43530,44220,44910,45600,
+  ],
+  3: [
+    2700,4000,4700,5300,6000,6600,7300,7900,8600,9200,
+    9850,10500,11150,11800,12400,13000,13650,14300,14950,15600,
+    16230,16860,17490,18120,18750,19380,20010,20640,21270,21900,
+    22530,23160,23790,24420,25050,25680,26310,26940,27570,28200,
+    28830,29460,30090,30720,31350,31980,32610,33240,33870,34500,
+    35130,35760,36390,37020,37650,38280,38910,39540,40170,40800,
+  ],
+};
+
 // Kozutsumi (国際小包) 1–30kg — rates in ¥ per 1kg bracket
 const KOZUTSUMI: Record<JapanPostZone, Record<KozutsumiType, number[]>> = {
   5: {
@@ -20,6 +41,9 @@ const KOZUTSUMI: Record<JapanPostZone, Record<KozutsumiType, number[]>> = {
   },
 };
 
+export const MAX_WEIGHT_G = 30000; // 30kg — Japan Post hard limit
+export const MAX_DIM_SUM_CM = 150; // 1500mm = 150cm — Japan Post hard limit (H+W+D)
+
 /** Rate in ¥ for e-Raito (≤2000g). Returns null if out of range. */
 export const getELightRate = (weightG: number, zone: JapanPostZone): number | null => {
   if (weightG <= 0 || weightG > 2000) return null;
@@ -27,9 +51,16 @@ export const getELightRate = (weightG: number, zone: JapanPostZone): number | nu
   return E_LIGHT[zone][idx] ?? null;
 };
 
+/** Rate in ¥ for EMS (up to 30kg). Returns null if out of range. */
+export const getEmsRate = (weightG: number, zone: JapanPostZone): number | null => {
+  if (weightG <= 0 || weightG > MAX_WEIGHT_G) return null;
+  const idx = Math.ceil(weightG / 500) - 1;
+  return EMS[zone][Math.min(idx, 59)] ?? null;
+};
+
 /** Rate in ¥ for Kozutsumi Air or SAL (1–30kg). Returns null if out of range. */
 export const getKozutsumiRate = (weightG: number, zone: JapanPostZone, type: KozutsumiType): number | null => {
-  if (weightG <= 0 || weightG > 30000) return null;
+  if (weightG <= 0 || weightG > MAX_WEIGHT_G) return null;
   const idx = Math.ceil(weightG / 1000) - 1;
   return KOZUTSUMI[zone][type][idx] ?? null;
 };
