@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Package, ArrowRight, MapPin, User, Phone, Mail, Clock, Tag, CreditCard } from 'lucide-react';
+import { Package, ArrowRight, MapPin, User, Phone, Mail, Clock, Tag, CreditCard, Sparkles } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,6 +19,8 @@ import { useLanguage, CountryType } from '@/context/LanguageContext';
 import { formatPrice } from '@/utils/currency';
 import { effectiveYen } from '@/utils/pricing';
 import { convertYen as fxConvert } from '@/services/fxService';
+import { POINTS } from '@/services/pointsService';
+import { safeStorage } from '@/utils/storage';
 import { productEnglishName } from '@/utils/productName';
 import { isValidEmail, isValidCPF, isValidPhone, isNonEmpty, maskPhone, runValidations, FieldErrors } from '@/utils/validation';
 import DemoBanner from '@/components/DemoBanner';
@@ -76,6 +78,16 @@ const Checkout: React.FC = () => {
   // Coupon state
   const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
   const [couponDiscount, setCouponDiscount] = useState(0);
+
+  // Points redemption
+  const availablePoints = user?.points || 0;
+  const canRedeem = availablePoints >= POINTS.minRedeem;
+  const [pointsToUse, setPointsToUse] = useState(0);
+  const productSubtotalYen = items.reduce((s, i) => i.freeGift ? s : s + effectiveYen(i.product, i.size) * i.quantity, 0);
+  const convertYen = (yen: number) => fxConvert(yen, formData.country === 'Japão' ? 'JPY' : isEuro ? 'EUR' : 'BRL');
+  const maxRedeemable = canRedeem ? Math.min(availablePoints, Math.floor(productSubtotalYen / POINTS.yenPerPoint)) : 0;
+  const redeemPoints = Math.max(0, Math.min(pointsToUse, maxRedeemable));
+  const pointsDiscount = convertYen(redeemPoints * POINTS.yenPerPoint);
 
   // Erros de validação do formulário
   const [errors, setErrors] = useState<FieldErrors>({});
@@ -318,14 +330,15 @@ const Checkout: React.FC = () => {
     }
 
     // Navigate to order review page
+    safeStorage.setItem('redeem_points', String(redeemPoints));
     navigate('/order-review', {
-      state: { 
+      state: {
         formData,
         shipping: selectedShipping,
         deliveryTime,
         coupon: appliedCoupon,
         couponDiscount
-      } 
+      }
     });
   };
 
@@ -357,7 +370,7 @@ const Checkout: React.FC = () => {
   }
     
   // Taxes are completely omitted from checkout final price!
-  const grandTotal = subtotalWithCoupon + actualShippingCost;
+  const grandTotal = subtotalWithCoupon - pointsDiscount + actualShippingCost;
 
   return (
     <Layout>
@@ -737,17 +750,64 @@ const Checkout: React.FC = () => {
                     appliedCoupon={appliedCoupon}
                   />
 
+                  {/* Points Redemption */}
+                  {isAuthenticated && (
+                    <div className={`rounded-xl p-3 border text-xs ${canRedeem ? 'bg-purple-50 dark:bg-purple-950/20 border-dashed border-purple-300' : 'bg-muted/40 border-border'}`}>
+                      <div className="flex items-center gap-1.5 mb-1.5">
+                        <Sparkles className={`w-3.5 h-3.5 ${canRedeem ? 'text-purple-600' : 'text-muted-foreground'}`} />
+                        <span className={`font-bold ${canRedeem ? 'text-purple-800 dark:text-purple-300' : 'text-muted-foreground'}`}>
+                          Pontos de fidelidade ({availablePoints} disponíveis)
+                        </span>
+                      </div>
+                      {!canRedeem ? (
+                        <p className="text-muted-foreground leading-snug">
+                          Mínimo de <strong>{POINTS.minRedeem} pontos</strong> para resgatar. Faltam <strong>{POINTS.minRedeem - availablePoints}</strong> pontos.
+                        </p>
+                      ) : (
+                        <>
+                          <p className="text-purple-700 mb-2 leading-snug">1 ponto = ¥1 de desconto. Máx. resgatável: {maxRedeemable} pts.</p>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="number" min={0} max={maxRedeemable}
+                              value={pointsToUse || ''}
+                              onChange={e => setPointsToUse(Math.max(0, Math.min(maxRedeemable, Number(e.target.value) || 0)))}
+                              placeholder="0"
+                              className="w-24 px-2 py-1.5 rounded-lg border border-purple-300 bg-background text-sm"
+                            />
+                            <button type="button" onClick={() => setPointsToUse(maxRedeemable)}
+                              className="text-xs font-semibold text-purple-700 hover:underline">
+                              Usar máx.
+                            </button>
+                            {redeemPoints > 0 && (
+                              <button type="button" onClick={() => setPointsToUse(0)}
+                                className="text-xs text-muted-foreground hover:underline ml-auto">
+                                limpar
+                              </button>
+                            )}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
+
                   {/* Calculations breakdown */}
                   <div className="space-y-2 pt-2 text-xs">
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Subtotal dos itens</span>
                       <span className="font-semibold text-gray-800">{formatPrice(baseTotalPrice, currency)}</span>
                     </div>
-                    
+
                     {appliedCoupon && couponDiscount > 0 && (
                       <div className="flex justify-between text-green-600 font-bold bg-green-50/50 p-1.5 rounded border border-dashed border-green-200">
                         <span>Desconto ({appliedCoupon.code})</span>
                         <span>-{formatPrice(couponDiscount, currency)}</span>
+                      </div>
+                    )}
+
+                    {redeemPoints > 0 && (
+                      <div className="flex justify-between text-purple-700 font-bold bg-purple-50/60 p-1.5 rounded border border-dashed border-purple-200">
+                        <span>Pontos ({redeemPoints} pts)</span>
+                        <span>-{formatPrice(pointsDiscount, currency)}</span>
                       </div>
                     )}
 
@@ -788,7 +848,7 @@ const Checkout: React.FC = () => {
                     <div className="flex justify-between pt-2 border-t border-border font-bold items-start">
                       <span className="text-sm">Total a pagar</span>
                       <div className="text-right">
-                        {couponDiscount > 0 && (
+                        {(couponDiscount > 0 || pointsDiscount > 0) && (
                           <p className="text-xs text-muted-foreground line-through font-normal">
                             {formatPrice(baseTotalPrice + actualShippingCost, currency)}
                           </p>
@@ -796,9 +856,9 @@ const Checkout: React.FC = () => {
                         <span className="text-base text-orange-600">
                           {formatPrice(grandTotal, currency)}
                         </span>
-                        {couponDiscount > 0 && (
+                        {(couponDiscount + pointsDiscount) > 0 && (
                           <p className="text-[10px] text-green-600 font-bold mt-0.5">
-                            Você economiza {formatPrice(couponDiscount, currency)}
+                            Você economiza {formatPrice(couponDiscount + pointsDiscount, currency)}
                           </p>
                         )}
                       </div>

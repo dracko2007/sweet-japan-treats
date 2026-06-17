@@ -22,7 +22,8 @@ export const POINTS = {
   perVideoMinute: 5,
   per100YenSpent: 1,
   birthday: 1000,
-  yenPerPoint: 1, // 1 ponto = ¥1 de desconto
+  yenPerPoint: 1,   // 1 ponto = ¥1 de desconto
+  minRedeem: 1000,  // mínimo para resgatar
 };
 
 export type VideoReviewStatus = 'pending' | 'approved' | 'rejected';
