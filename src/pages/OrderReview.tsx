@@ -2,8 +2,10 @@ import { safeStorage } from '@/utils/storage';
 import React, { useState, useEffect } from 'react';
 import { emailServiceSimple } from '@/services/emailServiceSimple';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Package, ArrowRight, Printer, CreditCard, Landmark, Smartphone, MapPin, User, Phone, Mail, CheckCircle, Tag } from 'lucide-react';
+import { Package, ArrowRight, Printer, CreditCard, Landmark, Smartphone, MapPin, User, Phone, Mail, CheckCircle, Tag, Copy, AlertCircle, ExternalLink, Wallet as WalletIcon, X } from 'lucide-react';
 import { couponService as globalCouponService } from '@/services/couponService';
+import { QRCodeSVG } from 'qrcode.react';
+import { buildPixPayload } from '@/utils/pixPayload';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { useCart } from '@/context/CartContext';
@@ -56,9 +58,20 @@ const OrderReview: React.FC = () => {
     return formData?.country === 'Japão' ? 'paypay' : 'pix';
   });
   const [wiseEnabled, setWiseEnabled] = useState(false);
+  const [wiseLink, setWiseLink] = useState('');
+  const [pixSettings, setPixSettings] = useState({ pixKey: '', pixReceiverName: 'Japan Express', pixCity: 'Sao Paulo' });
+
+  // Modal de pagamento — aberto antes de salvar o pedido
+  const [paymentModal, setPaymentModal] = useState(false);
+  const [pendingOrder, setPendingOrder] = useState<any>(null);
+  const [pixCopied, setPixCopied] = useState(false);
 
   useEffect(() => {
-    paymentSettingsService.get().then((s) => setWiseEnabled(s.wiseEnabled && !!s.wiseLink));
+    paymentSettingsService.get().then((s) => {
+      setWiseEnabled(s.wiseEnabled && !!s.wiseLink);
+      setWiseLink(s.wiseLink || '');
+      setPixSettings({ pixKey: s.pixKey || '', pixReceiverName: s.pixReceiverName || 'Japan Express', pixCity: s.pixCity || 'Sao Paulo' });
+    });
   }, []);
 
   // Redirect if no form data or shipping
@@ -195,24 +208,17 @@ const OrderReview: React.FC = () => {
     }
   };
 
-  const handleConfirmOrder = () => {
-    toast({
-      title: "Processando Pedido...",
-      description: isJapan ? "Preparando seu pedido com o centro de Hiroshima." : `Preparando seus dados com a aduana ${formData.country === 'Brasil' ? 'do Brasil' : 'de destino'}.`,
-    });
-
+  // Passo 1: monta os dados do pedido e abre o modal de pagamento (sem salvar nada ainda)
+  const handleProceedToPayment = () => {
     const countryPrefix = isJapan ? 'JP' : formData.country === 'Brasil' ? 'BR' : formData.country === 'Portugal' ? 'PT' : formData.country === 'França' ? 'FR' : formData.country === 'Itália' ? 'IT' : 'ES';
-
-    const orderId = isJapan 
+    const orderId = isJapan
       ? `SC-JP-${Math.floor(100000 + Math.random() * 900000)}`
       : `SE-${countryPrefix}-${Math.floor(100000 + Math.random() * 900000)}`;
-
     const trackingPrefix = isJapan ? 'JP' : countryPrefix === 'BR' ? 'NX' : 'EX';
     const trackingCode = `${trackingPrefix}${Math.floor(100000000 + Math.random() * 900000000)}JP`;
     const orderCreatedAt = new Date().toISOString();
     const customerEmail = String(formData.email || user?.email || '').trim().toLowerCase();
 
-    // Save mock order to simulated db (local storage for the admin panel)
     const mockOrder = {
       id: orderId,
       name: formData.name,
@@ -229,17 +235,19 @@ const OrderReview: React.FC = () => {
       shippingCost: finalShippingCost,
       subtotal: baseTotalPrice,
       couponCode: appliedCoupon?.code || '',
-      couponDiscount: couponDiscount,
-      pixDiscount: pixDiscount,
-      federalTax: federalTax,
-      icmsTax: icmsTax,
-      taxAmount: taxAmount,
+      couponDiscount,
+      pixDiscount,
+      federalTax,
+      icmsTax,
+      taxAmount,
       total: grandTotal,
-      currency: currency,
-      paymentMethod: paymentMethod,
+      currency,
+      paymentMethod,
       status: 'Pendente',
-      trackingCode: trackingCode,
+      trackingCode,
       date: new Date().toLocaleDateString('pt-BR'),
+      orderCreatedAt,
+      customerEmail,
       items: items.map(item => {
         const finalUnitPrice = item.freeGift ? 0 : convertYen(effectiveYen(item.product, item.size));
         return {
@@ -253,6 +261,24 @@ const OrderReview: React.FC = () => {
         };
       })
     };
+
+    setPendingOrder(mockOrder);
+    setPaymentModal(true);
+  };
+
+  // Passo 2: usuário confirmou o pagamento — agora salva tudo e navega
+  const handleFinalizeOrder = () => {
+    if (!pendingOrder) return;
+    const mockOrder = pendingOrder;
+    const orderId = mockOrder.id;
+    const trackingCode = mockOrder.trackingCode;
+    const orderCreatedAt = mockOrder.orderCreatedAt;
+    const customerEmail = mockOrder.customerEmail;
+
+    toast({
+      title: "Processando Pedido...",
+      description: isJapan ? "Preparando seu pedido com o centro de Hiroshima." : `Preparando seus dados com a aduana ${formData.country === 'Brasil' ? 'do Brasil' : 'de destino'}.`,
+    });
 
     // Save to list of orders in safeStorage (backup local / mesmo dispositivo)
     const existingOrders = JSON.parse(safeStorage.getItem('sakura_orders') || '[]');
@@ -831,15 +857,15 @@ const OrderReview: React.FC = () => {
 
             {/* Action Buttons */}
             <div className="flex flex-col sm:flex-row gap-4 print:hidden">
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 onClick={() => navigate('/checkout', { state: { formData } })}
                 className="flex-1 rounded-xl py-6 text-lg border-2"
               >
                 Voltar e Editar Dados
               </Button>
-              <Button 
-                onClick={handleConfirmOrder}
+              <Button
+                onClick={handleProceedToPayment}
                 className="flex-1 btn-primary rounded-xl py-6 text-lg font-bold"
               >
                 <CheckCircle className="w-5 h-5 mr-2" />
@@ -850,6 +876,137 @@ const OrderReview: React.FC = () => {
           </div>
         </div>
       </section>
+
+      {/* Modal de Pagamento — aparece ANTES de salvar o pedido */}
+      {paymentModal && pendingOrder && (() => {
+        const pixPayload = pixSettings.pixKey
+          ? buildPixPayload({
+              key: pixSettings.pixKey,
+              amount: Number(pendingOrder.total) || 0,
+              receiverName: pixSettings.pixReceiverName,
+              city: pixSettings.pixCity,
+              txid: String(pendingOrder.id || '').replace(/[^a-zA-Z0-9]/g, '').slice(0, 25),
+            })
+          : '';
+        const waMessage = encodeURIComponent(`Olá! Acabei de fazer o pagamento do pedido ${pendingOrder.id} no valor de ${formatPrice(pendingOrder.total, pendingOrder.currency)}. Segue o comprovante:`);
+        const whatsappLink = `https://wa.me/817013671679?text=${waMessage}`;
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+            <div className="bg-white dark:bg-card rounded-3xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+              <div className="flex items-center justify-between p-5 border-b">
+                <h2 className="font-bold text-lg text-foreground">Realizar Pagamento</h2>
+                <button onClick={() => setPaymentModal(false)} className="p-1 rounded-lg hover:bg-muted">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="p-6 space-y-5 text-center">
+                <p className="text-sm text-muted-foreground">
+                  Pedido <span className="font-mono font-bold text-foreground">{pendingOrder.id}</span> — Total: <strong>{formatPrice(pendingOrder.total, pendingOrder.currency)}</strong>
+                </p>
+
+                {/* PIX */}
+                {pendingOrder.paymentMethod === 'pix' && (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-center gap-2 text-orange-600 font-extrabold text-base">
+                      <Smartphone className="w-5 h-5" /> PAGAMENTO VIA PIX
+                    </div>
+                    {pixPayload ? (
+                      <>
+                        <p className="text-sm text-gray-600">Pague <strong>{formatPrice(pendingOrder.total, pendingOrder.currency)}</strong> escaneando o QR Code ou copiando a chave abaixo.</p>
+                        <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 inline-block">
+                          <QRCodeSVG value={pixPayload} size={180} includeMargin />
+                        </div>
+                        <div className="flex border border-gray-300 rounded-xl overflow-hidden bg-gray-50 max-w-sm mx-auto">
+                          <input readOnly value={pixPayload} className="flex-1 px-3 py-2 text-xs font-mono text-gray-500 bg-transparent select-all outline-none" />
+                          <button onClick={() => { navigator.clipboard.writeText(pixPayload); setPixCopied(true); setTimeout(() => setPixCopied(false), 2500); }}
+                            className="bg-orange-500 hover:bg-orange-600 text-white px-4 flex items-center gap-1.5 text-xs font-bold transition-colors">
+                            <Copy className="w-3.5 h-3.5" />{pixCopied ? 'Copiado!' : 'Copiar'}
+                          </button>
+                        </div>
+                        <a href={whatsappLink} target="_blank" rel="noopener noreferrer"
+                          className="inline-flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white font-bold px-4 py-2.5 rounded-xl text-sm transition-colors">
+                          <ExternalLink className="w-4 h-4" /> Enviar comprovante no WhatsApp
+                        </a>
+                      </>
+                    ) : (
+                      <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 text-sm text-yellow-800">
+                        <AlertCircle className="w-6 h-6 mx-auto mb-2 text-yellow-600" />
+                        Chave PIX não configurada. Entre em contato pelo WhatsApp <strong>+81 70-1367-1679</strong>.
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* PayPay */}
+                {pendingOrder.paymentMethod === 'paypay' && (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-center gap-2 text-orange-600 font-extrabold text-base">
+                      <Smartphone className="w-5 h-5 animate-pulse" /> PAGAMENTO VIA PAYPAY
+                    </div>
+                    <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 inline-block">
+                      <img src="/products/paypay-qr.png" alt="PayPay QR Code"
+                        className="w-52 h-auto rounded-xl border border-gray-200 mx-auto"
+                        onError={(e) => { e.currentTarget.src = 'https://placehold.co/200x200/red/white?text=PayPay+QR'; }} />
+                    </div>
+                    <div className="bg-gray-100 p-3 rounded-xl text-xs font-mono text-left max-w-xs mx-auto space-y-1">
+                      <p><strong>Enviar para:</strong> Japan Express</p>
+                      <p><strong>Telefone:</strong> 070-1367-1679</p>
+                      <p><strong>Valor:</strong> {formatPrice(pendingOrder.total, 'JPY')}</p>
+                    </div>
+                    <p className="text-xs text-muted-foreground">Após pagar, envie o comprovante no WhatsApp: <strong>070-1367-1679</strong></p>
+                  </div>
+                )}
+
+                {/* Yucho */}
+                {pendingOrder.paymentMethod === 'yucho' && (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-center gap-2 text-orange-600 font-extrabold text-base">
+                      <Landmark className="w-5 h-5" /> DEPÓSITO BANCÁRIO (YUCHO)
+                    </div>
+                    <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 font-mono text-xs text-left space-y-2 max-w-xs mx-auto">
+                      <div className="flex justify-between"><span className="text-gray-500">Banco:</span><span className="font-bold">ゆうちょ銀行</span></div>
+                      <div className="flex justify-between"><span className="text-gray-500">記号:</span><span className="font-bold">12260</span></div>
+                      <div className="flex justify-between"><span className="text-gray-500">番号:</span><span className="font-bold">33664351</span></div>
+                      <div className="flex justify-between"><span className="text-gray-500">Nome:</span><span className="font-bold">ロドリゲス シオカワ</span></div>
+                    </div>
+                    <p className="text-xs text-muted-foreground">Após o depósito, envie comprovante no WhatsApp: <strong>070-1367-1679</strong></p>
+                  </div>
+                )}
+
+                {/* Wise */}
+                {pendingOrder.paymentMethod === 'wise' && (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-center gap-2 text-emerald-600 font-extrabold text-base">
+                      <WalletIcon className="w-5 h-5" /> PAGAMENTO VIA WISE
+                    </div>
+                    <p className="text-sm text-muted-foreground">Pague <strong>{formatPrice(pendingOrder.total, pendingOrder.currency)}</strong> pelo Wise com câmbio justo.</p>
+                    {wiseLink && (
+                      <a href={wiseLink.startsWith('http') ? wiseLink : `https://wise.com/pay/${wiseLink.replace(/^@/, '')}`}
+                        target="_blank" rel="noopener noreferrer"
+                        className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-5 py-2.5 rounded-xl transition-colors">
+                        <ExternalLink className="w-4 h-4" /> Pagar pelo Wise
+                      </a>
+                    )}
+                  </div>
+                )}
+
+                <div className="border-t pt-4 space-y-3">
+                  <p className="text-xs text-muted-foreground">Após realizar o pagamento, clique no botão abaixo para registrar seu pedido.</p>
+                  <Button onClick={handleFinalizeOrder} className="w-full btn-primary py-4 text-base font-bold rounded-xl gap-2">
+                    <CheckCircle className="w-5 h-5" />
+                    Já realizei o pagamento — Confirmar Pedido
+                  </Button>
+                  <button onClick={() => setPaymentModal(false)} className="text-xs text-muted-foreground hover:underline">
+                    Voltar e revisar o pedido
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </Layout>
   );
 };
