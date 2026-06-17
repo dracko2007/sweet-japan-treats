@@ -41,8 +41,8 @@ const slugify = (s: string) =>
     .slice(0, 40) || `produto-${Date.now()}`;
 
 // Redimensiona e converte para WebP — muito mais leve que JPEG para o mesmo tamanho.
-// maxSize=800 para galeria, 300 para thumbnails de lista.
-function fileToCompressedDataURL(file: File, maxSize = 800, quality = 0.72): Promise<string> {
+// maxSize=1920 para galeria (Full HD), 300 para thumbnails de lista.
+function fileToCompressedDataURL(file: File, maxSize = 1920, quality = 0.90): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -82,7 +82,7 @@ function fileToThumbnailDataURL(file: File): Promise<string> {
 
 // Baixa uma imagem por URL e converte para WebP comprimido via canvas.
 // Usada para imagens externas (Yahoo/Rakuten) que chegam em resolução full.
-function urlToCompressedDataURL(url: string, maxSize = 800, quality = 0.72): Promise<string> {
+function urlToCompressedDataURL(url: string, maxSize = 1920, quality = 0.90): Promise<string> {
   return new Promise((resolve) => {
     const img = new Image();
     img.crossOrigin = 'anonymous';
