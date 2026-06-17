@@ -461,16 +461,26 @@ const Cart: React.FC = () => {
                     </div>
 
                     <div className="flex justify-between pt-3 border-t border-border">
-                      <span className="font-black text-lg text-gray-800">Total Geral</span>
+                      <span className="font-black text-lg text-gray-800">Total</span>
                       <div className="text-right">
+                        {discountAmount > 0 && (
+                          <p className="text-sm text-muted-foreground line-through">
+                            {formatPrice(baseTotalPrice, currency)}
+                          </p>
+                        )}
                         <span className="font-black text-2xl text-orange-600">
                           {formatPrice(grandTotal, currency)}
                         </span>
-                        {selectedCountry !== 'Japão' ? (
-                          <p className="text-[10px] text-gray-400 font-semibold mt-0.5">ou até 12x no cartão</p>
-                        ) : (
-                          <p className="text-[10px] text-gray-400 font-semibold mt-0.5">Pague via PayPay ou Depósito</p>
+                        {discountAmount > 0 && (
+                          <p className="text-[11px] text-green-600 font-bold mt-0.5">
+                            Você economiza {formatPrice(discountAmount, currency)}
+                          </p>
                         )}
+                        {selectedCountry !== 'Japão' && !discountAmount ? (
+                          <p className="text-[10px] text-gray-400 font-semibold mt-0.5">ou até 12x no cartão</p>
+                        ) : selectedCountry === 'Japão' && !discountAmount ? (
+                          <p className="text-[10px] text-gray-400 font-semibold mt-0.5">Pague via PayPay ou Depósito</p>
+                        ) : null}
                       </div>
                     </div>
                   </div>

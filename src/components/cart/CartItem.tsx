@@ -30,8 +30,11 @@ const CartItemComponent: React.FC<CartItemProps> = ({ item }) => {
   const unitPrice = fxConvert(basePrice, currency);
 
   const finalPrice = unitPrice * item.quantity;
-  const maxQty = item.product.stock && !item.product.stock.unlimited ? item.product.stock.quantity : Infinity;
+  const stockMax = item.product.stock && !item.product.stock.unlimited ? item.product.stock.quantity : Infinity;
+  const promoMax = isPromo ? ((item.product as any).promoLimit ?? 1) : Infinity;
+  const maxQty = Math.min(stockMax, promoMax);
   const atStockLimit = item.quantity >= maxQty;
+  const atPromoLimit = isPromo && item.quantity >= promoMax;
 
   if (item.freeGift) {
     return (
@@ -116,21 +119,28 @@ const CartItemComponent: React.FC<CartItemProps> = ({ item }) => {
 
         <div className="flex items-center justify-between mt-3">
           {/* Quantity controls */}
-          <div className="flex items-center border border-border rounded-lg">
-            <button
-              onClick={() => updateQuantity(item.product.id, item.size, item.quantity - 1)}
-              className="p-1.5 hover:bg-secondary/50 transition-colors rounded-l-lg"
-            >
-              <Minus className="w-4 h-4" />
-            </button>
-            <span className="w-8 text-center text-sm font-medium">{item.quantity}</span>
-            <button
-              onClick={() => updateQuantity(item.product.id, item.size, item.quantity + 1)}
-              disabled={atStockLimit}
-              className={cn("p-1.5 hover:bg-secondary/50 transition-colors rounded-r-lg", atStockLimit && "opacity-30 cursor-not-allowed")}
-            >
-              <Plus className="w-4 h-4" />
-            </button>
+          <div className="space-y-1">
+            <div className="flex items-center border border-border rounded-lg">
+              <button
+                onClick={() => updateQuantity(item.product.id, item.size, item.quantity - 1)}
+                className="p-1.5 hover:bg-secondary/50 transition-colors rounded-l-lg"
+              >
+                <Minus className="w-4 h-4" />
+              </button>
+              <span className="w-8 text-center text-sm font-medium">{item.quantity}</span>
+              <button
+                onClick={() => updateQuantity(item.product.id, item.size, item.quantity + 1)}
+                disabled={atStockLimit}
+                className={cn("p-1.5 hover:bg-secondary/50 transition-colors rounded-r-lg", atStockLimit && "opacity-30 cursor-not-allowed")}
+              >
+                <Plus className="w-4 h-4" />
+              </button>
+            </div>
+            {atPromoLimit && (
+              <p className="text-[10px] text-orange-600 font-semibold leading-tight">
+                Limite promocional atingido ({promoMax}x/pessoa)
+              </p>
+            )}
           </div>
 
           {/* Price */}

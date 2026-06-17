@@ -149,6 +149,7 @@ const Promotion: React.FC = () => {
         prices: { small: promo.promoPriceYen ?? 0, large: promo.promoPriceYen ?? 0 },
         variants: [],
         discountPercent: 0,
+        promoLimit: promo.limitPerPerson, // max qty no carrinho para este item promo
       };
       addToCart(promoItem as any, 'small', promoQty);
     }
