@@ -458,8 +458,9 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       if (firebaseUser) {
         devLog('🔥 [FIREBASE] Auth state changed - user logged in:', firebaseUser.uid);
 
-        // Sessão de ADMIN (login por usuário/nome): o Firebase está autenticado só para
-        // liberar escrita. NÃO sobrescrever com o perfil de cliente do Firestore.
+        // Sessão de ADMIN: o Firebase Auth do email admin é APENAS para autorizar escrita
+        // no Firestore — nunca deve sobrescrever com perfil de cliente.
+        if (isAdminEmail(firebaseUser.email)) return;
         try {
           const stored = safeStorage.getItem('user');
           if (stored && JSON.parse(stored)?.id === ADMIN_USER_ID) return;
