@@ -304,6 +304,18 @@ const OrderReview: React.FC = () => {
       }
     }
 
+    // Registra itens promocionais comprados (só agora, após pedido confirmado)
+    items.filter(i => !i.freeGift && i.product.id.endsWith('_promo')).forEach(item => {
+      const productId = item.product.id.replace(/_promo$/, '');
+      const key = `promo_bought_${productId}`;
+      try {
+        const raw = localStorage.getItem(key);
+        let current = 0;
+        if (raw) { try { current = JSON.parse(raw).count ?? 0; } catch { current = parseInt(raw) || 0; } }
+        localStorage.setItem(key, JSON.stringify({ count: current + item.quantity, setAt: Date.now() }));
+      } catch { /* localStorage indisponível */ }
+    });
+
     // Clear cart upon final purchase order creation
     clearCart();
     safeStorage.removeItem('redeem_points');

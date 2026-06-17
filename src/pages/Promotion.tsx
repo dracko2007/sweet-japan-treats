@@ -138,10 +138,10 @@ const Promotion: React.FC = () => {
     };
 
     // Adiciona unidades com preço promo (até o limite) — preço em ¥ para o carrinho converter corretamente
+    // NÃO incrementa o contador aqui — só conta após o pedido ser finalizado (OrderReview)
     if (promoQty > 0) {
       const promoItem = { ...baseProduct, id: promo.productId + '_promo', name: promo.productName + ' ✨', prices: { small: promo.promoPriceYen ?? 0, large: promo.promoPriceYen ?? 0 } };
       addToCart(promoItem as any, 'small', promoQty);
-      writeBought(boughtKey, alreadyBought + promoQty);
     }
 
     // Adiciona excedente com preço original
