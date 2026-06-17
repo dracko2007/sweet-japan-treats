@@ -184,12 +184,14 @@ const Promotion: React.FC = () => {
 
             {/* Preços */}
             <div className="space-y-1">
-              <div className="text-sm text-muted-foreground line-through">
-                De: {formatPrice(originalPriceLocal, currency, true)} (¥{promo.originalPriceYen.toLocaleString()})
-              </div>
+              {originalPriceLocal > 0 && (
+                <div className="text-sm text-muted-foreground line-through">
+                  De: {formatPrice(originalPriceLocal, currency, true)}{(promo.originalPriceYen ?? 0) > 0 && ` (¥${(promo.originalPriceYen ?? 0).toLocaleString()})`}
+                </div>
+              )}
               <div className="text-4xl font-black text-green-600">
-                {formatPrice(promoPriceLocal, currency, true)}
-                <span className="text-base font-normal text-muted-foreground ml-2">(¥{promo.promoPriceYen.toLocaleString()})</span>
+                {promoPriceLocal > 0 ? formatPrice(promoPriceLocal, currency, true) : 'Preço indisponível'}
+                {(promo.promoPriceYen ?? 0) > 0 && <span className="text-base font-normal text-muted-foreground ml-2">(¥{(promo.promoPriceYen ?? 0).toLocaleString()})</span>}
               </div>
               {discount > 0 && (
                 <div className="inline-block bg-red-100 text-red-700 text-sm font-bold px-3 py-1 rounded-full">
