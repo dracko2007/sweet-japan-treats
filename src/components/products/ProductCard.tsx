@@ -202,14 +202,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
         {/* Category Badge */}
         <div className={cn('absolute left-4 z-10', promoActive ? 'top-14' : 'top-4')}>
           <span className="px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wide bg-primary text-primary-foreground shadow-sm">
-            {product.category === 'cosmeticos' ? 'Cosméticos 🧴' :
-             product.category === 'acessorios' ? 'Acessórios 🎮' :
-             product.category === 'doces' ? 'Doces & Chás 🍵' :
-             product.category === 'papelaria' ? 'Papelaria ✏️' :
-             product.category === 'eletronicos' ? 'Eletrônicos 📱' :
-             product.category === 'masculino' ? 'Masculino 👔' :
-             product.category === 'vestuario' ? 'Vestuário 👕' :
-             product.category === 'higiene' ? 'Higiene & Saúde 🧼' : 'Importado 🌸'}
+            {t(`product.category.${['cosmeticos','acessorios','doces','papelaria','eletronicos','masculino','vestuario','higiene'].includes(product.category || '') ? product.category : 'importado'}`)}
           </span>
         </div>
 
@@ -276,7 +269,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
                 }}
                 className="mt-1 text-[11px] font-semibold text-primary hover:text-primary/80"
               >
-                {showDescription ? 'Ocultar descrição' : 'Mostrar descrição'}
+                {showDescription ? t('product.hideDesc') : t('product.showDesc')}
               </button>
             )}
           </div>
@@ -284,7 +277,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
 
         {/* Price */}
         <div className="mt-auto mb-2.5">
-          {multiVariant && <span className="block text-[10px] text-muted-foreground leading-none mb-0.5">a partir de</span>}
+          {multiVariant && <span className="block text-[10px] text-muted-foreground leading-none mb-0.5">{t('product.from')}</span>}
           <div className="flex items-baseline gap-1.5 flex-wrap">
             <span className={cn('text-lg font-extrabold leading-none', promoActive ? 'text-red-600' : 'text-primary')}>
               {formatPrice(currentPrice, currency)}
@@ -298,7 +291,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
         {/* Quantity selector + Add to cart */}
         {isSoldOut ? (
           <Button size="sm" disabled className="w-full rounded-lg h-9 bg-red-100 text-red-600 cursor-not-allowed text-xs font-bold border border-red-300 hover:bg-red-100">
-            Esgotado
+            {t('product.outOfStock')}
           </Button>
         ) : (
           <div className="flex flex-col gap-1.5">
@@ -332,7 +325,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
               {added ? (
                 <><Check className="w-4 h-4 mr-1" /> {t('productDetail.added')}</>
               ) : (
-                <><ShoppingCart className="w-4 h-4 mr-1" /> Adicionar</>
+                <><ShoppingCart className="w-4 h-4 mr-1" /> {t('product.addShort')}</>
               )}
             </Button>
           </div>

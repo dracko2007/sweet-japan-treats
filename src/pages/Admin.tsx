@@ -26,6 +26,7 @@ import PromotionManager from '@/components/admin/PromotionManager';
 import TrackingModal from '@/components/admin/TrackingModal';
 import AdminCalculator from '@/components/admin/AdminCalculator';
 import CN23Modal from '@/components/admin/CN23Modal';
+import PromoNotificationModal from '@/components/admin/PromoNotificationModal';
 import { orderService } from '@/services/orderService';
 import { customerService } from '@/services/customerService';
 import { requireAdminPassword } from '@/utils/adminGuard';
@@ -63,6 +64,7 @@ const Admin: React.FC = () => {
   const [trackingModalOpen, setTrackingModalOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
   const [cn23Order, setCn23Order] = useState<any | null>(null);
+  const [promoModalOpen, setPromoModalOpen] = useState(false);
 
   // Paginação da lista de pedidos (10 por página)
   const ordersPagination = usePagination(allOrders, 10);
@@ -466,6 +468,16 @@ _This is an automated test message_
             <p className="text-muted-foreground text-lg">
               Gestão de Pedidos - Paula Shiokawa
             </p>
+            <div className="mt-4 flex justify-center">
+              <Button
+                variant="outline"
+                className="gap-2 border-orange-400 text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-950"
+                onClick={() => setPromoModalOpen(true)}
+              >
+                <Megaphone className="w-4 h-4" />
+                Disparar Notificação Promocional
+              </Button>
+            </div>
           </div>
         </div>
       </div>
@@ -871,6 +883,11 @@ _This is an automated test message_
           </div>
         </div>
       </section>
+
+      {/* Promo Notification Modal */}
+      {promoModalOpen && (
+        <PromoNotificationModal onClose={() => setPromoModalOpen(false)} />
+      )}
 
       {/* CN22/CN23 Modal */}
       {cn23Order && (

@@ -173,10 +173,7 @@ const ProductDetail: React.FC = () => {
               <div>
                 <div className="mb-4">
                   <span className="inline-block px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wide bg-primary/20 text-primary">
-                    {product.category === 'cosmeticos' ? 'Cosméticos 🧴' : 
-                     product.category === 'acessorios' ? 'Acessórios & Geek 🎮' : 
-                     product.category === 'doces' ? 'Doces & Chás 🍵' : 
-                     product.category === 'papelaria' ? 'Papelaria ✏️' : 'Importado 🌸'}
+                    {t(`product.category.${['cosmeticos','acessorios','doces','papelaria','eletronicos','masculino','vestuario','higiene'].includes(product.category || '') ? product.category : 'importado'}`)}
                   </span>
                 </div>
 

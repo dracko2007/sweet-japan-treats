@@ -115,7 +115,7 @@ const Footer: React.FC = () => {
               </li>
               <li>
                 <Link to="/afiliado" className="text-sm text-accent-foreground/80 hover:text-accent-foreground transition-colors">
-                  Programa de Afiliados
+                  {t('footer.affiliate')}
                 </Link>
               </li>
               {!isInstalled && (
@@ -125,18 +125,18 @@ const Footer: React.FC = () => {
                     className="flex items-center gap-1.5 text-sm text-orange-300 hover:text-orange-200 font-semibold transition-colors"
                   >
                     <Smartphone className="w-3.5 h-3.5" />
-                    {platform === 'ios' ? 'Instalar no iPhone' : 'Instalar o App'}
+                    {platform === 'ios' ? t('footer.appInstallIOS') : t('footer.appInstall')}
                   </button>
                   {showIOSHint && (
                     <p className="text-xs text-accent-foreground/50 mt-1 leading-snug">
-                      No Safari: Compartilhar → Adicionar à Tela de Início
+                      {t('footer.iosHint')}
                     </p>
                   )}
                 </li>
               )}
               {isInstalled && (
                 <li className="pt-1">
-                  <span className="text-xs text-green-400 flex items-center gap-1">✓ App instalado</span>
+                  <span className="text-xs text-green-400 flex items-center gap-1">{t('footer.appInstalled')}</span>
                 </li>
               )}
             </ul>
@@ -174,13 +174,13 @@ const Footer: React.FC = () => {
           </p>
           <div className="flex items-center gap-4 flex-wrap justify-center">
             <Link to="/privacidade" className="text-xs text-accent-foreground/50 hover:text-accent-foreground/80 transition-colors">
-              Privacidade
+              {t('footer.privacy')}
             </Link>
             <Link to="/termos" className="text-xs text-accent-foreground/50 hover:text-accent-foreground/80 transition-colors">
-              Termos de Uso
+              {t('footer.terms')}
             </Link>
             <Link to="/cookies" className="text-xs text-accent-foreground/50 hover:text-accent-foreground/80 transition-colors">
-              Cookies
+              {t('footer.cookies')}
             </Link>
           </div>
         </div>
