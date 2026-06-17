@@ -1,7 +1,7 @@
 import { safeStorage } from '@/utils/storage';
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Package, Printer, ShoppingBag, User, MapPin, Phone, Mail, Calendar, TestTube, Tag, Truck, CheckCircle, XCircle, Trash2, BarChart3, Users, PackagePlus, Video, Megaphone, Clapperboard, Building2, Sparkles, ShieldCheck, Calculator, CloudUpload } from 'lucide-react';
+import { Package, Printer, ShoppingBag, User, MapPin, Phone, Mail, Calendar, TestTube, Tag, Truck, CheckCircle, XCircle, Trash2, BarChart3, Users, PackagePlus, Video, Megaphone, Clapperboard, Building2, Sparkles, ShieldCheck, Calculator, CloudUpload, FileText } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { useUser } from '@/context/UserContext';
@@ -25,6 +25,7 @@ import ImageMigration from '@/components/admin/ImageMigration';
 import PromotionManager from '@/components/admin/PromotionManager';
 import TrackingModal from '@/components/admin/TrackingModal';
 import AdminCalculator from '@/components/admin/AdminCalculator';
+import CN23Modal from '@/components/admin/CN23Modal';
 import { orderService } from '@/services/orderService';
 import { customerService } from '@/services/customerService';
 import { requireAdminPassword } from '@/utils/adminGuard';
@@ -61,6 +62,7 @@ const Admin: React.FC = () => {
   const [activeTab, setActiveTab] = useState<AdminTab>('dashboard');
   const [trackingModalOpen, setTrackingModalOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
+  const [cn23Order, setCn23Order] = useState<any | null>(null);
 
   // Paginação da lista de pedidos (10 por página)
   const ordersPagination = usePagination(allOrders, 10);
@@ -633,14 +635,24 @@ _This is an automated test message_
                         </p>
                       </div>
                       
-                      <Button 
-                        onClick={() => printShippingLabel(order)}
-                        variant="outline"
-                        className="gap-2"
-                      >
-                        <Printer className="w-4 h-4" />
-                        Imprimir Etiqueta
-                      </Button>
+                      <div className="flex gap-2 flex-wrap justify-end">
+                        <Button
+                          onClick={() => setCn23Order(order)}
+                          variant="outline"
+                          className="gap-2 border-red-300 text-red-700 hover:bg-red-50"
+                        >
+                          <FileText className="w-4 h-4" />
+                          CN22/CN23
+                        </Button>
+                        <Button
+                          onClick={() => printShippingLabel(order)}
+                          variant="outline"
+                          className="gap-2"
+                        >
+                          <Printer className="w-4 h-4" />
+                          Etiqueta
+                        </Button>
+                      </div>
                     </div>
 
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-4 border-t border-border">
@@ -859,6 +871,11 @@ _This is an automated test message_
           </div>
         </div>
       </section>
+
+      {/* CN22/CN23 Modal */}
+      {cn23Order && (
+        <CN23Modal order={cn23Order} onClose={() => setCn23Order(null)} />
+      )}
 
       {/* Tracking Modal */}
       {selectedOrder && (
