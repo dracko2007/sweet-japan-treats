@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Printer, FileText, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { getRates } from '@/services/fxService';
 
 interface CN23Item {
   description: string;
@@ -57,14 +58,29 @@ const CN23Modal: React.FC<CN23ModalProps> = ({ order, onClose }) => {
   const [activeTab, setActiveTab] = useState<'edit' | 'preview'>('edit');
 
   useEffect(() => {
+    const currency = order.currency || 'BRL';
+    const rates = getRates();
+    const toJpy = (price: number): number => {
+      if (!price) return 0;
+      if (currency === 'JPY') return Math.round(price);
+      if (currency === 'EUR') return Math.round(price / (rates.EUR || 0.006));
+      // BRL → JPY
+      return Math.round(price / (rates.BRL || 0.036));
+    };
+
     const mapped: CN23Item[] = (order.items || []).map((it: any) => {
       const name = it.productName || it.name || '';
+      // Try priceJpy first, then convert from order currency
+      const unitPriceInCurrency = (it.price || 0) / (it.quantity || 1);
+      const unitJpy = it.priceJpy
+        ? Math.round(it.priceJpy)
+        : toJpy(unitPriceInCurrency);
       return {
         description: name,
         descriptionEn: guessCategory(name),
         quantity: it.quantity || 1,
         weightG: 300,
-        unitValueJpy: Math.round((it.price || 0) / (it.quantity || 1)),
+        unitValueJpy: unitJpy,
         hsCode: '',
       };
     });
