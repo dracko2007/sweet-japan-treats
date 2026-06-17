@@ -59,7 +59,7 @@ async function migrateProduct(p: Product): Promise<Product> {
   if (!thumbUrl || thumbUrl.startsWith('data:')) {
     const rawCover = rawGallery[0] || '';
     if (rawCover.startsWith('data:')) {
-      const thumbCompressed = await compressToWebp(rawCover, 400, 0.78);
+      const thumbCompressed = await compressToWebp(rawCover, 1200, 0.90);
       thumbUrl = await cloudinaryService.uploadDataUrl(thumbCompressed || rawCover, folder);
     } else {
       thumbUrl = coverUrl;
@@ -112,7 +112,7 @@ async function remigrateProductHD(p: Product): Promise<Product> {
   if (coverSrc) {
     const coverData = await fetchAsDataUrl(coverSrc);
     if (coverData) {
-      const thumbCompressed = await compressToWebp(coverData, 400, 0.82);
+      const thumbCompressed = await compressToWebp(coverData, 1200, 0.90);
       if (thumbCompressed) {
         try { thumbUrl = await cloudinaryService.uploadDataUrl(thumbCompressed, folder); } catch { thumbUrl = coverUrl; }
       }

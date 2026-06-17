@@ -75,9 +75,9 @@ function fileToCompressedDataURL(file: File, maxSize = 1920, quality = 0.90): Pr
   });
 }
 
-// Versão para thumbnail de lista (menor, mais agressiva)
+// Thumbnail em HD — mesmo tamanho da galeria para máxima qualidade
 function fileToThumbnailDataURL(file: File): Promise<string> {
-  return fileToCompressedDataURL(file, 300, 0.65);
+  return fileToCompressedDataURL(file, 1200, 0.90);
 }
 
 // Baixa uma imagem por URL e converte para WebP comprimido via canvas.
@@ -366,14 +366,14 @@ const ProductManager: React.FC = () => {
       const rawCover = rawGallery[0] || '';
       const coverUrl = await toCdnUrl(rawCover);
 
-      // Thumbnail 300px a partir do data URL original
+      // Thumbnail HD 1200px a partir do data URL original
       let thumbnailUrl = editing.thumbnail || '';
       const needNewThumb = rawCover && !cloudinaryService.isCloudinaryUrl(rawCover);
       if (needNewThumb) {
         const thumbData = await urlToCompressedDataURL(
           cloudinaryService.isDataUrl(rawCover) ? rawCover : coverUrl,
-          400,
-          0.78
+          1200,
+          0.90
         );
         thumbnailUrl = await cloudinaryService.uploadDataUrl(thumbData, folder);
       }
