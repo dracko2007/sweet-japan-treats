@@ -415,17 +415,9 @@ const Cart: React.FC = () => {
                   {/* Price Summary List */}
                   <div className="space-y-3 pt-2 border-t border-border">
 
-                    {/* Subtotal com preço riscado quando há cupom */}
-                    <div className="flex justify-between text-sm items-start">
+                    <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Subtotal dos itens</span>
-                      <div className="text-right">
-                        {discountAmount > 0 && (
-                          <p className="text-xs text-muted-foreground line-through">{formatPrice(baseTotalPrice, currency)}</p>
-                        )}
-                        <span className="font-semibold text-gray-800">
-                          {formatPrice(baseTotalPrice - discountAmount, currency)}
-                        </span>
-                      </div>
+                      <span className="font-semibold text-gray-800">{formatPrice(baseTotalPrice, currency)}</span>
                     </div>
 
                     {activeCoupon && (

@@ -779,11 +779,23 @@ const Checkout: React.FC = () => {
                       </div>
                     )}
 
-                    <div className="flex justify-between pt-2 border-t border-border font-bold">
+                    <div className="flex justify-between pt-2 border-t border-border font-bold items-start">
                       <span className="text-sm">Total a pagar</span>
-                      <span className="text-base text-orange-600">
-                        {formatPrice(grandTotal, currency)}
-                      </span>
+                      <div className="text-right">
+                        {couponDiscount > 0 && (
+                          <p className="text-xs text-muted-foreground line-through font-normal">
+                            {formatPrice(baseTotalPrice + actualShippingCost, currency)}
+                          </p>
+                        )}
+                        <span className="text-base text-orange-600">
+                          {formatPrice(grandTotal, currency)}
+                        </span>
+                        {couponDiscount > 0 && (
+                          <p className="text-[10px] text-green-600 font-bold mt-0.5">
+                            Você economiza {formatPrice(couponDiscount, currency)}
+                          </p>
+                        )}
+                      </div>
                     </div>
                   </div>
 
