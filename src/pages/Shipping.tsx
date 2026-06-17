@@ -77,7 +77,7 @@ const Shipping: React.FC = () => {
 
     if (billableWeightG <= 2000) {
       const yen = getELightRate(billableWeightG, zone);
-      rates.push({ name: 'Japan Post e-Raito ✉️', cost: yen ? fxConvert(yen, cur) : null, time: isEurope ? '7-12 dias' : '10-15 dias' });
+      rates.push({ name: 'Japan Post E-Light ✉️', cost: yen ? fxConvert(yen, cur) : null, time: isEurope ? '7-12 dias' : '10-15 dias' });
     } else {
       const salYen = getKozutsumiRate(billableWeightG, zone, 'sal');
       rates.push({ name: 'Japan Post SAL 📦', cost: salYen ? fxConvert(salYen, cur) : null, time: isEurope ? '15-30 dias' : '20-45 dias' });
@@ -167,7 +167,7 @@ const Shipping: React.FC = () => {
       const eurAir5kg  = fxConvert(getKozutsumiRate(5000, 3, 'air') ?? 12450, 'EUR');
       return [
         {
-          name: 'Japan Post e-Raito ✉️',
+          name: 'Japan Post E-Light ✉️',
           logo: '✉️',
           desc: 'Econômico para pacotes até 2 kg.',
           rate60: eurELight1kg,
@@ -207,7 +207,7 @@ const Shipping: React.FC = () => {
     }
 
     // Brasil — preços calculados com tabelas reais Japan Post (zona 5)
-    // Referência: e-Raito 1kg / 2kg, EMS 1kg / 3kg, Kozutsumi Air 3kg / 5kg
+    // Referência: E-Light 1kg / 2kg, EMS 1kg / 3kg, Kozutsumi Air 3kg / 5kg
     const brlELight1kg = fxConvert(getELightRate(1000, 5) ?? 3260, 'BRL');
     const brlELight2kg = fxConvert(getELightRate(2000, 5) ?? 5860, 'BRL');
     const brlEms1kg  = fxConvert(getEmsRate(1000, 5) ?? 4700, 'BRL');
@@ -216,7 +216,7 @@ const Shipping: React.FC = () => {
     const brlAir5kg  = fxConvert(getKozutsumiRate(5000, 5, 'air') ?? 15350, 'BRL');
     return [
       {
-        name: 'Japan Post e-Raito ✉️',
+        name: 'Japan Post E-Light ✉️',
         logo: '✉️',
         desc: 'Econômico para pacotes até 2 kg.',
         rate60: brlELight1kg,

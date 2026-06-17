@@ -1,7 +1,7 @@
 export type JapanPostZone = 3 | 5;
 export type KozutsumiType = 'air' | 'sal';
 
-// e-Raito (国際eパケットライト) ≤2kg — rates in ¥ per 100g bracket
+// E-Light (国際eパケットライト) ≤2kg — rates in ¥ per 100g bracket
 // Zone 3 = Europe, Zone 5 = Brazil/South America
 const E_LIGHT: Record<JapanPostZone, number[]> = {
   3: [880,1060,1240,1420,1600,1780,1960,2140,2320,2500,2680,2860,3040,3220,3400,3580,3760,3940,4120,4300],
@@ -44,7 +44,7 @@ const KOZUTSUMI: Record<JapanPostZone, Record<KozutsumiType, number[]>> = {
 export const MAX_WEIGHT_G = 30000; // 30kg — Japan Post hard limit
 export const MAX_DIM_SUM_CM = 150; // 1500mm = 150cm — Japan Post hard limit (H+W+D)
 
-/** Rate in ¥ for e-Raito (≤2000g). Returns null if out of range. */
+/** Rate in ¥ for E-Light (≤2000g). Returns null if out of range. */
 export const getELightRate = (weightG: number, zone: JapanPostZone): number | null => {
   if (weightG <= 0 || weightG > 2000) return null;
   const idx = Math.ceil(weightG / 100) - 1;

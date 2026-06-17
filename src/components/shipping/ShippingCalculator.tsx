@@ -112,7 +112,7 @@ const ShippingCalculator: React.FC<ShippingCalculatorProps> = ({
       const eLightYen = getELightRate(weightG, jpZone);
       if (eLightYen) options.push({
         carrier: 'eraito',
-        name: 'Japan Post e-Raito · 国際eパケットライト',
+        name: 'Japan Post E-Light · 国際eパケットライト',
         logo: '✉️',
         cost: fxConvert(eLightYen, currency),
         costYen: eLightYen,
