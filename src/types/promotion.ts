@@ -32,4 +32,5 @@ export interface ActivePromo {
   limitPerPerson: number;
   expiresAt: number | null;
   nextPromo: ScheduledNextPromo | null;
+  limitResetAt?: number; // timestamp — invalida contadores locais anteriores a este valor
 }

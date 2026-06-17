@@ -15,6 +15,27 @@ import { ActivePromo, ScheduledNextPromo, PROMO_TYPES } from '@/types/promotion'
 
 const BOUGHT_KEY = (id: string) => `promo_bought_${id}`;
 
+// Lê contagem respeitando limitResetAt — se o contador foi gravado antes do reset, ignora.
+function readBought(key: string, limitResetAt?: number): number {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return 0;
+    // Formato novo: {"count":1,"setAt":timestamp}
+    const parsed = JSON.parse(raw);
+    if (typeof parsed === 'object' && parsed !== null) {
+      if (limitResetAt && parsed.setAt < limitResetAt) return 0;
+      return parsed.count ?? 0;
+    }
+    // Formato legado: número direto
+    if (limitResetAt) return 0; // qualquer entrada legada é anterior ao reset
+    return parseInt(raw) || 0;
+  } catch { return 0; }
+}
+
+function writeBought(key: string, count: number) {
+  localStorage.setItem(key, JSON.stringify({ count, setAt: Date.now() }));
+}
+
 function useCountdown(expiresAt: number | null | undefined) {
   const [label, setLabel] = useState('');
   useEffect(() => {
@@ -95,7 +116,7 @@ const Promotion: React.FC = () => {
   const discount = promo.discountPct > 0 ? promo.discountPct : (promo.originalPriceYen > 0 ? Math.round((1 - promo.promoPriceYen / promo.originalPriceYen) * 100) : 0);
 
   const boughtKey = BOUGHT_KEY(promo.productId);
-  const alreadyBought = parseInt(localStorage.getItem(boughtKey) || '0');
+  const alreadyBought = readBought(boughtKey, promo.limitResetAt ?? undefined);
   const remaining = Math.max(0, promo.limitPerPerson - alreadyBought);
 
   const gallery: string[] = product?.gallery?.length ? product.gallery : [promo.productImage].filter(Boolean);
@@ -120,7 +141,7 @@ const Promotion: React.FC = () => {
     if (promoQty > 0) {
       const promoItem = { ...baseProduct, id: promo.productId + '_promo', name: promo.productName + ' ✨', prices: { small: promo.promoPriceYen ?? 0, large: promo.promoPriceYen ?? 0 } };
       addToCart(promoItem as any, 'small', promoQty);
-      localStorage.setItem(boughtKey, String(alreadyBought + promoQty));
+      writeBought(boughtKey, alreadyBought + promoQty);
     }
 
     // Adiciona excedente com preço original
@@ -144,6 +165,8 @@ const Promotion: React.FC = () => {
 
   const resetPromoLimit = () => {
     localStorage.removeItem(boughtKey);
+    // Também limpa formato legado
+    Object.keys(localStorage).filter(k => k.startsWith('promo_bought_')).forEach(k => localStorage.removeItem(k));
     window.location.reload();
   };
 

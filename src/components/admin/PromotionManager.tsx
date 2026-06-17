@@ -270,11 +270,19 @@ const PromotionManager: React.FC = () => {
           <p className="text-sm text-muted-foreground mt-1">Preços em ¥ — convertidos automaticamente para R$/€ conforme o país do cliente.</p>
         </div>
         <Button variant="outline" size="sm" className="border-orange-300 text-orange-600 hover:bg-orange-50 gap-1.5 text-xs shrink-0"
-          onClick={() => {
-            const keys = Object.keys(localStorage).filter(k => k.startsWith('promo_bought_'));
-            if (keys.length === 0) { toast({ title: 'Nenhum contador de promoção encontrado.' }); return; }
-            keys.forEach(k => localStorage.removeItem(k));
-            toast({ title: `🔄 ${keys.length} contador(es) resetado(s)`, description: 'Limite de compra por pessoa zerado neste navegador.' });
+          onClick={async () => {
+            if (!db || !active) { toast({ title: 'Nenhuma promoção ativa para resetar.' }); return; }
+            try {
+              await ensureAdminAuth();
+              const resetAt = Date.now();
+              await setDoc(doc(db, 'siteContent', 'homePromotion'), { ...active, limitResetAt: resetAt });
+              setActive({ ...active, limitResetAt: resetAt });
+              // Limpa também o navegador local
+              Object.keys(localStorage).filter(k => k.startsWith('promo_bought_')).forEach(k => localStorage.removeItem(k));
+              toast({ title: '🔄 Limites resetados para todos os clientes', description: 'Contadores anteriores a agora serão ignorados em qualquer dispositivo.' });
+            } catch (e: any) {
+              toast({ title: 'Erro', description: e?.message, variant: 'destructive' });
+            }
           }}>
           <RotateCcw className="w-3.5 h-3.5" /> Resetar limites de compra
         </Button>
