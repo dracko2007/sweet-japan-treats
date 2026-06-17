@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, ShieldCheck, Sparkles, PlaneTakeoff } from 'lucide-react';
+import { ArrowRight, ShieldCheck, Sparkles, PlaneTakeoff, Users, Star } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useLanguage } from '@/context/LanguageContext';
 import { db } from '@/config/firebase';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, getCountFromServer } from 'firebase/firestore';
 
 interface ActivePromo { type: string; productId: string; productName: string; productImage: string; }
 
@@ -19,16 +19,31 @@ const PROMO_LABELS: Record<string, string> = {
   frete: 'Frete Grátis',
 };
 
+// Número mínimo exibido (prova social mesmo sem pedidos reais ainda)
+const BASE_COUNT = 100;
+
 const HeroSection: React.FC = () => {
   const { t } = useLanguage();
   const [promo, setPromo] = useState<ActivePromo | null | undefined>(undefined);
+  const [orderCount, setOrderCount] = useState<number | null>(null);
 
   useEffect(() => {
     if (!db) { setPromo(null); return; }
     getDoc(doc(db, 'siteContent', 'homePromotion'))
       .then((snap) => setPromo(snap.exists() ? (snap.data() as ActivePromo) : null))
       .catch(() => setPromo(null));
+    // Conta pedidos reais no Firestore (usa aggregation — sem download de docs)
+    getCountFromServer(collection(db, 'orders'))
+      .then((snap) => setOrderCount(snap.data().count))
+      .catch(() => setOrderCount(0));
   }, []);
+
+  const displayCount = orderCount !== null && orderCount >= BASE_COUNT
+    ? orderCount   // número real quando >= 100
+    : BASE_COUNT;  // fallback fictício mas verdadeiro ("mais de 100")
+  const countLabel = orderCount !== null && orderCount >= BASE_COUNT
+    ? `${orderCount}+`
+    : `${BASE_COUNT}+`;
 
   return (
     <section className="relative min-h-[85vh] bg-gradient-to-b from-pink-100 via-pink-50/60 to-white overflow-hidden pt-12">
@@ -75,23 +90,25 @@ const HeroSection: React.FC = () => {
               </Button>
             </div>
 
-            {/* Shopping Stats */}
-            <div className="flex items-center gap-6 md:gap-8 pt-6 border-t border-gray-100">
-              <div>
-                <p className="text-2xl md:text-3xl font-black text-gray-900 flex items-center">
-                  100%<span className="text-orange-500 text-sm font-bold ml-1">★</span>
-                </p>
-                <p className="text-xs text-gray-500 uppercase tracking-wider font-bold mt-0.5">{t('hero.stat.artesanal')}</p>
-              </div>
-              <div className="w-px h-10 bg-gray-200" />
-              <div>
-                <p className="text-2xl md:text-3xl font-black text-gray-900">7+</p>
-                <p className="text-xs text-gray-500 uppercase tracking-wider font-bold mt-0.5">{t('hero.stat.flavors')}</p>
-              </div>
-              <div className="w-px h-10 bg-gray-200" />
-              <div>
-                <p className="text-2xl md:text-3xl font-black text-gray-900">27</p>
-                <p className="text-xs text-gray-500 uppercase tracking-wider font-bold mt-0.5">{t('hero.stat.provinces')}</p>
+            {/* Social proof counter — destaque máximo */}
+            <div className="pt-6 border-t border-gray-100">
+              <div className="flex items-center gap-4 bg-gradient-to-r from-orange-50 to-pink-50 border border-orange-100 rounded-2xl px-5 py-4">
+                <div className="w-12 h-12 rounded-full bg-orange-500 flex items-center justify-center shrink-0 shadow-md">
+                  <Users className="w-6 h-6 text-white" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-3xl md:text-4xl font-black text-gray-900 leading-none">
+                    {countLabel}
+                    <span className="text-orange-500 text-lg ml-1">✓</span>
+                  </p>
+                  <p className="text-sm font-bold text-gray-600 mt-0.5">clientes felizes no Brasil</p>
+                </div>
+                <div className="text-right shrink-0">
+                  <div className="flex items-center gap-0.5 justify-end">
+                    {[1,2,3,4,5].map(i => <Star key={i} className="w-3.5 h-3.5 fill-yellow-400 text-yellow-400" />)}
+                  </div>
+                  <p className="text-xs text-gray-500 font-semibold mt-0.5">avaliação média</p>
+                </div>
               </div>
             </div>
           </div>

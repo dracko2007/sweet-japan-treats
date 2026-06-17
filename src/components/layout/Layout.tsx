@@ -17,7 +17,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   return (
     <div className="min-h-screen flex flex-col">
       <Header />
-      <main className="flex-1 pt-20">
+      {/* pt-20 = header (80px) + pt extra para a barra de confiança (~28px) nas páginas de cliente */}
+      <main className={`flex-1 ${isAdminPage ? 'pt-20' : 'pt-[108px]'}`}>
         {children}
       </main>
       <Footer />

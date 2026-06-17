@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { ShoppingCart, Menu, X, ChevronDown, UserCircle, Heart } from 'lucide-react';
+import { ShoppingCart, Menu, X, ChevronDown, UserCircle, Heart, Lock, Package, ShieldCheck as ShieldCheckIcon, Plane } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
 import { useUser } from '@/context/UserContext';
 import { useLanguage } from '@/context/LanguageContext';
@@ -41,8 +41,31 @@ const Header: React.FC = () => {
   // No painel admin a loja é só em português → esconde o seletor de idioma
   const isAdminPage = location.pathname.startsWith('/admin');
 
+  const trustItems = [
+    { icon: Lock,            text: 'SSL Seguro' },
+    { icon: ShieldCheckIcon, text: 'Compra Protegida' },
+    { icon: Package,         text: 'Remessa Conforme' },
+    { icon: Plane,           text: 'Envio direto do Japão 🇯🇵' },
+  ];
+
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-md border-b border-border">
+      {/* Barra de confiança — esconde no painel admin */}
+      {!isAdminPage && (
+        <div className="bg-primary text-primary-foreground text-[11px] font-semibold overflow-hidden">
+          <div className="flex items-center justify-center gap-0 animate-none">
+            <div className="flex items-center gap-6 px-4 py-1.5 overflow-x-auto scrollbar-none whitespace-nowrap w-full justify-center">
+              {trustItems.map(({ icon: Icon, text }) => (
+                <span key={text} className="flex items-center gap-1.5 shrink-0">
+                  <Icon className="w-3 h-3 opacity-90" />
+                  {text}
+                  <span className="text-primary-foreground/40 mx-1 hidden sm:inline">|</span>
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-20 gap-4">
           {/* Logo */}
