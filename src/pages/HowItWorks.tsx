@@ -10,72 +10,264 @@ import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import FlagIcon from '@/components/FlagIcon';
 import { cn } from '@/lib/utils';
+import { useLanguage } from '@/context/LanguageContext';
 
 /* ════════════════════════════════════════════════════════════════
    "Como Funciona" — jornada do pedido, pagamento, impostos e rastreio,
    com desenhos interativos (SVG animado + passos clicáveis).
    ════════════════════════════════════════════════════════════════ */
 
-// ---------- 1. JORNADA DO PEDIDO (stepper interativo) ----------
-const JOURNEY = [
-  {
-    icon: Package, color: '#ec4899', title: 'Você faz o pedido',
-    desc: 'Escolhe os produtos no catálogo e fecha o carrinho. Pode ser produto pronto ou um "Faça seu Pedido" personalizado.',
-  },
-  {
-    icon: CreditCard, color: '#f59e0b', title: 'Pagamento',
-    desc: 'Você paga por PIX ou Wise (Brasil), PayPay (Japão) ou Wise (internacional). Só preparamos o pacote depois do pagamento confirmado.',
-  },
-  {
-    icon: Package, color: '#8b5cf6', title: 'Preparo em Hiroshima',
-    desc: 'Separamos e embalamos tudo com carinho na nossa loja no Japão, com proteção extra para a viagem.',
-  },
-  {
-    icon: Plane, color: '#3b82f6', title: 'Envio aéreo / marítimo',
-    desc: 'O pacote viaja do Japão até o seu país pela transportadora escolhida (EMS, Correios, Yamato, navio...).',
-  },
-  {
-    icon: Landmark, color: '#ef4444', title: 'Alfândega & impostos',
-    desc: 'Na chegada, a Receita Federal fiscaliza o pacote. Se houver imposto, você recebe a notificação e paga online (app/site dos Correios) ANTES da liberação — nunca em dinheiro ao carteiro.',
-  },
-  {
-    icon: Truck, color: '#22c55e', title: 'Correios entrega',
-    desc: 'Os Correios do seu país assumem a última etapa. Você acompanha tudo pelo código de rastreio.',
-  },
-  {
-    icon: Home, color: '#0ea5e9', title: 'Chega na sua casa 🎉',
-    desc: 'Você recebe na porta (ou retira na agência, se preferir). Pronto — um pedacinho do Japão chegou!',
-  },
-];
+const getJourney = (lang: string) => {
+  if (lang === 'en') return [
+    { icon: Package, color: '#ec4899', title: 'You place the order', desc: 'Choose products in the catalog and complete your cart. Can be a ready product or a custom "Place Your Order".' },
+    { icon: CreditCard, color: '#f59e0b', title: 'Payment', desc: 'Pay via PIX or Wise (Brazil), PayPay (Japan) or Wise (international). We start preparing only after payment confirmation.' },
+    { icon: Package, color: '#8b5cf6', title: 'Preparation in Hiroshima', desc: 'We carefully pick and pack everything in our Japan store, with extra protection for the journey.' },
+    { icon: Plane, color: '#3b82f6', title: 'Air / sea shipping', desc: 'The package travels from Japan to your country via the chosen carrier (EMS, Correios, Yamato, sea...).' },
+    { icon: Landmark, color: '#ef4444', title: 'Customs & taxes', desc: 'On arrival, customs inspects the package. If there is tax, you receive a notification and pay online BEFORE release — never in cash to the postal worker.' },
+    { icon: Truck, color: '#22c55e', title: 'Carrier delivers', desc: "Your country's postal service handles the last mile. You track everything with the tracking code." },
+    { icon: Home, color: '#0ea5e9', title: 'Arrives at your door 🎉', desc: 'You receive at your door (or pick up at the post office if you prefer). Done — a piece of Japan has arrived!' },
+  ];
+  if (lang === 'ja') return [
+    { icon: Package, color: '#ec4899', title: 'ご注文', desc: 'カタログから商品を選んでカートに入れます。既製品のほか、カスタム注文も承っています。' },
+    { icon: CreditCard, color: '#f59e0b', title: 'お支払い', desc: 'PIXまたはWise（ブラジル）、PayPay（日本）、Wise（海外）でお支払いいただけます。入金確認後に準備を開始します。' },
+    { icon: Package, color: '#8b5cf6', title: '広島での準備', desc: '日本の店舗で丁寧に商品をピッキングし、長距離輸送に備えた特別な梱包を施します。' },
+    { icon: Plane, color: '#3b82f6', title: '航空便・船便での発送', desc: '選択した配送業者（EMS、Correios、ヤマト、船便など）で日本からお届け先の国へ発送します。' },
+    { icon: Landmark, color: '#ef4444', title: '税関・関税', desc: '到着後、税関が荷物を検査します。関税がある場合は通知が届き、オンラインで支払い後に通関されます。配達員への現金払いは不要です。' },
+    { icon: Truck, color: '#22c55e', title: '配達', desc: 'お届け先の郵便局が最後の配送を担当します。追跡番号ですべてのステップを確認できます。' },
+    { icon: Home, color: '#0ea5e9', title: 'ご自宅に到着 🎉', desc: 'ご自宅でお受け取り（または郵便局での受取も可能）。日本のアイテムがお手元に届きます！' },
+  ];
+  return [
+    { icon: Package, color: '#ec4899', title: 'Você faz o pedido', desc: 'Escolhe os produtos no catálogo e fecha o carrinho. Pode ser produto pronto ou um "Faça seu Pedido" personalizado.' },
+    { icon: CreditCard, color: '#f59e0b', title: 'Pagamento', desc: 'Você paga por PIX ou Wise (Brasil), PayPay (Japão) ou Wise (internacional). Só preparamos o pacote depois do pagamento confirmado.' },
+    { icon: Package, color: '#8b5cf6', title: 'Preparo em Hiroshima', desc: 'Separamos e embalamos tudo com carinho na nossa loja no Japão, com proteção extra para a viagem.' },
+    { icon: Plane, color: '#3b82f6', title: 'Envio aéreo / marítimo', desc: 'O pacote viaja do Japão até o seu país pela transportadora escolhida (EMS, Correios, Yamato, navio...).' },
+    { icon: Landmark, color: '#ef4444', title: 'Alfândega & impostos', desc: 'Na chegada, a Receita Federal fiscaliza o pacote. Se houver imposto, você recebe a notificação e paga online ANTES da liberação — nunca em dinheiro ao carteiro.' },
+    { icon: Truck, color: '#22c55e', title: 'Correios entrega', desc: 'Os Correios do seu país assumem a última etapa. Você acompanha tudo pelo código de rastreio.' },
+    { icon: Home, color: '#0ea5e9', title: 'Chega na sua casa 🎉', desc: 'Você recebe na porta (ou retira na agência, se preferir). Pronto — um pedacinho do Japão chegou!' },
+  ];
+};
 
-const JourneyStepper: React.FC = () => {
+const getPayments = (lang: string) => {
+  if (lang === 'en') return [
+    {
+      id: 'pix', icon: QrCode, color: '#22c55e', label: 'PIX', tag: 'Brazil 🇧🇷',
+      short: 'Instant payment with QR Code or copy-paste code.',
+      steps: [
+        'At checkout, choose PIX.',
+        'Open your bank app and scan the QR Code (or paste the code).',
+        'Confirm the exact amount and pay.',
+        'Payment is identified automatically and your order enters preparation.',
+      ],
+    },
+    {
+      id: 'paypay', icon: Wallet, color: '#ef4444', label: 'PayPay', tag: 'Japan 🇯🇵',
+      short: 'Most used digital wallet in Japan, via QR Code.',
+      steps: [
+        'At checkout, choose PayPay.',
+        'Open the PayPay app and tap "Scan".',
+        'Scan the Japan Express QR Code.',
+        'Enter the exact amount and confirm payment.',
+      ],
+    },
+    {
+      id: 'wise', icon: Globe2, color: '#3b82f6', label: 'Wise', tag: 'Brazil 🇧🇷 & International 🌍',
+      short: 'Cheap international transfer — Brazil, Europe and other countries.',
+      steps: [
+        'At checkout, choose Wise.',
+        'You receive a Wise payment link (or Wisetag).',
+        'Open the link and pay in your local currency (EUR, USD...).',
+        'Send us the receipt and we confirm preparation.',
+      ],
+    },
+  ];
+  if (lang === 'ja') return [
+    {
+      id: 'pix', icon: QrCode, color: '#22c55e', label: 'PIX', tag: 'ブラジル 🇧🇷',
+      short: 'QRコードまたはコピー＆ペーストコードで即時支払い。',
+      steps: [
+        'チェックアウトでPIXを選択。',
+        '銀行アプリを開いてQRコードをスキャン（またはコードを貼り付け）。',
+        '正確な金額を確認して支払い。',
+        '支払いが自動認識され、注文の準備が開始されます。',
+      ],
+    },
+    {
+      id: 'paypay', icon: Wallet, color: '#ef4444', label: 'PayPay', tag: '日本 🇯🇵',
+      short: 'QRコードで使える、日本で最も利用されている電子財布。',
+      steps: [
+        'チェックアウトでPayPayを選択。',
+        'PayPayアプリを開いて「スキャン」をタップ。',
+        'Japan ExpressのQRコードをスキャン。',
+        '正確な金額を入力して支払いを確認。',
+      ],
+    },
+    {
+      id: 'wise', icon: Globe2, color: '#3b82f6', label: 'Wise', tag: 'ブラジル 🇧🇷 & 海外 🌍',
+      short: '低コストの国際送金 — ブラジル、ヨーロッパ、その他の国々。',
+      steps: [
+        'チェックアウトでWiseを選択。',
+        'Wise支払いリンク（またはWisetag）が届きます。',
+        'リンクを開いて地元通貨（EUR、USDなど）で支払い。',
+        '領収書をお送りいただければ準備を確認します。',
+      ],
+    },
+  ];
+  return [
+    {
+      id: 'pix', icon: QrCode, color: '#22c55e', label: 'PIX', tag: 'Brasil 🇧🇷',
+      short: 'Pagamento instantâneo com QR Code ou código copia-e-cola.',
+      steps: [
+        'No checkout, escolha PIX.',
+        'Abra o app do seu banco e escaneie o QR Code (ou cole o código).',
+        'Confirme o valor exato e pague.',
+        'O pagamento é identificado automaticamente e seu pedido entra em preparo.',
+      ],
+    },
+    {
+      id: 'paypay', icon: Wallet, color: '#ef4444', label: 'PayPay', tag: 'Japão 🇯🇵',
+      short: 'Carteira digital mais usada no Japão, via QR Code.',
+      steps: [
+        'No checkout, escolha PayPay.',
+        'Abra o app PayPay e toque em "Scan".',
+        'Escaneie o QR Code da Japan Express.',
+        'Digite o valor exato e confirme o pagamento.',
+      ],
+    },
+    {
+      id: 'wise', icon: Globe2, color: '#3b82f6', label: 'Wise', tag: 'Brasil 🇧🇷 & Internacional 🌍',
+      short: 'Transferência internacional barata — Brasil, Europa e outros países.',
+      steps: [
+        'No checkout, escolha Wise.',
+        'Você recebe um link de cobrança Wise (ou Wisetag).',
+        'Abra o link e pague na sua moeda local (EUR, USD...).',
+        'Nos envie o comprovante e confirmamos o preparo.',
+      ],
+    },
+  ];
+};
+
+const getPickup = (lang: string) => {
+  if (lang === 'en') return [
+    { ic: Home, color: '#22c55e', t: 'Home delivery', d: 'After clearance (and tax paid online, if any), the carrier delivers to your address. Taxes are always paid in advance via app — never in cash at the door.' },
+    { ic: MapPin, color: '#3b82f6', t: 'Pick up at post office', d: 'If no one is home, the package stays at a nearby post office for pickup with ID.' },
+    { ic: ShieldCheck, color: '#8b5cf6', t: 'Inspect and sign', d: 'Check the packaging upon delivery. In case of damage, document it and let us know — we help with the carrier.' },
+  ];
+  if (lang === 'ja') return [
+    { ic: Home, color: '#22c55e', t: '自宅配達', d: '通関完了後（関税がある場合はオンライン支払い後）、配達員が指定住所にお届けします。税金は必ずアプリで事前に支払い、配達員への現金払いは不要です。' },
+    { ic: MapPin, color: '#3b82f6', t: '郵便局での受取', d: '不在の場合、荷物は近くの郵便局に保管されます。身分証明書を持参して受け取ってください。' },
+    { ic: ShieldCheck, color: '#8b5cf6', t: '確認とサイン', d: '受取時に梱包状態を確認してください。破損があった場合は記録して連絡ください。配送業者との対応をサポートします。' },
+  ];
+  return [
+    { ic: Home, color: '#22c55e', t: 'Entrega em casa', d: 'Depois de liberado (e do imposto pago online, se houver), o carteiro entrega no endereço do pedido. O pagamento de tributos é sempre feito antes, pelo app — nunca em dinheiro na porta.' },
+    { ic: MapPin, color: '#3b82f6', t: 'Retirar na agência', d: 'Se ninguém estiver em casa, o pacote fica numa agência dos Correios perto de você para retirada com documento.' },
+    { ic: ShieldCheck, color: '#8b5cf6', t: 'Confira e assine', d: 'Confira a embalagem na entrega. Em caso de avaria, registre e nos avise — ajudamos com a transportadora.' },
+  ];
+};
+
+const getTrackStates = (lang: string) => {
+  if (lang === 'en') return [
+    { ic: Package, lb: 'Package posted', sub: 'Hiroshima, Japan', color: '#ec4899' },
+    { ic: Plane, lb: 'International transit', sub: 'Flight to destination', color: '#3b82f6' },
+    { ic: Landmark, lb: 'Customs inspection', sub: 'Awaiting clearance', color: '#ef4444' },
+    { ic: Truck, lb: 'Out for delivery', sub: 'Your city', color: '#f59e0b' },
+    { ic: Home, lb: 'Package delivered 🎉', sub: 'Received', color: '#22c55e' },
+  ];
+  if (lang === 'ja') return [
+    { ic: Package, lb: '荷物を発送', sub: '広島、日本', color: '#ec4899' },
+    { ic: Plane, lb: '国際輸送中', sub: '目的地へのフライト', color: '#3b82f6' },
+    { ic: Landmark, lb: '税関検査', sub: '通関待ち', color: '#ef4444' },
+    { ic: Truck, lb: '配達中', sub: 'お届け先の市区町村', color: '#f59e0b' },
+    { ic: Home, lb: '配達完了 🎉', sub: '受け取り済み', color: '#22c55e' },
+  ];
+  return [
+    { ic: Package, lb: 'Objeto postado', sub: 'Hiroshima, Japão', color: '#ec4899' },
+    { ic: Plane, lb: 'Em trânsito internacional', sub: 'Voo para o Brasil', color: '#3b82f6' },
+    { ic: Landmark, lb: 'Fiscalização aduaneira', sub: 'Aguardando liberação', color: '#ef4444' },
+    { ic: Truck, lb: 'Saiu para entrega', sub: 'Sua cidade', color: '#f59e0b' },
+    { ic: Home, lb: 'Objeto entregue 🎉', sub: 'Recebido', color: '#22c55e' },
+  ];
+};
+
+const getTrackingSteps = (lang: string) => {
+  if (lang === 'en') return [
+    ['Download the "Correios" App', 'Available on App Store (iOS) and Google Play (Android).'],
+    ['Copy the tracking code', 'We send it as soon as the package is posted in Japan.'],
+    ['Paste in the app search', 'Tap "Track" and see each step in real time.'],
+    ['Enable notifications', 'The app alerts you when the package is out for delivery or at the agency.'],
+  ];
+  if (lang === 'ja') return [
+    ['「Correios」アプリをダウンロード', 'App Store（iOS）またはGoogle Play（Android）から入手できます。'],
+    ['追跡番号をコピー', '荷物が日本で発送されると同時にお知らせします。'],
+    ['アプリの検索欄に貼り付け', '「追跡」をタップしてリアルタイムで各ステップを確認。'],
+    ['通知を有効にする', '配達開始または郵便局到着時にアプリが通知します。'],
+  ];
+  return [
+    ['Baixe o app "Correios"', 'Disponível na App Store (iOS) e Google Play (Android).'],
+    ['Copie o código de rastreio', 'Enviamos por mensagem assim que o pacote é postado no Japão.'],
+    ['Cole na busca do app', 'Toque em "Rastrear" e veja cada etapa em tempo real.'],
+    ['Ative as notificações', 'O app avisa quando o pacote sai para entrega ou chega na agência.'],
+  ];
+};
+
+// ---------- TAX (keeps country-specific content) ----------
+const TAX = {
+  Brasil: {
+    flagCode: 'br', tone: '#f59e0b',
+    headline: 'Quem cobra é a Receita Federal (Remessa Conforme)',
+    rows: [
+      ['Compras até US$ 50', '20% Imposto de Importação + 17% ICMS'],
+      ['De US$ 50 a US$ 3.000', '60% (− US$ 20 de desconto) + 17% ICMS'],
+    ],
+    note: 'Os Correios apenas entregam — quem tributa é a Receita Federal. Você é avisado pelo app/e-mail/SMS dos Correios e paga online (Pix, cartão ou boleto) ANTES da liberação. Nunca se paga em dinheiro ao carteiro. ⚠️ Cuidado com links falsos: confirme sempre no app oficial ou em correios.com.br.',
+  },
+  Europa: {
+    flagCode: 'eu', tone: '#3b82f6',
+    headline: 'IVA + taxa postal local, pagos na entrega',
+    rows: [
+      ['No site (checkout)', '€ 0,00 de imposto'],
+      ['Na alfândega local', 'IVA do país (20–23%) + taxa postal'],
+    ],
+    note: 'Enviamos via remessa postal internacional. O IVA e a taxa dos correios locais (CTT, La Poste...) são cobrados na entrega.',
+  },
+  Japão: {
+    flagCode: 'jp', tone: '#22c55e',
+    headline: 'Envio nacional — sem imposto de importação',
+    rows: [
+      ['Imposto de importação', 'Isento (¥0)'],
+      ['Consumo (Shouhizei 10%)', 'Já incluso no preço'],
+    ],
+    note: 'Despachado de Hiroshima dentro do Japão: nenhum trâmite alfandegário. Frete grátis acima de ¥6.000.',
+  },
+} as const;
+
+type TaxKey = keyof typeof TAX;
+
+// ---------- SUBCOMPONENTS ----------
+
+interface JourneyStepperProps { language: string; t: (key: string) => string; }
+const JourneyStepper: React.FC<JourneyStepperProps> = ({ language, t }) => {
+  const JOURNEY = getJourney(language);
   const [active, setActive] = useState(0);
   const [paused, setPaused] = useState(false);
 
-  // Avança sozinho devagar; ao clicar num passo, para para a pessoa ler com calma.
   useEffect(() => {
     if (paused) return;
     const id = setInterval(() => setActive((a) => (a + 1) % JOURNEY.length), 6000);
     return () => clearInterval(id);
-  }, [paused]);
+  }, [paused, JOURNEY.length]);
 
   const pick = (i: number) => { setActive(i); setPaused(true); };
-
   const Cur = JOURNEY[active];
   const pct = (active / (JOURNEY.length - 1)) * 100;
 
   return (
     <div className="bg-card rounded-2xl border border-border p-5 sm:p-8 shadow-sm">
-      {/* Trilha com o pacote viajando */}
       <div className="relative mb-8 pt-6">
-        {/* linha de fundo */}
         <div className="absolute left-0 right-0 top-[42px] h-1.5 bg-secondary rounded-full" />
-        {/* linha preenchida */}
         <div
           className="absolute left-0 top-[42px] h-1.5 rounded-full transition-all duration-700 ease-out"
           style={{ width: `${pct}%`, background: 'linear-gradient(90deg,#ec4899,#f59e0b)' }}
         />
-        {/* pacote voando sobre a linha */}
         <div
           className="absolute -top-1 transition-all duration-700 ease-out z-10"
           style={{ left: `calc(${pct}% - 16px)` }}
@@ -86,7 +278,6 @@ const JourneyStepper: React.FC = () => {
           </div>
         </div>
 
-        {/* bolinhas dos passos */}
         <div className="flex justify-between relative">
           {JOURNEY.map((s, i) => {
             const Ico = s.icon;
@@ -125,14 +316,13 @@ const JourneyStepper: React.FC = () => {
         </div>
       </div>
 
-      {/* Painel do passo ativo */}
       <div key={active} className="animate-fade-up flex items-start gap-4 bg-secondary/40 rounded-xl p-5 border border-border/60">
         <div className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0" style={{ background: `${Cur.color}1a` }}>
           <Cur.icon className="w-6 h-6" style={{ color: Cur.color }} />
         </div>
         <div>
           <p className="text-xs font-bold uppercase tracking-wider mb-1" style={{ color: Cur.color }}>
-            Passo {active + 1} de {JOURNEY.length}
+            {t('howItWorks.step')} {active + 1} {t('howItWorks.of')} {JOURNEY.length}
           </p>
           <h3 className="font-bold text-lg text-foreground mb-1">{Cur.title}</h3>
           <p className="text-sm text-muted-foreground leading-relaxed">{Cur.desc}</p>
@@ -141,51 +331,19 @@ const JourneyStepper: React.FC = () => {
       <div className="text-center mt-3">
         {paused ? (
           <button onClick={() => setPaused(false)} className="text-[11px] font-semibold text-primary hover:underline">
-            ⏸️ Pausado — toque para voltar a avançar automaticamente
+            {t('howItWorks.paused')}
           </button>
         ) : (
-          <p className="text-[11px] text-muted-foreground">👆 Toque em uma etapa para pausar e ler com calma</p>
+          <p className="text-[11px] text-muted-foreground">{t('howItWorks.tapToPause')}</p>
         )}
       </div>
     </div>
   );
 };
 
-// ---------- 2. FORMAS DE PAGAMENTO (cartões interativos) ----------
-const PAYMENTS = [
-  {
-    id: 'pix', icon: QrCode, color: '#22c55e', label: 'PIX', tag: 'Brasil 🇧🇷',
-    short: 'Pagamento instantâneo com QR Code ou código copia-e-cola.',
-    steps: [
-      'No checkout, escolha PIX.',
-      'Abra o app do seu banco e escaneie o QR Code (ou cole o código).',
-      'Confirme o valor exato e pague.',
-      'O pagamento é identificado automaticamente e seu pedido entra em preparo.',
-    ],
-  },
-  {
-    id: 'paypay', icon: Wallet, color: '#ef4444', label: 'PayPay', tag: 'Japão 🇯🇵',
-    short: 'Carteira digital mais usada no Japão, via QR Code.',
-    steps: [
-      'No checkout, escolha PayPay.',
-      'Abra o app PayPay e toque em "Scan".',
-      'Escaneie o QR Code da Japan Express.',
-      'Digite o valor exato e confirme o pagamento.',
-    ],
-  },
-  {
-    id: 'wise', icon: Globe2, color: '#3b82f6', label: 'Wise', tag: 'Brasil 🇧🇷 & Internacional 🌍',
-    short: 'Transferência internacional barata — Brasil, Europa e outros países.',
-    steps: [
-      'No checkout, escolha Wise.',
-      'Você recebe um link de cobrança Wise (ou Wisetag).',
-      'Abra o link e pague na sua moeda local (EUR, USD...).',
-      'Nos envie o comprovante e confirmamos o preparo.',
-    ],
-  },
-];
-
-const PaymentMethods: React.FC = () => {
+interface PaymentMethodsProps { language: string; t: (key: string) => string; }
+const PaymentMethods: React.FC<PaymentMethodsProps> = ({ language, t }) => {
+  const PAYMENTS = getPayments(language);
   const [open, setOpen] = useState('pix');
   return (
     <div className="grid md:grid-cols-3 gap-4">
@@ -225,7 +383,7 @@ const PaymentMethods: React.FC = () => {
                 ))}
               </ol>
             </div>
-            {!isOpen && <span className="text-[11px] font-semibold" style={{ color: p.color }}>Ver passo a passo →</span>}
+            {!isOpen && <span className="text-[11px] font-semibold" style={{ color: p.color }}>{t('howItWorks.seeStepByStep')}</span>}
           </button>
         );
       })}
@@ -233,45 +391,12 @@ const PaymentMethods: React.FC = () => {
   );
 };
 
-// ---------- 3. IMPOSTOS (explicador por país) ----------
-const TAX = {
-  Brasil: {
-    flagCode: 'br', tone: '#f59e0b',
-    headline: 'Quem cobra é a Receita Federal (Remessa Conforme)',
-    rows: [
-      ['Compras até US$ 50', '20% Imposto de Importação + 17% ICMS'],
-      ['De US$ 50 a US$ 3.000', '60% (− US$ 20 de desconto) + 17% ICMS'],
-    ],
-    note: 'Os Correios apenas entregam — quem tributa é a Receita Federal. Você é avisado pelo app/e-mail/SMS dos Correios e paga online (Pix, cartão ou boleto) ANTES da liberação. Nunca se paga em dinheiro ao carteiro. ⚠️ Cuidado com links falsos: confirme sempre no app oficial ou em correios.com.br.',
-  },
-  Europa: {
-    flagCode: 'eu', tone: '#3b82f6',
-    headline: 'IVA + taxa postal local, pagos na entrega',
-    rows: [
-      ['No site (checkout)', '€ 0,00 de imposto'],
-      ['Na alfândega local', 'IVA do país (20–23%) + taxa postal'],
-    ],
-    note: 'Enviamos via remessa postal internacional. O IVA e a taxa dos correios locais (CTT, La Poste...) são cobrados na entrega.',
-  },
-  Japão: {
-    flagCode: 'jp', tone: '#22c55e',
-    headline: 'Envio nacional — sem imposto de importação',
-    rows: [
-      ['Imposto de importação', 'Isento (¥0)'],
-      ['Consumo (Shouhizei 10%)', 'Já incluso no preço'],
-    ],
-    note: 'Despachado de Hiroshima dentro do Japão: nenhum trâmite alfandegário. Frete grátis acima de ¥6.000.',
-  },
-} as const;
-
-type TaxKey = keyof typeof TAX;
-
-const TaxExplainer: React.FC = () => {
+interface TaxExplainerProps { language: string; }
+const TaxExplainer: React.FC<TaxExplainerProps> = ({ language: _lang }) => {
   const [c, setC] = useState<TaxKey>('Brasil');
-  const t = TAX[c];
+  const tx = TAX[c];
   return (
     <div className="bg-card rounded-2xl border border-border p-5 sm:p-7 shadow-sm">
-      {/* toggle país */}
       <div className="flex gap-2 mb-5">
         {(Object.keys(TAX) as TaxKey[]).map((k) => (
           <button
@@ -288,7 +413,6 @@ const TaxExplainer: React.FC = () => {
         ))}
       </div>
 
-      {/* fluxo visual produto → alfândega → você */}
       <div className="flex items-center justify-between gap-2 mb-5">
         {[
           { ic: Package, lb: 'Produto + frete', sub: 'pago no site' },
@@ -297,8 +421,8 @@ const TaxExplainer: React.FC = () => {
         ].map((s, i, arr) => (
           <React.Fragment key={i}>
             <div className="flex flex-col items-center text-center gap-1.5 flex-1">
-              <span className="w-11 h-11 rounded-full flex items-center justify-center" style={{ background: `${t.tone}1a` }}>
-                <s.ic className="w-5 h-5" style={{ color: t.tone }} />
+              <span className="w-11 h-11 rounded-full flex items-center justify-center" style={{ background: `${tx.tone}1a` }}>
+                <s.ic className="w-5 h-5" style={{ color: tx.tone }} />
               </span>
               <span className="text-[11px] font-bold text-foreground leading-none">{s.lb}</span>
               <span className="text-[10px] text-muted-foreground">{s.sub}</span>
@@ -308,36 +432,30 @@ const TaxExplainer: React.FC = () => {
         ))}
       </div>
 
-      <div key={c} className="animate-fade-up rounded-xl p-4 border" style={{ background: `${t.tone}0d`, borderColor: `${t.tone}33` }}>
+      <div key={c} className="animate-fade-up rounded-xl p-4 border" style={{ background: `${tx.tone}0d`, borderColor: `${tx.tone}33` }}>
         <p className="font-bold text-foreground flex items-center gap-2 mb-3">
-          <Percent className="w-4 h-4" style={{ color: t.tone }} /> {t.headline}
+          <Percent className="w-4 h-4" style={{ color: tx.tone }} /> {tx.headline}
         </p>
         <div className="space-y-2 mb-3">
-          {t.rows.map(([a, b], i) => (
+          {tx.rows.map(([a, b], i) => (
             <div key={i} className="flex justify-between items-center text-xs gap-3 border-b border-border/50 pb-2 last:border-0">
               <span className="text-muted-foreground">{a}</span>
-              <span className="font-bold text-foreground text-right" style={{ color: t.tone }}>{b}</span>
+              <span className="font-bold text-foreground text-right" style={{ color: tx.tone }}>{b}</span>
             </div>
           ))}
         </div>
         <p className="text-[11px] text-muted-foreground leading-relaxed bg-background/60 rounded-lg p-2.5">
-          ⚠️ {t.note}
+          ⚠️ {tx.note}
         </p>
       </div>
     </div>
   );
 };
 
-// ---------- 4. APP CORREIOS + RASTREAMENTO (mockup de celular) ----------
-const TRACK_STATES = [
-  { ic: Package, lb: 'Objeto postado', sub: 'Hiroshima, Japão', color: '#ec4899' },
-  { ic: Plane, lb: 'Em trânsito internacional', sub: 'Voo para o Brasil', color: '#3b82f6' },
-  { ic: Landmark, lb: 'Fiscalização aduaneira', sub: 'Aguardando liberação', color: '#ef4444' },
-  { ic: Truck, lb: 'Saiu para entrega', sub: 'Sua cidade', color: '#f59e0b' },
-  { ic: Home, lb: 'Objeto entregue 🎉', sub: 'Recebido', color: '#22c55e' },
-];
-
-const CorreiosTracking: React.FC = () => {
+interface CorreiosTrackingProps { language: string; t: (key: string) => string; }
+const CorreiosTracking: React.FC<CorreiosTrackingProps> = ({ language, t }) => {
+  const TRACK_STATES = getTrackStates(language);
+  const trackingSteps = getTrackingSteps(language);
   const [step, setStep] = useState(0);
   const [paused, setPaused] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -347,7 +465,7 @@ const CorreiosTracking: React.FC = () => {
     if (paused) return;
     const id = setInterval(() => setStep((s) => (s + 1) % (TRACK_STATES.length + 1)), 3500);
     return () => clearInterval(id);
-  }, [paused]);
+  }, [paused, TRACK_STATES.length]);
 
   const copy = () => {
     navigator.clipboard?.writeText(fakeCode);
@@ -357,28 +475,23 @@ const CorreiosTracking: React.FC = () => {
 
   return (
     <div className="grid lg:grid-cols-2 gap-6 items-center">
-      {/* Mockup de celular */}
       <div className="flex flex-col items-center">
         <div
           onClick={() => setPaused((p) => !p)}
           title="Toque para pausar/continuar"
           className="w-[270px] rounded-[2.2rem] border-[10px] border-foreground/90 bg-background shadow-2xl overflow-hidden cursor-pointer select-none">
-          {/* notch */}
           <div className="h-6 bg-foreground/90 flex items-center justify-center">
             <div className="w-16 h-1.5 bg-background/40 rounded-full" />
           </div>
-          {/* topo do app */}
           <div className="px-4 py-3 text-white flex items-center gap-2" style={{ background: 'linear-gradient(135deg,#facc15,#eab308)' }}>
             <span className="w-7 h-7 rounded-md bg-white/20 flex items-center justify-center">📮</span>
             <span className="font-bold text-sm">App Correios</span>
           </div>
-          {/* campo de busca */}
           <div className="p-3">
             <div className="flex items-center gap-2 bg-secondary rounded-lg px-2.5 py-2 mb-3">
               <Search className="w-3.5 h-3.5 text-muted-foreground" />
               <span className="text-[11px] font-mono text-foreground tracking-wide">{fakeCode}</span>
             </div>
-            {/* timeline */}
             <div className="space-y-0">
               {TRACK_STATES.map((s, i) => {
                 const reached = i < step;
@@ -407,27 +520,21 @@ const CorreiosTracking: React.FC = () => {
           </div>
         </div>
         <button onClick={() => setPaused((p) => !p)} className="text-[11px] font-semibold text-primary hover:underline mt-3">
-          {paused ? '⏸️ Pausado — toque para continuar' : '👆 Toque no celular para pausar'}
+          {paused ? t('howItWorks.phonePause') : t('howItWorks.phoneTap')}
         </button>
       </div>
 
-      {/* Instruções */}
       <div>
         <h3 className="font-bold text-xl text-foreground mb-3 flex items-center gap-2">
-          <Smartphone className="w-5 h-5 text-primary" /> Acompanhe pelo app dos Correios
+          <Smartphone className="w-5 h-5 text-primary" /> {t('howItWorks.tracking.instructions.title')}
         </h3>
         <ol className="space-y-3 mb-5">
-          {[
-            ['Baixe o app "Correios"', 'Disponível na App Store (iOS) e Google Play (Android).'],
-            ['Copie o código de rastreio', 'Enviamos por mensagem assim que o pacote é postado no Japão.'],
-            ['Cole na busca do app', 'Toque em "Rastrear" e veja cada etapa em tempo real.'],
-            ['Ative as notificações', 'O app avisa quando o pacote sai para entrega ou chega na agência.'],
-          ].map(([t, d], i) => (
+          {trackingSteps.map(([title, desc], i) => (
             <li key={i} className="flex gap-3">
               <span className="w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center shrink-0">{i + 1}</span>
               <div>
-                <p className="font-semibold text-sm text-foreground">{t}</p>
-                <p className="text-xs text-muted-foreground">{d}</p>
+                <p className="font-semibold text-sm text-foreground">{title}</p>
+                <p className="text-xs text-muted-foreground">{desc}</p>
               </div>
             </li>
           ))}
@@ -436,22 +543,22 @@ const CorreiosTracking: React.FC = () => {
         <div className="flex flex-col sm:flex-row flex-wrap gap-2 mb-4">
           <Button onClick={copy} variant="outline" className="gap-2 justify-center min-w-0 flex-1 sm:flex-none">
             {copied ? <Check className="w-4 h-4 text-green-600 shrink-0" /> : <Copy className="w-4 h-4 shrink-0" />}
-            <span className="truncate">{copied ? 'Código copiado!' : 'Copiar código de exemplo'}</span>
+            <span className="truncate">{copied ? t('howItWorks.tracking.btn.copied') : t('howItWorks.tracking.btn.copy')}</span>
           </Button>
           <Button asChild className="btn-primary gap-2 justify-center min-w-0 flex-1 sm:flex-none">
-            <Link to="/rastrear"><MapPin className="w-4 h-4 shrink-0" /> <span className="truncate">Rastrear meu pedido</span></Link>
+            <Link to="/rastrear"><MapPin className="w-4 h-4 shrink-0" /> <span className="truncate">{t('howItWorks.tracking.btn.track')}</span></Link>
           </Button>
         </div>
         <p className="text-xs text-muted-foreground flex items-start gap-1.5 bg-secondary/40 rounded-lg p-3">
           <Bell className="w-4 h-4 text-primary shrink-0 mt-0.5" />
-          Dica: fora do Brasil, use o app/site dos correios do seu país (CTT, La Poste, Japan Post...) com o mesmo código de rastreio internacional.
+          {t('howItWorks.tracking.tip')}
         </p>
       </div>
     </div>
   );
 };
 
-// ---------- 4b. IMPORTAÇÃO PARA EMPRESAS (banner expansível) ----------
+// ---------- Business Import (expandable banner) ----------
 const BIZ_STEPS = [
   { ic: BadgeCheck, t: 'Habilitação no Radar / Siscomex', d: 'A empresa precisa do Radar (Registro e Rastreamento da Atuação dos Intervenientes Aduaneiros) habilitado na Receita Federal para operar no Siscomex — o sistema oficial de comércio exterior.' },
   { ic: Briefcase, t: 'Despachante aduaneiro', d: 'Um despachante registra a operação e cuida da documentação. Para grandes volumes/valores, é praticamente obrigatório.' },
@@ -459,7 +566,8 @@ const BIZ_STEPS = [
   { ic: Percent, t: 'Tributação completa', d: 'Em vez do regime simplificado, incidem II + IPI + PIS/COFINS-Importação + ICMS, conforme a NCM. Pode somar bem mais que os 60% do regime de pessoa física.' },
 ];
 
-const BusinessImport: React.FC = () => {
+interface BusinessImportProps { t: (key: string) => string; }
+const BusinessImport: React.FC<BusinessImportProps> = ({ t }) => {
   const [open, setOpen] = useState(false);
   return (
     <div className="rounded-2xl border-2 border-dashed border-primary/40 bg-primary/5 overflow-hidden">
@@ -471,9 +579,9 @@ const BusinessImport: React.FC = () => {
           <Building2 className="w-6 h-6 text-primary" />
         </span>
         <div className="flex-1">
-          <h3 className="font-bold text-foreground">Você é empresa? Importação em grande volume</h3>
+          <h3 className="font-bold text-foreground">{t('howItWorks.biz.title')}</h3>
           <p className="text-xs text-muted-foreground">
-            Acima de US$ 3.000 por remessa, ou compras para revenda, seguem outro caminho — clique para entender.
+            {t('howItWorks.biz.subtitle')}
           </p>
         </div>
         <ChevronDown className={cn('w-5 h-5 text-primary shrink-0 transition-transform', open && 'rotate-180')} />
@@ -504,10 +612,10 @@ const BusinessImport: React.FC = () => {
 
           <div className="flex flex-col sm:flex-row gap-2">
             <Button asChild className="btn-primary gap-2">
-              <Link to="/empresas"><Building2 className="w-4 h-4" /> Falar sobre pedido empresarial</Link>
+              <Link to="/empresas"><Building2 className="w-4 h-4" /> {t('howItWorks.biz.btn')}</Link>
             </Button>
             <Button asChild variant="outline" className="gap-2">
-              <Link to="/faca-seu-pedido">Solicitar cotação personalizada</Link>
+              <Link to="/faca-seu-pedido">{t('howItWorks.biz.quote')}</Link>
             </Button>
           </div>
         </div>
@@ -516,25 +624,21 @@ const BusinessImport: React.FC = () => {
   );
 };
 
-// ---------- 5. COMO RETIRAR / RECEBER ----------
-const PICKUP = [
-  { ic: Home, color: '#22c55e', t: 'Entrega em casa', d: 'Depois de liberado (e do imposto pago online, se houver), o carteiro entrega no endereço do pedido. O pagamento de tributos é sempre feito antes, pelo app — nunca em dinheiro na porta.' },
-  { ic: MapPin, color: '#3b82f6', t: 'Retirar na agência', d: 'Se ninguém estiver em casa, o pacote fica numa agência dos Correios perto de você para retirada com documento.' },
-  { ic: ShieldCheck, color: '#8b5cf6', t: 'Confira e assine', d: 'Confira a embalagem na entrega. Em caso de avaria, registre e nos avise — ajudamos com a transportadora.' },
-];
-
-// ---------- PÁGINA ----------
+// ---------- PAGE ----------
 const HowItWorks: React.FC = () => {
+  const { t, language } = useLanguage();
+  const PICKUP = getPickup(language);
+
   return (
     <Layout>
       {/* Hero */}
       <div className="gradient-hero py-16">
         <div className="container mx-auto px-4 text-center max-w-2xl">
           <h1 className="font-display text-4xl lg:text-5xl font-bold text-foreground mb-4">
-            Como Funciona
+            {t('howItWorks.title')}
           </h1>
           <p className="text-muted-foreground text-lg">
-            Do pagamento à sua porta: pagamento, retirada, impostos e rastreamento — explicados com desenhos interativos.
+            {t('howItWorks.subtitle')}
           </p>
         </div>
       </div>
@@ -545,37 +649,37 @@ const HowItWorks: React.FC = () => {
           {/* 1. Jornada */}
           <div>
             <header className="mb-5 text-center">
-              <h2 className="font-display text-2xl font-bold text-foreground">A jornada do seu pedido</h2>
-              <p className="text-sm text-muted-foreground">Acompanhe cada etapa, do Japão até a sua casa.</p>
+              <h2 className="font-display text-2xl font-bold text-foreground">{t('howItWorks.journey.title')}</h2>
+              <p className="text-sm text-muted-foreground">{t('howItWorks.journey.subtitle')}</p>
             </header>
-            <JourneyStepper />
+            <JourneyStepper language={language} t={t} />
           </div>
 
           {/* 2. Pagamento */}
           <div>
             <header className="mb-5 text-center">
               <h2 className="font-display text-2xl font-bold text-foreground flex items-center justify-center gap-2">
-                <CreditCard className="w-6 h-6 text-primary" /> Formas de pagamento
+                <CreditCard className="w-6 h-6 text-primary" /> {t('howItWorks.payment.title')}
               </h2>
-              <p className="text-sm text-muted-foreground">Escolha um cartão para ver o passo a passo.</p>
+              <p className="text-sm text-muted-foreground">{t('howItWorks.payment.subtitle')}</p>
             </header>
-            <PaymentMethods />
+            <PaymentMethods language={language} t={t} />
           </div>
 
           {/* 3. Impostos */}
           <div>
             <header className="mb-5 text-center">
               <h2 className="font-display text-2xl font-bold text-foreground flex items-center justify-center gap-2">
-                <Landmark className="w-6 h-6 text-primary" /> Como funciona a cobrança de impostos
+                <Landmark className="w-6 h-6 text-primary" /> {t('howItWorks.tax.title')}
               </h2>
-              <p className="text-sm text-muted-foreground">Selecione o destino para entender o que é cobrado e quando.</p>
+              <p className="text-sm text-muted-foreground">{t('howItWorks.tax.subtitle')}</p>
             </header>
-            <TaxExplainer />
+            <TaxExplainer language={language} />
             <p className="text-center text-xs text-muted-foreground mt-3">
-              Quer simular o valor exato? Use a <Link to="/frete" className="text-primary font-semibold hover:underline">página de Frete</Link>.
+              {t('howItWorks.taxSimText')} <Link to="/frete" className="text-primary font-semibold hover:underline">{t('howItWorks.taxSimLink')}</Link>.
             </p>
             <div className="mt-5">
-              <BusinessImport />
+              <BusinessImport t={t} />
             </div>
           </div>
 
@@ -583,7 +687,7 @@ const HowItWorks: React.FC = () => {
           <div>
             <header className="mb-5 text-center">
               <h2 className="font-display text-2xl font-bold text-foreground flex items-center justify-center gap-2">
-                <Truck className="w-6 h-6 text-primary" /> Como retirar / receber
+                <Truck className="w-6 h-6 text-primary" /> {t('howItWorks.pickup.title')}
               </h2>
             </header>
             <div className="grid md:grid-cols-3 gap-4">
@@ -603,21 +707,21 @@ const HowItWorks: React.FC = () => {
           <div>
             <header className="mb-5 text-center">
               <h2 className="font-display text-2xl font-bold text-foreground flex items-center justify-center gap-2">
-                <Search className="w-6 h-6 text-primary" /> App dos Correios & rastreamento
+                <Search className="w-6 h-6 text-primary" /> {t('howItWorks.tracking.title')}
               </h2>
             </header>
             <div className="bg-card rounded-2xl border border-border p-5 sm:p-8 shadow-sm">
-              <CorreiosTracking />
+              <CorreiosTracking language={language} t={t} />
             </div>
           </div>
 
           {/* CTA final */}
           <div className="text-center bg-primary/5 border border-primary/20 rounded-2xl p-8">
             <Clock className="w-8 h-8 text-primary mx-auto mb-3" />
-            <h3 className="font-display text-xl font-bold text-foreground mb-2">Pronto para começar?</h3>
-            <p className="text-sm text-muted-foreground mb-4">Escolha seus produtos e acompanhe tudo até a sua porta.</p>
+            <h3 className="font-display text-xl font-bold text-foreground mb-2">{t('howItWorks.cta.title')}</h3>
+            <p className="text-sm text-muted-foreground mb-4">{t('howItWorks.cta.subtitle')}</p>
             <Button asChild className="btn-primary gap-2">
-              <Link to="/produtos">Ver catálogo <ArrowRight className="w-4 h-4" /></Link>
+              <Link to="/produtos">{t('howItWorks.cta.btn')} <ArrowRight className="w-4 h-4" /></Link>
             </Button>
           </div>
 

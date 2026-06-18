@@ -342,10 +342,10 @@ const Shipping: React.FC = () => {
                   </div>
                   <div>
                     <h3 className="font-sans text-lg font-bold text-foreground">
-                      Simulador de Envio por Peso & Dimensões
+                      {t('shippingPage.dimSim')}
                     </h3>
                     <p className="text-xs text-muted-foreground">
-                      Simule pacotes sob medida informando o valor declarado, as dimensões da caixa e o peso físico.
+                      {t('shippingPage.dimSimSub')}
                     </p>
                   </div>
                 </div>
@@ -484,14 +484,14 @@ const Shipping: React.FC = () => {
                     <span className="font-semibold text-foreground">{volumetricWeight.toFixed(2)} kg</span>
                   </div>
                   <div className="flex justify-between border-t border-border/50 pt-1.5 mt-1 font-bold">
-                    <span className="text-foreground">Peso Taxável (Maior entre Físico e Cubado):</span>
+                    <span className="text-foreground">{t('shippingPage.taxableWeight')}:</span>
                     <span className="text-primary">{billableWeight.toFixed(2)} kg</span>
                   </div>
                 </div>
 
                 {/* Simulator Results */}
                 <div className="space-y-3 pt-2">
-                  <h4 className="text-xs font-bold text-foreground uppercase tracking-wider">Custo do Frete Estimado</h4>
+                  <h4 className="text-xs font-bold text-foreground uppercase tracking-wider">{t('shippingPage.freightCost')}</h4>
                   {(isOversize || isWeightExceeded) ? (
                     <div className="p-6 bg-red-50/20 rounded-xl border border-dashed border-red-200 text-center text-xs text-red-700 dark:text-red-400 font-semibold">
                       🚫 Cálculo suspenso. Corrija os dados acima para continuar.
@@ -519,7 +519,7 @@ const Shipping: React.FC = () => {
                     <div className="flex justify-between items-center text-sm font-bold text-orange-850 dark:text-orange-300">
                       <span className="flex items-center gap-1.5">
                         <Percent className="w-4 h-4" />
-                        Imposto Alfandegário Estimado ({simTax.label})
+                        {t('shippingPage.customsEst')} ({simTax.label})
                       </span>
                       <span>{formatPrice(simTax.total, currency)}</span>
                     </div>
@@ -534,7 +534,7 @@ const Shipping: React.FC = () => {
                 <Info className="w-5 h-5 text-primary shrink-0 mt-0.5" />
                 <div>
                   <p className="text-xs text-muted-foreground leading-relaxed">
-                    <strong>Dica de Economia Japan Express:</strong> Adicione mais itens para preencher totalmente o espaço da caixa (60cm ou 80cm) e diluir o custo unitário do frete aéreo internacional por item!
+                    <strong>{t('shippingPage.freeTip')}:</strong> Adicione mais itens para preencher totalmente o espaço da caixa (60cm ou 80cm) e diluir o custo unitário do frete aéreo internacional por item!
                   </p>
                   <Button asChild variant="link" className="mt-1.5 p-0 h-auto text-primary text-xs font-bold">
                     <Link to="/produtos" className="flex items-center gap-1">
@@ -553,13 +553,13 @@ const Shipping: React.FC = () => {
               <div className="p-6 rounded-2xl bg-primary/5 border border-primary/20 space-y-4">
                 <h3 className="font-display text-lg font-bold text-foreground flex items-center gap-2 border-b border-primary/10 pb-3">
                   <Percent className="w-5 h-5 text-primary animate-pulse" />
-                  Regras Alfandegárias ({country})
+                  {t('shippingPage.customs')} ({country})
                 </h3>
                 
                 {country === 'Brasil' && (
                   <div className="space-y-3 text-xs leading-relaxed text-muted-foreground">
                     <div className="bg-orange-50 dark:bg-orange-950/20 border border-orange-200 rounded-lg p-3 text-orange-850 dark:text-orange-200 font-medium">
-                      ⚠️ <strong>Remessa Conforme: Impostos Estimados</strong>
+                      ⚠️ <strong>{t('shippingPage.customsEst')}</strong>
                     </div>
                     <p>
                       Diferente de compras nacionais, as compras internacionais de importação a partir do Japão sofrem taxação na alfândega de Curitiba. Apresentamos as estimativas no carrinho para sua transparência.
@@ -569,7 +569,7 @@ const Shipping: React.FC = () => {
                     </p>
                     <div className="border-t border-primary/10 pt-2.5 space-y-2">
                       <div className="flex justify-between font-bold text-foreground">
-                        <span>Compras até R$ 250 (US$ 50):</span>
+                        <span>{t('shippingPage.customs.below')}:</span>
                         <span className="text-orange-600">20% Federal + 17% ICMS</span>
                       </div>
                       <p className="text-[10px] pl-2 border-l-2 border-border">
@@ -577,7 +577,7 @@ const Shipping: React.FC = () => {
                       </p>
                       
                       <div className="flex justify-between font-bold text-foreground">
-                        <span>Compras acima de R$ 250:</span>
+                        <span>{t('shippingPage.customs.above')}:</span>
                         <span className="text-orange-600">60% Federal + 17% ICMS</span>
                       </div>
                       <p className="text-[10px] pl-2 border-l-2 border-border">
