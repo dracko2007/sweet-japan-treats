@@ -80,14 +80,19 @@ const Header: React.FC = () => {
           </Link>
 
           {/* Desktop Navigation (escondida no painel admin) */}
-          <nav className={cn("items-center gap-3", isAdminPage ? "hidden" : "hidden xl:flex")}>
-            {navItems.map((item) => (
-              <div key={item.label} className="relative group">
+          <nav className={cn("items-center gap-1", isAdminPage ? "hidden" : "hidden xl:flex")}>
+            {navItems.map((item, index) => (
+              <div key={item.label} className="relative group flex items-center">
+                {index > 0 && (
+                  <span className="w-px h-4 bg-border/60 mr-1 shrink-0" />
+                )}
                 {item.submenu ? (
                   <button
                     className={cn(
-                      "flex items-center gap-1 text-sm font-medium transition-colors py-2 whitespace-nowrap",
-                      isActive(item.href) ? "text-primary" : "text-muted-foreground hover:text-foreground"
+                      "flex items-center gap-1 text-sm font-medium transition-all px-3 py-1.5 rounded-full whitespace-nowrap",
+                      isActive(item.href)
+                        ? "bg-primary/10 text-primary"
+                        : "text-muted-foreground hover:text-foreground hover:bg-secondary/70"
                     )}
                     onMouseEnter={() => setIsProductsOpen(true)}
                     onMouseLeave={() => setIsProductsOpen(false)}
@@ -99,8 +104,10 @@ const Header: React.FC = () => {
                   <Link
                     to={item.href}
                     className={cn(
-                      "text-sm font-medium transition-colors py-2 whitespace-nowrap",
-                      isActive(item.href) ? "text-primary" : "text-muted-foreground hover:text-foreground"
+                      "text-sm font-medium transition-all px-3 py-1.5 rounded-full whitespace-nowrap",
+                      isActive(item.href)
+                        ? "bg-primary/10 text-primary"
+                        : "text-muted-foreground hover:text-foreground hover:bg-secondary/70"
                     )}
                   >
                     {item.label}
