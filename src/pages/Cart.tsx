@@ -102,8 +102,8 @@ const Cart: React.FC = () => {
     setActiveCoupon(null);
     setCouponError(
       isAuthenticated
-        ? 'Cupom inválido ou você não possui este cupom.'
-        : 'Cupom inválido. Cupons pessoais exigem login.'
+        ? t('cart.couponInvalid')
+        : t('cart.couponLoggedOut')
     );
   };
 
@@ -200,20 +200,12 @@ const Cart: React.FC = () => {
         <div className="container mx-auto px-4">
           <div className="text-center">
             <h1 className="font-display text-4xl lg:text-5xl font-bold text-foreground mb-4">
-              {selectedCountry === 'Japão' 
-                ? 'Carrinho de Compras (Japão 🇯🇵)' 
-                : `Carrinho de Compras (${selectedCountry} ${
-                    selectedCountry === 'Brasil' ? '🇧🇷' : 
-                    selectedCountry === 'Portugal' ? '🇵🇹' : 
-                    selectedCountry === 'França' ? '🇫🇷' : 
-                    selectedCountry === 'Itália' ? '🇮🇹' : '🇪🇸'
-                  })`
-              }
+              {t('cart.title')} {selectedCountry === 'Japão' ? '🇯🇵' : selectedCountry === 'Brasil' ? '🇧🇷' : selectedCountry === 'Portugal' ? '🇵🇹' : selectedCountry === 'França' ? '🇫🇷' : selectedCountry === 'Itália' ? '🇮🇹' : selectedCountry === 'Espanha' ? '🇪🇸' : ''}
             </h1>
             <p className="text-muted-foreground text-lg">
-              {items.length > 0 
-                ? `Você tem ${items.length} ${items.length === 1 ? 'item' : 'itens'} no carrinho`
-                : 'Seu carrinho está vazio'
+              {items.length > 0
+                ? `${items.length} ${items.length === 1 ? t('cart.items') : t('cart.items_plural')}`
+                : t('cart.empty')
               }
             </p>
           </div>
@@ -228,7 +220,7 @@ const Cart: React.FC = () => {
               <div className="lg:col-span-2 space-y-4">
                 <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
                   <h2 className="font-sans text-xl font-bold text-foreground">
-                    Seus Produtos
+                    {t('cart.yourProducts')}
                   </h2>
                   <div className="flex items-center gap-2">
                     <Button
@@ -237,7 +229,7 @@ const Cart: React.FC = () => {
                       onClick={() => navigate('/produtos')}
                       className="font-semibold text-xs"
                     >
-                      ← Continuar comprando
+                      {t('cart.continueShopping')}
                     </Button>
                     <Button
                       variant="ghost"
@@ -246,7 +238,7 @@ const Cart: React.FC = () => {
                       className="text-muted-foreground hover:text-destructive font-semibold"
                     >
                       <Trash2 className="w-4 h-4 mr-2" />
-                      Limpar
+                      {t('cart.clear')}
                     </Button>
                   </div>
                 </div>
@@ -337,18 +329,18 @@ const Cart: React.FC = () => {
               {/* Order Summary Card */}
               <div className="lg:col-span-1">
                 <div className="bg-card rounded-2xl border border-border p-6 sticky top-24 space-y-6 shadow-sm">
-                  <h3 className="font-sans text-lg font-bold text-foreground">Resumo do Pedido</h3>
-                  
+                  <h3 className="font-sans text-lg font-bold text-foreground">{t('cart.summary')}</h3>
+
                   {/* Coupon Application Input + lista de cupons disponíveis */}
                   {!activeCoupon && (
                     <form onSubmit={handleApplyCoupon} className="space-y-2 relative">
                       <label className="text-xs font-bold text-gray-500 uppercase flex items-center gap-1.5">
-                        <Tag className="w-3.5 h-3.5" /> Cupom de Desconto
+                        <Tag className="w-3.5 h-3.5" /> {t('cart.coupon')}
                       </label>
                       <div className="flex gap-2">
                         <input
                           type="text"
-                          placeholder={isAuthenticated ? 'Digite ou escolha um cupom' : 'Entre para usar cupons'}
+                          placeholder={isAuthenticated ? t('cart.couponPlaceholder') : t('cart.couponLoggedOut')}
                           value={couponCode}
                           onChange={(e) => setCouponCode(e.target.value)}
                           onFocus={() => setShowCouponList(true)}
@@ -356,7 +348,7 @@ const Cart: React.FC = () => {
                           className="flex-1 px-3 py-2 text-sm rounded-lg border border-border bg-background uppercase font-bold"
                         />
                         <Button type="submit" variant="secondary" className="px-4 text-xs font-bold">
-                          Aplicar
+                          {t('cart.apply')}
                         </Button>
                       </div>
                       {couponError && <p className="text-xs text-red-500 font-semibold">{couponError}</p>}
@@ -365,7 +357,7 @@ const Cart: React.FC = () => {
                       {showCouponList && isAuthenticated && availableCoupons.length > 0 && (
                         <div className="absolute z-20 left-0 right-0 top-full mt-1 bg-card border border-border rounded-xl shadow-lg max-h-60 overflow-y-auto">
                           <p className="text-[10px] uppercase font-bold text-muted-foreground px-3 pt-2 pb-1">
-                            Seus cupons
+                            {t('cart.yourCoupons')}
                           </p>
                           {availableCoupons.map((coupon) => {
                             const preview = computeDiscount(coupon, baseTotalPrice);
@@ -397,7 +389,7 @@ const Cart: React.FC = () => {
                       {showCouponList && isAuthenticated && availableCoupons.length === 0 && (
                         <div className="absolute z-20 left-0 right-0 top-full mt-1 bg-card border border-border rounded-xl shadow-lg p-3">
                           <p className="text-xs text-muted-foreground text-center">
-                            Você não tem cupons disponíveis.
+                            {t('cart.noCoupons')}
                           </p>
                         </div>
                       )}
@@ -416,7 +408,7 @@ const Cart: React.FC = () => {
                   <div className="space-y-3 pt-2 border-t border-border">
 
                     <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Subtotal dos itens</span>
+                      <span className="text-muted-foreground">{t('cart.subtotal')}</span>
                       <span className="font-semibold text-gray-800">{formatPrice(baseTotalPrice, currency)}</span>
                     </div>
 
@@ -465,12 +457,12 @@ const Cart: React.FC = () => {
                     )}
 
                     <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Frete</span>
-                      <span className="text-xs text-muted-foreground">Calcular no checkout</span>
+                      <span className="text-muted-foreground">{t('cart.shipping')}</span>
+                      <span className="text-xs text-muted-foreground">{t('cart.shippingCalc')}</span>
                     </div>
 
                     <div className="flex justify-between pt-3 border-t border-border">
-                      <span className="font-black text-lg text-gray-800">Total</span>
+                      <span className="font-black text-lg text-gray-800">{t('cart.total')}</span>
                       <div className="text-right">
                         {discountAmount > 0 && (
                           <p className="text-sm text-muted-foreground line-through">
@@ -498,7 +490,7 @@ const Cart: React.FC = () => {
                     className="w-full btn-primary rounded-xl py-6 text-lg font-bold"
                     onClick={() => navigate('/checkout', { state: { coupon: activeCoupon } })}
                   >
-                    Finalizar Compra
+                    {t('cart.checkout')}
                     <ArrowRight className="w-5 h-5 ml-2" />
                   </Button>
                   
@@ -517,14 +509,14 @@ const Cart: React.FC = () => {
                 <ShoppingBag className="w-12 h-12 text-muted-foreground" />
               </div>
               <h2 className="font-display text-2xl font-bold text-foreground mb-2">
-                Seu carrinho está vazio
+                {t('cart.empty')}
               </h2>
               <p className="text-muted-foreground mb-8">
-                Adicione alguns produtos incríveis ao seu carrinho!
+                {t('cart.emptyDesc')}
               </p>
               <Button asChild className="btn-primary rounded-full px-8">
                 <Link to="/produtos">
-                  Ver Produtos
+                  {t('cart.viewProducts')}
                   <ArrowRight className="w-5 h-5 ml-2" />
                 </Link>
               </Button>

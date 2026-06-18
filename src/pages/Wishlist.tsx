@@ -18,7 +18,7 @@ const Wishlist: React.FC = () => {
   const { user, isAuthenticated } = useUser();
   const { products } = useProducts();
   const { addToCart } = useCart();
-  const { selectedCountry } = useLanguage();
+  const { selectedCountry, t } = useLanguage();
   const { toast } = useToast();
   const [wishlistItems, setWishlistItems] = useState<WishlistItem[]>([]);
 
@@ -97,17 +97,17 @@ const Wishlist: React.FC = () => {
               className="mb-4 gap-2"
             >
               <ArrowLeft className="w-4 h-4" />
-              Voltar aos Produtos
+              {t('productDetail.back')}
             </Button>
             <div className="text-center">
               <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-red-100 dark:bg-red-900 mb-4">
                 <Heart className="w-8 h-8 text-red-600" />
               </div>
               <h1 className="font-display text-4xl lg:text-5xl font-bold text-foreground mb-4">
-                Meus Favoritos
+                {t('wishlist.title')}
               </h1>
               <p className="text-muted-foreground text-lg">
-                {wishlistItems.length} {wishlistItems.length === 1 ? 'produto salvo' : 'produtos salvos'}
+                {wishlistItems.length} {wishlistItems.length === 1 ? t('wishlist.saved') : t('wishlist.saved_plural')}
               </p>
             </div>
           </div>
@@ -127,7 +127,7 @@ const Wishlist: React.FC = () => {
                     className="gap-2 text-red-600 hover:text-red-700"
                   >
                     <Trash2 className="w-4 h-4" />
-                    Limpar Lista
+                    {t('wishlist.clear')}
                   </Button>
                 </div>
 
@@ -173,7 +173,7 @@ const Wishlist: React.FC = () => {
                               className="flex-1 gap-2"
                             >
                               <ShoppingCart className="w-4 h-4" />
-                              Adicionar ao Carrinho
+                              {t('product.addToCart')}
                             </Button>
                             <Button
                               variant="outline"
@@ -198,7 +198,7 @@ const Wishlist: React.FC = () => {
                     size="lg"
                     className="gap-2"
                   >
-                    Continuar Comprando
+                    {t('wishlist.continueShopping')}
                   </Button>
                 </div>
               </>
@@ -208,17 +208,17 @@ const Wishlist: React.FC = () => {
                   <Heart className="w-12 h-12 text-muted-foreground" />
                 </div>
                 <h2 className="font-display text-2xl font-bold mb-4">
-                  Sua lista está vazia
+                  {t('wishlist.empty')}
                 </h2>
                 <p className="text-muted-foreground mb-8">
-                  Adicione produtos aos favoritos para salvá-los aqui!
+                  {t('wishlist.emptyDesc')}
                 </p>
                 <Button
                   onClick={() => navigate('/produtos')}
                   size="lg"
                   className="gap-2"
                 >
-                  Explorar Produtos
+                  {t('wishlist.explore')}
                 </Button>
               </div>
             )}

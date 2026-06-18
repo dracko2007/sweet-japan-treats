@@ -1,5 +1,6 @@
 import { safeStorage } from '@/utils/storage';
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
+import { useLanguage } from '@/context/LanguageContext';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { CheckCircle, Home, Mail, Printer, Copy, AlertCircle, Smartphone, CreditCard, FileText, Landmark, Wallet, ExternalLink } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
@@ -17,6 +18,7 @@ const OrderConfirmation: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
+  const { t } = useLanguage();
   const order = location.state?.order;
   
   const [copied, setCopied] = useState(false);
@@ -97,13 +99,13 @@ const OrderConfirmation: React.FC = () => {
                 <CheckCircle className="w-12 h-12 text-green-600" />
               </div>
               <h1 className="font-display text-4xl font-extrabold text-gray-900 mb-2">
-                {order.currency === 'JPY' ? 'Pedido Confirmado! 🎉' : 'Pedido Gerado!'}
+                {order.currency === 'JPY' ? t('order.confirmed') : t('order.generated')}
               </h1>
               <p className="text-lg text-muted-foreground mb-2">
-                ID do pedido: <span className="font-mono font-semibold text-gray-900">{order.orderNumber || order.id}</span>
+                {t('order.id')}: <span className="font-mono font-semibold text-gray-900">{order.orderNumber || order.id}</span>
               </p>
               <p className="text-muted-foreground text-sm">
-                Obrigado por comprar na Japan Express. Realize o pagamento para iniciar o preparo e envio de Hiroshima.
+                {t('order.thanks')}
               </p>
             </div>
 
@@ -114,12 +116,12 @@ const OrderConfirmation: React.FC = () => {
               <div className="bg-white rounded-3xl border-2 border-orange-500 p-6 mb-8 shadow-md print:hidden text-center space-y-4 animate-fade-in">
                 <div className="flex items-center justify-center gap-2 text-orange-600 font-extrabold text-lg">
                   <Smartphone className="w-6 h-6 animate-pulse" />
-                  <span>ÁREA DE PAGAMENTO PAYPAY</span>
+                  <span>{t('order.payAreaPayPay')}</span>
                 </div>
 
                 <div className="bg-red-50 text-red-700 text-xs font-semibold px-4 py-3 rounded-xl inline-flex items-center gap-2">
                   <AlertCircle className="w-4 h-4 shrink-0" />
-                  <span>Abra o app PayPay, escaneie o QR Code e realize o pagamento no valor exato.</span>
+                  <span>{t('order.payDescPayPay')}</span>
                 </div>
 
                 <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 inline-block shadow-sm">
@@ -137,13 +139,13 @@ const OrderConfirmation: React.FC = () => {
                 </div>
 
                 <div className="bg-gray-100 p-4 rounded-xl max-w-sm mx-auto text-xs space-y-2 font-mono text-left">
-                  <p><strong className="text-gray-800">Enviar para:</strong> Japan Express</p>
-                  <p><strong className="text-gray-800">Telefone:</strong> 070-1367-1679</p>
-                  <p><strong className="text-gray-800">Valor do Pedido:</strong> {formatPrice(order.total, 'JPY')}</p>
+                  <p><strong className="text-gray-800">{t('order.sendTo')}</strong> Japan Express</p>
+                  <p><strong className="text-gray-800">{t('order.phone')}</strong> 070-1367-1679</p>
+                  <p><strong className="text-gray-800">{t('order.value')}</strong> {formatPrice(order.total, 'JPY')}</p>
                 </div>
 
                 <div className="pt-2 text-xs text-muted-foreground leading-relaxed max-w-md mx-auto">
-                  Após concluir a transferência, por favor envie o comprovante (print de tela) para o WhatsApp: <strong className="text-gray-800">070-1367-1679</strong>. Seu pedido será liberado no mesmo dia!
+                  {t('order.transferNote')} <strong className="text-gray-800">070-1367-1679</strong>.
                 </div>
               </div>
             )}
@@ -594,7 +596,7 @@ const OrderConfirmation: React.FC = () => {
                 className="btn-primary rounded-xl py-6 text-base font-bold gap-2 px-8 shadow-md"
               >
                 <Home className="w-5 h-5" />
-                Voltar à Página Inicial
+                {t('order.backHome')}
               </Button>
             </div>
 
