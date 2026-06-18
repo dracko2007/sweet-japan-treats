@@ -67,9 +67,9 @@ class ErrorBoundary extends Component<Props, State> {
               ? 'O site foi atualizado. A página será recarregada automaticamente em instantes...'
               : 'Encontramos um problema ao carregar esta parte da página. Você pode tentar novamente ou voltar para o início.'}
           </p>
-          {import.meta.env.DEV && this.state.error && (
+          {this.state.error && (
             <pre className="text-left text-xs bg-secondary/40 rounded-lg p-3 mb-6 overflow-auto max-h-32 text-red-600 dark:text-red-400">
-              {this.state.error.message}
+              {this.state.error.name}: {this.state.error.message}
             </pre>
           )}
           <div className="flex gap-3 justify-center">
