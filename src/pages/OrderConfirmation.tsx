@@ -439,9 +439,9 @@ const OrderConfirmation: React.FC = () => {
                   Japan Express
                 </h1>
                 <p className="text-muted-foreground">
-                  {order.currency === 'JPY' ? 'Recibo de Pedido Doméstico' : 'Recibo de Pedido Internacional'}
+                  {order.currency === 'JPY' ? t('order.receipt.domestic') : t('order.receipt.intl')}
                 </p>
-                <p className="font-mono text-sm">Pedido: {order.orderNumber || order.id}</p>
+                <p className="font-mono text-sm">{t('order.id')}: {order.orderNumber || order.id}</p>
                 <p className="text-sm text-muted-foreground">{order.date}</p>
               </div>
 
@@ -450,37 +450,43 @@ const OrderConfirmation: React.FC = () => {
                 {/* Print Title Header */}
                 <div className="flex items-center justify-between border-b pb-4">
                   <h3 className="font-sans font-bold text-lg text-foreground">
-                    {order.currency === 'JPY' ? 'Comprovante de Compra Local' : 'Comprovante de Importação'}
+                    {order.currency === 'JPY' ? t('order.receipt.local') : t('order.receipt.import')}
                   </h3>
                   <Button onClick={handlePrint} variant="ghost" size="sm" className="print:hidden font-semibold">
                     <Printer className="w-4 h-4 mr-2" />
-                    Imprimir Comprovante
+                    {t('order.print')}
                   </Button>
                 </div>
 
-                {/* Tracking Details */}
+                {/* Tracking Details — só aparece quando há código de rastreio */}
+                {order.trackingCode && (
                 <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 flex flex-col md:flex-row justify-between gap-3 text-xs md:text-sm">
                   <div>
                     <span className="text-muted-foreground block">
-                      {order.currency === 'JPY' ? 'Código de Rastreamento (Transportadora):' : `Código de Rastreamento Aéreo (${order.country === 'Brasil' ? 'Correios' : 'Posta Local'}):`}
+                      {order.currency === 'JPY'
+                        ? t('order.tracking.domestic')
+                        : order.country === 'Brasil'
+                          ? t('order.tracking.air.br')
+                          : t('order.tracking.air.intl')}
                     </span>
                     <span className="font-mono font-bold text-gray-800 text-base">{order.trackingCode}</span>
                   </div>
                   <div className="text-right">
-                    <span className="text-muted-foreground block">Status Logístico:</span>
+                    <span className="text-muted-foreground block">{t('order.logisticStatus')}</span>
                     <span className="bg-orange-600 text-white font-extrabold px-2 py-0.5 rounded text-xs uppercase inline-block mt-1">
                       {order.status === 'Pago'
-                        ? (order.currency === 'JPY' ? 'Preparando Envio Doméstico' : 'Aguardando Despacho Aéreo')
-                        : 'Aguardando Pagamento'
+                        ? (order.currency === 'JPY' ? t('order.status.preparingDomestic') : t('order.status.waitingDispatch'))
+                        : t('order.status.waiting')
                       }
                     </span>
                   </div>
                 </div>
+                )}
 
                 {/* Customer Details */}
                 <div className="grid md:grid-cols-2 gap-4 text-xs md:text-sm border-b pb-4">
                   <div>
-                    <h4 className="font-semibold text-gray-500 uppercase tracking-wider mb-1">Destinatário</h4>
+                    <h4 className="font-semibold text-gray-500 uppercase tracking-wider mb-1">{t('order.recipient')}</h4>
                     <p className="font-bold text-gray-800">{order.name}</p>
                     {order.currency !== 'JPY' && order.cpf && (
                       <p className="text-muted-foreground font-mono mt-0.5">CPF: {order.cpf}</p>
@@ -489,13 +495,13 @@ const OrderConfirmation: React.FC = () => {
                     <p className="text-muted-foreground">{order.email}</p>
                   </div>
                   <div>
-                    <h4 className="font-semibold text-gray-500 uppercase tracking-wider mb-1">Endereço de Entrega</h4>
+                    <h4 className="font-semibold text-gray-500 uppercase tracking-wider mb-1">{t('order.deliveryAddress')}</h4>
                     <p className="text-gray-800">〒 {order.postalCode}</p>
                     <p className="text-gray-800">
                       {order.prefecture}, {order.city}
                     </p>
                     <p className="text-gray-800">{order.address}</p>
-                    {order.building && <p className="text-gray-500 text-xs">Complemento: {order.building}</p>}
+                    {order.building && <p className="text-gray-500 text-xs">{t('order.complement')} {order.building}</p>}
                     <p className="font-bold text-gray-800 mt-1">
                       {order.country || 'Brasil'} {
                         order.country === 'Japão' ? '🇯🇵' :
@@ -512,7 +518,7 @@ const OrderConfirmation: React.FC = () => {
                 {/* Items list */}
                 <div>
                   <h4 className="font-semibold text-xs text-gray-500 uppercase tracking-wider mb-2">
-                    Itens do Pedido
+                    {t('order.items')}
                   </h4>
                   <div className="space-y-3">
                     {order.items.map((item: any, idx: number) => (
@@ -537,22 +543,22 @@ const OrderConfirmation: React.FC = () => {
                 {/* Invoice Totals */}
                 <div className="border-t pt-4 space-y-2 text-xs md:text-sm">
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Subtotal dos Produtos</span>
+                    <span className="text-muted-foreground">{t('order.subtotal')}</span>
                     <span className="font-semibold text-gray-800">
                       {formatPrice(order.subtotal, order.currency || 'BRL')}
                     </span>
                   </div>
-                  
+
                   {order.couponDiscount > 0 && (
                     <div className="flex justify-between text-green-600 font-bold">
-                      <span>Desconto do Cupom ({order.couponCode})</span>
+                      <span>{t('order.couponDiscount')} ({order.couponCode})</span>
                       <span>-{formatPrice(order.couponDiscount, order.currency || 'BRL')}</span>
                     </div>
                   )}
 
                   {order.currency !== 'JPY' && order.pixDiscount > 0 && (
                     <div className="flex justify-between text-orange-600 font-bold">
-                      <span>Desconto Adicional de PIX (5%)</span>
+                      <span>{t('order.pixDiscount')}</span>
                       <span>-{formatPrice(order.pixDiscount, 'BRL')}</span>
                     </div>
                   )}
@@ -560,26 +566,26 @@ const OrderConfirmation: React.FC = () => {
                   {order.currency !== 'JPY' && (order.taxAmount > 0 || order.federalTax > 0) && (
                     <div className="bg-orange-50/50 dark:bg-orange-950/10 border border-orange-200/60 rounded-xl p-3 space-y-2 mt-2">
                       <div className="flex justify-between text-xs font-bold text-orange-850 dark:text-orange-300">
-                        <span>Imposto Aduaneiro Estimado (A cobrar na entrega)</span>
+                        <span>{t('order.tax.estimate')}</span>
                         <span>{formatPrice(order.taxAmount || (order.federalTax + order.icmsTax), order.currency)}</span>
                       </div>
                       <p className="text-[10px] text-orange-700 dark:text-orange-400 leading-relaxed font-semibold">
-                        ⚠️ <strong>Lembrete:</strong> Este valor é apenas uma estimativa do imposto que poderá ser cobrado pela alfândega local na chegada do pacote ao país de destino. Ele <strong>NÃO</strong> foi somado ao total pago no site.
+                        {t('order.tax.note')}
                       </p>
                     </div>
                   )}
 
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">
-                      {order.currency === 'JPY' ? 'Frete Local' : 'Frete Internacional (Tóquio Hub)'}
+                      {order.currency === 'JPY' ? t('order.shipping.local') : t('order.shipping.intl')}
                     </span>
                     <span className="font-semibold text-gray-800">
-                      {order.shippingCost === 0 ? 'Grátis' : formatPrice(order.shippingCost, order.currency || 'BRL')}
+                      {order.shippingCost === 0 ? t('order.shipping.free') : formatPrice(order.shippingCost, order.currency || 'BRL')}
                     </span>
                   </div>
 
                   <div className="flex justify-between pt-3 border-t font-black text-base md:text-lg">
-                    <span>Total Pago / A Pagar</span>
+                    <span>{t('order.total')}</span>
                     <span className="text-xl text-orange-600">
                       {formatPrice(order.total, order.currency || 'BRL')}
                     </span>
@@ -603,87 +609,54 @@ const OrderConfirmation: React.FC = () => {
             {/* Simulated Logistics Milestones - Urgency & Trust */}
             <div className="mt-8 bg-gray-50 border border-gray-100 rounded-2xl p-6 print:hidden space-y-4">
               <h3 className="font-bold text-sm text-gray-800 uppercase tracking-wider">
-                {order.currency === 'JPY' ? 'Como Acompanhar Sua Entrega Doméstica' : 'Como Acompanhar Sua Importação'}
+                {order.currency === 'JPY' ? t('order.followTitle.domestic') : t('order.followTitle.intl')}
               </h3>
               <div className="relative pl-6 border-l border-orange-300 space-y-4 text-xs text-muted-foreground">
-                
+
                 {order.currency === 'JPY' ? (
                   <>
-                    <div className="relative">
-                      <div className="absolute -left-[30px] top-0 w-4 h-4 bg-orange-500 rounded-full border-2 border-white flex items-center justify-center text-white text-[8px]">✓</div>
-                      <h4 className="font-bold text-gray-800">Etapa 1: Embalagem em Hiroshima (Centro de Distribuição Japan Express)</h4>
-                      <p className="mt-0.5">Sua encomenda é conferida, embalada com proteção reforçada e preparada para envio no centro de Hiroshima Prefecture.</p>
-                    </div>
-
-                    <div className="relative">
-                      <div className="absolute -left-[30px] top-0 w-4 h-4 bg-gray-300 rounded-full border-2 border-white flex items-center justify-center text-white text-[8px]">2</div>
-                      <h4 className="font-bold text-gray-700">Etapa 2: Coleta e Despacho Doméstico (Yamato / Sagawa / JP Post)</h4>
-                      <p className="mt-0.5">A transportadora local selecionada coleta a encomenda diretamente em nosso centro de distribuição em Hiroshima Prefecture.</p>
-                    </div>
-
-                    <div className="relative">
-                      <div className="absolute -left-[30px] top-0 w-4 h-4 bg-gray-300 rounded-full border-2 border-white flex items-center justify-center text-white text-[8px]">3</div>
-                      <h4 className="font-bold text-gray-700">Etapa 3: Trânsito Expresso entre Províncias</h4>
-                      <p className="mt-0.5">Sua encomenda segue via rede expressa rodoviária japonesa para trânsito rápido e seguro até sua província.</p>
-                    </div>
-
-                    <div className="relative">
-                      <div className="absolute -left-[30px] top-0 w-4 h-4 bg-gray-300 rounded-full border-2 border-white flex items-center justify-center text-white text-[8px]">4</div>
-                      <h4 className="font-bold text-gray-700">Etapa 4: Entrega Direta na Residência</h4>
-                      <p className="mt-0.5">A transportadora realiza a entrega em mãos no seu endereço no Japão. Use o código para rastrear no site oficial.</p>
-                    </div>
+                    {([
+                      { title: t('order.steps.jp1.title'), desc: t('order.steps.jp1.desc'), done: true },
+                      { title: t('order.steps.jp2.title'), desc: t('order.steps.jp2.desc'), done: false },
+                      { title: t('order.steps.jp3.title'), desc: t('order.steps.jp3.desc'), done: false },
+                      { title: t('order.steps.jp4.title'), desc: t('order.steps.jp4.desc'), done: false },
+                    ] as const).map((step, i) => (
+                      <div key={i} className="relative">
+                        <div className={`absolute -left-[30px] top-0 w-4 h-4 ${step.done ? 'bg-orange-500' : 'bg-gray-300'} rounded-full border-2 border-white flex items-center justify-center text-white text-[8px]`}>{step.done ? '✓' : i + 1}</div>
+                        <h4 className={`font-bold ${step.done ? 'text-gray-800' : 'text-gray-700'}`}>{step.title}</h4>
+                        <p className="mt-0.5">{step.desc}</p>
+                      </div>
+                    ))}
                   </>
                 ) : order.country === 'Brasil' ? (
                   <>
-                    <div className="relative">
-                      <div className="absolute -left-[30px] top-0 w-4 h-4 bg-orange-500 rounded-full border-2 border-white flex items-center justify-center text-white text-[8px]">✓</div>
-                      <h4 className="font-bold text-gray-800">Etapa 1: Embalagem em Tóquio (Hub Logístico)</h4>
-                      <p className="mt-0.5">Após a aprovação do pagamento, seu pedido é inspecionado, embalado com plástico bolha e preparado para despacho aéreo.</p>
-                    </div>
-
-                    <div className="relative">
-                      <div className="absolute -left-[30px] top-0 w-4 h-4 bg-gray-300 rounded-full border-2 border-white flex items-center justify-center text-white text-[8px]">2</div>
-                      <h4 className="font-bold text-gray-700">Etapa 2: Voo Tóquio para São Paulo (GRU)</h4>
-                      <p className="mt-0.5">Despacho no aeroporto de Narita (Tóquio) com destino a São Paulo Guarulhos via priority mail express.</p>
-                    </div>
-
-                    <div className="relative">
-                      <div className="absolute -left-[30px] top-0 w-4 h-4 bg-gray-300 rounded-full border-2 border-white flex items-center justify-center text-white text-[8px]">3</div>
-                      <h4 className="font-bold text-gray-700">Etapa 3: Desembaraço Aduaneiro Rápido</h4>
-                      <p className="mt-0.5">O pacote passa pela alfândega dos Correios. Por estar no programa Remessa Conforme, o desembaraço ocorre em poucas horas sem taxas adicionais.</p>
-                    </div>
-
-                    <div className="relative">
-                      <div className="absolute -left-[30px] top-0 w-4 h-4 bg-gray-300 rounded-full border-2 border-white flex items-center justify-center text-white text-[8px]">4</div>
-                      <h4 className="font-bold text-gray-700">Etapa 4: Entrega no Seu Endereço</h4>
-                      <p className="mt-0.5">Os Correios realizam a entrega direta na sua residência. Rastreie pelo site dos Correios com o código de rastreamento.</p>
-                    </div>
+                    {([
+                      { title: t('order.steps.br1.title'), desc: t('order.steps.br1.desc'), done: true },
+                      { title: t('order.steps.br2.title'), desc: t('order.steps.br2.desc'), done: false },
+                      { title: t('order.steps.br3.title'), desc: t('order.steps.br3.desc'), done: false },
+                      { title: t('order.steps.br4.title'), desc: t('order.steps.br4.desc'), done: false },
+                    ] as const).map((step, i) => (
+                      <div key={i} className="relative">
+                        <div className={`absolute -left-[30px] top-0 w-4 h-4 ${step.done ? 'bg-orange-500' : 'bg-gray-300'} rounded-full border-2 border-white flex items-center justify-center text-white text-[8px]`}>{step.done ? '✓' : i + 1}</div>
+                        <h4 className={`font-bold ${step.done ? 'text-gray-800' : 'text-gray-700'}`}>{step.title}</h4>
+                        <p className="mt-0.5">{step.desc}</p>
+                      </div>
+                    ))}
                   </>
                 ) : (
                   <>
-                    <div className="relative">
-                      <div className="absolute -left-[30px] top-0 w-4 h-4 bg-orange-500 rounded-full border-2 border-white flex items-center justify-center text-white text-[8px]">✓</div>
-                      <h4 className="font-bold text-gray-800">Etapa 1: Embalagem em Tóquio (Hub Logístico)</h4>
-                      <p className="mt-0.5">Após a aprovação do pagamento, seu pedido é inspecionado, embalado com plástico bolha e preparado para despacho aéreo.</p>
-                    </div>
-
-                    <div className="relative">
-                      <div className="absolute -left-[30px] top-0 w-4 h-4 bg-gray-300 rounded-full border-2 border-white flex items-center justify-center text-white text-[8px]">2</div>
-                      <h4 className="font-bold text-gray-700">Etapa 2: Voo Tóquio para Europa</h4>
-                      <p className="mt-0.5">Despacho no aeroporto de Narita (Tóquio) com destino ao aeroporto internacional europeu via priority mail express.</p>
-                    </div>
-
-                    <div className="relative">
-                      <div className="absolute -left-[30px] top-0 w-4 h-4 bg-gray-300 rounded-full border-2 border-white flex items-center justify-center text-white text-[8px]">3</div>
-                      <h4 className="font-bold text-gray-700">Etapa 3: Desembaraço Aduaneiro Simplificado</h4>
-                      <p className="mt-0.5">O pacote passa pelo processamento e liberação na alfândega do país de destino europeu de forma rápida e simplificada.</p>
-                    </div>
-
-                    <div className="relative">
-                      <div className="absolute -left-[30px] top-0 w-4 h-4 bg-gray-300 rounded-full border-2 border-white flex items-center justify-center text-white text-[8px]">4</div>
-                      <h4 className="font-bold text-gray-700">Etapa 4: Entrega no Seu Endereço</h4>
-                      <p className="mt-0.5">A transportadora postal local (como CTT, La Poste, Poste Italiane, Correos) realiza a entrega direta na sua residência.</p>
-                    </div>
+                    {([
+                      { title: t('order.steps.intl1.title'), desc: t('order.steps.intl1.desc'), done: true },
+                      { title: t('order.steps.intl2.title'), desc: t('order.steps.intl2.desc'), done: false },
+                      { title: t('order.steps.intl3.title'), desc: t('order.steps.intl3.desc'), done: false },
+                      { title: t('order.steps.intl4.title'), desc: t('order.steps.intl4.desc'), done: false },
+                    ] as const).map((step, i) => (
+                      <div key={i} className="relative">
+                        <div className={`absolute -left-[30px] top-0 w-4 h-4 ${step.done ? 'bg-orange-500' : 'bg-gray-300'} rounded-full border-2 border-white flex items-center justify-center text-white text-[8px]`}>{step.done ? '✓' : i + 1}</div>
+                        <h4 className={`font-bold ${step.done ? 'text-gray-800' : 'text-gray-700'}`}>{step.title}</h4>
+                        <p className="mt-0.5">{step.desc}</p>
+                      </div>
+                    ))}
                   </>
                 )}
 
