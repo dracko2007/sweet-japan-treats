@@ -715,42 +715,59 @@ const Profile: React.FC = () => {
                         </div>
                       </div>
 
-                      {/* Tracking Info */}
-                      {order.status === 'shipped' && (order as any).trackingNumber && (() => {
-                        const trackingNumber = (order as any).trackingNumber;
+                      {/* Tracking Info — shown whenever a tracking number exists */}
+                      {(order as any).trackingNumber && (() => {
+                        const trackingNumber = ((order as any).trackingNumber as string).trim();
                         const savedUrl = (order as any).trackingUrl || '';
                         let carrierRaw = (order as any).carrier || (order as any).shipping?.carrier || '';
-                        
-                        // If carrier is empty, detect from saved URL
+
+                        // Detect carrier from saved URL if not set
                         if (!carrierRaw && savedUrl) {
                           if (savedUrl.includes('kuronekoyamato')) carrierRaw = 'Yamato';
                           else if (savedUrl.includes('sagawa')) carrierRaw = 'Sagawa';
                           else if (savedUrl.includes('japanpost')) carrierRaw = 'Japan Post';
                           else if (savedUrl.includes('fukutsu')) carrierRaw = 'Fukutsu';
+                          else if (savedUrl.includes('correios')) carrierRaw = 'Correios';
                         }
-                        
-                        // Derive carrier display name
+
+                        // Auto-detect from tracking code pattern when carrier still unknown
+                        if (!carrierRaw) {
+                          const tnUp = trackingNumber.toUpperCase();
+                          if (/^[A-Z]{2}\d{9}BR$/.test(tnUp)) carrierRaw = 'Correios';
+                          else if (/^[A-Z]{2}\d{9}JP$/.test(tnUp)) carrierRaw = 'Japan Post';
+                        }
+
                         const getCarrierName = (c: string) => {
                           const lc = c.toLowerCase();
+                          if (lc.includes('correios')) return 'Correios (Brasil)';
+                          if (lc.includes('ems')) return 'EMS / Japan Post';
                           if (lc.includes('yamato') || lc.includes('クロネコ')) return 'Yamato Transport (クロネコヤマト)';
                           if (lc.includes('sagawa') || lc.includes('佐川')) return 'Sagawa Express (佐川急便)';
-                          if (lc.includes('japan post') || lc.includes('ゆうパック') || lc.includes('post')) return 'Japan Post (日本郵便)';
+                          if (lc.includes('japan post') || lc.includes('ゆうパック') || lc.includes('kozutsumi') || lc.includes('post')) return 'Japan Post (日本郵便)';
                           if (lc.includes('fukutsu') || lc.includes('福通')) return 'Fukutsu Express (福山通運)';
                           return c;
                         };
-                        
-                        // Always reconstruct the tracking URL with latest format
+
                         const getTrackingUrl = (c: string, tn: string) => {
                           const lc = c.toLowerCase();
-                          if (lc.includes('yamato') || lc.includes('クロネコ')) return `https://toi.kuronekoyamato.co.jp/cgi-bin/tneko?number00=1&number01=${tn}`;
-                          if (lc.includes('sagawa') || lc.includes('佐川')) return `https://k2k.sagawa-exp.co.jp/p/web/okurijosearch.do?okurijoNo=${tn}`;
-                          if (lc.includes('japan post') || lc.includes('ゆうパック') || lc.includes('post')) return `https://trackings.post.japanpost.jp/services/srv/search/direct?reqCodeNo1=${tn}&locale=ja`;
-                          if (lc.includes('fukutsu') || lc.includes('福通')) return `https://corp.fukutsu.co.jp/situation/tracking_no_hunt.html?tracking_no=${tn}`;
-                          return '';
+                          // Brazilian Correios — handles international EMS codes ending in BR too
+                          if (lc.includes('correios') || tn.toUpperCase().endsWith('BR'))
+                            return `https://rastreamento.correios.com.br/app/resultado.php?objeto=${tn}`;
+                          if (lc.includes('ems'))
+                            return `https://trackings.post.japanpost.jp/services/srv/search/direct?reqCodeNo1=${tn}&locale=pt`;
+                          if (lc.includes('yamato') || lc.includes('クロネコ'))
+                            return `https://toi.kuronekoyamato.co.jp/cgi-bin/tneko?number00=1&number01=${tn}`;
+                          if (lc.includes('sagawa') || lc.includes('佐川'))
+                            return `https://k2k.sagawa-exp.co.jp/p/web/okurijosearch.do?okurijoNo=${tn}`;
+                          if (lc.includes('japan post') || lc.includes('kozutsumi') || lc.includes('post') || tn.toUpperCase().endsWith('JP'))
+                            return `https://trackings.post.japanpost.jp/services/srv/search/direct?reqCodeNo1=${tn}&locale=pt`;
+                          if (lc.includes('fukutsu') || lc.includes('福通'))
+                            return `https://corp.fukutsu.co.jp/situation/tracking_no_hunt.html?tracking_no=${tn}`;
+                          // Unknown carrier — fallback to Correios (most common for Brazil orders)
+                          return `https://rastreamento.correios.com.br/app/resultado.php?objeto=${tn}`;
                         };
-                        
+
                         const carrierName = getCarrierName(carrierRaw);
-                        // Always reconstruct the URL to ensure latest format is used
                         const trackingUrl = getTrackingUrl(carrierRaw, trackingNumber) || savedUrl;
                         
                         return (
@@ -760,23 +777,25 @@ const Profile: React.FC = () => {
                               <span className="text-sm font-semibold text-blue-800 dark:text-blue-200">{t('profile.orders.tracking.title')}</span>
                             </div>
                             <p className="text-sm text-blue-700 dark:text-blue-300 font-mono">
-                              {t('profile.orders.tracking.code')} {trackingNumber}
+                              {t('profile.orders.tracking.code')}{' '}
+                              <a href={trackingUrl} target="_blank" rel="noopener noreferrer"
+                                className="underline hover:text-blue-900 font-bold">
+                                {trackingNumber}
+                              </a>
                             </p>
                             {carrierName && (
                               <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
                                 {t('profile.orders.tracking.carrier')} {carrierName}
                               </p>
                             )}
-                            {trackingUrl && (
-                              <a
-                                href={trackingUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1 mt-2 px-3 py-1.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
-                              >
-                                {t('profile.orders.tracking.btn')}
-                              </a>
-                            )}
+                            <a
+                              href={trackingUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 mt-2 px-3 py-1.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                            >
+                              {t('profile.orders.tracking.btn')}
+                            </a>
                           </div>
                         );
                       })()}
