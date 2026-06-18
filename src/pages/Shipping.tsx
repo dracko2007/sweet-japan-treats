@@ -11,7 +11,7 @@ import { getELightRate, getKozutsumiRate, getEmsRate, MAX_DIM_SUM_CM, MAX_WEIGHT
 import { convertYen as fxConvert } from '@/services/fxService';
 
 const Shipping: React.FC = () => {
-  const { t, selectedCountry } = useLanguage();
+  const { t, selectedCountry, language } = useLanguage();
   const [country, setCountry] = useState<CountryType>(selectedCountry);
   const [activeSection, setActiveSection] = useState<'rates' | 'prohibited'>('rates');
 
@@ -63,9 +63,9 @@ const Shipping: React.FC = () => {
   const getSimulatorRates = () => {
     if (country === 'Japão') {
       return [
-        { name: 'Japan Post Local (ゆうパック) 📮', cost: 700 + 150 * billableWeight, time: '1-2 dias' },
-        { name: 'Yamato Transport (宅急便) 🐱', cost: 800 + 180 * billableWeight, time: '1-2 dias' },
-        { name: 'Sagawa Express (飛脚宅配便) 🏃', cost: 750 + 160 * billableWeight, time: '1-2 dias' }
+        { name: 'Japan Post Local (ゆうパック) 📮', cost: 700 + 150 * billableWeight, time: language === 'ja' ? '1-2日' : '1-2 days' },
+        { name: 'Yamato Transport (宅急便) 🐱', cost: 800 + 180 * billableWeight, time: language === 'ja' ? '1-2日' : '1-2 days' },
+        { name: 'Sagawa Express (飛脚宅配便) 🏃', cost: 750 + 160 * billableWeight, time: language === 'ja' ? '1-2日' : '1-2 days' }
       ];
     }
 
@@ -79,17 +79,17 @@ const Shipping: React.FC = () => {
 
     if (billableWeightG <= 2000) {
       const yen = getELightRate(billableWeightG, zone);
-      rates.push({ name: 'Japan Post E-Light ✉️', cost: yen ? fxConvert(yen, cur) : null, time: isEurope ? '7-12 dias' : '10-15 dias' });
+      rates.push({ name: 'Japan Post E-Light ✉️', cost: yen ? fxConvert(yen, cur) : null, time: isEurope ? '7-12 days' : '10-15 days' });
     } else {
       const salYen = getKozutsumiRate(billableWeightG, zone, 'sal');
-      rates.push({ name: 'Japan Post SAL 📦', cost: salYen ? fxConvert(salYen, cur) : null, time: isEurope ? '15-30 dias' : '20-45 dias' });
+      rates.push({ name: 'Japan Post SAL 📦', cost: salYen ? fxConvert(salYen, cur) : null, time: isEurope ? '15-30 days' : '20-45 days' });
       const airYen = getKozutsumiRate(billableWeightG, zone, 'air');
-      rates.push({ name: 'Japan Post Kozutsumi Aéreo 📦', cost: airYen ? fxConvert(airYen, cur) : null, time: isEurope ? '7-10 dias' : '10-15 dias' });
+      rates.push({ name: 'Japan Post Kozutsumi Air 📦', cost: airYen ? fxConvert(airYen, cur) : null, time: isEurope ? '7-10 days' : '10-15 days' });
     }
 
     const emsYen = getEmsRate(billableWeightG, zone);
-    rates.push({ name: 'Japan Post EMS / DHL ✈️', cost: emsYen ? fxConvert(emsYen, cur) : null, time: isEurope ? '5-8 dias' : '7-12 dias' });
-    rates.push({ name: 'Marítimo (Navio) 🚢', cost: null, time: '60-90 dias', consultar: true });
+    rates.push({ name: 'Japan Post EMS / DHL ✈️', cost: emsYen ? fxConvert(emsYen, cur) : null, time: isEurope ? '5-8 days' : '7-12 days' });
+    rates.push({ name: 'Sea Freight 🚢', cost: null, time: '60-90 days', consultar: true });
 
     return rates;
   };
@@ -133,28 +133,28 @@ const Shipping: React.FC = () => {
         {
           name: 'Japan Post Local (ゆうパック) ✉️',
           logo: '📮',
-          desc: 'Envio econômico via correio japonês.',
+          desc: t('shippingPage.carrier.jp.desc'),
           rate60: 870,
           rate80: 1100,
-          time: '1-2 dias úteis',
+          time: language === 'ja' ? '1-2営業日' : '1-2 business days',
           features: ['Rastreamento completo', 'Entrega aos sábados/domingos', 'Seguro básico']
         },
         {
           name: 'Yamato Transport (宅急便) 🐱',
           logo: '📦',
-          desc: 'Entrega expressa líder no Japão.',
+          desc: t('shippingPage.carrier.yamato.desc'),
           rate60: 930,
           rate80: 1150,
-          time: '1-2 dias úteis',
+          time: language === 'ja' ? '1-2営業日' : '1-2 business days',
           features: ['Horários selecionáveis', 'Entrega rápida', 'Alta confiabilidade']
         },
         {
           name: 'Sagawa Express (飛脚宅配便) 🏃‍♂️',
           logo: '🏃‍♂️',
-          desc: 'Serviço corporativo e privado rápido.',
+          desc: t('shippingPage.carrier.sagawa.desc'),
           rate60: 880,
           rate80: 1100,
-          time: '1-2 dias úteis',
+          time: language === 'ja' ? '1-2営業日' : '1-2 business days',
           features: ['Rastreável online', 'Suporte local excelente', 'Rede expressa']
         }
       ];
@@ -171,37 +171,37 @@ const Shipping: React.FC = () => {
         {
           name: 'Japan Post E-Light ✉️',
           logo: '✉️',
-          desc: 'Econômico para pacotes até 2 kg.',
+          desc: t('shippingPage.carrier.elight.desc'),
           rate60: eurELight1kg,
           rate80: eurELight2kg,
-          time: '7-12 dias úteis',
+          time: '7-12 days',
           features: ['Até 2 kg', 'Rastreio básico', 'Mais acessível']
         },
         {
           name: 'Japan Post EMS / DHL ✈️',
           logo: '✈️',
-          desc: 'Expresso prioritário via rede DHL.',
+          desc: t('shippingPage.carrier.ems.desc'),
           rate60: eurEms1kg,
           rate80: eurEms3kg,
-          time: '5-8 dias úteis',
+          time: '5-8 days',
           features: ['Despacho prioritário Narita', 'Rastreio em tempo real', 'Trânsito aéreo expresso']
         },
         {
-          name: 'Japan Post Kozutsumi Aéreo 📦',
+          name: 'Japan Post Kozutsumi Air 📦',
           logo: '📦',
-          desc: 'Aéreo para pacotes acima de 2 kg.',
+          desc: t('shippingPage.carrier.kozutsumi.desc'),
           rate60: eurAir3kg,
           rate80: eurAir5kg,
-          time: '7-10 dias úteis',
+          time: '7-10 days',
           features: ['Até 30 kg', 'Rastreio completo', 'Ótimo custo-benefício']
         },
         {
-          name: 'Marítimo / Navio 🚢',
+          name: 'Sea Freight 🚢',
           logo: '🚢',
-          desc: 'Envio por navio cargueiro — consultar disponibilidade.',
+          desc: t('shippingPage.carrier.sea.desc'),
           rate60: null as unknown as number,
           rate80: null as unknown as number,
-          time: '60-90 dias úteis',
+          time: '60-90 days',
           features: ['Custo baixo', 'Ideal para volumes grandes', 'Consultar disponibilidade'],
           consultar: true
         }
@@ -220,37 +220,37 @@ const Shipping: React.FC = () => {
       {
         name: 'Japan Post E-Light ✉️',
         logo: '✉️',
-        desc: 'Econômico para pacotes até 2 kg.',
+        desc: t('shippingPage.carrier.elight.desc'),
         rate60: brlELight1kg,
         rate80: brlELight2kg,
-        time: '10-15 dias úteis',
+        time: '10-15 days',
         features: ['Até 2 kg', 'Rastreio básico', 'Mais acessível']
       },
       {
         name: 'Japan Post EMS / DHL ✈️',
         logo: '✈️',
-        desc: 'Expresso prioritário via rede DHL.',
+        desc: t('shippingPage.carrier.ems.desc'),
         rate60: brlEms1kg,
         rate80: brlEms3kg,
-        time: '7-12 dias úteis',
+        time: '7-12 days',
         features: ['Prioridade na aduana', 'Rastreio em tempo real', 'Despacho rápido']
       },
       {
-        name: 'Japan Post Kozutsumi Aéreo 📦',
+        name: 'Japan Post Kozutsumi Air 📦',
         logo: '📦',
-        desc: 'Aéreo para pacotes acima de 2 kg.',
+        desc: t('shippingPage.carrier.kozutsumi.desc'),
         rate60: brlAir3kg,
         rate80: brlAir5kg,
-        time: '10-15 dias úteis',
+        time: '10-15 days',
         features: ['Até 30 kg', 'Rastreio completo', 'Ótimo custo-benefício']
       },
       {
-        name: 'Marítimo / Navio 🚢',
+        name: 'Sea Freight 🚢',
         logo: '🚢',
-        desc: 'Envio por navio cargueiro — consultar disponibilidade.',
+        desc: t('shippingPage.carrier.sea.desc'),
         rate60: null as unknown as number,
         rate80: null as unknown as number,
-        time: '60-90 dias úteis',
+        time: '60-90 days',
         features: ['Custo baixo', 'Ideal para volumes grandes', 'Consultar disponibilidade'],
         consultar: true
       }
@@ -355,7 +355,7 @@ const Shipping: React.FC = () => {
                   <div className="grid md:grid-cols-2 gap-4">
                     <div className="space-y-1.5">
                       <label className="text-xs font-bold text-muted-foreground uppercase flex items-center gap-1">
-                        Valor Decl. ({currency})
+                        {t('shippingPage.declaredValue').replace('{currency}', currency)}
                       </label>
                       <input
                         type="text"
@@ -368,7 +368,7 @@ const Shipping: React.FC = () => {
 
                     <div className="space-y-1.5">
                       <label className="text-xs font-bold text-muted-foreground uppercase flex items-center gap-1">
-                        <Weight className="w-3.5 h-3.5 text-primary" /> Peso Físico (kg)
+                        <Weight className="w-3.5 h-3.5 text-primary" /> {t('shippingPage.physicalWeight')}
                       </label>
                       <input
                         type="text"
@@ -383,11 +383,11 @@ const Shipping: React.FC = () => {
                   {/* Row 2: Box Dimensions in cm */}
                   <div className="space-y-2">
                     <label className="text-xs font-bold text-muted-foreground uppercase flex items-center gap-1">
-                      <Box className="w-3.5 h-3.5 text-primary" /> Dimensões da Caixa (cm)
+                      <Box className="w-3.5 h-3.5 text-primary" /> {t('shippingPage.boxDimensions')}
                     </label>
                     <div className="grid grid-cols-3 gap-3">
                       <div className="space-y-1">
-                        <span className="text-[10px] text-muted-foreground font-semibold">Altura</span>
+                        <span className="text-[10px] text-muted-foreground font-semibold">{t('shippingPage.height')}</span>
                         <input
                           type="text"
                           inputMode="decimal"
@@ -397,7 +397,7 @@ const Shipping: React.FC = () => {
                         />
                       </div>
                       <div className="space-y-1">
-                        <span className="text-[10px] text-muted-foreground font-semibold">Largura</span>
+                        <span className="text-[10px] text-muted-foreground font-semibold">{t('shippingPage.width')}</span>
                         <input
                           type="text"
                           inputMode="decimal"
@@ -407,7 +407,7 @@ const Shipping: React.FC = () => {
                         />
                       </div>
                       <div className="space-y-1">
-                        <span className="text-[10px] text-muted-foreground font-semibold">Profundidade</span>
+                        <span className="text-[10px] text-muted-foreground font-semibold">{t('shippingPage.depth')}</span>
                         <input
                           type="text"
                           inputMode="decimal"
@@ -426,21 +426,21 @@ const Shipping: React.FC = () => {
                           onClick={() => setBoxPreset(20, 20, 20)}
                           className="text-[9px] bg-secondary hover:bg-secondary/80 px-2 py-1 rounded text-muted-foreground hover:text-foreground font-semibold"
                         >
-                          Caixa 60 (20x20x20)
+                          {t('shippingPage.box60only')} (20x20x20)
                         </button>
                         <button
                           type="button"
                           onClick={() => setBoxPreset(30, 25, 25)}
                           className="text-[9px] bg-secondary hover:bg-secondary/80 px-2 py-1 rounded text-muted-foreground hover:text-foreground font-semibold"
                         >
-                          Caixa 80 (30x25x25)
+                          {t('shippingPage.box80only')} (30x25x25)
                         </button>
                         <button
                           type="button"
                           onClick={() => setBoxPreset(40, 30, 30)}
                           className="text-[9px] bg-secondary hover:bg-secondary/80 px-2 py-1 rounded text-muted-foreground hover:text-foreground font-semibold"
                         >
-                          Caixa 100 (40x30x30)
+                          Box 100 (40x30x30)
                         </button>
                       </div>
                     </div>
@@ -451,20 +451,20 @@ const Shipping: React.FC = () => {
                 {isOversize && (
                   <div className="bg-red-50 dark:bg-red-950/20 border border-red-200 rounded-xl p-4 text-xs text-red-800 dark:text-red-300 font-semibold space-y-1">
                     <p className="flex items-center gap-1.5 font-bold text-red-600">
-                      ⚠️ Dimensões Excedem o Limite (A+L+P &gt; 150 cm / 1500 mm)
+                      {t('shippingPage.oversizeTitle')}
                     </p>
                     <p className="leading-relaxed">
-                      A soma das dimensões é <strong>{dimensionSum} cm</strong>. O Japan Post não aceita pacotes com soma superior a <strong>150 cm (1500 mm)</strong>. Reduza as dimensões para continuar.
+                      {t('shippingPage.oversizeDesc').replace('{sum}', String(dimensionSum))}
                     </p>
                   </div>
                 )}
                 {!isOversize && isWeightExceeded && (
                   <div className="bg-red-50 dark:bg-red-950/20 border border-red-200 rounded-xl p-4 text-xs text-red-800 dark:text-red-300 font-semibold space-y-1">
                     <p className="flex items-center gap-1.5 font-bold text-red-600">
-                      ⚠️ Peso Excedido — Limite Máximo: 30 kg
+                      {t('shippingPage.weightTitle')}
                     </p>
                     <p className="leading-relaxed">
-                      O peso físico informado é <strong>{simWeight} kg</strong>. O Japan Post não aceita pacotes acima de <strong>30 kg</strong>. Entre em contato para envio especial.
+                      {t('shippingPage.weightDesc').replace('{weight}', String(simWeight))}
                     </p>
                   </div>
                 )}
@@ -472,15 +472,15 @@ const Shipping: React.FC = () => {
                 {/* Calculation Info */}
                 <div className="bg-secondary/40 p-3.5 rounded-xl border border-border/80 text-xs text-muted-foreground space-y-1.5">
                   <div className="flex justify-between">
-                    <span>Soma das Dimensões (Altura + Largura + Prof.):</span>
+                    <span>{t('shippingPage.dimSum')}</span>
                     <span className="font-bold text-foreground">{dimensionSum} cm</span>
                   </div>
                   <div className="flex justify-between">
-                    <span>Volume Resultante:</span>
+                    <span>{t('shippingPage.volumeResult')}</span>
                     <span className="font-semibold text-foreground">{simVolume.toFixed(6)} m³</span>
                   </div>
                   <div className="flex justify-between">
-                    <span>Peso Cubado (Volumétrico):</span>
+                    <span>{t('shippingPage.volumetricWeight')}</span>
                     <span className="font-semibold text-foreground">{volumetricWeight.toFixed(2)} kg</span>
                   </div>
                   <div className="flex justify-between border-t border-border/50 pt-1.5 mt-1 font-bold">
@@ -494,7 +494,7 @@ const Shipping: React.FC = () => {
                   <h4 className="text-xs font-bold text-foreground uppercase tracking-wider">{t('shippingPage.freightCost')}</h4>
                   {(isOversize || isWeightExceeded) ? (
                     <div className="p-6 bg-red-50/20 rounded-xl border border-dashed border-red-200 text-center text-xs text-red-700 dark:text-red-400 font-semibold">
-                      🚫 Cálculo suspenso. Corrija os dados acima para continuar.
+                      {t('shippingPage.calcSuspended')}
                     </div>
                   ) : (
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -502,11 +502,11 @@ const Shipping: React.FC = () => {
                         <div key={rate.name} className="p-3 bg-secondary/20 rounded-xl border border-border text-center flex flex-col justify-between">
                           <span className="text-[10px] text-muted-foreground block truncate font-bold">{rate.name}</span>
                           {(rate as any).consultar || rate.cost === null ? (
-                            <span className="text-sm font-black text-muted-foreground block mt-1">Consultar</span>
+                            <span className="text-sm font-black text-muted-foreground block mt-1">{t('shippingPage.consultar')}</span>
                           ) : (
                             <span className="text-base font-black text-primary block mt-1">{formatPrice(rate.cost as number, currency)}</span>
                           )}
-                          <span className="text-[9px] text-muted-foreground block mt-0.5">Prazo: {rate.time}</span>
+                          <span className="text-[9px] text-muted-foreground block mt-0.5">{t('shippingPage.deadline')} {rate.time}</span>
                         </div>
                       ))}
                     </div>
@@ -524,7 +524,7 @@ const Shipping: React.FC = () => {
                       <span>{formatPrice(simTax.total, currency)}</span>
                     </div>
                     <p className="text-[10px] text-orange-700 dark:text-orange-400 leading-relaxed font-semibold">
-                      ⚠️ <strong>Nota Fiscal:</strong> Este imposto é apenas uma estimativa aproximada cobrada pelas autoridades fiscais na alfândega do país de destino. Ele <strong>NÃO</strong> é adicionado ao checkout da Japan Express e deve ser pago na chegada caso o pacote seja tributado.
+                      ⚠️ {t('shippingPage.notaFiscal')}
                     </p>
                   </div>
                 )}
@@ -534,11 +534,11 @@ const Shipping: React.FC = () => {
                 <Info className="w-5 h-5 text-primary shrink-0 mt-0.5" />
                 <div>
                   <p className="text-xs text-muted-foreground leading-relaxed">
-                    <strong>{t('shippingPage.freeTip')}:</strong> Adicione mais itens para preencher totalmente o espaço da caixa (60cm ou 80cm) e diluir o custo unitário do frete aéreo internacional por item!
+                    <strong>{t('shippingPage.freeTip')}:</strong> {t('shippingPage.freeTipDesc')}
                   </p>
                   <Button asChild variant="link" className="mt-1.5 p-0 h-auto text-primary text-xs font-bold">
                     <Link to="/produtos" className="flex items-center gap-1">
-                      Ver Catálogo de Produtos
+                      {t('shippingPage.viewCatalog')}
                       <ArrowRight className="w-3.5 h-3.5" />
                     </Link>
                   </Button>
@@ -562,10 +562,12 @@ const Shipping: React.FC = () => {
                       ⚠️ <strong>{t('shippingPage.customsEst')}</strong>
                     </div>
                     <p>
-                      Diferente de compras nacionais, as compras internacionais de importação a partir do Japão sofrem taxação na alfândega de Curitiba. Apresentamos as estimativas no carrinho para sua transparência.
+                      {country === 'Brasil'
+                        ? 'International purchases from Japan are subject to customs fees at the Curitiba clearance center. We show estimates in your cart for full transparency.'
+                        : 'As compras internacionais do Japão sofrem taxação na alfândega. Apresentamos as estimativas no carrinho para sua transparência.'}
                     </p>
                     <p className="text-orange-700 dark:text-orange-400 font-semibold bg-orange-50/50 p-2 rounded">
-                      * O valor do imposto é apenas informativo e não será acrescido ao valor final pago no site. O imposto é pago na chegada do pacote caso cobrado pela alfândega.
+                      * {t('shippingPage.notaFiscal')}
                     </p>
                     <div className="border-t border-primary/10 pt-2.5 space-y-2">
                       <div className="flex justify-between font-bold text-foreground">
@@ -573,15 +575,15 @@ const Shipping: React.FC = () => {
                         <span className="text-orange-600">20% Federal + 17% ICMS</span>
                       </div>
                       <p className="text-[10px] pl-2 border-l-2 border-border">
-                        Cobrança simplificada de 20% sobre o valor aduaneiro e 17% de ICMS Estadual incidindo por dentro.
+                        20% simplified federal tax on customs value + 17% ICMS state tax.
                       </p>
-                      
+
                       <div className="flex justify-between font-bold text-foreground">
                         <span>{t('shippingPage.customs.above')}:</span>
                         <span className="text-orange-600">60% Federal + 17% ICMS</span>
                       </div>
                       <p className="text-[10px] pl-2 border-l-2 border-border">
-                        Aplica-se alíquota de 60% de imposto de importação federal (com dedução fixa de R$ 62,50) + 17% de ICMS Estadual.
+                        60% federal import tax (with R$ 62.50 fixed deduction) + 17% ICMS state tax.
                       </p>
                     </div>
                   </div>
@@ -590,26 +592,26 @@ const Shipping: React.FC = () => {
                 {['Portugal', 'França', 'Itália', 'Espanha'].includes(country) && (
                   <div className="space-y-3 text-xs leading-relaxed text-muted-foreground">
                     <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 rounded-lg p-3 text-blue-800 dark:text-blue-200 font-medium">
-                      ℹ️ <strong>Importação Aérea Europeia (DDU/DAP)</strong>
+                      ℹ️ <strong>European Air Import (DDU/DAP)</strong>
                     </div>
                     <p>
-                      Não cobramos taxas ou impostos europeus de importação (como IVA/VAT ou tarifas alfandegárias locais) no fechamento do seu pedido no site. O pacote é enviado do Japão via remessa postal internacional simples.
+                      We do not charge European import taxes (VAT or local customs duties) at checkout. Your package is shipped from Japan as a standard international postal shipment.
                     </p>
                     <div className="border-t border-primary/10 pt-2.5 space-y-2">
                       <div className="flex justify-between font-bold text-foreground">
-                        <span>Imposto no Checkout:</span>
-                        <span className="text-green-600">€ 0,00</span>
+                        <span>Tax at Checkout:</span>
+                        <span className="text-green-600">€ 0.00</span>
                       </div>
                       <p className="text-[10px] pl-2 border-l-2 border-border">
-                        Você paga apenas o valor dos produtos e o frete de Tóquio no nosso site.
+                        You pay only the product price and shipping from Tokyo on our site.
                       </p>
-                      
+
                       <div className="flex justify-between font-bold text-foreground">
-                        <span>Tributação na Alfândega Local:</span>
-                        <span className="text-blue-600">IVA + Taxas Postais</span>
+                        <span>Local Customs Tax:</span>
+                        <span className="text-blue-600">VAT + Postal Fees</span>
                       </div>
                       <p className="text-[10px] pl-2 border-l-2 border-border">
-                        Na chegada à alfândega europeia, o pacote poderá estar sujeito à cobrança do IVA local do país de destino (ex: 23% em Portugal, 20% na França) e tarifas aduaneiras postais locais (como a taxa dos CTT ou La Poste) a serem pagas pelo destinatário.
+                        Upon arrival at European customs, the package may be subject to local VAT (e.g. 23% in Portugal, 20% in France) and local postal handling fees payable by the recipient.
                       </p>
                     </div>
                   </div>
@@ -618,31 +620,32 @@ const Shipping: React.FC = () => {
                 {country === 'Japão' && (
                   <div className="space-y-3 text-xs leading-relaxed text-muted-foreground">
                     <div className="bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 rounded-lg p-3 text-emerald-800 dark:text-emerald-200 font-medium">
-                      ✓ <strong>Envio Nacional Local (Isento de Taxas de Importação)</strong>
+                      ✓ <strong>国内発送（輸入税免除）/ Domestic Shipping (Import Tax Exempt)</strong>
                     </div>
                     <p>
-                      Como o envio é doméstico (despachado de nossa loja em Hiroshima), não há nenhum trâmite alfandegário ou cobrança de impostos de importação internacional.
+                      国内発送のため（広島の店舗から発送）、輸入関税や通関手続きは一切ありません。<br />
+                      <span className="text-muted-foreground">Domestic shipment from our Hiroshima store — no customs or international import taxes.</span>
                     </p>
                     <div className="border-t border-primary/10 pt-2.5 space-y-2">
                       <div className="flex justify-between font-bold text-foreground">
-                        <span>Imposto de Importação:</span>
-                        <span className="text-green-600">Isento (¥0)</span>
+                        <span>輸入税 / Import Tax:</span>
+                        <span className="text-green-600">免除 / Exempt (¥0)</span>
                       </div>
-                      
+
                       <div className="flex justify-between font-bold text-foreground">
-                        <span>Imposto de Consumo Local (Shouhizei):</span>
-                        <span className="text-emerald-600">Incluso (10%)</span>
+                        <span>消費税 (消費税 10%) / Consumption Tax:</span>
+                        <span className="text-emerald-600">含む / Included (10%)</span>
                       </div>
                       <p className="text-[10px] pl-2 border-l-2 border-border">
-                        O imposto de consumo japonês de 10% já está totalmente incluído no preço de tabela dos produtos.
+                        Japanese 10% consumption tax is already fully included in all product prices.
                       </p>
-                      
+
                       <div className="flex justify-between font-bold text-foreground">
-                        <span>Benefício de Frete Grátis:</span>
-                        <span className="text-emerald-600">Disponível</span>
+                        <span>送料無料 / Free Shipping:</span>
+                        <span className="text-emerald-600">利用可 / Available</span>
                       </div>
                       <p className="text-[10px] pl-2 border-l-2 border-border">
-                        Seu frete local no Japão é 100% gratuito para compras acima de ¥6.000 na Japan Express!
+                        Free domestic shipping in Japan for orders over ¥6,000 at Japan Express!
                       </p>
                     </div>
                   </div>
@@ -652,10 +655,10 @@ const Shipping: React.FC = () => {
               {/* Dynamic Carrier & Box Table */}
               <div className="space-y-4">
                 <h3 className="font-display text-lg font-bold text-foreground">
-                  Tarifas Médias de Amostra ({country})
+                  {t('shippingPage.sampleRates')} ({country})
                 </h3>
                 <p className="text-[10px] text-muted-foreground leading-relaxed">
-                  *Valores médios fixados como referência de custo médio para caixas padrão (Zone 1/Principais Cidades). O simulador à esquerda calcula com base no peso e dimensão real digitados.
+                  {t('shippingPage.sampleNote')}
                 </p>
                 <div className="space-y-3">
                   {sampleRates.map((carrier) => (
@@ -672,22 +675,22 @@ const Shipping: React.FC = () => {
                       
                       <div className="grid grid-cols-2 gap-3 pt-2.5 border-t border-border/80 text-xs">
                         <div className="bg-secondary/40 p-2 rounded-lg text-center">
-                          <span className="text-muted-foreground block text-[10px]">{(carrier as any).consultar ? 'Caixa 60cm' : 'Média Caixa 60cm'}</span>
+                          <span className="text-muted-foreground block text-[10px]">{(carrier as any).consultar ? t('shippingPage.box60only') : t('shippingPage.avgBox60')}</span>
                           <span className="font-sans font-black text-sm text-primary">
-                            {(carrier as any).consultar ? 'Consultar' : formatPrice(carrier.rate60, currency)}
+                            {(carrier as any).consultar ? t('shippingPage.consultar') : formatPrice(carrier.rate60, currency)}
                           </span>
                         </div>
                         <div className="bg-secondary/40 p-2 rounded-lg text-center">
-                          <span className="text-muted-foreground block text-[10px]">{(carrier as any).consultar ? 'Caixa 80cm' : 'Média Caixa 80cm'}</span>
+                          <span className="text-muted-foreground block text-[10px]">{(carrier as any).consultar ? t('shippingPage.box80only') : t('shippingPage.avgBox80')}</span>
                           <span className="font-sans font-black text-sm text-primary">
-                            {(carrier as any).consultar ? 'Consultar' : formatPrice(carrier.rate80, currency)}
+                            {(carrier as any).consultar ? t('shippingPage.consultar') : formatPrice(carrier.rate80, currency)}
                           </span>
                         </div>
                       </div>
 
                       <div className="text-[10px] text-muted-foreground flex items-center gap-1">
                         <Clock className="w-3.5 h-3.5 text-orange-500 shrink-0" />
-                        Prazo estimado: <span className="font-semibold text-foreground">{carrier.time}</span>
+                        {t('shippingPage.estDeadline')} <span className="font-semibold text-foreground">{carrier.time}</span>
                       </div>
                     </div>
                   ))}

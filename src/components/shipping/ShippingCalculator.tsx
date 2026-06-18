@@ -134,7 +134,7 @@ const ShippingCalculator: React.FC<ShippingCalculatorProps> = ({
       const airYen = getKozutsumiRate(weightG, jpZone, 'air');
       if (airYen) options.push({
         carrier: 'kozutsumi-air',
-        name: 'Japan Post Kozutsumi Aéreo · 国際小包 航空便',
+        name: 'Japan Post Kozutsumi Air · 国際小包 航空便',
         logo: '📦',
         cost: fxConvert(airYen, currency),
         costYen: airYen,
@@ -158,7 +158,7 @@ const ShippingCalculator: React.FC<ShippingCalculatorProps> = ({
     // Maritime — always show as "Consultar"
     options.push({
       carrier: 'maritimo',
-      name: 'Marítimo · Encomenda por Navio',
+      name: 'Sea Freight · 船便',
       logo: '🚢',
       cost: 0,
       costYen: null,
@@ -203,12 +203,12 @@ const ShippingCalculator: React.FC<ShippingCalculatorProps> = ({
           </div>
           <div>
             <h2 className="font-sans text-2xl font-bold text-foreground">
-              {isJapan ? 'Calcular Frete Nacional' : 'Calcular Frete Internacional'}
+              {isJapan ? t('calc.domesticTitle') : t('calc.intlTitle')}
             </h2>
             <p className="text-sm text-muted-foreground">
               {isJapan
-                ? 'De Hiroshima para todo o Japão'
-                : `Diretamente do Japão para ${destinationCountry}`}
+                ? t('calc.fromHiroshima')
+                : t('calc.directFrom').replace('{country}', destinationCountry || '')}
             </p>
           </div>
         </div>
@@ -219,8 +219,7 @@ const ShippingCalculator: React.FC<ShippingCalculatorProps> = ({
         <div className="mb-6">
           <label className="block text-sm font-bold text-foreground mb-2">
             <MapPin className="w-4 h-4 inline mr-1" />
-            Selecione a Província Japonesa
-            <span className="text-muted-foreground text-xs ml-2">(Envio Local)</span>
+            {t('calc.selectProvinceLabel')}
           </label>
           <select
             value={selectedPrefecture}
@@ -228,7 +227,7 @@ const ShippingCalculator: React.FC<ShippingCalculatorProps> = ({
             disabled={!!externalPrefecture}
             className="w-full p-3 rounded-lg border border-border bg-background text-foreground focus:ring-2 focus:ring-primary focus:border-primary transition-all disabled:opacity-50 disabled:cursor-not-allowed font-medium"
           >
-            <option value="">Escolha a Província...</option>
+            <option value="">{t('calc.chooseProv')}</option>
             {japanPrefectures.map((pref) => (
               <option key={pref.name} value={pref.name}>
                 {pref.nameJa} ({pref.name})
@@ -244,11 +243,11 @@ const ShippingCalculator: React.FC<ShippingCalculatorProps> = ({
           <p className="text-sm font-semibold text-blue-800 dark:text-blue-200 flex items-center gap-2">
             🗾 Japan Post Internacional · Zona {jpZone}
             <span className="text-xs font-normal text-blue-600 dark:text-blue-400">
-              — {isEurope ? `${destinationCountry} (Europa)` : 'Brasil (América do Sul)'}
+              — {isEurope ? `${destinationCountry} (Europe)` : t('calc.southAmerica')}
             </span>
           </p>
           <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
-            Serviço determinado pelo peso total estimado do pedido.
+            {t('calc.weightService')}
           </p>
         </div>
       )}
@@ -258,10 +257,10 @@ const ShippingCalculator: React.FC<ShippingCalculatorProps> = ({
         <div className="bg-gradient-to-r from-emerald-50 to-green-50 dark:from-emerald-950/20 dark:to-green-950/20 rounded-xl p-4 mb-6 border border-emerald-200">
           <div className="flex items-center gap-2 mb-1">
             <span className="text-2xl">🌸</span>
-            <h3 className="font-bold text-emerald-800 dark:text-emerald-200">Frete Local Grátis!</h3>
+            <h3 className="font-bold text-emerald-800 dark:text-emerald-200">{t('calc.freeShippingBanner')}</h3>
           </div>
           <p className="text-sm text-emerald-700 dark:text-emerald-300 font-medium">
-            Benefício Japan Express: Envio 100% gratuito para entregas no território japonês.
+            {t('calc.freeShippingDesc')}
           </p>
         </div>
       )}
@@ -270,10 +269,10 @@ const ShippingCalculator: React.FC<ShippingCalculatorProps> = ({
         <div className="bg-amber-50 dark:bg-amber-950/20 rounded-xl p-4 mb-6 border border-amber-200">
           <div className="flex items-center gap-2 mb-1">
             <span className="text-2xl">🌸</span>
-            <h3 className="font-bold text-amber-800 dark:text-amber-200">Frete Grátis acima de ¥6.000</h3>
+            <h3 className="font-bold text-amber-800 dark:text-amber-200">{t('calc.freeShippingThreshold')}</h3>
           </div>
           <p className="text-sm text-amber-700 dark:text-amber-300 font-medium">
-            Falta {formatPrice(6000 - finalAmountForFreeShipping, 'JPY')} para frete grátis.
+            {t('calc.freeShippingRemain').replace('{amount}', formatPrice(6000 - finalAmountForFreeShipping, 'JPY'))}
           </p>
         </div>
       )}
@@ -282,7 +281,7 @@ const ShippingCalculator: React.FC<ShippingCalculatorProps> = ({
       {!isJapan && items.length > 0 && (
         <div className="bg-orange-50 dark:bg-orange-950/20 rounded-xl p-4 mb-6 border border-orange-200">
           <p className="text-xs text-orange-700 dark:text-orange-300 font-semibold leading-relaxed">
-            ✈️ Envio de Tóquio para {destinationCountry}: frete calculado pelo Japan Post, com base no peso estimado. Não elegível para frete grátis.
+            {t('calc.intlNote').replace('{country}', destinationCountry || '')}
           </p>
         </div>
       )}
@@ -291,17 +290,17 @@ const ShippingCalculator: React.FC<ShippingCalculatorProps> = ({
       {isOverweight && items.length > 0 && (
         <div className="bg-red-50 dark:bg-red-950/20 rounded-xl p-4 mb-6 border border-red-200">
           <p className="text-sm font-bold text-red-700 dark:text-red-300">
-            ⚠️ Pedido excede 30 kg ({weightLabel}) — limite máximo Japan Post.
+            {t('calc.overweightWarning').replace('{weight}', weightLabel)}
           </p>
-          <p className="text-xs text-red-600 dark:text-red-400 mt-1">Entre em contato para envios especiais.</p>
+          <p className="text-xs text-red-600 dark:text-red-400 mt-1">{t('calc.overweightContact')}</p>
         </div>
       )}
       {isOversize && items.length > 0 && (
         <div className="bg-red-50 dark:bg-red-950/20 rounded-xl p-4 mb-6 border border-red-200">
           <p className="text-sm font-bold text-red-700 dark:text-red-300">
-            ⚠️ Dimensões excedem o limite de 150 cm (A+L+P) — Japan Post não aceita.
+            {t('calc.oversizeWarning')}
           </p>
-          <p className="text-xs text-red-600 dark:text-red-400 mt-1">Entre em contato para envio especial via courier privado.</p>
+          <p className="text-xs text-red-600 dark:text-red-400 mt-1">{t('calc.oversizeContact')}</p>
         </div>
       )}
 
@@ -314,29 +313,29 @@ const ShippingCalculator: React.FC<ShippingCalculatorProps> = ({
           </h3>
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Itens Padrão</span>
+              <span className="text-muted-foreground">{t('calc.standardItems')}</span>
               <span className="font-medium">{spaceInfo.small}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Itens Premium</span>
+              <span className="text-muted-foreground">{t('calc.premiumItems')}</span>
               <span className="font-medium">{spaceInfo.large}</span>
             </div>
             <div className="border-t border-border pt-2 mt-2 space-y-1">
               {isJapan ? (
                 <>
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Caixas 60 cm estimadas:</span>
+                    <span className="text-muted-foreground">{t('calc.boxes60est')}</span>
                     <span className="font-medium">{calculateBoxes.boxes60}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Caixas 80 cm estimadas:</span>
+                    <span className="text-muted-foreground">{t('calc.boxes80est')}</span>
                     <span className="font-medium">{calculateBoxes.boxes80}</span>
                   </div>
                 </>
               ) : (
                 <div className="flex justify-between items-center">
                   <span className="text-muted-foreground flex items-center gap-1">
-                    <Scale className="w-3.5 h-3.5" /> Peso estimado:
+                    <Scale className="w-3.5 h-3.5" /> {t('calc.estWeight')}
                   </span>
                   <span className="font-bold text-foreground">{weightLabel}</span>
                 </div>
@@ -372,7 +371,7 @@ const ShippingCalculator: React.FC<ShippingCalculatorProps> = ({
           </h3>
 
           {isJapan && !selectedPrefecture && onShippingSelect && (
-            <p className="text-sm text-muted-foreground mb-3">Selecione uma província acima.</p>
+            <p className="text-sm text-muted-foreground mb-3">{t('calc.selectProvinceHint')}</p>
           )}
 
           {shippingOptions.map((option, index) => {
@@ -409,26 +408,26 @@ const ShippingCalculator: React.FC<ShippingCalculatorProps> = ({
                       <p className="font-bold text-sm text-foreground">{option.name}</p>
                       <p className="text-xs text-muted-foreground">
                         {option.costYen ? `¥${option.costYen.toLocaleString()} · ` : ''}
-                        {isConsultar ? 'Prazo variável conforme rota' : `Entrega em ${option.estimatedDays} dias úteis`}
+                        {isConsultar ? t('calc.variableDeadline') : t('calc.deliveryDays').replace('{days}', option.estimatedDays)}
                       </p>
                     </div>
                   </div>
                   <div className="text-right shrink-0">
                     {isConsultar ? (
-                      <p className="font-sans text-sm font-black text-muted-foreground">Consultar</p>
+                      <p className="font-sans text-sm font-black text-muted-foreground">{t('calc.consultar')}</p>
                     ) : (
                       <p className={cn(
                         "font-sans text-lg font-black",
                         option.cost === 0 ? "text-green-600" : "text-primary"
                       )}>
-                        {option.cost === 0 ? 'Grátis' : formatPrice(option.cost, currency)}
+                        {option.cost === 0 ? t('calc.gratis') : formatPrice(option.cost, currency)}
                       </p>
                     )}
                     {option.originalCost && option.originalCost > 0 && (
                       <p className="text-xs text-muted-foreground line-through">{formatPrice(option.originalCost, currency)}</p>
                     )}
                     {!onShippingSelect && !isConsultar && index === 0 && (
-                      <span className="text-xs text-primary font-bold">Melhor Opção</span>
+                      <span className="text-xs text-primary font-bold">{t('calc.bestOption')}</span>
                     )}
                     {selectedCarrier === option.carrier && !isConsultar && (
                       <span className="text-xs text-primary font-bold">{t('calc.selected')}</span>
@@ -460,7 +459,7 @@ const ShippingCalculator: React.FC<ShippingCalculatorProps> = ({
       {isJapan && items.length > 0 && !selectedPrefecture && shippingOptions.length === 0 && (
         <div className="text-center py-4 text-muted-foreground text-sm">
           <MapPin className="w-8 h-8 mx-auto mb-2 opacity-40" />
-          Selecione a província para ver as opções de envio.
+          {t('calc.selectProvinceHint')}
         </div>
       )}
 
