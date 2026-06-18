@@ -14,27 +14,60 @@ const normalize = (s: string) =>
 
 type SortKey = 'az' | 'za' | 'vendidos' | 'lancamento';
 
-const SORT_OPTIONS: { key: SortKey; label: string }[] = [
-  { key: 'az',        label: 'A → Z' },
-  { key: 'za',        label: 'Z → A' },
-  { key: 'vendidos',  label: 'Mais Vendidos' },
-  { key: 'lancamento', label: 'Lançamento' },
-];
+const SORT_KEYS: SortKey[] = ['az', 'za', 'vendidos', 'lancamento'];
 
-const CATEGORY_META: Record<string, { label: string; icon: string; desc: string }> = {
-  cosmeticos: { label: 'Cosméticos', icon: '🧴', desc: 'Os cosméticos, protetores solares e produtos de skin care mais famosos e tecnológicos do Japão.' },
-  acessorios: { label: 'Acessórios', icon: '🎮', desc: 'Action figures originais de anime, luminárias kawaii e organizadores de design minimalista.' },
-  doces:      { label: 'Doces & Chás', icon: '🍵', desc: 'Doces finos de matcha, chás verdes tradicionais orgânicos e guloseimas exclusivas de Tóquio.' },
-  papelaria:  { label: 'Papelaria', icon: '✏️', desc: 'Canetas gel Sakura de fluxo suave e papelaria japonesa de alta durabilidade e estilo.' },
-  eletronicos:{ label: 'Eletrônicos', icon: '📱', desc: 'Gadgets, acessórios e eletrônicos japoneses com a qualidade e a tecnologia de ponta do Japão.' },
-  masculino:  { label: 'Masculino', icon: '👔', desc: 'Produtos e cuidados pensados para o público masculino, com estilo e qualidade japonesa.' },
-  vestuario:  { label: 'Vestuário', icon: '👕', desc: 'Roupas e peças de vestuário com design e conforto japonês.' },
-  higiene:    { label: 'Higiene & Saúde', icon: '🧼', desc: 'Produtos de higiene pessoal, cuidados e saúde com a qualidade japonesa.' },
+const CATEGORY_ICONS: Record<string, string> = {
+  cosmeticos: '🧴', acessorios: '🎮', doces: '🍵', papelaria: '✏️',
+  eletronicos: '📱', masculino: '👔', vestuario: '👕', higiene: '🧼',
 };
 
 const Products: React.FC = () => {
   const { category } = useParams<{ category?: string }>();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+
+  const SORT_OPTIONS = [
+    { key: 'az' as SortKey,         label: t('productsPage.sortAZ') },
+    { key: 'za' as SortKey,         label: t('productsPage.sortZA') },
+    { key: 'vendidos' as SortKey,   label: t('productsPage.sortBestseller') },
+    { key: 'lancamento' as SortKey, label: t('productsPage.sortNew') },
+  ];
+
+  const getCategoryLabel = (id: string) => t(`product.category.${id}`) || id;
+  const getCategoryDesc = (id: string) => {
+    const descs: Record<string, Record<string, string>> = {
+      pt: {
+        cosmeticos: 'Os cosméticos, protetores solares e produtos de skin care mais famosos do Japão.',
+        acessorios: 'Action figures originais de anime, luminárias kawaii e organizadores minimalistas.',
+        doces: 'Doces finos de matcha, chás verdes tradicionais orgânicos e guloseimas de Tóquio.',
+        papelaria: 'Canetas gel Sakura de fluxo suave e papelaria japonesa de alta durabilidade.',
+        eletronicos: 'Gadgets, acessórios e eletrônicos japoneses com tecnologia de ponta.',
+        masculino: 'Produtos pensados para o público masculino com estilo e qualidade japonesa.',
+        vestuario: 'Roupas e peças com design e conforto japonês.',
+        higiene: 'Produtos de higiene pessoal e saúde com a qualidade japonesa.',
+      },
+      en: {
+        cosmeticos: 'The most famous Japanese cosmetics, sunscreens and skincare products.',
+        acessorios: 'Original anime figures, kawaii lamps and minimalist organizers.',
+        doces: 'Premium matcha sweets, organic green teas and Tokyo exclusive treats.',
+        papelaria: 'Smooth-flow Sakura gel pens and durable Japanese stationery.',
+        eletronicos: 'Japanese gadgets, accessories and electronics with cutting-edge tech.',
+        masculino: 'Products designed for men with Japanese style and quality.',
+        vestuario: 'Clothing with Japanese design and comfort.',
+        higiene: 'Personal care and health products with Japanese quality.',
+      },
+      ja: {
+        cosmeticos: '日本の人気コスメ・日焼け止め・スキンケア製品。',
+        acessorios: 'アニメオリジナルフィギュア、かわいいランプ、ミニマルオーガナイザー。',
+        doces: '抹茶スイーツ・有機緑茶・東京限定おやつ。',
+        papelaria: 'サクラのゲルペンと高品質の日本文房具。',
+        eletronicos: '最先端技術の日本製ガジェット・アクセサリー・電子機器。',
+        masculino: '日本品質のメンズケア商品。',
+        vestuario: '日本デザインの快適なウェア。',
+        higiene: '日本品質の衛生・健康ケア商品。',
+      },
+    };
+    return descs[language]?.[id] || descs['pt'][id] || '';
+  };
   const { products, loading } = useProducts();
 
   const [query,      setQuery]      = useState('');
@@ -92,12 +125,11 @@ const Products: React.FC = () => {
   const { page, totalPages, pageItems, setPage, rangeStart, rangeEnd, total } =
     usePagination(displayProducts, 12);
 
-  // Categorias disponíveis (para filtro no /todos)
   const availableCats = useMemo(() =>
     Array.from(new Set(visible.map(p => p.category)))
-      .filter(id => CATEGORY_META[id])
-      .sort((a, b) => (CATEGORY_META[a]?.label || a).localeCompare(CATEGORY_META[b]?.label || b, 'pt')),
-    [visible]);
+      .filter(id => CATEGORY_ICONS[id])
+      .sort((a, b) => getCategoryLabel(a).localeCompare(getCategoryLabel(b))),
+    [visible, language]);
 
   // Tipos disponíveis (tags) — mostra sempre que existam tags na lista atual
   const availableTypes = useMemo(() => {
@@ -108,10 +140,10 @@ const Products: React.FC = () => {
 
   // Categorias como nav links (compatibilidade com rotas existentes)
   const navCategories = [
-    { id: 'all', label: t('productsPage.all') || 'Todos', href: '/produtos' },
+    { id: 'all', label: t('productsPage.all'), href: '/produtos' },
     ...availableCats.map(id => ({
       id,
-      label: CATEGORY_META[id]?.label || id,
+      label: getCategoryLabel(id),
       href: `/produtos/${id}`,
     })),
   ];
@@ -131,7 +163,7 @@ const Products: React.FC = () => {
     return () => document.removeEventListener('mousedown', onClick);
   }, [filtersOpen]);
 
-  const catMeta = effectiveCat ? CATEGORY_META[effectiveCat] : null;
+  const catMeta = effectiveCat ? { icon: CATEGORY_ICONS[effectiveCat] || '🛍️', label: getCategoryLabel(effectiveCat), desc: getCategoryDesc(effectiveCat) } : null;
 
   return (
     <Layout>
@@ -173,7 +205,7 @@ const Products: React.FC = () => {
                   type="text"
                   value={query}
                   onChange={(e) => { setQuery(e.target.value); setPage(1); }}
-                  placeholder="Pesquisar..."
+                  placeholder={t('productsPage.search')}
                   className="w-full pl-9 pr-8 py-2 text-sm rounded-full border border-border bg-card text-foreground shadow-sm focus:ring-2 focus:ring-primary focus:outline-none transition"
                 />
                 {query && (
@@ -191,7 +223,7 @@ const Products: React.FC = () => {
                   )}
                 >
                   <SlidersHorizontal className="w-4 h-4" />
-                  <span className="hidden sm:inline">Filtros</span>
+                  <span className="hidden sm:inline">{t('productsPage.filters')}</span>
                   {hasActiveFilters && <span className="bg-white/30 text-[10px] px-1.5 py-0.5 rounded-full font-bold">●</span>}
                   <ChevronDown className={cn("w-4 h-4 transition-transform", filtersOpen && "rotate-180")} />
                 </button>
@@ -201,7 +233,7 @@ const Products: React.FC = () => {
                   <div className="absolute right-0 top-full mt-2 z-40 w-[min(20rem,88vw)] max-h-[70vh] overflow-y-auto bg-card border border-border rounded-2xl shadow-elevated p-4 space-y-4 text-left">
                     {/* Ordenar */}
                     <div>
-                      <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground mb-1.5">Ordenar</p>
+                      <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground mb-1.5">{t('productsPage.sort')}</p>
                       <div className="flex flex-wrap gap-1.5">
                         {SORT_OPTIONS.map(opt => (
                           <button key={opt.key} onClick={() => { setSort(sort === opt.key ? null : opt.key); setPage(1); }}
@@ -216,18 +248,18 @@ const Products: React.FC = () => {
                     {/* Categoria — só na rota /todos */}
                     {isAllRoute && availableCats.length > 0 && (
                       <div>
-                        <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground mb-1.5">Categoria</p>
+                        <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground mb-1.5">{t('productsPage.categoryFilter')}</p>
                         <div className="flex flex-wrap gap-1.5">
                           <button onClick={() => { setCatFilter(null); setPage(1); }}
                             className={cn("px-3 py-1 rounded-full text-xs font-semibold border transition-all",
                               !catFilter ? "bg-primary text-primary-foreground border-primary" : "bg-card text-muted-foreground border-border hover:text-foreground")}>
-                            Todas
+                            {t('productsPage.allCategories')}
                           </button>
                           {availableCats.map(id => (
                             <button key={id} onClick={() => { setCatFilter(catFilter === id ? null : id); setPage(1); }}
                               className={cn("px-3 py-1 rounded-full text-xs font-semibold border transition-all",
                                 catFilter === id ? "bg-primary text-primary-foreground border-primary" : "bg-card text-muted-foreground border-border hover:text-foreground")}>
-                              {CATEGORY_META[id]?.icon} {CATEGORY_META[id]?.label || id}
+                              {CATEGORY_ICONS[id]} {getCategoryLabel(id)}
                             </button>
                           ))}
                         </div>
@@ -237,12 +269,12 @@ const Products: React.FC = () => {
                     {/* Tipo — dinâmico */}
                     {availableTypes.length > 0 && (
                       <div>
-                        <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground mb-1.5">Tipo</p>
+                        <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground mb-1.5">{t('productsPage.typeFilter')}</p>
                         <div className="flex flex-wrap gap-1.5">
                           <button onClick={() => { setTypeFilter(null); setPage(1); }}
                             className={cn("px-3 py-1 rounded-full text-xs font-semibold border transition-all",
                               !typeFilter ? "bg-secondary text-foreground border-foreground/20" : "bg-card text-muted-foreground border-border hover:text-foreground")}>
-                            Todos
+                            {t('productsPage.allTypes')}
                           </button>
                           {availableTypes.map(type => (
                             <button key={type} onClick={() => { setTypeFilter(typeFilter === type ? null : type); setPage(1); }}
@@ -259,7 +291,7 @@ const Products: React.FC = () => {
                     {hasActiveFilters && (
                       <button onClick={clearFilters}
                         className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground font-semibold pt-1 border-t border-border w-full justify-center">
-                        <X className="w-3.5 h-3.5" /> Limpar filtros
+                        <X className="w-3.5 h-3.5" /> {t('productsPage.clearFilters')}
                       </button>
                     )}
                   </div>
@@ -290,7 +322,7 @@ const Products: React.FC = () => {
           {/* Resumo do filtro ativo */}
           {hasActiveFilters && (
             <div className="mb-6 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-              <span>Filtros ativos:</span>
+              <span>{t('productsPage.activeFilters')}</span>
               {sort && (
                 <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold">
                   {SORT_OPTIONS.find(o => o.key === sort)?.label}
@@ -299,7 +331,7 @@ const Products: React.FC = () => {
               )}
               {catFilter && (
                 <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold">
-                  {CATEGORY_META[catFilter]?.icon} {CATEGORY_META[catFilter]?.label || catFilter}
+                  {CATEGORY_ICONS[catFilter]} {getCategoryLabel(catFilter)}
                   <button onClick={() => setCatFilter(null)}><X className="w-3 h-3" /></button>
                 </span>
               )}
@@ -309,7 +341,7 @@ const Products: React.FC = () => {
                   <button onClick={() => setTypeFilter(null)}><X className="w-3 h-3" /></button>
                 </span>
               )}
-              <span className="text-xs">— {total} produto{total !== 1 ? 's' : ''}</span>
+              <span className="text-xs">— {total} {total !== 1 ? t('productsPage.products_plural') : t('productsPage.products')}</span>
             </div>
           )}
 

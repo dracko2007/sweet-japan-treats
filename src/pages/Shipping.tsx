@@ -266,10 +266,10 @@ const Shipping: React.FC = () => {
         <div className="container mx-auto px-4">
           <div className="text-center max-w-2xl mx-auto">
             <h1 className="font-display text-4xl lg:text-5xl font-bold text-foreground mb-4">
-              Políticas de Envio e Prazos
+              {t('shippingPage.title')}
             </h1>
             <p className="text-muted-foreground text-lg">
-              Veja as taxas de envio aéreo, prazos estimados e detalhes fiscais para cada país
+              {t('shippingPage.subtitle')}
             </p>
           </div>
         </div>
@@ -284,13 +284,13 @@ const Shipping: React.FC = () => {
               onClick={() => setActiveSection('rates')}
               className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold transition-colors ${activeSection === 'rates' ? 'bg-card shadow text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
             >
-              <Truck className="w-4 h-4" /> Tarifas & Prazos
+              <Truck className="w-4 h-4" /> {t('shippingPage.tabRates')}
             </button>
             <button
               onClick={() => setActiveSection('prohibited')}
               className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold transition-colors ${activeSection === 'prohibited' ? 'bg-card shadow text-red-600' : 'text-muted-foreground hover:text-foreground'}`}
             >
-              <AlertTriangle className="w-4 h-4" /> Itens Proibidos
+              <AlertTriangle className="w-4 h-4" /> {t('shippingPage.tabProhibited')}
             </button>
           </div>
 
@@ -303,10 +303,10 @@ const Shipping: React.FC = () => {
             <div>
               <h3 className="text-lg font-bold text-foreground mb-1 flex items-center gap-2">
                 <Truck className="w-5 h-5 text-primary" />
-                Simular Destino de Envio
+                {t('shippingPage.simulatorTitle')}
               </h3>
               <p className="text-xs text-muted-foreground">
-                Selecione o país de destino para visualizar as transportadoras disponíveis, taxas de frete e regras de tributação.
+                {t('shippingPage.simulatorDesc')}
               </p>
             </div>
             <div className="min-w-[240px]">
