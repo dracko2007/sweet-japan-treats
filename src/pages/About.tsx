@@ -40,26 +40,16 @@ const About: React.FC = () => {
             {/* Texto */}
             <div className="order-first lg:order-last space-y-5">
               <span className="inline-block px-4 py-1.5 rounded-full bg-primary/10 text-primary text-sm font-medium">
-                Sua Conexão Direta com o Japão
+                {t('aboutPage.hero.badge')}
               </span>
               <h1 className="font-display text-4xl lg:text-5xl font-bold text-foreground leading-tight">
-                Mais do que uma loja, somos uma ponte entre o Japão e você.
+                {t('aboutPage.hero.title')}
               </h1>
-              <p className="text-muted-foreground leading-relaxed">
-                A Japan Express nasceu da paixão por conectar pessoas aos melhores produtos, tendências e experiências do Japão e da Coreia. Localizados em Hiroshima, oferecemos compras personalizadas, redirecionamento de encomendas e envios internacionais com segurança, transparência e atendimento dedicado.
-              </p>
-              <p className="text-muted-foreground leading-relaxed">
-                Selecionamos cuidadosamente cosméticos, produtos de skincare, alimentos, suplementos, itens exclusivos e lançamentos diretamente das principais lojas japonesas e coreanas, garantindo autenticidade, qualidade e confiança em cada pedido.
-              </p>
-              <p className="text-muted-foreground leading-relaxed">
-                Nosso compromisso é tornar sua experiência simples e segura, acompanhando cada etapa do processo, desde a busca pelo produto ideal até a entrega em seu destino.
-              </p>
-              <p className="text-muted-foreground leading-relaxed">
-                Acreditamos que a distância não deve ser um obstáculo para quem deseja ter acesso ao melhor que o Japão oferece.
-              </p>
-              <p className="font-display font-semibold text-foreground">
-                Japan Express — aproximando você da qualidade, inovação e cultura japonesa, onde quer que você esteja.
-              </p>
+              <p className="text-muted-foreground leading-relaxed">{t('aboutPage.hero.p1')}</p>
+              <p className="text-muted-foreground leading-relaxed">{t('aboutPage.hero.p2')}</p>
+              <p className="text-muted-foreground leading-relaxed">{t('aboutPage.hero.p3')}</p>
+              <p className="text-muted-foreground leading-relaxed">{t('aboutPage.hero.p4')}</p>
+              <p className="font-display font-semibold text-foreground">{t('aboutPage.hero.tagline')}</p>
             </div>
           </div>
         </div>
