@@ -4,7 +4,7 @@ import {
   Package, CreditCard, Plane, Landmark, Truck, Home,
   Smartphone, Search, QrCode, Wallet, Globe2, Copy, Check,
   ArrowRight, MapPin, Bell, Percent, ShieldCheck,
-  Building2, ChevronDown, FileText, BadgeCheck, Briefcase,
+  Building2, ChevronDown, FileText, BadgeCheck, Briefcase, Clock,
 } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';

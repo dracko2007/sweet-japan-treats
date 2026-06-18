@@ -28,13 +28,13 @@ const FeaturedProducts: React.FC = () => {
         <div className="text-center mb-12">
           <div className="inline-flex items-center gap-2 bg-primary/10 text-primary font-semibold text-sm px-4 py-1.5 rounded-full mb-4">
             <Sparkles className="w-4 h-4" />
-            Seleção em destaque
+            {t('featured.badge')}
           </div>
           <h2 className="font-display text-3xl md:text-4xl font-bold text-gray-900">
-            Direto do Japão para você
+            {t('featured.title')}
           </h2>
           <p className="text-muted-foreground mt-3 max-w-xl mx-auto">
-            Produtos originais selecionados a dedo, enviados com cuidado.
+            {t('featured.subtitle')}
           </p>
         </div>
 
@@ -81,11 +81,11 @@ const FeaturedProducts: React.FC = () => {
                   <div className="absolute top-2 left-2">
                     {selectedCountry === 'Japão' ? (
                       <span className="bg-green-600 text-white font-black text-[9px] px-2 py-0.5 rounded shadow-sm tracking-wider uppercase">
-                        Envio Doméstico (Hiroshima) 🇯🇵
+                        {t('featured.tag.domestic')} 🇯🇵
                       </span>
                     ) : (
                       <span className="bg-primary text-white font-black text-[9px] px-2 py-0.5 rounded shadow-sm tracking-wider uppercase">
-                        Importado do Japão ✈️
+                        {t('featured.tag.imported')} ✈️
                       </span>
                     )}
                   </div>
@@ -114,7 +114,7 @@ const FeaturedProducts: React.FC = () => {
                       )}
                     </span>
                     <span className="text-[11px] font-medium text-primary group-hover:underline">
-                      Ver detalhes
+                      {t('featured.details')}
                     </span>
                   </div>
                 </div>
