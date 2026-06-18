@@ -21,8 +21,10 @@ export interface UserProfile {
   birthdate?: string;
   adminRole?: number;         // nível de admin (1/2/3) quando é sessão de admin
   personType?: 'PF' | 'PJ';   // Pessoa Física ou Jurídica
-  cnpj?: string;              // se PJ
+  cpf?: string;               // CPF (PF, Brasil) — obrigatório p/ Remessa Conforme
+  cnpj?: string;              // CNPJ (PJ, Brasil)
   razaoSocial?: string;       // se PJ
+  document?: string;          // Documento de identificação para envio internacional (passaporte, NIF, etc.)
   gender?: 'masculino' | 'feminino' | 'outro';
   whatsappMarketing?: boolean;
   points?: number; // Pontos de fidelidade (reviews, vídeos)

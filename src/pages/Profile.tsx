@@ -14,7 +14,7 @@ import { useLanguage } from '@/context/LanguageContext';
 import { addAddressHints } from '@/utils/romanize';
 import { formatPrice } from '@/utils/currency';
 import { useProducts } from '@/context/ProductsContext';
-import { isValidEmail, isValidPhone, isNonEmpty, maskPhone } from '@/utils/validation';
+import { isValidEmail, isValidPhone, isNonEmpty, maskPhone, isValidCPF, isValidCNPJ, maskCPF, maskCNPJ } from '@/utils/validation';
 import { affiliateService, AffiliateRequest } from '@/services/affiliateService';
 import { reviewService } from '@/services/reviewService';
 import ReviewModal from '@/components/products/ReviewModal';
@@ -136,7 +136,10 @@ const Profile: React.FC = () => {
         }
       }));
     } else {
-      const nextValue = name === 'phone' ? maskPhone(value) : value;
+      let nextValue = value;
+      if (name === 'phone') nextValue = maskPhone(value);
+      else if (name === 'cpf') nextValue = maskCPF(value);
+      else if (name === 'cnpj') nextValue = maskCNPJ(value);
       setEditedUser(prev => ({ ...prev, [name]: nextValue }));
     }
   };
@@ -215,6 +218,21 @@ const Profile: React.FC = () => {
     if (editedUser.phone !== undefined && editedUser.phone !== '' && !isValidPhone(editedUser.phone)) {
       toast({ title: 'Telefone inválido', description: 'Use 10 a 11 dígitos.', variant: 'destructive' });
       return;
+    }
+    // Validação de CPF/CNPJ apenas quando endereço é Brasil
+    if (isBrazilAddress) {
+      const isPJ = editedUser.personType === 'PJ';
+      if (isPJ) {
+        if (editedUser.cnpj !== undefined && editedUser.cnpj !== '' && !isValidCNPJ(editedUser.cnpj)) {
+          toast({ title: 'CNPJ inválido', description: 'Verifique o número digitado.', variant: 'destructive' });
+          return;
+        }
+      } else {
+        if (editedUser.cpf !== undefined && editedUser.cpf !== '' && !isValidCPF(editedUser.cpf)) {
+          toast({ title: 'CPF inválido', description: 'Verifique o número digitado.', variant: 'destructive' });
+          return;
+        }
+      }
     }
 
     const turnedOnMarketing = editedUser.whatsappMarketing && !user.whatsappMarketing;
@@ -349,6 +367,71 @@ const Profile: React.FC = () => {
                       {t('profile.field.whatsapp')}
                     </Label>
                   </div>
+                  {/* Documento fiscal — CPF/CNPJ para Brasil, documento genérico para outros países */}
+                  {isBrazilAddress && (
+                    <>
+                      <div className="space-y-2 md:col-span-2">
+                        <Label>{t('profile.field.personType')}</Label>
+                        <div className="flex gap-3">
+                          {(['PF', 'PJ'] as const).map((type) => (
+                            <label key={type} className="flex items-center gap-2 cursor-pointer">
+                              <input
+                                type="radio"
+                                name="personType"
+                                value={type}
+                                checked={(editedUser.personType ?? 'PF') === type}
+                                onChange={() => setEditedUser(prev => ({ ...prev, personType: type }))}
+                                className="w-4 h-4 text-primary"
+                              />
+                              <span className="text-sm font-medium">
+                                {type === 'PF' ? t('profile.field.personType.pf') : t('profile.field.personType.pj')}
+                              </span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                      {(editedUser.personType ?? 'PF') === 'PF' ? (
+                        <div className="space-y-1 md:col-span-2">
+                          <Label htmlFor="cpf">{t('profile.field.cpf')}</Label>
+                          <Input
+                            id="cpf"
+                            name="cpf"
+                            placeholder="000.000.000-00"
+                            value={editedUser.cpf || ''}
+                            onChange={handleInputChange}
+                            maxLength={14}
+                          />
+                          <p className="text-xs text-muted-foreground">⚠️ {t('profile.field.cpf.hint')}</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-1 md:col-span-2">
+                          <Label htmlFor="cnpj">{t('profile.field.cnpj')}</Label>
+                          <Input
+                            id="cnpj"
+                            name="cnpj"
+                            placeholder="00.000.000/0000-00"
+                            value={editedUser.cnpj || ''}
+                            onChange={handleInputChange}
+                            maxLength={18}
+                          />
+                          <p className="text-xs text-muted-foreground">⚠️ {t('profile.field.cnpj.hint')}</p>
+                        </div>
+                      )}
+                    </>
+                  )}
+                  {!isBrazilAddress && !isJapanAddress && (
+                    <div className="space-y-1 md:col-span-2">
+                      <Label htmlFor="document">{t('profile.field.document')}</Label>
+                      <Input
+                        id="document"
+                        name="document"
+                        placeholder={t('profile.field.document.placeholder')}
+                        value={editedUser.document || ''}
+                        onChange={handleInputChange}
+                      />
+                      <p className="text-xs text-muted-foreground">⚠️ {t('profile.field.document.hint')}</p>
+                    </div>
+                  )}
                   <div className="space-y-2">
                     <Label htmlFor="birthdate">{t('profile.field.birthdate')}</Label>
                     <Input
@@ -519,6 +602,23 @@ const Profile: React.FC = () => {
                     </div>
                   )}
                   <div className="space-y-2 md:col-span-2">
+                    {/* Documento fiscal no modo visualização */}
+                    {isBrazilAddress && (user.cpf || user.cnpj) && (
+                      <div className="space-y-1">
+                        <Label className="text-muted-foreground text-xs">
+                          {user.personType === 'PJ' ? t('profile.field.cnpj') : t('profile.field.cpf')}
+                        </Label>
+                        <p className="font-medium text-foreground font-mono">
+                          {user.personType === 'PJ' ? user.cnpj : user.cpf}
+                        </p>
+                      </div>
+                    )}
+                    {!isBrazilAddress && !isJapanAddress && user.document && (
+                      <div className="space-y-1">
+                        <Label className="text-muted-foreground text-xs">{t('profile.field.document')}</Label>
+                        <p className="font-medium text-foreground font-mono">{user.document}</p>
+                      </div>
+                    )}
                     <Label className="text-muted-foreground flex items-center gap-2">
                       <MapPin className="w-4 h-4" />
                       {t('profile.field.address')}
