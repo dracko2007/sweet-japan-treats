@@ -17,12 +17,17 @@ export default defineConfig(({ mode }) => ({
     VitePWA({
       registerType: "autoUpdate",
       workbox: {
-        // Pré-cacheia assets do build (JS, CSS, HTML, imagens locais)
-        globPatterns: ["**/*.{js,css,html,ico,jpg,jpeg,png,svg,woff2}"],
+        // Pré-cacheia apenas assets com hash (JS/CSS) — NÃO cacheia HTML para
+        // que index.html venha sempre da rede (evita "old chunks" após deploy)
+        globPatterns: ["**/*.{js,css,ico,jpg,jpeg,png,svg,woff2}"],
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
-        // SPA: serve index.html para todas as rotas
+        // Limpa caches de versões antigas automaticamente
+        cleanupOutdatedCaches: true,
+        // SPA: serve index.html para todas as rotas (network-first para HTML)
         navigateFallback: "/index.html",
         navigateFallbackDenylist: [/^\/api/, /^\/firebase-sync/],
+        // index.html: sempre busca da rede, usa cache só se offline
+        navigationPreload: true,
         runtimeCaching: [
           // Imagens do Firebase Storage — cache 7 dias
           {
