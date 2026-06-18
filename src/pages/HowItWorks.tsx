@@ -3,12 +3,11 @@ import { Link } from 'react-router-dom';
 import {
   Package, CreditCard, Plane, Landmark, Truck, Home,
   Smartphone, Search, QrCode, Wallet, Globe2, Copy, Check,
-  ArrowRight, MapPin, Bell, Percent, ShieldCheck, Clock,
+  ArrowRight, MapPin, Bell, Percent, ShieldCheck,
   Building2, ChevronDown, FileText, BadgeCheck, Briefcase,
 } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
-import FlagIcon from '@/components/FlagIcon';
 import { cn } from '@/lib/utils';
 import { useLanguage } from '@/context/LanguageContext';
 
@@ -209,38 +208,151 @@ const getTrackingSteps = (lang: string) => {
   ];
 };
 
-// ---------- TAX (keeps country-specific content) ----------
-const TAX = {
-  Brasil: {
-    flagCode: 'br', tone: '#f59e0b',
-    headline: 'Quem cobra é a Receita Federal (Remessa Conforme)',
-    rows: [
-      ['Compras até US$ 50', '20% Imposto de Importação + 17% ICMS'],
-      ['De US$ 50 a US$ 3.000', '60% (− US$ 20 de desconto) + 17% ICMS'],
-    ],
-    note: 'Os Correios apenas entregam — quem tributa é a Receita Federal. Você é avisado pelo app/e-mail/SMS dos Correios e paga online (Pix, cartão ou boleto) ANTES da liberação. Nunca se paga em dinheiro ao carteiro. ⚠️ Cuidado com links falsos: confirme sempre no app oficial ou em correios.com.br.',
-  },
-  Europa: {
-    flagCode: 'eu', tone: '#3b82f6',
-    headline: 'IVA + taxa postal local, pagos na entrega',
-    rows: [
-      ['No site (checkout)', '€ 0,00 de imposto'],
-      ['Na alfândega local', 'IVA do país (20–23%) + taxa postal'],
-    ],
-    note: 'Enviamos via remessa postal internacional. O IVA e a taxa dos correios locais (CTT, La Poste...) são cobrados na entrega.',
-  },
-  Japão: {
-    flagCode: 'jp', tone: '#22c55e',
-    headline: 'Envio nacional — sem imposto de importação',
-    rows: [
-      ['Imposto de importação', 'Isento (¥0)'],
-      ['Consumo (Shouhizei 10%)', 'Já incluso no preço'],
-    ],
-    note: 'Despachado de Hiroshima dentro do Japão: nenhum trâmite alfandegário. Frete grátis acima de ¥6.000.',
-  },
-} as const;
+// ---------- TAX (language-aware) ----------
+type TaxKey = 'Brasil' | 'Europa' | 'Japão';
 
-type TaxKey = keyof typeof TAX;
+interface TaxEntry {
+  flag: string; tone: string; label: string;
+  headline: string;
+  rows: [string, string][];
+  note: string;
+  flow: { lb: string; sub: string }[];
+}
+
+const getTax = (lang: string): Record<TaxKey, TaxEntry> => {
+  if (lang === 'en') return {
+    Brasil: {
+      flag: '🇧🇷', tone: '#f59e0b', label: 'Brazil',
+      headline: 'Brazilian Federal Revenue (Receita Federal) collects taxes — Remessa Conforme',
+      rows: [
+        ['Orders up to US$ 50', '20% Federal Tax + 17% ICMS'],
+        ['From US$ 50 to US$ 3,000', '60% (− US$ 20 discount) + 17% ICMS'],
+      ],
+      note: 'Correios only delivers — the Federal Revenue is the taxing authority. You\'re notified by the Correios app/email/SMS and pay online (Pix, card or boleto) BEFORE the package is released. Never pay in cash to the postal worker. ⚠️ Beware of fake links: always confirm in the official app or at correios.com.br.',
+      flow: [
+        { lb: 'Product + shipping', sub: 'paid on site' },
+        { lb: 'Federal Revenue', sub: 'inspects & calculates' },
+        { lb: 'You', sub: 'pay online to release' },
+      ],
+    },
+    Europa: {
+      flag: '🇪🇺', tone: '#3b82f6', label: 'Europe',
+      headline: 'VAT + local postal fee — paid upon delivery',
+      rows: [
+        ['At checkout', '€ 0.00 tax charged'],
+        ['At local customs', 'Country VAT (20–23%) + postal fee'],
+      ],
+      note: 'We ship via standard international postal service. Local VAT and postal handling fees (CTT, La Poste...) are charged upon delivery.',
+      flow: [
+        { lb: 'Product + shipping', sub: 'paid on site' },
+        { lb: 'Local customs', sub: 'inspects & calculates' },
+        { lb: 'You', sub: 'pay upon delivery' },
+      ],
+    },
+    Japão: {
+      flag: '🇯🇵', tone: '#22c55e', label: 'Japan',
+      headline: 'Domestic shipping — no import tax',
+      rows: [
+        ['Import tax', 'Exempt (¥0)'],
+        ['Consumption tax (Shouhizei 10%)', 'Already included in price'],
+      ],
+      note: 'Shipped from Hiroshima within Japan: no customs procedures. Free shipping over ¥6,000.',
+      flow: [
+        { lb: 'Product + shipping', sub: 'paid on site' },
+        { lb: 'No customs', sub: 'domestic delivery' },
+        { lb: 'You', sub: 'receive at home' },
+      ],
+    },
+  };
+  if (lang === 'ja') return {
+    Brasil: {
+      flag: '🇧🇷', tone: '#f59e0b', label: 'ブラジル',
+      headline: 'ブラジル連邦税務署（Receita Federal）が税金を徴収 — Remessa Conforme',
+      rows: [
+        ['US$ 50以下の購入', '連邦税20% + ICMS 17%'],
+        ['US$ 50〜US$ 3,000', '連邦税60%（US$ 20割引）+ ICMS 17%'],
+      ],
+      note: 'Correiosは配送のみ — 課税するのは連邦税務署です。Correiosのアプリ/メール/SMSで通知が届き、荷物引き渡し前にオンラインで支払います。配達員への現金払いは不要です。⚠️ 偽リンクに注意：必ず公式アプリまたはcorreios.com.brで確認してください。',
+      flow: [
+        { lb: '商品 + 送料', sub: 'サイトで支払い' },
+        { lb: '連邦税務署', sub: '検査・計算' },
+        { lb: 'あなた', sub: 'オンラインで支払い' },
+      ],
+    },
+    Europa: {
+      flag: '🇪🇺', tone: '#3b82f6', label: 'ヨーロッパ',
+      headline: 'VAT + 現地郵便手数料 — 配達時に支払い',
+      rows: [
+        ['チェックアウト時', '税金 € 0.00'],
+        ['現地税関', '国内VAT（20〜23%）+ 郵便手数料'],
+      ],
+      note: '国際郵便として発送します。現地VAT・郵便手数料（CTT、La Posteなど）は配達時に徴収されます。',
+      flow: [
+        { lb: '商品 + 送料', sub: 'サイトで支払い' },
+        { lb: '現地税関', sub: '検査・計算' },
+        { lb: 'あなた', sub: '配達時に支払い' },
+      ],
+    },
+    Japão: {
+      flag: '🇯🇵', tone: '#22c55e', label: '日本',
+      headline: '国内発送 — 輸入税なし',
+      rows: [
+        ['輸入税', '免除（¥0）'],
+        ['消費税（消費税 10%）', '価格に含む'],
+      ],
+      note: '広島から国内発送のため、通関手続きは一切ありません。¥6,000以上のご注文は送料無料。',
+      flow: [
+        { lb: '商品 + 送料', sub: 'サイトで支払い' },
+        { lb: '税関なし', sub: '国内配送' },
+        { lb: 'あなた', sub: '自宅で受取' },
+      ],
+    },
+  };
+  return {
+    Brasil: {
+      flag: '🇧🇷', tone: '#f59e0b', label: 'Brasil',
+      headline: 'Quem cobra é a Receita Federal (Remessa Conforme)',
+      rows: [
+        ['Compras até US$ 50', '20% Imposto de Importação + 17% ICMS'],
+        ['De US$ 50 a US$ 3.000', '60% (− US$ 20 de desconto) + 17% ICMS'],
+      ],
+      note: 'Os Correios apenas entregam — quem tributa é a Receita Federal. Você é avisado pelo app/e-mail/SMS dos Correios e paga online (Pix, cartão ou boleto) ANTES da liberação. Nunca se paga em dinheiro ao carteiro. ⚠️ Cuidado com links falsos: confirme sempre no app oficial ou em correios.com.br.',
+      flow: [
+        { lb: 'Produto + frete', sub: 'pago no site' },
+        { lb: 'Receita Federal', sub: 'fiscaliza e calcula' },
+        { lb: 'Você', sub: 'paga online p/ liberar' },
+      ],
+    },
+    Europa: {
+      flag: '🇪🇺', tone: '#3b82f6', label: 'Europa',
+      headline: 'IVA + taxa postal local, pagos na entrega',
+      rows: [
+        ['No site (checkout)', '€ 0,00 de imposto'],
+        ['Na alfândega local', 'IVA do país (20–23%) + taxa postal'],
+      ],
+      note: 'Enviamos via remessa postal internacional. O IVA e a taxa dos correios locais (CTT, La Poste...) são cobrados na entrega.',
+      flow: [
+        { lb: 'Produto + frete', sub: 'pago no site' },
+        { lb: 'Alfândega local', sub: 'fiscaliza e calcula' },
+        { lb: 'Você', sub: 'paga na entrega' },
+      ],
+    },
+    Japão: {
+      flag: '🇯🇵', tone: '#22c55e', label: 'Japão',
+      headline: 'Envio nacional — sem imposto de importação',
+      rows: [
+        ['Imposto de importação', 'Isento (¥0)'],
+        ['Consumo (Shouhizei 10%)', 'Já incluso no preço'],
+      ],
+      note: 'Despachado de Hiroshima dentro do Japão: nenhum trâmite alfandegário. Frete grátis acima de ¥6.000.',
+      flow: [
+        { lb: 'Produto + frete', sub: 'pago no site' },
+        { lb: 'Sem alfândega', sub: 'envio doméstico' },
+        { lb: 'Você', sub: 'recebe em casa' },
+      ],
+    },
+  };
+};
 
 // ---------- SUBCOMPONENTS ----------
 
@@ -392,9 +504,11 @@ const PaymentMethods: React.FC<PaymentMethodsProps> = ({ language, t }) => {
 };
 
 interface TaxExplainerProps { language: string; }
-const TaxExplainer: React.FC<TaxExplainerProps> = ({ language: _lang }) => {
+const TaxExplainer: React.FC<TaxExplainerProps> = ({ language }) => {
   const [c, setC] = useState<TaxKey>('Brasil');
+  const TAX = getTax(language);
   const tx = TAX[c];
+  const FLOW_ICONS = [Package, Landmark, Smartphone];
   return (
     <div className="bg-card rounded-2xl border border-border p-5 sm:p-7 shadow-sm">
       <div className="flex gap-2 mb-5">
@@ -408,28 +522,27 @@ const TaxExplainer: React.FC<TaxExplainerProps> = ({ language: _lang }) => {
             )}
             style={{ background: c === k ? TAX[k].tone : undefined, borderColor: c === k ? TAX[k].tone : 'transparent' }}
           >
-            <FlagIcon code={TAX[k].flagCode} size={18} className="mr-1" />{k}
+            <span className="mr-1">{TAX[k].flag}</span>{TAX[k].label}
           </button>
         ))}
       </div>
 
       <div className="flex items-center justify-between gap-2 mb-5">
-        {[
-          { ic: Package, lb: 'Produto + frete', sub: 'pago no site' },
-          { ic: Landmark, lb: 'Receita Federal', sub: 'fiscaliza e calcula' },
-          { ic: Smartphone, lb: 'Você', sub: 'paga online p/ liberar' },
-        ].map((s, i, arr) => (
-          <React.Fragment key={i}>
-            <div className="flex flex-col items-center text-center gap-1.5 flex-1">
-              <span className="w-11 h-11 rounded-full flex items-center justify-center" style={{ background: `${tx.tone}1a` }}>
-                <s.ic className="w-5 h-5" style={{ color: tx.tone }} />
-              </span>
-              <span className="text-[11px] font-bold text-foreground leading-none">{s.lb}</span>
-              <span className="text-[10px] text-muted-foreground">{s.sub}</span>
-            </div>
-            {i < arr.length - 1 && <ArrowRight className="w-4 h-4 text-muted-foreground shrink-0" />}
-          </React.Fragment>
-        ))}
+        {tx.flow.map((s, i, arr) => {
+          const Ico = FLOW_ICONS[i];
+          return (
+            <React.Fragment key={i}>
+              <div className="flex flex-col items-center text-center gap-1.5 flex-1">
+                <span className="w-11 h-11 rounded-full flex items-center justify-center" style={{ background: `${tx.tone}1a` }}>
+                  <Ico className="w-5 h-5" style={{ color: tx.tone }} />
+                </span>
+                <span className="text-[11px] font-bold text-foreground leading-none">{s.lb}</span>
+                <span className="text-[10px] text-muted-foreground">{s.sub}</span>
+              </div>
+              {i < arr.length - 1 && <ArrowRight className="w-4 h-4 text-muted-foreground shrink-0" />}
+            </React.Fragment>
+          );
+        })}
       </div>
 
       <div key={c} className="animate-fade-up rounded-xl p-4 border" style={{ background: `${tx.tone}0d`, borderColor: `${tx.tone}33` }}>
@@ -559,16 +672,47 @@ const CorreiosTracking: React.FC<CorreiosTrackingProps> = ({ language, t }) => {
 };
 
 // ---------- Business Import (expandable banner) ----------
-const BIZ_STEPS = [
-  { ic: BadgeCheck, t: 'Habilitação no Radar / Siscomex', d: 'A empresa precisa do Radar (Registro e Rastreamento da Atuação dos Intervenientes Aduaneiros) habilitado na Receita Federal para operar no Siscomex — o sistema oficial de comércio exterior.' },
-  { ic: Briefcase, t: 'Despachante aduaneiro', d: 'Um despachante registra a operação e cuida da documentação. Para grandes volumes/valores, é praticamente obrigatório.' },
-  { ic: FileText, t: 'Declaração de Importação (DI)', d: 'A importação formal é registrada via DI no Siscomex, com a classificação fiscal (NCM) de cada produto e o valor aduaneiro.' },
-  { ic: Percent, t: 'Tributação completa', d: 'Em vez do regime simplificado, incidem II + IPI + PIS/COFINS-Importação + ICMS, conforme a NCM. Pode somar bem mais que os 60% do regime de pessoa física.' },
-];
+const getBizSteps = (lang: string) => {
+  if (lang === 'en') return [
+    { ic: BadgeCheck, t: 'Radar / Siscomex Registration', d: 'The company needs a Radar (Importer Registration) approved by the Federal Revenue to operate in Siscomex — Brazil\'s official foreign trade system.' },
+    { ic: Briefcase, t: 'Customs Broker', d: 'A customs broker registers the operation and handles documentation. For large volumes/values, this is practically mandatory.' },
+    { ic: FileText, t: 'Import Declaration (DI)', d: 'Formal imports are registered via Import Declaration (DI) in Siscomex, with the NCM tax classification of each product and the customs value.' },
+    { ic: Percent, t: 'Full Taxation', d: 'Instead of the simplified regime, II + IPI + PIS/COFINS-Import + ICMS apply per NCM code. Can total much more than the 60% personal import rate.' },
+  ];
+  if (lang === 'ja') return [
+    { ic: BadgeCheck, t: 'Radar / Siscomex 登録', d: '企業はブラジルの公式貿易システムSiscomexを利用するため、連邦税務署でRadar（輸入者登録）の承認が必要です。' },
+    { ic: Briefcase, t: '通関業者', d: '通関業者が業務登録と書類手続きを行います。大量・高額の輸入にはほぼ必須です。' },
+    { ic: FileText, t: '輸入申告書（DI）', d: '正式な輸入はSiscomexの輸入申告書（DI）で登録され、各商品のNCM税分類と関税価格が記載されます。' },
+    { ic: Percent, t: '全税負担', d: '簡易制度の代わりに、NCMコードに応じてII + IPI + PIS/COFINS-Import + ICMSが適用されます。個人輸入の60%を大きく上回る場合があります。' },
+  ];
+  return [
+    { ic: BadgeCheck, t: 'Habilitação no Radar / Siscomex', d: 'A empresa precisa do Radar (Registro e Rastreamento da Atuação dos Intervenientes Aduaneiros) habilitado na Receita Federal para operar no Siscomex — o sistema oficial de comércio exterior.' },
+    { ic: Briefcase, t: 'Despachante aduaneiro', d: 'Um despachante registra a operação e cuida da documentação. Para grandes volumes/valores, é praticamente obrigatório.' },
+    { ic: FileText, t: 'Declaração de Importação (DI)', d: 'A importação formal é registrada via DI no Siscomex, com a classificação fiscal (NCM) de cada produto e o valor aduaneiro.' },
+    { ic: Percent, t: 'Tributação completa', d: 'Em vez do regime simplificado, incidem II + IPI + PIS/COFINS-Importação + ICMS, conforme a NCM. Pode somar bem mais que os 60% do regime de pessoa física.' },
+  ];
+};
 
-interface BusinessImportProps { t: (key: string) => string; }
-const BusinessImport: React.FC<BusinessImportProps> = ({ t }) => {
+const getBizBody = (lang: string) => {
+  if (lang === 'en') return {
+    intro: <>The simplified regime (Remessa Conforme — Correios app) applies to individuals, up to <strong>US$ 3,000</strong> per shipment. Above that, or for resale goods, the operation is a <strong>formal import</strong> with its own rules:</>,
+    note: <>⚠️ Notifications and payments do <strong>not</strong> come through the Correios app as in regular purchases — everything goes through Siscomex and the customs broker. Timelines and costs also differ.</>,
+  };
+  if (lang === 'ja') return {
+    intro: <>簡易制度（Remessa Conforme — Correiosアプリ）は個人向けで、1件あたり最大<strong>US$ 3,000</strong>まで適用されます。それ以上、または転売目的の商品は<strong>正式輸入</strong>として独自のルールが適用されます：</>,
+    note: <>⚠️ 通知と支払いは通常購入のようにCorreiosアプリでは届きません — すべてSiscomexと通関業者を通じて行われます。期間とコストも異なります。</>,
+  };
+  return {
+    intro: <>O regime simplificado (Remessa Conforme — app dos Correios) vale para pessoa física, até <strong>US$ 3.000</strong> por remessa. Acima disso, ou para mercadoria de revenda, a operação é uma <strong>importação formal</strong> com regras próprias:</>,
+    note: <>⚠️ A notificação e o pagamento <strong>não</strong> chegam pelo app dos Correios como nas compras comuns — tudo passa pelo Siscomex e pelo despachante. Os prazos e custos também são diferentes.</>,
+  };
+};
+
+interface BusinessImportProps { t: (key: string) => string; language: string; }
+const BusinessImport: React.FC<BusinessImportProps> = ({ t, language }) => {
   const [open, setOpen] = useState(false);
+  const BIZ_STEPS = getBizSteps(language);
+  const bizBody = getBizBody(language);
   return (
     <div className="rounded-2xl border-2 border-dashed border-primary/40 bg-primary/5 overflow-hidden">
       <button
@@ -590,8 +734,7 @@ const BusinessImport: React.FC<BusinessImportProps> = ({ t }) => {
       <div className={cn('transition-all duration-500 overflow-hidden', open ? 'max-h-[700px]' : 'max-h-0')}>
         <div className="px-5 pb-5 space-y-4">
           <p className="text-sm text-muted-foreground leading-relaxed bg-background/60 rounded-xl p-3 border border-border">
-            O regime simplificado (Remessa Conforme — app dos Correios) vale para pessoa física, até <strong>US$ 3.000</strong> por remessa.
-            Acima disso, ou para mercadoria de revenda, a operação é uma <strong>importação formal</strong> com regras próprias:
+            {bizBody.intro}
           </p>
 
           <div className="grid sm:grid-cols-2 gap-3">
@@ -607,7 +750,7 @@ const BusinessImport: React.FC<BusinessImportProps> = ({ t }) => {
           </div>
 
           <p className="text-[11px] text-muted-foreground leading-relaxed">
-            ⚠️ A notificação e o pagamento <strong>não</strong> chegam pelo app dos Correios como nas compras comuns — tudo passa pelo Siscomex e pelo despachante. Os prazos e custos também são diferentes.
+            {bizBody.note}
           </p>
 
           <div className="flex flex-col sm:flex-row gap-2">
@@ -679,7 +822,7 @@ const HowItWorks: React.FC = () => {
               {t('howItWorks.taxSimText')} <Link to="/frete" className="text-primary font-semibold hover:underline">{t('howItWorks.taxSimLink')}</Link>.
             </p>
             <div className="mt-5">
-              <BusinessImport t={t} />
+              <BusinessImport t={t} language={language} />
             </div>
           </div>
 
