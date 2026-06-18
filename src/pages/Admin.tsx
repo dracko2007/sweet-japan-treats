@@ -27,6 +27,7 @@ import TrackingModal from '@/components/admin/TrackingModal';
 import AdminCalculator from '@/components/admin/AdminCalculator';
 import CN23Modal from '@/components/admin/CN23Modal';
 import PromoNotificationModal from '@/components/admin/PromoNotificationModal';
+import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { orderService } from '@/services/orderService';
 import { customerService } from '@/services/customerService';
 import { requireAdminPassword } from '@/utils/adminGuard';
@@ -65,6 +66,7 @@ const Admin: React.FC = () => {
   const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
   const [cn23Order, setCn23Order] = useState<any | null>(null);
   const [promoModalOpen, setPromoModalOpen] = useState(false);
+  const { settings, saveSettings } = useSiteSettings();
 
   // Paginação da lista de pedidos (10 por página)
   const ordersPagination = usePagination(allOrders, 10);
@@ -468,7 +470,7 @@ _This is an automated test message_
             <p className="text-muted-foreground text-lg">
               Gestão de Pedidos - Paula Shiokawa
             </p>
-            <div className="mt-4 flex justify-center">
+            <div className="mt-4 flex flex-wrap justify-center gap-3">
               <Button
                 variant="outline"
                 className="gap-2 border-orange-400 text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-950"
@@ -476,6 +478,13 @@ _This is an automated test message_
               >
                 <Megaphone className="w-4 h-4" />
                 Disparar Notificação Promocional
+              </Button>
+              <Button
+                variant="outline"
+                className={`gap-2 ${settings.vlogEnabled ? 'border-green-500 text-green-600 hover:bg-green-50 dark:hover:bg-green-950' : 'border-border text-muted-foreground hover:bg-secondary'}`}
+                onClick={() => saveSettings({ ...settings, vlogEnabled: !settings.vlogEnabled })}
+              >
+                {settings.vlogEnabled ? '👁 Vlog ATIVO' : '🙈 Vlog OCULTO'}
               </Button>
             </div>
           </div>

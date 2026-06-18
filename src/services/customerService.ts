@@ -16,6 +16,8 @@ export interface CustomerStats {
   email: string;
   name: string;
   phone: string;
+  gender?: 'masculino' | 'feminino' | 'outro';
+  birthdate?: string; // "YYYY-MM" format
   totalOrders: number;
   totalSpent: number;
   averageOrderValue: number;
@@ -48,11 +50,12 @@ export const customerService = {
       const orders = user.orders || [];
 
       if (orders.length === 0) {
-        // Cliente sem pedidos
         customers.push({
           email,
           name: user.name || 'N/A',
           phone: user.phone || 'N/A',
+          gender: user.gender,
+          birthdate: user.birthdate,
           totalOrders: 0,
           totalSpent: 0,
           averageOrderValue: 0,
@@ -107,6 +110,8 @@ export const customerService = {
         email,
         name: user.name || 'N/A',
         phone: user.phone || 'N/A',
+        gender: user.gender,
+        birthdate: user.birthdate,
         totalOrders: orders.length,
         totalSpent,
         averageOrderValue: totalSpent / orders.length,

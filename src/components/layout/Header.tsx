@@ -10,6 +10,7 @@ import LanguageSwitcher from '@/components/LanguageSwitcher';
 import CountrySwitcher from '@/components/CountrySwitcher';
 import JapanExpressLogo from '@/components/JapanExpressLogo';
 import { useToast } from '@/hooks/use-toast';
+import { useSiteSettings } from '@/hooks/useSiteSettings';
 
 const Header: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -18,6 +19,7 @@ const Header: React.FC = () => {
   const { isAuthenticated, user, isAdmin } = useUser();
   const { t, selectedCountry } = useLanguage();
   const location = useLocation();
+  const { settings } = useSiteSettings();
 
   const navItems = [
     { 
@@ -29,7 +31,7 @@ const Header: React.FC = () => {
       ]
     },
     { label: t('nav.offers'), href: '/ofertas' },
-    { label: t('nav.vlog'), href: '/vlog' },
+    ...(settings.vlogEnabled ? [{ label: t('nav.vlog'), href: '/vlog' }] : []),
     { label: t('nav.shipping'), href: '/frete' },
     { label: t('nav.howItWorks'), href: '/como-funciona' },
     { label: t('nav.customRequest'), href: '/faca-seu-pedido' },

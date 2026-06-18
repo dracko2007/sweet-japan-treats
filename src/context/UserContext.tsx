@@ -23,6 +23,7 @@ export interface UserProfile {
   personType?: 'PF' | 'PJ';   // Pessoa Física ou Jurídica
   cnpj?: string;              // se PJ
   razaoSocial?: string;       // se PJ
+  gender?: 'masculino' | 'feminino' | 'outro';
   whatsappMarketing?: boolean;
   points?: number; // Pontos de fidelidade (reviews, vídeos)
   birthdayBonusYear?: number; // Ano em que já recebeu os 1000 pts de aniversário

@@ -26,6 +26,9 @@ const Register: React.FC = () => {
     personType: 'PF' as 'PF' | 'PJ',
     cnpj: '',
     razaoSocial: '',
+    gender: '' as '' | 'masculino' | 'feminino' | 'outro',
+    birthdayMonth: '',
+    birthdayYear: '',
   });
   // Código do país (DDI), default pelo país selecionado na loja
   const [dialCode, setDialCode] = useState<string>(() => {
@@ -98,12 +101,17 @@ const Register: React.FC = () => {
     setIsLoading(true);
 
     try {
+      const birthdateParts = [formData.birthdayYear, formData.birthdayMonth].filter(Boolean);
+      const birthdate = birthdateParts.length === 2 ? `${formData.birthdayYear}-${formData.birthdayMonth.padStart(2,'0')}` : undefined;
+
       const result = await registerUser({
         name: formData.name,
         email: formData.email,
-        phone: fullPhone(), // inclui o código do país (ex: "+351 912345678")
+        phone: fullPhone(),
         password: formData.password,
         personType: formData.personType,
+        ...(formData.gender ? { gender: formData.gender as 'masculino' | 'feminino' | 'outro' } : {}),
+        ...(birthdate ? { birthdate } : {}),
         ...(formData.personType === 'PJ'
           ? { cnpj: formData.cnpj, razaoSocial: formData.razaoSocial }
           : {}),
@@ -310,6 +318,53 @@ const Register: React.FC = () => {
                     Selecione o país e digite o número <strong>sem</strong> o código (ex: {dialCode} 912345678).
                   </p>
                   {errors.phone && <p className="text-xs text-destructive">{errors.phone}</p>}
+                </div>
+
+                {/* Gênero */}
+                <div className="space-y-2">
+                  <Label>Gênero <span className="text-muted-foreground font-normal text-xs">(opcional)</span></Label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { value: 'feminino', label: '♀ Feminino' },
+                      { value: 'masculino', label: '♂ Masculino' },
+                      { value: 'outro', label: '— Prefiro não dizer' },
+                    ].map(opt => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => setFormData(p => ({ ...p, gender: p.gender === opt.value ? '' : opt.value as any }))}
+                        className={`py-2 rounded-lg border-2 text-xs font-semibold transition-colors ${formData.gender === opt.value ? 'border-primary bg-primary/5 text-primary' : 'border-border text-muted-foreground hover:border-gray-300'}`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Data de aniversário */}
+                <div className="space-y-2">
+                  <Label>Mês de aniversário <span className="text-muted-foreground font-normal text-xs">(opcional — para ofertas especiais)</span></Label>
+                  <div className="flex gap-2">
+                    <select
+                      value={formData.birthdayMonth}
+                      onChange={e => setFormData(p => ({ ...p, birthdayMonth: e.target.value }))}
+                      className="flex-1 px-3 py-2 rounded-lg border border-input bg-background text-sm focus:ring-2 focus:ring-primary focus:border-primary"
+                    >
+                      <option value="">Mês</option>
+                      {['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'].map((m, i) => (
+                        <option key={i} value={String(i+1).padStart(2,'0')}>{m}</option>
+                      ))}
+                    </select>
+                    <input
+                      type="number"
+                      value={formData.birthdayYear}
+                      onChange={e => setFormData(p => ({ ...p, birthdayYear: e.target.value }))}
+                      placeholder="Ano"
+                      min={1900}
+                      max={new Date().getFullYear()}
+                      className="w-24 px-3 py-2 rounded-lg border border-input bg-background text-sm focus:ring-2 focus:ring-primary focus:border-primary"
+                    />
+                  </div>
                 </div>
 
                 <div className="space-y-2">

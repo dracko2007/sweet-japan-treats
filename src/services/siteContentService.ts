@@ -72,7 +72,41 @@ export const DEFAULT_VLOG_CONTENT: VlogContent = {
   ],
 };
 
+/* ----------------------------- Settings ----------------------------- */
+export interface SiteSettings {
+  vlogEnabled: boolean;
+}
+
+const SETTINGS_LS = 'je_site_settings';
+const DEFAULT_SETTINGS: SiteSettings = { vlogEnabled: false };
+
 export const siteContentService = {
+  async getSettings(): Promise<SiteSettings> {
+    try {
+      const cached = localStorage.getItem(SETTINGS_LS);
+      if (cached) return { ...DEFAULT_SETTINGS, ...JSON.parse(cached) };
+    } catch {}
+    if (!db) return DEFAULT_SETTINGS;
+    try {
+      const snap = await getDoc(doc(db, 'siteContent', 'settings'));
+      const data = snap.exists() ? (snap.data() as Partial<SiteSettings>) : {};
+      const result = { ...DEFAULT_SETTINGS, ...data };
+      try { localStorage.setItem(SETTINGS_LS, JSON.stringify(result)); } catch {}
+      return result;
+    } catch (e) {
+      devWarn('getSettings falhou:', e);
+      return DEFAULT_SETTINGS;
+    }
+  },
+
+  async saveSettings(settings: SiteSettings): Promise<void> {
+    if (!db) throw new Error('Firebase indisponível');
+    await ensureAdminAuth();
+    await setDoc(doc(db, 'siteContent', 'settings'), { ...settings, updatedAt: serverTimestamp() }, { merge: true });
+    try { localStorage.setItem(SETTINGS_LS, JSON.stringify(settings)); } catch {}
+  },
+
+
   async getHome(): Promise<HomeContent> {
     if (!db) return DEFAULT_HOME;
     try {
