@@ -30,7 +30,7 @@ const devError = isDev ? console.error.bind(console) : () => {};
 
 const Profile: React.FC = () => {
   const { user, isAuthenticated, coupons, orders, updateProfile, logout } = useUser();
-  const { selectedCountry } = useLanguage();
+  const { t, selectedCountry } = useLanguage();
   const { products } = useProducts();
   const { addToCart, clearCart } = useCart();
   const navigate = useNavigate();
@@ -248,10 +248,10 @@ const Profile: React.FC = () => {
         <div className="container mx-auto px-4">
           <div className="text-center">
             <h1 className="font-display text-4xl lg:text-5xl font-bold text-foreground mb-4">
-              Meu Perfil
+              {t('profile.title')}
             </h1>
             <p className="text-muted-foreground text-lg">
-              Gerencie suas informações e acompanhe seus pedidos
+              {t('profile.subtitle')}
             </p>
           </div>
         </div>
@@ -264,9 +264,9 @@ const Profile: React.FC = () => {
             {/* Pontos de Fidelidade */}
             <div className="bg-gradient-to-r from-amber-400 to-orange-500 rounded-2xl p-6 lg:p-8 text-white shadow-elevated flex items-center justify-between">
               <div>
-                <p className="text-sm font-semibold uppercase tracking-wide text-white/90">Pontos de Fidelidade</p>
+                <p className="text-sm font-semibold uppercase tracking-wide text-white/90">{t('profile.points.title')}</p>
                 <p className="font-display text-5xl font-extrabold mt-1">{user?.points || 0} <span className="text-2xl font-bold">pts</span></p>
-                <p className="text-sm text-white/90 mt-1">Avaliação +1 · vídeo de review +5/min (após validação) · 1 ponto a cada ¥100 em compras · 1000 no aniversário. Use como desconto (1 pt = ¥1)!</p>
+                <p className="text-sm text-white/90 mt-1">{t('profile.points.desc')}</p>
               </div>
               <div className="text-7xl opacity-80">🎁</div>
             </div>
@@ -283,23 +283,23 @@ const Profile: React.FC = () => {
                     <User className="w-5 h-5 text-primary" />
                   </div>
                   <h2 className="font-display text-2xl font-semibold text-foreground">
-                    Informações Pessoais
+                    {t('profile.info.title')}
                   </h2>
                 </div>
                 <div className="flex gap-2">
                   {isEditing ? (
                     <>
                       <Button variant="outline" onClick={() => setIsEditing(false)}>
-                        Cancelar
+                        {t('profile.cancel')}
                       </Button>
                       <Button onClick={handleSaveProfile} className="btn-primary">
-                        Salvar
+                        {t('profile.save')}
                       </Button>
                     </>
                   ) : (
                     <Button variant="outline" onClick={() => setIsEditing(true)}>
                       <Edit2 className="w-4 h-4 mr-2" />
-                      Editar
+                      {t('profile.edit')}
                     </Button>
                   )}
                 </div>
@@ -308,7 +308,7 @@ const Profile: React.FC = () => {
               {isEditing ? (
                 <div className="grid md:grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <Label htmlFor="name">Nome Completo</Label>
+                    <Label htmlFor="name">{t('profile.field.fullname')}</Label>
                     <Input
                       id="name"
                       name="name"
@@ -327,7 +327,7 @@ const Profile: React.FC = () => {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="phone">Telefone</Label>
+                    <Label htmlFor="phone">{t('profile.field.phone')}</Label>
                     <Input
                       id="phone"
                       name="phone"
@@ -346,11 +346,11 @@ const Profile: React.FC = () => {
                       className="w-4 h-4 rounded border-input text-primary focus:ring-primary cursor-pointer"
                     />
                     <Label htmlFor="whatsappMarketing" className="text-sm font-semibold cursor-pointer select-none leading-none">
-                      Receber novidades e cupons diretamente no meu WhatsApp (Cupom BEMVINDO10)
+                      {t('profile.field.whatsapp')}
                     </Label>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="birthdate">Data de Nascimento</Label>
+                    <Label htmlFor="birthdate">{t('profile.field.birthdate')}</Label>
                     <Input
                       id="birthdate"
                       name="birthdate"
@@ -360,7 +360,7 @@ const Profile: React.FC = () => {
                     />
                   </div>
                   <div className="space-y-2 md:col-span-2">
-                    <Label htmlFor="addressCountry">País do endereço</Label>
+                    <Label htmlFor="addressCountry">{t('profile.field.country')}</Label>
                     <select
                       id="addressCountry"
                       value={addressCountry}
@@ -377,7 +377,7 @@ const Profile: React.FC = () => {
                     </select>
                   </div>
                   <div className="space-y-2 md:col-span-2">
-                    <Label htmlFor="postalCode">{isJapanAddress ? 'CEP (郵便番号)' : isEuropeAddress ? 'Código Postal' : 'CEP'}</Label>
+                    <Label htmlFor="postalCode">{isJapanAddress ? t('profile.field.postal.jp') : isEuropeAddress ? t('profile.field.postal.eu') : t('profile.field.postal')}</Label>
                     <Input
                       id="postalCode"
                       name="address.postalCode"
@@ -388,13 +388,11 @@ const Profile: React.FC = () => {
                       maxLength={isEuropeAddress ? 12 : isJapanAddress ? 8 : 9}
                     />
                     <p className="text-xs text-muted-foreground">
-                      {isEuropeAddress
-                        ? 'Digite o código postal, a região/distrito e a cidade manualmente.'
-                        : `Digite o CEP - ${isJapanAddress ? 'Província' : 'Estado'} e cidade preenchem automaticamente`}
+                      {isEuropeAddress ? t('profile.field.postalHint.eu') : isJapanAddress ? t('profile.field.postalHint.jp') : t('profile.field.postalHint.br')}
                     </p>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="prefecture">{isJapanAddress ? 'Província (都道府県)' : isEuropeAddress ? 'Região / Distrito' : 'Estado (UF)'}</Label>
+                    <Label htmlFor="prefecture">{isJapanAddress ? t('profile.field.state.jp') : isEuropeAddress ? t('profile.field.state.eu') : t('profile.field.state')}</Label>
                     {isEuropeAddress ? (
                       <Input
                         id="prefecture"
@@ -416,7 +414,7 @@ const Profile: React.FC = () => {
                         }}
                         className="w-full p-3 rounded-lg border border-border bg-background text-foreground focus:ring-2 focus:ring-primary focus:border-primary transition-all"
                       >
-                        <option value="">{isJapanAddress ? 'Escolha uma província...' : 'Escolha um estado...'}</option>
+                        <option value="">{isJapanAddress ? t('profile.field.state.placeholder.jp') : t('profile.field.state.placeholder.br')}</option>
                         {addressList.map((pref) => (
                           <option key={pref.name} value={pref.name}>
                             {pref.nameJa} ({pref.name})
@@ -426,7 +424,7 @@ const Profile: React.FC = () => {
                     )}
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="city">{isJapanAddress ? 'Cidade (市区町村)' : 'Cidade'}</Label>
+                    <Label htmlFor="city">{isJapanAddress ? t('profile.field.city.jp') : t('profile.field.city')}</Label>
                     <Input
                       id="city"
                       name="address.city"
@@ -438,7 +436,7 @@ const Profile: React.FC = () => {
                     />
                   </div>
                   <div className="space-y-2 md:col-span-2">
-                    <Label htmlFor="address">Endereço</Label>
+                    <Label htmlFor="address">{t('profile.field.address')}</Label>
                     <Input
                       id="address"
                       name="address.address"
@@ -447,7 +445,7 @@ const Profile: React.FC = () => {
                     />
                   </div>
                   <div className="space-y-2 md:col-span-2">
-                    <Label htmlFor="building">Edifício / Apartamento</Label>
+                    <Label htmlFor="building">{t('profile.field.building')}</Label>
                     <Input
                       id="building"
                       name="address.building"
@@ -461,7 +459,7 @@ const Profile: React.FC = () => {
                   <div className="space-y-2">
                     <Label className="text-muted-foreground flex items-center gap-2">
                       <User className="w-4 h-4" />
-                      Nome
+                      {t('profile.label.name')}
                     </Label>
                     <p className="font-medium text-foreground">{user.name}</p>
                   </div>
@@ -475,18 +473,18 @@ const Profile: React.FC = () => {
                   <div className="space-y-2">
                     <Label className="text-muted-foreground flex items-center gap-2">
                       <Phone className="w-4 h-4" />
-                      Telefone
+                      {t('profile.field.phone')}
                     </Label>
                     <p className="font-medium text-foreground">{user.phone}</p>
                   </div>
                   <div className="space-y-2">
                     <Label className="text-muted-foreground flex items-center gap-2">
                       <Cloud className="w-4 h-4" />
-                      Receber novidades e promoções
+                      {t('profile.label.marketing')}
                     </Label>
                     <div className="flex items-center gap-3 flex-wrap">
                       <p className="font-medium text-foreground">
-                        {user.whatsappMarketing ? '✅ Ativado' : '❌ Desativado'}
+                        {user.whatsappMarketing ? t('profile.marketing.on') : t('profile.marketing.off')}
                       </p>
                       <button
                         onClick={() => {
@@ -505,7 +503,7 @@ const Profile: React.FC = () => {
                             : 'border-green-300 text-green-600 hover:bg-green-50'
                         }`}
                       >
-                        {user.whatsappMarketing ? 'Desativar' : 'Ativar'}
+                        {user.whatsappMarketing ? t('profile.marketing.disable') : t('profile.marketing.enable')}
                       </button>
                     </div>
                   </div>
@@ -513,7 +511,7 @@ const Profile: React.FC = () => {
                     <div className="space-y-2">
                       <Label className="text-muted-foreground flex items-center gap-2">
                         <Calendar className="w-4 h-4" />
-                        Data de Nascimento
+                        {t('profile.field.birthdate')}
                       </Label>
                       <p className="font-medium text-foreground">
                         {new Date(user.birthdate).toLocaleDateString('pt-BR')}
@@ -523,7 +521,7 @@ const Profile: React.FC = () => {
                   <div className="space-y-2 md:col-span-2">
                     <Label className="text-muted-foreground flex items-center gap-2">
                       <MapPin className="w-4 h-4" />
-                      Endereço
+                      {t('profile.field.address')}
                     </Label>
                     <p className="font-medium text-foreground">
                       〒{user.address.postalCode}<br />
@@ -551,8 +549,8 @@ const Profile: React.FC = () => {
                       <Megaphone className="w-6 h-6 text-primary" />
                     </div>
                     <div>
-                      <h2 className="font-display text-lg font-bold text-foreground">Painel de Afiliado</h2>
-                      <p className="text-sm text-muted-foreground">Veja suas indicações, vendas e comissões</p>
+                      <h2 className="font-display text-lg font-bold text-foreground">{t('profile.affiliate.panel')}</h2>
+                      <p className="text-sm text-muted-foreground">{t('profile.affiliate.panel.desc')}</p>
                     </div>
                   </div>
                   <ArrowRight className="w-5 h-5 text-primary flex-shrink-0" />
@@ -568,24 +566,24 @@ const Profile: React.FC = () => {
                     <Megaphone className="w-6 h-6 text-primary" />
                   </div>
                   <div>
-                    <h2 className="font-display text-lg font-bold text-foreground">Seja um afiliado 🎁</h2>
-                    <p className="text-sm text-muted-foreground">Divulgue a Japan Express, dê desconto aos seus seguidores e ganhe comissão por venda.</p>
+                    <h2 className="font-display text-lg font-bold text-foreground">{t('profile.affiliate.become')}</h2>
+                    <p className="text-sm text-muted-foreground">{t('profile.affiliate.become.desc')}</p>
                   </div>
                 </div>
                 {affRequest?.status === 'pending' ? (
                   <p className="text-sm font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-                    ⏳ Sua solicitação está <strong>em análise</strong>. A equipe vai te avisar quando aprovar.
+                    {t('profile.affiliate.pending')}
                   </p>
                 ) : affRequest?.status === 'rejected' ? (
                   <div className="space-y-2">
-                    <p className="text-sm text-muted-foreground">Sua solicitação anterior não foi aprovada desta vez.</p>
+                    <p className="text-sm text-muted-foreground">{t('profile.affiliate.rejected')}</p>
                     <Button onClick={handleBecomeAffiliate} disabled={requesting} className="btn-primary gap-2">
-                      <Megaphone className="w-4 h-4" /> Solicitar novamente
+                      <Megaphone className="w-4 h-4" /> {t('profile.affiliate.requestAgain')}
                     </Button>
                   </div>
                 ) : (
                   <Button onClick={handleBecomeAffiliate} disabled={requesting} className="btn-primary gap-2">
-                    <Megaphone className="w-4 h-4" /> {requesting ? 'Enviando...' : 'Quero ser afiliado'}
+                    <Megaphone className="w-4 h-4" /> {requesting ? t('profile.affiliate.requesting') : t('profile.affiliate.request')}
                   </Button>
                 )}
               </div>
@@ -598,13 +596,13 @@ const Profile: React.FC = () => {
                   <Gift className="w-5 h-5 text-primary" />
                 </div>
                 <h2 className="font-display text-2xl font-semibold text-foreground">
-                  Meus Cupons
+                  {t('profile.coupons.title')}
                 </h2>
               </div>
 
               {activeCoupons.length > 0 ? (
                 <div className="space-y-4">
-                  <h3 className="font-semibold text-foreground mb-3">Cupons Ativos</h3>
+                  <h3 className="font-semibold text-foreground mb-3">{t('profile.coupons.active')}</h3>
                   {activeCoupons.map((coupon) => (
                     <div 
                       key={coupon.id}
@@ -615,14 +613,14 @@ const Profile: React.FC = () => {
                           <p className="font-bold text-lg text-primary font-mono">{coupon.code}</p>
                           <p className="text-sm text-foreground">{coupon.description}</p>
                           <p className="text-xs text-muted-foreground mt-1">
-                            Válido até {new Date(coupon.expiresAt).toLocaleDateString('pt-BR')}
+                            {t('profile.coupons.validUntil')} {new Date(coupon.expiresAt).toLocaleDateString()}
                           </p>
                         </div>
                         <div className="text-right">
                           <p className="font-bold text-2xl text-primary">
                             {coupon.discountType === 'percentage' ? `${coupon.discount}%` : `¥${coupon.discount}`}
                           </p>
-                          <p className="text-xs text-muted-foreground">desconto</p>
+                          <p className="text-xs text-muted-foreground">{t('profile.coupons.discount')}</p>
                         </div>
                       </div>
                     </div>
@@ -630,14 +628,14 @@ const Profile: React.FC = () => {
                 </div>
               ) : (
                 <p className="text-muted-foreground text-center py-8">
-                  Você não tem cupons ativos no momento.
+                  {t('profile.coupons.none')}
                 </p>
               )}
 
               {(usedCoupons.length > 0 || expiredCoupons.length > 0) && (
                 <div className="mt-6 pt-6 border-t border-border">
                   <h3 className="font-semibold text-muted-foreground mb-3 text-sm">
-                    Cupons Utilizados ou Expirados
+                    {t('profile.coupons.expired')}
                   </h3>
                   <div className="space-y-2">
                     {[...usedCoupons, ...expiredCoupons].map((coupon) => (
@@ -649,7 +647,7 @@ const Profile: React.FC = () => {
                           <div>
                             <p className="font-mono text-sm">{coupon.code}</p>
                             <p className="text-xs text-muted-foreground">
-                              {coupon.isUsed ? 'Utilizado' : 'Expirado'}
+                              {coupon.isUsed ? t('profile.coupons.used') : t('profile.coupons.expiredLabel')}
                             </p>
                           </div>
                           <p className="text-sm">
@@ -671,7 +669,7 @@ const Profile: React.FC = () => {
                     <ShoppingBag className="w-5 h-5 text-primary" />
                   </div>
                   <h2 className="font-display text-2xl font-semibold text-foreground">
-                    Histórico de Compras
+                    {t('profile.orders.title')}
                   </h2>
                 </div>
               </div>
@@ -708,11 +706,11 @@ const Profile: React.FC = () => {
                             order.status === 'cancelled' ? 'bg-red-100 text-red-800' :
                             'bg-gray-100 text-gray-800'
                           }`}>
-                            {order.status === 'delivered' ? 'Entregue' :
-                             order.status === 'shipped' ? 'Em Trânsito' :
-                             (order.status as string) === 'processing' ? 'Processando' :
-                             order.status === 'confirmed' ? 'Confirmado' :
-                             order.status === 'cancelled' ? 'Cancelado' : 'Pendente'}
+                            {order.status === 'delivered' ? t('profile.orders.status.delivered') :
+                             order.status === 'shipped' ? t('profile.orders.status.shipped') :
+                             (order.status as string) === 'processing' ? t('profile.orders.status.processing') :
+                             order.status === 'confirmed' ? t('profile.orders.status.confirmed') :
+                             order.status === 'cancelled' ? t('profile.orders.status.cancelled') : t('profile.orders.status.pending')}
                           </span>
                         </div>
                       </div>
@@ -759,14 +757,14 @@ const Profile: React.FC = () => {
                           <div className="mb-3 p-3 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800">
                             <div className="flex items-center gap-2 mb-1">
                               <Package className="w-4 h-4 text-blue-600" />
-                              <span className="text-sm font-semibold text-blue-800 dark:text-blue-200">Rastreamento</span>
+                              <span className="text-sm font-semibold text-blue-800 dark:text-blue-200">{t('profile.orders.tracking.title')}</span>
                             </div>
                             <p className="text-sm text-blue-700 dark:text-blue-300 font-mono">
-                              Código: {trackingNumber}
+                              {t('profile.orders.tracking.code')} {trackingNumber}
                             </p>
                             {carrierName && (
                               <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
-                                Transportadora: {carrierName}
+                                {t('profile.orders.tracking.carrier')} {carrierName}
                               </p>
                             )}
                             {trackingUrl && (
@@ -776,7 +774,7 @@ const Profile: React.FC = () => {
                                 rel="noopener noreferrer"
                                 className="inline-flex items-center gap-1 mt-2 px-3 py-1.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
                               >
-                                🔍 Rastrear Pedido
+                                {t('profile.orders.tracking.btn')}
                               </a>
                             )}
                           </div>
@@ -796,14 +794,14 @@ const Profile: React.FC = () => {
                               {pid && (
                                 reviewed ? (
                                   <span className="text-[11px] text-green-600 font-semibold flex items-center gap-1 shrink-0">
-                                    <Star className="w-3.5 h-3.5 fill-green-600" /> Avaliado
+                                    <Star className="w-3.5 h-3.5 fill-green-600" /> {t('profile.orders.reviewed')}
                                   </span>
                                 ) : (
                                   <button
                                     onClick={() => setReviewTarget({ id: pid, name: item.productName })}
                                     className="text-[11px] font-semibold text-primary border border-primary/30 rounded-full px-2.5 py-1 hover:bg-primary/5 flex items-center gap-1 shrink-0"
                                   >
-                                    <Star className="w-3.5 h-3.5" /> Avaliar
+                                    <Star className="w-3.5 h-3.5" /> {t('profile.orders.review')}
                                   </button>
                                 )
                               )}
@@ -826,14 +824,14 @@ const Profile: React.FC = () => {
                         return (
                           <div className="mt-2 pt-2 border-t border-border space-y-1 text-sm">
                             <div className="flex justify-between text-muted-foreground">
-                              <span>Subtotal</span>
+                              <span>{t('profile.orders.subtotal')}</span>
                               <span>{formatPrice(itemsSubtotal, oc)}</span>
                             </div>
                             {discount > 0 && (
                               <div className="flex justify-between text-green-600">
                                 <span className="flex items-center gap-1">
                                   <Tag className="w-3 h-3" />
-                                  Cupom {couponCode && <span className="font-mono text-xs">({couponCode})</span>}
+                                  {t('profile.orders.coupon')} {couponCode && <span className="font-mono text-xs">({couponCode})</span>}
                                 </span>
                                 <span>-{formatPrice(discount, oc)}</span>
                               </div>
@@ -842,13 +840,13 @@ const Profile: React.FC = () => {
                               <div className="flex justify-between text-muted-foreground">
                                 <span className="flex items-center gap-1">
                                   <Truck className="w-3 h-3" />
-                                  Frete {carrierName && <span className="text-xs">({carrierName})</span>}
+                                  {t('profile.orders.shipping')} {carrierName && <span className="text-xs">({carrierName})</span>}
                                 </span>
-                                <span>{shippingCost === 0 ? <span className="text-green-600">Grátis</span> : formatPrice(shippingCost, oc)}</span>
+                                <span>{shippingCost === 0 ? <span className="text-green-600">{t('profile.orders.free')}</span> : formatPrice(shippingCost, oc)}</span>
                               </div>
                             )}
                             <div className="flex justify-between font-semibold pt-1 border-t border-border">
-                              <span>Total</span>
+                              <span>{t('profile.orders.total')}</span>
                               <span className="text-primary">{formatPrice(order.totalAmount, oc)}</span>
                             </div>
                           </div>
@@ -859,7 +857,7 @@ const Profile: React.FC = () => {
                         <div className="flex items-center justify-between">
                           <p className="text-xs text-muted-foreground">
                             <Package className="w-3 h-3 inline mr-1" />
-                            Pagamento: {order.paymentMethod === 'bank' ? 'Depósito Bancário' : 'PayPay'}
+                            {t('profile.orders.payment')} {order.paymentMethod === 'bank' ? t('profile.orders.payment.bank') : 'PayPay'}
                           </p>
                           <Button
                             onClick={() => handleReorder(order)}
@@ -868,7 +866,7 @@ const Profile: React.FC = () => {
                             className="gap-2 text-primary hover:bg-primary/10"
                           >
                             <RotateCcw className="w-3 h-3" />
-                            Comprar Novamente
+                            {t('profile.orders.reorder')}
                           </Button>
                         </div>
                       </div>
@@ -881,13 +879,13 @@ const Profile: React.FC = () => {
                     <ShoppingBag className="w-10 h-10 text-muted-foreground" />
                   </div>
                   <p className="text-muted-foreground mb-2">
-                    Você ainda não fez nenhuma compra
+                    {t('profile.orders.none')}
                   </p>
-                  <Button 
+                  <Button
                     className="btn-primary mt-4"
                     onClick={() => navigate('/produtos')}
                   >
-                    Começar a Comprar
+                    {t('profile.orders.start')}
                     <ShoppingBag className="w-4 h-4 ml-2" />
                   </Button>
                 </div>
@@ -902,7 +900,7 @@ const Profile: React.FC = () => {
                 className="text-destructive hover:bg-destructive/10"
               >
                 <LogOut className="w-4 h-4 mr-2" />
-                Sair da Conta
+                {t('profile.logout')}
               </Button>
             </div>
           </div>
