@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Package, Truck, Clock, Shield, ArrowRight, HelpCircle, Info, Landmark, Percent, Calculator, Weight, Box } from 'lucide-react';
+import { Package, Truck, Clock, Shield, ArrowRight, HelpCircle, Info, Landmark, Percent, Calculator, Weight, Box, AlertTriangle } from 'lucide-react';
+import ProhibitedItems from '@/components/shipping/ProhibitedItems';
 import Layout from '@/components/layout/Layout';
 import ShippingCalculator from '@/components/shipping/ShippingCalculator';
 import { Button } from '@/components/ui/button';
@@ -12,6 +13,7 @@ import { convertYen as fxConvert } from '@/services/fxService';
 const Shipping: React.FC = () => {
   const { t, selectedCountry } = useLanguage();
   const [country, setCountry] = useState<CountryType>(selectedCountry);
+  const [activeSection, setActiveSection] = useState<'rates' | 'prohibited'>('rates');
 
   // Simulator state (typed string inputs for smooth deletion and no spinner jumping)
   const [simValueInput, setSimValueInput] = useState<string>('150');
@@ -275,7 +277,27 @@ const Shipping: React.FC = () => {
 
       <section className="py-12 bg-background">
         <div className="container mx-auto px-4 max-w-6xl">
-          
+
+          {/* Tab selector */}
+          <div className="flex gap-2 mb-8 bg-secondary/50 rounded-xl p-1.5 w-fit">
+            <button
+              onClick={() => setActiveSection('rates')}
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold transition-colors ${activeSection === 'rates' ? 'bg-card shadow text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+            >
+              <Truck className="w-4 h-4" /> Tarifas & Prazos
+            </button>
+            <button
+              onClick={() => setActiveSection('prohibited')}
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold transition-colors ${activeSection === 'prohibited' ? 'bg-card shadow text-red-600' : 'text-muted-foreground hover:text-foreground'}`}
+            >
+              <AlertTriangle className="w-4 h-4" /> Itens Proibidos
+            </button>
+          </div>
+
+          {activeSection === 'prohibited' ? (
+            <ProhibitedItems />
+          ) : (<>
+
           {/* Country Selection Dropdown */}
           <div className="bg-card rounded-2xl border border-border p-6 mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-sm">
             <div>
@@ -675,6 +697,8 @@ const Shipping: React.FC = () => {
             </div>
 
           </div>
+
+          </>)}
 
         </div>
       </section>
