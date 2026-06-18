@@ -12,6 +12,7 @@ interface Props {
 interface State {
   hasError: boolean;
   error: Error | null;
+  isChunkError: boolean;
 }
 
 /**
@@ -19,18 +20,33 @@ interface State {
  * uma tela de recuperação amigável em vez de quebrar a página inteira.
  */
 class ErrorBoundary extends Component<Props, State> {
-  state: State = { hasError: false, error: null };
+  state: State = { hasError: false, error: null, isChunkError: false };
+
+  static isChunk(error: Error) {
+    return (
+      error.name === 'ChunkLoadError' ||
+      /Failed to fetch dynamically imported module|Loading chunk \d+ failed|dynamically imported module/i.test(error.message)
+    );
+  }
 
   static getDerivedStateFromError(error: Error): State {
-    return { hasError: true, error };
+    return { hasError: true, error, isChunkError: ErrorBoundary.isChunk(error) };
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
     console.error(`❌ [ErrorBoundary${this.props.area ? ` · ${this.props.area}` : ''}]`, error, info.componentStack);
+    // PWA deploy: old SW serves stale HTML with old chunk hashes → 404 on import
+    if (ErrorBoundary.isChunk(error)) {
+      setTimeout(() => window.location.reload(), 800);
+    }
   }
 
   handleReset = () => {
-    this.setState({ hasError: false, error: null });
+    if (this.state.isChunkError) {
+      window.location.reload();
+    } else {
+      this.setState({ hasError: false, error: null, isChunkError: false });
+    }
   };
 
   render() {
@@ -43,9 +59,13 @@ class ErrorBoundary extends Component<Props, State> {
           <div className="w-16 h-16 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center mx-auto mb-5">
             <AlertTriangle className="w-8 h-8 text-red-600 dark:text-red-400" />
           </div>
-          <h2 className="font-display text-xl font-bold mb-2">Algo deu errado</h2>
+          <h2 className="font-display text-xl font-bold mb-2">
+            {this.state.isChunkError ? 'Nova versão disponível' : 'Algo deu errado'}
+          </h2>
           <p className="text-sm text-muted-foreground mb-6">
-            Encontramos um problema ao carregar esta parte da página. Você pode tentar novamente ou voltar para o início.
+            {this.state.isChunkError
+              ? 'O site foi atualizado. A página será recarregada automaticamente em instantes...'
+              : 'Encontramos um problema ao carregar esta parte da página. Você pode tentar novamente ou voltar para o início.'}
           </p>
           {import.meta.env.DEV && this.state.error && (
             <pre className="text-left text-xs bg-secondary/40 rounded-lg p-3 mb-6 overflow-auto max-h-32 text-red-600 dark:text-red-400">
