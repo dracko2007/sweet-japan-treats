@@ -37,12 +37,14 @@ const TrackingModal: React.FC<TrackingModalProps> = ({
   const getTrackingUrl = (carrier: string, trackingNumber: string): string => {
     const lowerCarrier = carrier.toLowerCase();
     
-    if (lowerCarrier.includes('yamato') || lowerCarrier.includes('クロネコ')) {
+    if (lowerCarrier.includes('correios') || lowerCarrier.includes('brasil')) {
+      return `https://rastreamento.correios.com.br/app/resultado.php?objeto=${trackingNumber}`;
+    } else if (lowerCarrier.includes('yamato') || lowerCarrier.includes('クロネコ')) {
       return `https://toi.kuronekoyamato.co.jp/cgi-bin/tneko?number00=1&number01=${trackingNumber}`;
     } else if (lowerCarrier.includes('sagawa') || lowerCarrier.includes('佐川')) {
       return `https://k2k.sagawa-exp.co.jp/p/web/okurijosearch.do?okurijoNo=${trackingNumber}`;
     } else if (lowerCarrier.includes('japan post') || lowerCarrier.includes('ゆうパック') || lowerCarrier.includes('post')) {
-      return `https://trackings.post.japanpost.jp/services/srv/search/direct?reqCodeNo1=${trackingNumber}&locale=ja`;
+      return `https://trackings.post.japanpost.jp/services/srv/search/direct?reqCodeNo1=${trackingNumber}&locale=pt`;
     } else if (lowerCarrier.includes('fukutsu') || lowerCarrier.includes('福通')) {
       return `https://corp.fukutsu.co.jp/situation/tracking_no_hunt.html?tracking_no=${trackingNumber}`;
     }
@@ -55,7 +57,9 @@ const TrackingModal: React.FC<TrackingModalProps> = ({
   const getCarrierName = (carrier: string): string => {
     const lowerCarrier = carrier.toLowerCase();
     
-    if (lowerCarrier.includes('yamato') || lowerCarrier.includes('クロネコ')) {
+    if (lowerCarrier.includes('correios') || lowerCarrier.includes('brasil')) {
+      return 'Correios (Brasil) 🇧🇷';
+    } else if (lowerCarrier.includes('yamato') || lowerCarrier.includes('クロネコ')) {
       return 'Yamato Transport (クロネコヤマト)';
     } else if (lowerCarrier.includes('sagawa') || lowerCarrier.includes('佐川')) {
       return 'Sagawa Express (佐川急便)';
@@ -332,6 +336,7 @@ Obrigado por comprar na *Japan Express*! 🌸
               className="mt-2 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               <option value="">Selecione a transportadora</option>
+              <option value="Correios">Correios (Brasil) 🇧🇷</option>
               <option value="Yamato">Yamato Transport (クロネコヤマト)</option>
               <option value="Sagawa">Sagawa Express (佐川急便)</option>
               <option value="Japan Post">Japan Post (日本郵便)</option>
