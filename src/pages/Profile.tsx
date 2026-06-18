@@ -852,7 +852,7 @@ const Profile: React.FC = () => {
                           const lc = c.toLowerCase();
                           // Brazilian Correios — handles international EMS codes ending in BR too
                           if (lc.includes('correios') || tn.toUpperCase().endsWith('BR'))
-                            return `https://rastreamento.correios.com.br/app/index.php?objeto=${tn}`;
+                            return `https://www.linketrack.com/trace?code=${tn}`;
                           if (lc.includes('ems'))
                             return `https://trackings.post.japanpost.jp/services/srv/search/direct?reqCodeNo1=${tn}&locale=pt`;
                           if (lc.includes('yamato') || lc.includes('クロネコ'))
@@ -864,7 +864,7 @@ const Profile: React.FC = () => {
                           if (lc.includes('fukutsu') || lc.includes('福通'))
                             return `https://corp.fukutsu.co.jp/situation/tracking_no_hunt.html?tracking_no=${tn}`;
                           // Unknown carrier — fallback to Correios (most common for Brazil orders)
-                          return `https://rastreamento.correios.com.br/app/index.php?objeto=${tn}`;
+                          return `https://www.linketrack.com/trace?code=${tn}`;
                         };
 
                         const carrierName = getCarrierName(carrierRaw);

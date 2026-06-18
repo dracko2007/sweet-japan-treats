@@ -38,7 +38,7 @@ const TrackingModal: React.FC<TrackingModalProps> = ({
     const lowerCarrier = carrier.toLowerCase();
     
     if (lowerCarrier.includes('correios') || lowerCarrier.includes('brasil')) {
-      return `https://rastreamento.correios.com.br/app/index.php?objeto=${trackingNumber}`;
+      return `https://www.linketrack.com/trace?code=${trackingNumber}`;
     } else if (lowerCarrier.includes('yamato') || lowerCarrier.includes('クロネコ')) {
       return `https://toi.kuronekoyamato.co.jp/cgi-bin/tneko?number00=1&number01=${trackingNumber}`;
     } else if (lowerCarrier.includes('sagawa') || lowerCarrier.includes('佐川')) {
