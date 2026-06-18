@@ -151,7 +151,7 @@ const Checkout: React.FC = () => {
         name: user.name || '',
         email: user.email || '',
         phone: user.phone || '',
-        cpf: '', 
+        cpf: user.cpf || '',
         postalCode: user.address?.postalCode || '',
         prefecture: user.address?.prefecture || '',
         city: user.address?.city || '',
