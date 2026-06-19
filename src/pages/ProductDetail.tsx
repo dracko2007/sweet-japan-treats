@@ -200,7 +200,13 @@ const ProductDetail: React.FC = () => {
                   </div>
                 )}
 
-                <p className="text-lg text-muted-foreground mb-6">{translatedDesc}</p>
+                <div className="text-lg text-muted-foreground mb-6 space-y-2">
+                  {translatedDesc.split('\n').map((line, i) =>
+                    line.trim() === ''
+                      ? <br key={i} />
+                      : <p key={i}>{line}</p>
+                  )}
+                </div>
 
                 <div className="bg-secondary/30 rounded-xl p-4 mb-6">
                   <p className="text-sm text-muted-foreground mb-1">{t('productDetail.flavor')}</p>
