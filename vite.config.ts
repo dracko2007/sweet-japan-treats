@@ -16,7 +16,11 @@ export default defineConfig(({ mode }) => ({
     mode === "development" && componentTagger(),
     VitePWA({
       registerType: "autoUpdate",
+      // Ativa o novo SW imediatamente sem esperar fechar todas as abas
+      injectRegister: "auto",
       workbox: {
+        skipWaiting: true,
+        clientsClaim: true,
         // Pré-cacheia apenas assets com hash (JS/CSS) — NÃO cacheia HTML para
         // que index.html venha sempre da rede (evita "old chunks" após deploy)
         globPatterns: ["**/*.{js,css,ico,jpg,jpeg,png,svg,woff2}"],
