@@ -16,8 +16,6 @@ export default defineConfig(({ mode }) => ({
     mode === "development" && componentTagger(),
     VitePWA({
       registerType: "autoUpdate",
-      // Ativa o novo SW imediatamente sem esperar fechar todas as abas
-      injectRegister: "auto",
       workbox: {
         skipWaiting: true,
         clientsClaim: true,
