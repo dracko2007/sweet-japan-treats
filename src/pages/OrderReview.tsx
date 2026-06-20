@@ -59,9 +59,11 @@ const OrderReview: React.FC = () => {
   const [paymentMethod, setPaymentMethod] = useState(() => {
     return formData?.country === 'Japão' ? 'paypay' : 'pix';
   });
-  const [wiseEnabled, setWiseEnabled] = useState(false);
-  const [wiseLink, setWiseLink] = useState('');
-  const [pixSettings, setPixSettings] = useState({ pixKey: '', pixReceiverName: 'Japan Express', pixCity: 'Sao Paulo' });
+  const [paySettings, setPaySettings] = useState<import('@/services/paymentSettingsService').PaymentSettings>({
+    wiseLink: '', wiseEnabled: false,
+    pixKey: '', pixReceiverName: 'Japan Express', pixCity: 'Sao Paulo',
+    yuchoKigo: '', yuchoNumber: '', yuchoName: '', contactPhone: '',
+  });
 
   // Modal de pagamento — aberto antes de salvar o pedido
   const [paymentModal, setPaymentModal] = useState(false);
@@ -69,11 +71,7 @@ const OrderReview: React.FC = () => {
   const [pixCopied, setPixCopied] = useState(false);
 
   useEffect(() => {
-    paymentSettingsService.get().then((s) => {
-      setWiseEnabled(s.wiseEnabled && !!s.wiseLink);
-      setWiseLink(s.wiseLink || '');
-      setPixSettings({ pixKey: s.pixKey || '', pixReceiverName: s.pixReceiverName || 'Japan Express', pixCity: s.pixCity || 'Sao Paulo' });
-    });
+    paymentSettingsService.get().then(setPaySettings);
   }, []);
 
   // Redirect if no form data or shipping
@@ -815,7 +813,7 @@ const OrderReview: React.FC = () => {
                       </div>
 
                       {/* Wise Option (transferência internacional) */}
-                      {wiseEnabled && (
+                      {(paySettings.wiseEnabled && !!paySettings.wiseLink) && (
                         <div className={cn(
                           "flex items-start space-x-3 p-4 rounded-xl border-2 transition-all cursor-pointer",
                           paymentMethod === 'wise' ? "border-emerald-500 bg-emerald-50/50" : "border-border hover:border-gray-300"
@@ -885,17 +883,21 @@ const OrderReview: React.FC = () => {
 
       {/* Modal de Pagamento — aparece ANTES de salvar o pedido */}
       {paymentModal && pendingOrder && (() => {
-        const pixPayload = pixSettings.pixKey
+        const pixPayload = paySettings.pixKey
           ? buildPixPayload({
-              key: pixSettings.pixKey,
+              key: paySettings.pixKey,
               amount: Number(pendingOrder.total) || 0,
-              receiverName: pixSettings.pixReceiverName,
-              city: pixSettings.pixCity,
+              receiverName: paySettings.pixReceiverName,
+              city: paySettings.pixCity,
               txid: String(pendingOrder.id || '').replace(/[^a-zA-Z0-9]/g, '').slice(0, 25),
             })
           : '';
+        // Converte telefone doméstico (070-XXXX-XXXX) → formato internacional wa.me (81XXXXXXXXXX)
+        const waPhone = paySettings.contactPhone
+          ? paySettings.contactPhone.replace(/[-\s]/g, '').replace(/^0/, '81')
+          : '';
         const waMessage = encodeURIComponent(`Olá! Acabei de fazer o pagamento do pedido ${pendingOrder.id} no valor de ${formatPrice(pendingOrder.total, pendingOrder.currency)}. Segue o comprovante:`);
-        const whatsappLink = `https://wa.me/817013671679?text=${waMessage}`;
+        const whatsappLink = waPhone ? `https://wa.me/${waPhone}?text=${waMessage}` : '';
 
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
@@ -931,15 +933,17 @@ const OrderReview: React.FC = () => {
                             <Copy className="w-3.5 h-3.5" />{pixCopied ? 'Copiado!' : 'Copiar'}
                           </button>
                         </div>
-                        <a href={whatsappLink} target="_blank" rel="noopener noreferrer"
-                          className="inline-flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white font-bold px-4 py-2.5 rounded-xl text-sm transition-colors">
-                          <ExternalLink className="w-4 h-4" /> Enviar comprovante no WhatsApp
-                        </a>
+                        {whatsappLink && (
+                          <a href={whatsappLink} target="_blank" rel="noopener noreferrer"
+                            className="inline-flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white font-bold px-4 py-2.5 rounded-xl text-sm transition-colors">
+                            <ExternalLink className="w-4 h-4" /> Enviar comprovante no WhatsApp
+                          </a>
+                        )}
                       </>
                     ) : (
                       <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 text-sm text-yellow-800">
                         <AlertCircle className="w-6 h-6 mx-auto mb-2 text-yellow-600" />
-                        Chave PIX não configurada. Entre em contato pelo WhatsApp <strong>+81 70-1367-1679</strong>.
+                        Chave PIX não configurada. {paySettings.contactPhone && <>Entre em contato pelo WhatsApp <strong>+{waPhone}</strong>.</>}
                       </div>
                     )}
                   </div>
@@ -958,10 +962,12 @@ const OrderReview: React.FC = () => {
                     </div>
                     <div className="bg-gray-100 p-3 rounded-xl text-xs font-mono text-left max-w-xs mx-auto space-y-1">
                       <p><strong>Enviar para:</strong> Japan Express</p>
-                      <p><strong>Telefone:</strong> 070-1367-1679</p>
+                      {paySettings.contactPhone && <p><strong>Telefone:</strong> {paySettings.contactPhone}</p>}
                       <p><strong>Valor:</strong> {formatPrice(pendingOrder.total, 'JPY')}</p>
                     </div>
-                    <p className="text-xs text-muted-foreground">Após pagar, envie o comprovante no WhatsApp: <strong>070-1367-1679</strong></p>
+                    {paySettings.contactPhone && (
+                      <p className="text-xs text-muted-foreground">Após pagar, envie o comprovante no WhatsApp: <strong>{paySettings.contactPhone}</strong></p>
+                    )}
                   </div>
                 )}
 
@@ -973,11 +979,13 @@ const OrderReview: React.FC = () => {
                     </div>
                     <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 font-mono text-xs text-left space-y-2 max-w-xs mx-auto">
                       <div className="flex justify-between"><span className="text-gray-500">Banco:</span><span className="font-bold">ゆうちょ銀行</span></div>
-                      <div className="flex justify-between"><span className="text-gray-500">記号:</span><span className="font-bold">12260</span></div>
-                      <div className="flex justify-between"><span className="text-gray-500">番号:</span><span className="font-bold">33664351</span></div>
-                      <div className="flex justify-between"><span className="text-gray-500">Nome:</span><span className="font-bold">ロドリゲス シオカワ</span></div>
+                      {paySettings.yuchoKigo && <div className="flex justify-between"><span className="text-gray-500">記号:</span><span className="font-bold">{paySettings.yuchoKigo}</span></div>}
+                      {paySettings.yuchoNumber && <div className="flex justify-between"><span className="text-gray-500">番号:</span><span className="font-bold">{paySettings.yuchoNumber}</span></div>}
+                      {paySettings.yuchoName && <div className="flex justify-between"><span className="text-gray-500">Nome:</span><span className="font-bold">{paySettings.yuchoName}</span></div>}
                     </div>
-                    <p className="text-xs text-muted-foreground">Após o depósito, envie comprovante no WhatsApp: <strong>070-1367-1679</strong></p>
+                    {paySettings.contactPhone && (
+                      <p className="text-xs text-muted-foreground">Após o depósito, envie comprovante no WhatsApp: <strong>{paySettings.contactPhone}</strong></p>
+                    )}
                   </div>
                 )}
 
@@ -988,8 +996,8 @@ const OrderReview: React.FC = () => {
                       <WalletIcon className="w-5 h-5" /> PAGAMENTO VIA WISE
                     </div>
                     <p className="text-sm text-muted-foreground">Pague <strong>{formatPrice(pendingOrder.total, pendingOrder.currency)}</strong> pelo Wise com câmbio justo.</p>
-                    {wiseLink && (
-                      <a href={wiseLink.startsWith('http') ? wiseLink : `https://wise.com/pay/${wiseLink.replace(/^@/, '')}`}
+                    {paySettings.wiseLink && (
+                      <a href={paySettings.wiseLink.startsWith('http') ? paySettings.wiseLink : `https://wise.com/pay/${paySettings.wiseLink.replace(/^@/, '')}`}
                         target="_blank" rel="noopener noreferrer"
                         className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-5 py-2.5 rounded-xl transition-colors">
                         <ExternalLink className="w-4 h-4" /> Pagar pelo Wise

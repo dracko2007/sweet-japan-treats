@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Loader2, Save, Wallet } from 'lucide-react';
+import { Loader2, Save, Wallet, Landmark, Phone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { paymentSettingsService, PaymentSettings } from '@/services/paymentSettingsService';
 import { useToast } from '@/hooks/use-toast';
@@ -28,6 +28,10 @@ const WisePaymentSettings: React.FC = () => {
         pixKey: settings.pixKey.trim(),
         pixReceiverName: settings.pixReceiverName.trim() || 'Japan Express',
         pixCity: settings.pixCity.trim() || 'Sao Paulo',
+        yuchoKigo: settings.yuchoKigo.trim(),
+        yuchoNumber: settings.yuchoNumber.trim(),
+        yuchoName: settings.yuchoName.trim(),
+        contactPhone: settings.contactPhone.trim(),
       };
       await paymentSettingsService.save(clean);
       setSettings(clean);
@@ -108,6 +112,65 @@ const WisePaymentSettings: React.FC = () => {
         <p className="text-[11px] text-muted-foreground">
           O nome e a cidade devem ser os mesmos cadastrados na sua conta do banco/PIX.
         </p>
+      </div>
+
+      {/* Seção Japão — Yucho Bank e Telefone */}
+      <div className="mt-5 pt-5 border-t border-border space-y-3">
+        <div className="flex items-center gap-2 mb-1">
+          <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center">
+            <Landmark className="w-4 h-4 text-red-600" />
+          </div>
+          <div>
+            <p className="font-semibold text-foreground text-sm">ゆうちょ銀行 — Yucho Bank (Japão)</p>
+            <p className="text-xs text-muted-foreground">Dados exibidos no checkout para clientes no Japão.</p>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label className="text-[11px] text-muted-foreground font-medium block mb-1">記号 (Kigo)</label>
+            <input
+              value={settings.yuchoKigo}
+              onChange={(e) => setSettings({ ...settings, yuchoKigo: e.target.value })}
+              placeholder="Ex: 12260"
+              className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm font-mono"
+            />
+          </div>
+          <div>
+            <label className="text-[11px] text-muted-foreground font-medium block mb-1">番号 (Bangou)</label>
+            <input
+              value={settings.yuchoNumber}
+              onChange={(e) => setSettings({ ...settings, yuchoNumber: e.target.value })}
+              placeholder="Ex: 33664351"
+              className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm font-mono"
+            />
+          </div>
+        </div>
+        <div>
+          <label className="text-[11px] text-muted-foreground font-medium block mb-1">口座名義 (Nome do titular)</label>
+          <input
+            value={settings.yuchoName}
+            onChange={(e) => setSettings({ ...settings, yuchoName: e.target.value })}
+            placeholder="Ex: ロドリゲス シオカワ"
+            className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm font-mono"
+          />
+        </div>
+
+        {/* Telefone de contato — WhatsApp e PayPay */}
+        <div className="pt-3 border-t border-dashed border-border">
+          <div className="flex items-center gap-2 mb-2">
+            <Phone className="w-4 h-4 text-muted-foreground" />
+            <p className="font-semibold text-foreground text-sm">Telefone de Contato (WhatsApp / PayPay)</p>
+          </div>
+          <input
+            value={settings.contactPhone}
+            onChange={(e) => setSettings({ ...settings, contactPhone: e.target.value })}
+            placeholder="Ex: 070-1367-1679"
+            className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm font-mono"
+          />
+          <p className="text-[11px] text-muted-foreground mt-1">
+            Formato doméstico japonês. Aparece nos modais de PayPay e Yucho, e no link do WhatsApp para envio de comprovante.
+          </p>
+        </div>
       </div>
     </div>
   );
