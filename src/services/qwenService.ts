@@ -43,10 +43,11 @@ export async function askQwen(
     }
 
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-    if (options?.isAdmin && auth) {
+    // Manda o token sempre que há sessão — o SERVIDOR decide se é admin.
+    // O adminCatalog (com custos) só vai se o frontend acredita ser admin,
+    // pois esses dados são sensíveis e não devem trafegar para clientes comuns.
+    if (auth) {
       try {
-        // authStateReady() aguarda o Firebase restaurar a sessão do IndexedDB —
-        // sem isso, auth.currentUser é null nos primeiros instantes após o carregamento.
         await auth.authStateReady();
         if (auth.currentUser) {
           headers['x-firebase-token'] = await auth.currentUser.getIdToken();
