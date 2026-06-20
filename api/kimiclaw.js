@@ -1,6 +1,18 @@
 // Função serverless (Vercel) — "cérebro" do KimiClaw via Groq (tier grátis, rápido).
 // A chave fica SÓ no servidor (process.env.GROQ_API_KEY) e nunca vai pro navegador.
 // Sem a chave, retorna 503 e o KimiClaw responde pelas regras (fallback).
+import { cert, getApps, initializeApp } from 'firebase-admin/app';
+import { getAuth } from 'firebase-admin/auth';
+
+function firebaseAdminAuth() {
+  if (!getApps().length) {
+    const sa = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+    if (!sa) throw new Error('Firebase Admin not configured');
+    initializeApp({ credential: cert(JSON.parse(sa)) });
+  }
+  return getAuth();
+}
+
 const DEFAULT_GROQ_MODELS = ['llama-3.3-70b-versatile', 'openai/gpt-oss-120b'];
 const DISABLED_GROQ_MODELS = new Set(['moonshotai/kimi-k2-instruct']);
 const uniqueNonEmpty = (values) => {
@@ -185,7 +197,7 @@ export default async function handler(req, res) {
     const idToken = req.headers['x-firebase-token'];
     if (idToken) {
       try {
-        const adminEmail = process.env.VITE_ADMIN_EMAIL || 'dracko2007@gmail.com';
+        const adminEmail = process.env.ADMIN_EMAIL || 'dracko2007@gmail.com';
         const decoded = await firebaseAdminAuth().verifyIdToken(idToken);
         isAdmin = decoded.email?.toLowerCase() === adminEmail.toLowerCase();
       } catch {
