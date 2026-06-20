@@ -46,7 +46,7 @@ const AdminAccessManager: React.FC = () => {
   const add = async () => {
     if (!name.trim()) { toast({ title: 'Informe o nome de usuário do admin', variant: 'destructive' }); return; }
     if (password.length < 4) { toast({ title: 'Senha muito curta', description: 'Mínimo 4 caracteres.', variant: 'destructive' }); return; }
-    if (!requireAdminPassword(`adicionar o admin ${name}`)) return;
+    if (!(await requireAdminPassword(`adicionar o admin ${name}`))) return;
     setSaving(true);
     const res = await adminService.addAdmin(name, password, role, user?.name || '');
     setSaving(false);
@@ -61,7 +61,7 @@ const AdminAccessManager: React.FC = () => {
 
   const remove = async (username: string, displayName: string) => {
     if (!confirm(`Remover o acesso admin de "${displayName}"?`)) return;
-    if (!requireAdminPassword(`remover o admin ${displayName}`)) return;
+    if (!(await requireAdminPassword(`remover o admin ${displayName}`))) return;
     const ok = await adminService.removeAdmin(username);
     if (ok) { toast({ title: 'Admin removido', description: displayName }); load(); }
     else toast({ title: 'Não foi possível remover', variant: 'destructive' });

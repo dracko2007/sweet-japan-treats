@@ -28,7 +28,7 @@ const B2BRequestManager: React.FC = () => {
   const setStatus = async (id: string, status: B2BRequest['status']) => { await b2bRequestService.updateStatus(id, status); load(); };
   const remove = async (id: string) => {
     if (!confirm('Excluir esta cotação B2B?')) return;
-    if (!requireAdminPassword('excluir esta cotação B2B')) return;
+    if (!(await requireAdminPassword('excluir esta cotação B2B'))) return;
     await b2bRequestService.remove(id);
     toast({ title: 'Cotação excluída' });
     load();

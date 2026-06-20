@@ -39,7 +39,7 @@ const CustomerList: React.FC = () => {
     if (!code) return;
     const disc = Number(window.prompt('Desconto que o cupom dá ao comprador (%):', '10')) || 10;
     const comm = Number(window.prompt('Comissão do afiliado por venda (%):', '10')) || 10;
-    if (!requireAdminPassword(`aprovar o afiliado ${req.name}`)) return;
+    if (!(await requireAdminPassword(`aprovar o afiliado ${req.name}`))) return;
     const res = await affiliateService.approveRequest(req, { code, discountPercent: disc, commissionPercent: comm });
     if (res.ok) { toast({ title: '✅ Afiliado aprovado', description: `${req.name} · código ${code.toUpperCase()}` }); loadAffRequests(); }
     else toast({ title: 'Erro ao aprovar', description: res.error, variant: 'destructive' });
@@ -47,7 +47,7 @@ const CustomerList: React.FC = () => {
 
   const rejectAff = async (req: AffiliateRequest) => {
     if (!confirm(`Recusar a solicitação de afiliado de "${req.name}"?`)) return;
-    if (!requireAdminPassword(`recusar o afiliado ${req.name}`)) return;
+    if (!(await requireAdminPassword(`recusar o afiliado ${req.name}`))) return;
     const ok = await affiliateService.rejectRequest(req.email);
     if (ok) { toast({ title: 'Solicitação recusada', description: req.name }); loadAffRequests(); }
     else toast({ title: 'Erro ao recusar', variant: 'destructive' });
@@ -111,7 +111,7 @@ const CustomerList: React.FC = () => {
       toast({ title: 'Valor inválido', variant: 'destructive' });
       return;
     }
-    if (!requireAdminPassword(`ajustar pontos de ${name}`)) return;
+    if (!(await requireAdminPassword(`ajustar pontos de ${name}`))) return;
     await ensureAdminAuth();
     const res = await firebaseSyncService.addPointsToUserByEmail(email, amount);
     if (res.success) {
@@ -186,7 +186,7 @@ const CustomerList: React.FC = () => {
     if (!confirm(`Deletar histórico de pedidos de "${customerName}"?\n\n⚠️ Essa ação não pode ser desfeita!`)) {
       return;
     }
-    if (!requireAdminPassword(`deletar o histórico de ${customerName}`)) return;
+    if (!(await requireAdminPassword(`deletar o histórico de ${customerName}`))) return;
     const success = await customerService.deleteCustomerOrders(email);
     if (success) {
       toast({
@@ -210,7 +210,7 @@ const CustomerList: React.FC = () => {
     if (!confirm(`Deletar cliente "${customerName}" e TODO seu histórico?\n\n⚠️ Essa ação não pode ser desfeita!`)) {
       return;
     }
-    if (!requireAdminPassword(`deletar o cliente ${customerName}`)) return;
+    if (!(await requireAdminPassword(`deletar o cliente ${customerName}`))) return;
     const success = await customerService.deleteCustomer(email);
     if (success) {
       toast({
@@ -237,7 +237,7 @@ const CustomerList: React.FC = () => {
     if (!confirm('Tem CERTEZA? Digite "SIM" para confirmar:\n\n[Clique OK e confirme novamente]')) {
       return;
     }
-    if (!requireAdminPassword('deletar TODOS os clientes')) return;
+    if (!(await requireAdminPassword('deletar TODOS os clientes'))) return;
     const success = await customerService.deleteAllCustomers();
     if (success) {
       toast({
@@ -257,7 +257,7 @@ const CustomerList: React.FC = () => {
     if (!confirm('⚠️ DELETAR TODO O HISTÓRICO DE PEDIDOS?\n\nEssa ação é IRREVERSÍVEL!')) {
       return;
     }
-    if (!requireAdminPassword('deletar TODO o histórico de pedidos')) return;
+    if (!(await requireAdminPassword('deletar TODO o histórico de pedidos'))) return;
     const success = await customerService.deleteAllOrderHistory();
     if (success) {
       toast({

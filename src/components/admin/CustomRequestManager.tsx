@@ -32,7 +32,7 @@ const CustomRequestManager: React.FC = () => {
   };
   const remove = async (id: string) => {
     if (!confirm('Excluir este pedido personalizado?')) return;
-    if (!requireAdminPassword('excluir este pedido personalizado')) return;
+    if (!(await requireAdminPassword('excluir este pedido personalizado'))) return;
     await customRequestService.remove(id);
     toast({ title: 'Pedido excluído' });
     load();

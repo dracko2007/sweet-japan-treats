@@ -23,7 +23,7 @@ const ResetOrdersButton: React.FC = () => {
       'Esta ação NÃO pode ser desfeita.'
     );
     if (!ok) return;
-    if (!requireAdminPassword('o reset do histórico de pedidos')) return;
+    if (!(await requireAdminPassword('o reset do histórico de pedidos'))) return;
 
     setBusy(true);
     try {

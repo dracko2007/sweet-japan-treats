@@ -6,13 +6,12 @@ import { useUser } from '@/context/UserContext';
 // Barra fixa que aparece quando o admin navega a LOJA (fora do painel),
 // deixando claro que ele está em "modo visualização" do site real.
 const AdminPreviewBar: React.FC = () => {
-  const { user } = useUser();
+  const { isAdminAccount } = useUser();
   const location = useLocation();
 
-  const isAdmin = user?.id === 'admin-001' || user?.email === 'dracko2007@gmail.com';
   const onAdminPage = location.pathname.startsWith('/admin');
 
-  if (!isAdmin || onAdminPage) return null;
+  if (!isAdminAccount || onAdminPage) return null;
 
   return (
     <div className="fixed bottom-0 inset-x-0 z-40 bg-gray-900 text-white shadow-[0_-2px_10px_rgba(0,0,0,0.3)]">

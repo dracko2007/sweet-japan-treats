@@ -3,7 +3,7 @@ import { safeStorage } from '@/utils/storage';
 import { firebaseSyncService } from '@/services/firebaseSyncService';
 import { firebaseConfigReady, allowLocalOnly, auth } from '@/config/firebase';
 import { signInWithEmailAndPassword } from 'firebase/auth';
-import { ADMIN_EMAIL, ADMIN_PASSWORD, ADMIN_USER_ID, isAdminEmail } from '@/config/admin';
+import { ADMIN_EMAIL, ADMIN_USER_ID, isAdminEmail } from '@/config/admin';
 import { adminService } from '@/services/adminService';
 import { referralService } from '@/services/referralService';
 
@@ -163,12 +163,9 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
   const canRestoreStoredSession = (u: Partial<UserProfile>): boolean => {
     const isAdminUser = u.id === ADMIN_USER_ID || isAdminEmail(u.email);
     if (isAdminUser) {
-      // Admin session from localStorage só é confiada quando:
-      // 1. Firebase configurado E senha não vazia (re-auth vai verificar logo após)
-      // 2. OU modo local-only sem Firebase (ambiente sem credenciais)
-      // Sem isso, qualquer pessoa poderia injetar dados de admin via DevTools
-      if (!ADMIN_PASSWORD) return false; // senha não configurada → não restaurar
-      return firebaseConfigReady || (!firebaseConfigReady && allowLocalOnly);
+      // Admin session from localStorage só é confiada quando Firebase pode verificar.
+      // Se a sessão Firebase expirou, o listener (linha ~440) limpa e exige re-login.
+      return firebaseConfigReady || allowLocalOnly;
     }
     return !firebaseConfigReady && allowLocalOnly;
   };
@@ -617,12 +614,14 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       setOrders([]);
       safeStorage.setItem('user', JSON.stringify(stripSensitive(adminUser)));
 
-      // Autentica no Firebase com a senha digitada pelo admin (não mais armazenada no bundle)
+      // Autentica no Firebase DEPOIS de salvar estado+localStorage.
+      // Assim quando onAuthStateChanged disparar, o guard do listener (linha ~463)
+      // já encontra o admin no localStorage e retorna cedo.
       if (auth) {
         try {
           await signInWithEmailAndPassword(auth, ADMIN_EMAIL, password);
         } catch (err) {
-          devWarn('⚠️ Admin local OK, mas Firebase Auth falhou:', err);
+          devWarn('⚠️ Admin verificado via REST, mas signIn do SDK falhou:', err);
         }
       }
       devLog(`✅ Admin "${admin.name}" (nível ${admin.role}) logado`);

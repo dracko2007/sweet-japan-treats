@@ -175,7 +175,7 @@ const Admin: React.FC = () => {
     if (!confirm(`Tem certeza que deseja excluir o pedido ${orderNumber}?`)) {
       return;
     }
-    if (!requireAdminPassword(`excluir o pedido ${orderNumber}`)) return;
+    if (!(await requireAdminPassword(`excluir o pedido ${orderNumber}`))) return;
 
     const success = await orderService.deleteOrder(orderNumber);
     
