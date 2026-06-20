@@ -192,7 +192,7 @@ export default async function handler(req, res) {
 
     // Limita histórico e catálogo para controlar uso de tokens
     const history = Array.isArray(body.messages) ? body.messages.slice(-6) : [];
-    const catalog = Array.isArray(body.catalog) ? body.catalog.slice(0, 120) : [];
+    const catalog = Array.isArray(body.catalog) ? body.catalog.slice(0, 60) : [];
     const locale = body.locale || { country: 'Brasil', currencyCode: 'BRL', currencySymbol: 'R$' };
 
     // isAdmin é determinado pelo servidor via Firebase token — body.isAdmin é ignorado.
@@ -210,7 +210,7 @@ export default async function handler(req, res) {
       }
     }
 
-    const adminCatalog = isAdmin && Array.isArray(body.adminCatalog) ? body.adminCatalog.slice(0, 200) : [];
+    const adminCatalog = isAdmin && Array.isArray(body.adminCatalog) ? body.adminCatalog.slice(0, 80) : [];
 
     // Sanitiza textos de entrada (remove tags HTML para evitar prompt injection)
     const sanitize = (s) => typeof s === 'string' ? s.replace(/<[^>]*>/g, '').slice(0, 500) : '';
@@ -289,7 +289,7 @@ pode ser pedido pelo "Faça seu Pedido". Nunca apresente o número como preço f
         if (r.ok) break;
         lastStatus = r.status;
         lastDetail = await r.text().catch(() => '');
-        if (r.status === 429 && attempt === 0) { await sleep(1000); continue; }
+        if (r.status === 429 && attempt === 0) { await sleep(300); continue; }
         break;
       }
       if (r && r.ok) {
