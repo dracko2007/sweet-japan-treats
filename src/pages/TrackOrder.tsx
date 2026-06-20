@@ -8,6 +8,8 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { firebaseSyncService } from '@/services/firebaseSyncService';
+import { db } from '@/config/firebase';
+import { doc, getDoc } from 'firebase/firestore';
 import { formatPrice } from '@/utils/currency';
 
 const isDev = import.meta.env.DEV;
@@ -77,11 +79,12 @@ const TrackOrder: React.FC = () => {
       order = allLocalOrders.find((o: any) => o.orderNumber === orderNumber.toUpperCase());
     }
 
-    // 2. Se não encontrou localmente, buscar no Firestore
-    if (!order) {
+    // 2. Se não encontrou localmente, busca direta no Firestore pelo ID do pedido
+    // (o document ID é o orderNumber — O(1) em vez de ler todos os pedidos)
+    if (!order && db) {
       try {
-        const firestoreOrders = await firebaseSyncService.getAllOrdersFromFirestore();
-        order = firestoreOrders.find((o: any) => o.orderNumber === orderNumber.toUpperCase());
+        const snap = await getDoc(doc(db, 'orders', orderNumber.toUpperCase()));
+        if (snap.exists()) order = { id: snap.id, ...snap.data() };
       } catch (err) {
         devError('Error searching Firestore:', err);
       }

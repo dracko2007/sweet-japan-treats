@@ -222,7 +222,9 @@ export const firebaseSyncService = {
   },
 
   /**
-   * Busca TODOS os pedidos (para admin)
+   * Busca TODOS os pedidos (para admin).
+   * TODO: adicionar paginação (limit + startAfter cursor) quando passar de ~500 pedidos.
+   * Cada chamada cobra 1 read/documento no Firestore.
    */
   async getAllOrdersFromFirestore() {
     try {
