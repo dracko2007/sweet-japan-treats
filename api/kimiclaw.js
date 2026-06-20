@@ -14,9 +14,10 @@ function firebaseAdminAuth() {
 }
 
 const DEFAULT_GROQ_MODELS = [
-  'llama-3.3-70b-versatile',   // principal — rápido e capaz
-  'llama-3.1-8b-instant',      // fallback leve — quase sempre disponível
-  'gemma2-9b-it',              // fallback extra do Groq
+  'llama-3.3-70b-versatile',        // principal — 70B, rápido
+  'llama-3.3-70b-specdec',          // variante especulativa do 70B (alta disponibilidade)
+  'deepseek-r1-distill-llama-70b',  // fallback 70B com raciocínio
+  'llama-3.1-8b-instant',           // último recurso leve
 ];
 const DISABLED_GROQ_MODELS = new Set(['moonshotai/kimi-k2-instruct', 'openai/gpt-oss-120b']);
 const uniqueNonEmpty = (values) => {
@@ -273,6 +274,7 @@ pode ser pedido pelo "Faça seu Pedido". Nunca apresente o número como preço f
     const baseMessages = [{ role: 'system', content: systemContent }, ...safeHistory];
 
     let text = null;
+    let usedModel = null;
     let lastStatus = 0;
     let lastDetail = '';
 
@@ -293,7 +295,7 @@ pode ser pedido pelo "Faça seu Pedido". Nunca apresente o número como preço f
       if (r && r.ok) {
         const data = await r.json().catch(() => null);
         const t = data?.choices?.[0]?.message?.content?.trim();
-        if (t) { text = t; break; }
+        if (t) { text = t; usedModel = model; break; }
       }
     }
 
@@ -301,7 +303,7 @@ pode ser pedido pelo "Faça seu Pedido". Nunca apresente o número como preço f
       res.status(502).json({ error: 'upstream-or-empty', status: lastStatus, detail: lastDetail.slice(0, 300) });
       return;
     }
-    res.status(200).json({ text });
+    res.status(200).json({ text, model: usedModel });
   } catch (e) {
     res.status(500).json({ error: String(e?.message || e) });
   }
