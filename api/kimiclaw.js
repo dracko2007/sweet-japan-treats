@@ -177,7 +177,22 @@ export default async function handler(req, res) {
     const history = Array.isArray(body.messages) ? body.messages.slice(-6) : [];
     const catalog = Array.isArray(body.catalog) ? body.catalog.slice(0, 120) : [];
     const locale = body.locale || { country: 'Brasil', currencyCode: 'BRL', currencySymbol: 'R$' };
-    const isAdmin = body.isAdmin === true;
+
+    // isAdmin é determinado pelo servidor via Firebase token — body.isAdmin é ignorado.
+    // O cliente envia o token no header x-firebase-token; o servidor verifica e confere
+    // se o email pertence ao admin. Sem token válido = não-admin, sem exceção.
+    let isAdmin = false;
+    const idToken = req.headers['x-firebase-token'];
+    if (idToken) {
+      try {
+        const adminEmail = process.env.VITE_ADMIN_EMAIL || 'dracko2007@gmail.com';
+        const decoded = await firebaseAdminAuth().verifyIdToken(idToken);
+        isAdmin = decoded.email?.toLowerCase() === adminEmail.toLowerCase();
+      } catch {
+        // token inválido ou expirado → não-admin
+      }
+    }
+
     const adminCatalog = isAdmin && Array.isArray(body.adminCatalog) ? body.adminCatalog.slice(0, 200) : [];
 
     // Sanitiza textos de entrada (remove tags HTML para evitar prompt injection)

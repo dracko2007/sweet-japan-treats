@@ -1,6 +1,7 @@
 // Cliente do "cérebro" do KimiClaw. Chama a função serverless /api/kimiclaw,
 // que guarda a chave do OpenRouter no servidor (não fica exposta no navegador).
 // Se a IA não estiver configurada/disponível, retorna null → KimiClaw usa as regras.
+import { auth } from '@/config/firebase';
 
 export interface QwenMsg { role: 'user' | 'assistant'; content: string; }
 export interface CatalogItem { name: string; category: string; priceYen: number; discount?: number; }
@@ -38,12 +39,21 @@ export async function askQwen(
       locale,
     };
     if (options?.isAdmin) {
-      body.isAdmin = true;
       body.adminCatalog = (options.adminCatalog || []).slice(0, 200);
     }
+
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (options?.isAdmin && auth?.currentUser) {
+      try {
+        headers['x-firebase-token'] = await auth.currentUser.getIdToken();
+      } catch {
+        // sem token → endpoint trata como não-admin
+      }
+    }
+
     const res = await fetch('/api/kimiclaw', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify(body),
     });
     if (!res.ok) return null; // 503 sem chave, 502 upstream, etc.
