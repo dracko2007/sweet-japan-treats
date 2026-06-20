@@ -28,6 +28,11 @@ dist-ssr
 *.sln
 *.sw?
 
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
 # ERP files
 erp/__pycache__/
 erp/*.pyc
@@ -64,3 +69,35 @@ upload-images.ts
 add-sitecontent-rule.cjs
 provision-storage.cjs
 add-eventos-rule.cjs
+build-debug.js
+test-kimiclaw.js
+cadastro_produtos_windows.py
+deploy-rules.sh
+netlify.toml
+
+# Backups manuais (o git já guarda histórico)
+original_*.txt
+original_*.ts
+original_*.tsx
+full_original_*.txt
+full_original_*.ts
+
+# Docs de rascunho
+CONFIGURACAO_EMAIL.md
+CORRECOES_NOTIFICACOES.md
+EMAILJS_SETUP.md
+FIREBASE_SETUP.md
+GUIA_RAPIDO.md
+INSTRUCOES_IMAGENS.md
+QUICK_START.md
+RESUMO_ALTERACOES.md
+SETUP_IMAGES.md
+SINCRONIZACAO_DISPOSITIVOS.md
+SOLUCAO_DEFINITIVA.md
+STATUS_FINAL.txt
+VERCEL_STATUS.md
+WHATSAPP_AUTOMATICO.md
+
+# HTML de debug
+clear-storage.html
+email-template-*.html
