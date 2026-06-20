@@ -109,47 +109,9 @@ function buildTemplate(type, name, code, extra = {}) {
   };
 }
 
-// Rate limiting por IP — 5 emails por janela de 10 minutos.
-// In-memory: efetivo dentro de cada instância serverless. Um atacante com muitos
-// IPs diferentes ou que acerte instâncias frias separadas ainda passa, mas bloqueia
-// 100% dos ataques de IP único (o caso mais comum de spam/abuso em sites pequenos).
-const RATE_WINDOW_MS = 10 * 60 * 1000; // 10 min
-const RATE_LIMIT = 5;
-const ipLog = new Map(); // ip → [timestamp, ...]
-
-function clientIp(req) {
-  return (
-    req.headers['x-forwarded-for']?.split(',')[0].trim() ||
-    req.socket?.remoteAddress ||
-    'unknown'
-  );
-}
-
-function isRateLimited(ip) {
-  const now = Date.now();
-  const cutoff = now - RATE_WINDOW_MS;
-  const hits = (ipLog.get(ip) || []).filter((t) => t > cutoff);
-  if (hits.length >= RATE_LIMIT) return true;
-  hits.push(now);
-  ipLog.set(ip, hits);
-  // Evita crescimento ilimitado do Map: remove entradas antigas a cada 1000 IPs
-  if (ipLog.size > 1000) {
-    for (const [k, v] of ipLog) {
-      if (v.every((t) => t <= cutoff)) ipLog.delete(k);
-    }
-  }
-  return false;
-}
-
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed' });
-    return;
-  }
-
-  const ip = clientIp(req);
-  if (isRateLimited(ip)) {
-    res.status(429).json({ error: 'Too many requests. Try again later.' });
     return;
   }
 
@@ -164,6 +126,19 @@ export default async function handler(req, res) {
     const to = String(body.to || '').trim().toLowerCase();
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to)) {
       res.status(400).json({ error: 'invalid email' });
+      return;
+    }
+
+    // Verificação de evento: o destinatário precisa existir no Firebase Auth.
+    // Isso âncora o envio a um fato que o servidor controla — sem conta real,
+    // o endpoint não pode ser usado para mandar emails para endereços arbitrários.
+    // O 2FA é a única exceção: o código é gerado imediatamente após o cadastro,
+    // antes de o usuário confirmar o email, então getUserByEmail já funciona.
+    try {
+      await firebaseAdminAuth().getUserByEmail(to);
+    } catch {
+      // Não revela se o email existe ou não — resposta genérica para ambos os casos
+      res.status(400).json({ error: 'invalid request' });
       return;
     }
 
