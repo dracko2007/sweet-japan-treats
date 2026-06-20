@@ -125,9 +125,13 @@ const HeroSection: React.FC = () => {
           <div className="lg:col-span-5 relative animate-fade-in">
             <Link to={promo ? '/promocao' : '#'} className={`relative aspect-[4/3] rounded-3xl overflow-hidden shadow-elevated border-4 border-white bg-gray-100 block ${promo ? 'cursor-pointer' : 'cursor-default'}`}>
               {promo?.productImage ? (
-                <img src={promo.productImage} alt={promo.productName} className="w-full h-full object-cover hover:scale-105 transition-transform duration-500" />
+                <img
+                  src={promo.productImage.replace('/upload/f_webp,q_auto/', '/upload/f_webp,q_100,w_1200/')}
+                  alt={promo.productName}
+                  className="w-full h-full object-cover hover:scale-105 transition-transform duration-500"
+                />
               ) : (
-                <img src="https://images.unsplash.com/photo-1540959733332-eab4deceeaf7?q=80&w=800&auto=format&fit=crop" alt="Japanese Shopping District" className="w-full h-full object-cover" />
+                <img src="https://images.unsplash.com/photo-1540959733332-eab4deceeaf7?q=100&w=1200&auto=format&fit=crop" alt="Japanese Shopping District" className="w-full h-full object-cover" />
               )}
               <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent pointer-events-none" />
               {promo && (
