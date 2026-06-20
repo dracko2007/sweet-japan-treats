@@ -109,9 +109,27 @@ function buildTemplate(type, name, code, extra = {}) {
   };
 }
 
+const ALLOWED_ORIGINS = [
+  'https://japanexpress-store.com',
+  'https://www.japanexpress-store.com',
+];
+
+function isAllowedOrigin(req) {
+  const origin = req.headers.origin || '';
+  if (!origin) return false; // rejeita chamadas diretas sem origin (curl, Postman)
+  if (ALLOWED_ORIGINS.includes(origin)) return true;
+  // Aceita qualquer localhost em dev
+  try { return new URL(origin).hostname === 'localhost'; } catch { return false; }
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed' });
+    return;
+  }
+
+  if (!isAllowedOrigin(req)) {
+    res.status(403).json({ error: 'Forbidden' });
     return;
   }
 
