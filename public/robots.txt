@@ -23,19 +23,9 @@ Disallow: /sync-data
 
 User-agent: ClaudeBot
 Allow: /
-Disallow: /admin
-Disallow: /checkout
-Disallow: /order-review
-Disallow: /order-confirmation
-Disallow: /perfil
 
 User-agent: anthropic-ai
 Allow: /
-Disallow: /admin
-Disallow: /checkout
-Disallow: /order-review
-Disallow: /order-confirmation
-Disallow: /perfil
 
 User-agent: Twitterbot
 Allow: /
