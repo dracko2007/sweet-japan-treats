@@ -2,10 +2,12 @@
 // Necessário porque as regras de segurança do Firestore só permitem escrita do admin,
 // e o SDK client-side não pode trocar de usuário no meio do fluxo de compra.
 
-const FIREBASE_API_KEY = 'AIzaSyCKf6f9QqRk9VUPTzNr28gVEEn5sAdwr0g';
-const FIREBASE_PROJECT_ID = 'localstorage-98492';
-const ADMIN_EMAIL = process.env.VITE_ADMIN_EMAIL || 'dracko2007@gmail.com';
-const ADMIN_PASSWORD = process.env.VITE_ADMIN_PASSWORD || '';
+// Variáveis de ambiente server-only (sem prefixo VITE_ — não chegam ao browser)
+// Configure no painel Vercel → Settings → Environment Variables (server-only)
+const FIREBASE_API_KEY = process.env.FIREBASE_API_KEY || '';
+const FIREBASE_PROJECT_ID = process.env.FIREBASE_PROJECT_ID || '';
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || '';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '';
 
 async function getAdminToken() {
   const res = await fetch(

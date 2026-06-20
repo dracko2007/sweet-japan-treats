@@ -437,16 +437,12 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
         setCoupons(userCoupons);
         setOrders(userOrders);
 
-        // Se a sessão restaurada for do admin, reautentica no Firebase para confirmar.
-        // Se a verificação falhar, a sessão é encerrada — não basta ter dados no localStorage.
+        // Se a sessão restaurada for do admin mas o Firebase perdeu a sessão,
+        // encerra e exige re-login — não há senha em memória para re-autenticar silenciosamente.
         const isAdminSession = userData.id === ADMIN_USER_ID || isAdminEmail(userData.email);
         if (isAdminSession && auth && !auth.currentUser) {
-          signInWithEmailAndPassword(auth, ADMIN_EMAIL, ADMIN_PASSWORD)
-            .then(() => devLog('✅ Admin reautenticado no Firebase (sessão restaurada)'))
-            .catch((err) => {
-              devWarn('⚠️ Admin Firebase re-auth falhou — sessão encerrada:', err?.code);
-              clearCurrentSession();
-            });
+          devWarn('⚠️ Admin session in localStorage but Firebase Auth gone — requiring re-login');
+          clearCurrentSession();
           }
         } else {
           devLog('[INIT] Ignoring customer safeStorage session until Firebase verifies email:', userData.email);
@@ -621,10 +617,10 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       setOrders([]);
       safeStorage.setItem('user', JSON.stringify(stripSensitive(adminUser)));
 
-      // Autentica no Firebase (conta admin compartilhada) p/ liberar escrita no painel
+      // Autentica no Firebase com a senha digitada pelo admin (não mais armazenada no bundle)
       if (auth) {
         try {
-          await signInWithEmailAndPassword(auth, ADMIN_EMAIL, ADMIN_PASSWORD);
+          await signInWithEmailAndPassword(auth, ADMIN_EMAIL, password);
         } catch (err) {
           devWarn('⚠️ Admin local OK, mas Firebase Auth falhou:', err);
         }
