@@ -84,7 +84,7 @@ const SYSTEM_PROMPT = `Você é o KimiClaw, o assistente virtual simpático da l
 que importa produtos do Japão (cosméticos, doces e chás, snacks, papelaria, eletrônicos, vestuário, higiene & saúde).
 Contato para falar com um vendedor/administrador: WhatsApp +81 70-1367-1679 (wa.me/817013671679) e e-mail contato@japanexpress-store.com.
 Sempre que disser "confirme com um vendedor/administrador", ofereça esse WhatsApp/e-mail.
-Responda SEMPRE em português do Brasil, de forma curta, amigável e útil (no máximo 4 frases). Use emojis com moderação.
+Responda SEMPRE em português do Brasil, de forma amigável e útil. Para clientes: respostas curtas (no máximo 4 frases). Use emojis com moderação.
 
 REGRA IMPORTANTE: sempre que fizer QUALQUER cálculo, conta, estimativa de preço, frete, imposto, conversão de moeda
 ou prazo, deixe claro na resposta que "isso é uma estimativa para fácil elucidação" e que os valores reais devem ser
@@ -284,7 +284,7 @@ pode ser pedido pelo "Faça seu Pedido". Nunca apresente o número como preço f
         r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
-          body: JSON.stringify({ model, max_tokens: isAdmin ? 900 : 600, temperature: 0.5, messages: baseMessages }),
+          body: JSON.stringify({ model, max_tokens: isAdmin ? 2048 : 600, temperature: 0.5, messages: baseMessages }),
         });
         if (r.ok) break;
         lastStatus = r.status;
