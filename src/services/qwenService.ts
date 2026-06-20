@@ -43,9 +43,14 @@ export async function askQwen(
     }
 
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-    if (options?.isAdmin && auth?.currentUser) {
+    if (options?.isAdmin && auth) {
       try {
-        headers['x-firebase-token'] = await auth.currentUser.getIdToken();
+        // authStateReady() aguarda o Firebase restaurar a sessão do IndexedDB —
+        // sem isso, auth.currentUser é null nos primeiros instantes após o carregamento.
+        await auth.authStateReady();
+        if (auth.currentUser) {
+          headers['x-firebase-token'] = await auth.currentUser.getIdToken();
+        }
       } catch {
         // sem token → endpoint trata como não-admin
       }
