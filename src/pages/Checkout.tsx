@@ -23,6 +23,7 @@ import { POINTS } from '@/services/pointsService';
 import { safeStorage } from '@/utils/storage';
 import { productEnglishName } from '@/utils/productName';
 import { isValidEmail, isValidCPF, isValidPhone, isNonEmpty, maskPhone, runValidations, FieldErrors } from '@/utils/validation';
+import { calcBrazilTax, calcEuVat, EU_VAT_RATES } from '@/utils/taxRules';
 import DemoBanner from '@/components/DemoBanner';
 
 const isDev = import.meta.env.DEV;
@@ -92,20 +93,14 @@ const Checkout: React.FC = () => {
   // Erros de validação do formulário
   const [errors, setErrors] = useState<FieldErrors>({});
 
-  // Sync country in state with language context selectedCountry
+  // When the header language/country changes, mirror it into the form.
+  // The reverse sync happens in the SELECT's onChange (calls setSelectedCountry directly).
   useEffect(() => {
     setFormData(prev => ({
       ...prev,
       country: selectedCountry
     }));
   }, [selectedCountry]);
-
-  // Sync back to selectedCountry context if form country select changes
-  useEffect(() => {
-    if (formData.country !== selectedCountry) {
-      setSelectedCountry(formData.country as 'Brasil' | 'Japão');
-    }
-  }, [formData.country, selectedCountry, setSelectedCountry]);
 
   // Aplica um cupom do perfil (já validado pelo CouponSelector)
   const handleCouponApply = (coupon: Coupon, discount: number) => {
@@ -233,34 +228,35 @@ const Checkout: React.FC = () => {
       setFormData(prev => ({ ...prev, postalCode: formatted }));
 
       if (cleanVal.length === 8) {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
         try {
-          const response = await fetch(`https://viacep.com.br/ws/${cleanVal}/json/`);
+          const response = await fetch(`https://viacep.com.br/ws/${cleanVal}/json/`, { signal: controller.signal });
+          clearTimeout(timeoutId);
           const data = await response.json();
-          
+
           if (response.ok && !data.erro) {
             const stateCode = data.uf || '';
-            const addressString = data.logradouro ? `${data.logradouro}${data.bairro ? `, Bairro: ${data.bairro}` : ''}` : '';
-            
+            const addressString = data.logradouro
+              ? `${data.logradouro}${data.bairro ? `, Bairro: ${data.bairro}` : ''}`
+              : '';
             setFormData(prev => ({
               ...prev,
               prefecture: stateCode,
               city: data.localidade || '',
               address: addressString,
             }));
-            
-            toast({
-              title: "CEP Encontrado!",
-              description: `${data.localidade} - ${stateCode}`,
-            });
+            toast({ title: "CEP Encontrado!", description: `${data.localidade} - ${stateCode}` });
           } else {
-            toast({
-              title: "Erro no CEP",
-              description: "Não foi possível localizar este CEP.",
-              variant: "destructive",
-            });
+            toast({ title: "CEP não encontrado", description: "Preencha o endereço manualmente.", variant: "destructive" });
           }
         } catch (error) {
-          devError('Erro ao buscar CEP:', error);
+          clearTimeout(timeoutId);
+          if (error instanceof Error && error.name === 'AbortError') {
+            toast({ title: "ViaCEP indisponível", description: "Serviço lento — preencha o endereço manualmente.", variant: "destructive" });
+          } else {
+            devError('Erro ao buscar CEP:', error);
+          }
         }
       }
     } else {
@@ -347,25 +343,16 @@ const Checkout: React.FC = () => {
 
   const subtotalWithCoupon = baseTotalPrice - couponDiscount;
   
-  // Tax calculations (Estimated only, NOT added to grandTotal)
-  let federalTax = 0;
-  let icmsTax = 0;
+  // Tax estimates shown as warning only — NOT added to grandTotal
   let estimatedTax = 0;
   let taxLabel = '';
-  
+
   if (formData.country === 'Brasil') {
-    const isBelow50USD = subtotalWithCoupon < 250;
-    federalTax = isBelow50USD
-      ? subtotalWithCoupon * 0.20
-      : (subtotalWithCoupon * 0.60) - 62.50;
-      
-    icmsTax = (subtotalWithCoupon + federalTax) * 0.17;
-    estimatedTax = federalTax + icmsTax;
+    estimatedTax = calcBrazilTax(subtotalWithCoupon).total;
     taxLabel = 'Impostos Estimados (Brasil)';
   } else if (isEuro) {
-    const rates: Record<string, number> = { Portugal: 0.23, França: 0.20, Itália: 0.22, Espanha: 0.21 };
-    const rate = rates[formData.country] || 0.20;
-    estimatedTax = subtotalWithCoupon * rate;
+    const rate = EU_VAT_RATES[formData.country] ?? 0.20;
+    estimatedTax = calcEuVat(subtotalWithCoupon, formData.country);
     taxLabel = `IVA / VAT Estimado (${Math.round(rate * 100)}%)`;
   }
     
@@ -519,10 +506,11 @@ const Checkout: React.FC = () => {
                           value={formData.country}
                           onChange={(e) => {
                             const val = e.target.value as CountryType;
+                            setSelectedCountry(val);
                             setFormData(prev => ({
                               ...prev,
                               country: val,
-                              prefecture: '', // Reset
+                              prefecture: '',
                               postalCode: '',
                               city: '',
                               address: '',

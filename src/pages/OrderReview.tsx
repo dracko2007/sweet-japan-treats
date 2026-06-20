@@ -27,6 +27,7 @@ import { firebaseSyncService } from '@/services/firebaseSyncService';
 import { paymentSettingsService } from '@/services/paymentSettingsService';
 import { Wallet } from 'lucide-react';
 import { referralService } from '@/services/referralService';
+import { calcBrazilTax, calcEuVat, EU_VAT_RATES } from '@/utils/taxRules';
 
 const isDev = import.meta.env.DEV;
 const devLog = isDev ? console.log.bind(console) : () => {};
@@ -125,20 +126,16 @@ const OrderReview: React.FC = () => {
   let icmsTax = 0;
   let estimatedTax = 0;
   let taxLabel = '';
-  
+
   if (formData.country === 'Brasil') {
-    const isBelow50USD = priceAfterPix < 250;
-    federalTax = isBelow50USD
-      ? priceAfterPix * 0.20
-      : (priceAfterPix * 0.60) - 62.50;
-      
-    icmsTax = (priceAfterPix + federalTax) * 0.17;
-    estimatedTax = federalTax + icmsTax;
+    const br = calcBrazilTax(priceAfterPix);
+    federalTax = br.federal;
+    icmsTax = br.icms;
+    estimatedTax = br.total;
     taxLabel = 'Impostos Estimados (Brasil)';
   } else if (isEurope) {
-    const rates: Record<string, number> = { Portugal: 0.23, França: 0.20, Itália: 0.22, Espanha: 0.21 };
-    const rate = rates[formData.country] || 0.20;
-    estimatedTax = priceAfterPix * rate;
+    const rate = EU_VAT_RATES[formData.country] ?? 0.20;
+    estimatedTax = calcEuVat(priceAfterPix, formData.country);
     taxLabel = `IVA / VAT Estimado (${Math.round(rate * 100)}%)`;
   }
   
@@ -282,8 +279,11 @@ const OrderReview: React.FC = () => {
     });
 
     // Save to list of orders in safeStorage (backup local / mesmo dispositivo)
+    // CPF is omitted from the local cache — it lives only in Firestore (LGPD)
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { cpf: _cpf, ...localOrder } = mockOrder;
     const existingOrders = JSON.parse(safeStorage.getItem('sakura_orders') || '[]');
-    safeStorage.setItem('sakura_orders', JSON.stringify([mockOrder, ...existingOrders]));
+    safeStorage.setItem('sakura_orders', JSON.stringify([localOrder, ...existingOrders]));
 
     // ⭐ GRAVA NO FIRESTORE — sem isto o pedido só fica no navegador do comprador
     // e o admin (em outro dispositivo) NUNCA vê. Formato exato que o painel espera:
