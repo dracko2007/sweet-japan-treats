@@ -78,8 +78,11 @@ service cloud.firestore {
     }
 
     // ---------- Afiliados / Influencers ----------
+    // get (por código) é público: necessário para validar cupons de afiliado no checkout.
+    // list é restrito: impede enumerar todos os afiliados e expor ownerEmail em massa.
     match /affiliates/{code} {
-      allow read: if true;
+      allow get: if true;
+      allow list: if isAdmin();
       allow create, delete: if isAdmin();
       allow update: if isAdmin()
         || (request.auth != null && resource.data.ownerEmail == request.auth.token.email);
@@ -93,9 +96,13 @@ service cloud.firestore {
         || (request.auth != null && resource.data.buyerEmail == request.auth.token.email);
     }
 
-    // Solicitações para virar afiliado
+    // Solicitações para virar afiliado — validação mínima evita spam de bots
     match /affiliate_requests/{id} {
-      allow create: if true;
+      allow create: if request.resource.data.keys().hasAll(['email', 'name'])
+        && request.resource.data.email is string
+        && request.resource.data.email.size() > 3
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 1;
       allow read: if isAdmin()
         || (request.auth != null && resource.data.email == request.auth.token.email);
       allow update, delete: if isAdmin();
@@ -137,9 +144,5 @@ service cloud.firestore {
       allow update, delete: if isAdmin();
     }
 
-    // ---------- Coleção de teste ----------
-    match /test/{docId} {
-      allow read, write: if request.auth != null;
-    }
   }
 }
