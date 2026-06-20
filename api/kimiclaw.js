@@ -13,8 +13,12 @@ function firebaseAdminAuth() {
   return getAuth();
 }
 
-const DEFAULT_GROQ_MODELS = ['llama-3.3-70b-versatile', 'openai/gpt-oss-120b'];
-const DISABLED_GROQ_MODELS = new Set(['moonshotai/kimi-k2-instruct']);
+const DEFAULT_GROQ_MODELS = [
+  'llama-3.3-70b-versatile',   // principal — rápido e capaz
+  'llama-3.1-8b-instant',      // fallback leve — quase sempre disponível
+  'gemma2-9b-it',              // fallback extra do Groq
+];
+const DISABLED_GROQ_MODELS = new Set(['moonshotai/kimi-k2-instruct', 'openai/gpt-oss-120b']);
 const uniqueNonEmpty = (values) => {
   const seen = new Set();
   const out = [];
