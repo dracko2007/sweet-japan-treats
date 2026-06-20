@@ -13,7 +13,7 @@ import LanguageSwitcher from '@/components/LanguageSwitcher';
 const Login: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const loginState = location.state as { registeredEmail?: string; verificationEmailSent?: boolean } | null;
+  const loginState = location.state as { registeredEmail?: string; verificationEmailSent?: boolean; from?: string } | null;
   const registeredEmail = loginState?.registeredEmail || '';
   const verificationEmailSent = Boolean(loginState?.verificationEmailSent);
   const verificationEmailFailed = Boolean(registeredEmail) && loginState?.verificationEmailSent === false;
@@ -38,11 +38,12 @@ const Login: React.FC = () => {
     return '';
   });
 
-  // Conta admin → painel; conta usuário → loja. Sem escolha/troca.
+  // Conta admin → painel; conta usuário → volta pra onde estava (ou perfil)
+  const redirectTo = loginState?.from || '/perfil';
   React.useEffect(() => {
     if (!isAuthenticated) return;
-    navigate(isAdminAccount ? '/admin' : '/perfil');
-  }, [isAuthenticated, isAdminAccount, navigate]);
+    navigate(isAdminAccount ? '/admin' : redirectTo);
+  }, [isAuthenticated, isAdminAccount, navigate, redirectTo]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;

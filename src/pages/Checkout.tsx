@@ -157,6 +157,13 @@ const Checkout: React.FC = () => {
     }
   }, [isAuthenticated, user, location.state, selectedCountry]);
 
+  // Exige login — pedido sem conta não é salvo no Firestore e o admin nunca vê
+  useEffect(() => {
+    if (!isAuthenticated) {
+      navigate('/cadastro', { state: { from: '/checkout' } });
+    }
+  }, [isAuthenticated, navigate]);
+
   // Redirect if cart is empty
   useEffect(() => {
     if (items.length === 0) {

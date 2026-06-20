@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { UserCircle, Mail, Lock, Phone, ArrowRight } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
@@ -13,8 +13,10 @@ import { isValidEmail, isNonEmpty, runValidations, FieldErrors, COUNTRY_DIAL_COD
 
 const Register: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { toast } = useToast();
   const { register: registerUser, isAuthenticated } = useUser();
+  const redirectTo = (location.state as any)?.from || '/perfil';
   const { t, selectedCountry } = useLanguage();
 
   const [formData, setFormData] = useState({
@@ -38,12 +40,12 @@ const Register: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<FieldErrors>({});
 
-  // Redirect if already authenticated
+  // Redirect after login — volta pra onde o usuário estava (ex: /checkout)
   React.useEffect(() => {
     if (isAuthenticated) {
-      navigate('/perfil');
+      navigate(redirectTo);
     }
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, navigate, redirectTo]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
