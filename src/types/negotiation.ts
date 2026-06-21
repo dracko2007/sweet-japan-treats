@@ -1,4 +1,4 @@
-export type NegotiationStatus = 'pending' | 'auto_approved' | 'approved' | 'rejected' | 'expired';
+export type NegotiationStatus = 'pending' | 'auto_approved' | 'approved' | 'rejected' | 'expired' | 'used';
 export type NegotiationType = 'ps_fee' | 'shipping';
 
 export interface CartItemSnapshot {

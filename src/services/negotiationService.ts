@@ -101,12 +101,22 @@ export const negotiationService = {
     await updateDoc(doc(db, COL, id), { clientSeen: true });
   },
 
+  async markUsed(id: string, orderId: string): Promise<void> {
+    await updateDoc(doc(db, COL, id), {
+      status: 'used',
+      resolvedAt: new Date().toISOString(),
+      clientSeen: true,
+      usedInOrderId: orderId,
+    });
+  },
+
   async getById(id: string): Promise<Negotiation | null> {
     const snap = await getDoc(doc(db, COL, id));
     return snap.exists() ? (snap.data() as Negotiation) : null;
   },
 
   isExpired(neg: Negotiation): boolean {
+    if (neg.status === 'used' || neg.status === 'rejected' || neg.status === 'expired') return false;
     return neg.status === 'pending' && new Date(neg.expiresAt) < new Date();
   },
 };

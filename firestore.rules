@@ -161,7 +161,7 @@ service cloud.firestore {
             && (resource.data.userId == request.auth.uid
                 || resource.data.userEmail == request.auth.token.email)
             && request.resource.data.diff(resource.data).affectedKeys()
-               .hasOnly(['clientSeen', 'status', 'resolvedAt', 'clientNotified']));
+               .hasOnly(['clientSeen', 'status', 'resolvedAt', 'clientNotified', 'usedInOrderId']));
       allow delete: if isAdmin();
     }
 

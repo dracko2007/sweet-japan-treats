@@ -1041,20 +1041,36 @@ const Profile: React.FC = () => {
                   {negotiations.map((neg) => {
                     const isExpiredClient = negotiationService.isExpired(neg);
                     const isPending = neg.status === 'pending' && !isExpiredClient;
-                    const isApproved = neg.status === 'approved' || neg.status === 'auto_approved';
+                    const isApproved = (neg.status === 'approved' || neg.status === 'auto_approved');
+                    const isUsed = neg.status === 'used';
                     const isRejected = neg.status === 'rejected';
                     const isExpired = neg.status === 'expired' || isExpiredClient;
+                    const borderClass = isPending
+                      ? 'border-orange-200 bg-orange-50/30 dark:bg-orange-950/10'
+                      : isApproved
+                      ? 'border-green-200 bg-green-50/30 dark:bg-green-950/10'
+                      : isUsed
+                      ? 'border-blue-200 bg-blue-50/30 dark:bg-blue-950/10'
+                      : isExpired
+                      ? 'border-gray-200 opacity-60'
+                      : 'border-red-200 bg-red-50/20 dark:bg-red-950/10';
                     return (
-                      <div key={neg.id} className={`rounded-xl border p-4 ${isPending ? 'border-orange-200 bg-orange-50/30 dark:bg-orange-950/10' : isApproved ? 'border-green-200 bg-green-50/30 dark:bg-green-950/10' : isExpired ? 'border-gray-200 opacity-60' : 'border-red-200 bg-red-50/20 dark:bg-red-950/10'}`}>
+                      <div key={neg.id} className={`rounded-xl border p-4 ${borderClass}`}>
                         <div className="flex items-start justify-between gap-3">
                           <div className="flex-1 min-w-0">
                             <div className="flex flex-wrap items-center gap-2 mb-1">
                               <span className="font-semibold text-sm text-foreground">
                                 {neg.type === 'ps_fee' ? '🤝 Taxa Personal Shopper' : '🚚 Frete'}
                               </span>
-                              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold border ${isPending ? 'bg-orange-100 text-orange-700 border-orange-300' : isApproved ? 'bg-green-100 text-green-700 border-green-300' : 'bg-red-100 text-red-700 border-red-300'}`}>
+                              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold border ${
+                                isPending ? 'bg-orange-100 text-orange-700 border-orange-300'
+                                : isApproved ? 'bg-green-100 text-green-700 border-green-300'
+                                : isUsed ? 'bg-blue-100 text-blue-700 border-blue-300'
+                                : 'bg-red-100 text-red-700 border-red-300'
+                              }`}>
                                 {isPending && <><Hourglass className="w-3 h-3" /> Aguardando</>}
                                 {isApproved && <><CheckCircle2 className="w-3 h-3" /> Aprovado</>}
+                                {isUsed && <><CheckCircle2 className="w-3 h-3" /> Finalizado</>}
                                 {isRejected && <><XCircle className="w-3 h-3" /> Recusado</>}
                                 {isExpired && <><XCircle className="w-3 h-3" /> Expirado</>}
                               </span>
@@ -1062,8 +1078,8 @@ const Profile: React.FC = () => {
                             <p className="text-xs text-muted-foreground">
                               Desconto pedido: ¥{neg.requestedDiscountYen.toLocaleString()} em ¥{neg.originalAmountYen.toLocaleString()}
                             </p>
-                            {isApproved && neg.approvedDiscountYen != null && (
-                              <p className="text-xs text-green-600 font-semibold mt-1">
+                            {(isApproved || isUsed) && neg.approvedDiscountYen != null && (
+                              <p className={`text-xs font-semibold mt-1 ${isUsed ? 'text-blue-600' : 'text-green-600'}`}>
                                 ✅ Desconto aprovado: ¥{neg.approvedDiscountYen.toLocaleString()} — Valor final: ¥{(neg.originalAmountYen - neg.approvedDiscountYen).toLocaleString()}
                               </p>
                             )}

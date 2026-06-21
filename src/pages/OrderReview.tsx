@@ -18,6 +18,7 @@ import { useProducts } from '@/context/ProductsContext';
 import { formatPrice } from '@/utils/currency';
 import { effectiveYen } from '@/utils/pricing';
 import { convertYen as fxConvert } from '@/services/fxService';
+import { negotiationService } from '@/services/negotiationService';
 import { productService } from '@/services/productService';
 import { pointsForSpendYen, POINTS } from '@/services/pointsService';
 import { productEnglishName } from '@/utils/productName';
@@ -429,6 +430,9 @@ const OrderReview: React.FC = () => {
     clearCart();
     safeStorage.removeItem('redeem_points');
     localStorage.removeItem('activeNegId');
+    if (negotiationId) {
+      negotiationService.markUsed(negotiationId, orderId).catch(() => {});
+    }
 
     // E-mail automático de confirmação (fire-and-forget — não trava a navegação)
     void emailServiceSimple.sendOrderConfirmation({
