@@ -1021,14 +1021,22 @@ const Profile: React.FC = () => {
             </div>
 
             {/* Negociações */}
-            {negotiations.length > 0 && (
-              <div className="bg-card rounded-2xl border border-border p-6 lg:p-8">
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                    <Handshake className="w-5 h-5 text-primary" />
-                  </div>
-                  <h2 className="font-display text-2xl font-semibold text-foreground">Negociações</h2>
+            <div className="bg-card rounded-2xl border border-border p-6 lg:p-8">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                  <Handshake className="w-5 h-5 text-primary" />
                 </div>
+                <h2 className="font-display text-2xl font-semibold text-foreground">Negociações</h2>
+              </div>
+              {negotiations.length === 0 ? (
+                <div className="text-center py-8">
+                  <div className="w-16 h-16 bg-secondary rounded-full flex items-center justify-center mx-auto mb-3">
+                    <Handshake className="w-8 h-8 text-muted-foreground" />
+                  </div>
+                  <p className="text-muted-foreground text-sm">Nenhuma negociação ainda.</p>
+                  <p className="text-xs text-muted-foreground mt-1">Use o botão "Negociar" no checkout para solicitar desconto na taxa ou no frete.</p>
+                </div>
+              ) : (
                 <div className="space-y-3">
                   {negotiations.map((neg) => {
                     const isExpiredClient = negotiationService.isExpired(neg);
@@ -1083,8 +1091,8 @@ const Profile: React.FC = () => {
                     );
                   })}
                 </div>
-              </div>
-            )}
+              )}
+            </div>
 
             {/* Logout Button */}
             <div className="flex justify-center pt-6">
