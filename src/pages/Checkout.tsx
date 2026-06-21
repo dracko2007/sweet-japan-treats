@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Package, ArrowRight, MapPin, User, Phone, Mail, Clock, Tag, CreditCard, Sparkles, Handshake, X, CheckCircle2, AlertCircle, Hourglass } from 'lucide-react';
+import { Package, ArrowRight, MapPin, User, Phone, Mail, Tag, CreditCard, Sparkles, Handshake, X, CheckCircle2, AlertCircle, Hourglass } from 'lucide-react';
 import { negotiationService } from '@/services/negotiationService';
 import type { Negotiation } from '@/types/negotiation';
 import Layout from '@/components/layout/Layout';
@@ -26,7 +26,6 @@ import { safeStorage } from '@/utils/storage';
 import { productEnglishName } from '@/utils/productName';
 import { isValidEmail, isValidCPF, isValidPhone, isNonEmpty, maskPhone, runValidations, FieldErrors } from '@/utils/validation';
 import { calcBrazilTax, calcEuVat, EU_VAT_RATES } from '@/utils/taxRules';
-import DemoBanner from '@/components/DemoBanner';
 
 const isDev = import.meta.env.DEV;
 const devLog = isDev ? console.log.bind(console) : () => {};
@@ -595,9 +594,6 @@ const Checkout: React.FC = () => {
 
       <section className="py-12 bg-background">
         <div className="container mx-auto px-4">
-          <div className="max-w-6xl mx-auto mb-6">
-            <DemoBanner />
-          </div>
           <div className="grid lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
             {/* Checkout Form */}
             <div className="lg:col-span-2">
@@ -868,27 +864,6 @@ const Checkout: React.FC = () => {
                       couponDiscount={couponDiscount}
                     />
                   </div>
-
-                  {/* Delivery Time Selection */}
-                  {selectedShipping && (
-                    <div className="pt-4 border-t border-border">
-                      <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wide mb-4 flex items-center gap-2">
-                        <Clock className="w-4 h-4 text-orange-500" />
-                        Período de Entrega Preferido (Correios)
-                      </h3>
-                      <select
-                        id="deliveryTime"
-                        name="deliveryTime"
-                        value={deliveryTime}
-                        onChange={(e) => setDeliveryTime(e.target.value)}
-                        className="w-full p-2.5 rounded-lg border border-border bg-background text-foreground focus:ring-2 focus:ring-primary focus:border-primary transition-all font-medium text-sm"
-                      >
-                        <option value="">Qualquer horário (Recomendado)</option>
-                        <option value="morning">Horário Comercial (9h - 18h)</option>
-                        <option value="saturday">Finais de Semana</option>
-                      </select>
-                    </div>
-                  )}
 
                   <div className="pt-4 border-t border-border">
                     {negIsPending ? (
@@ -1172,9 +1147,6 @@ const Checkout: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="pt-4 border-t border-border flex items-center justify-center gap-1.5 text-[10px] text-muted-foreground uppercase font-bold">
-                    <CreditCard className="w-4 h-4 text-amber-600" /> Ambiente de demonstração
-                  </div>
                 </div>
               </div>
             </div>
