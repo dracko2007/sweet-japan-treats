@@ -836,7 +836,7 @@ const OrderReview: React.FC = () => {
                             </div>
                             <div className="flex items-center gap-1.5 text-[11px] text-blue-700 bg-blue-50 border border-blue-200 rounded-md px-2 py-1 w-fit">
                               <span>ℹ️</span>
-                              <span>Sujeito a <strong>IOF 0,38%</strong> + taxa bancária de remessa internacional</span>
+                              <span>Sujeito a <strong>IOF 1%</strong> + taxa bancária de remessa internacional</span>
                             </div>
                           </div>
                         </Label>
@@ -875,7 +875,7 @@ const OrderReview: React.FC = () => {
                             <div className="mt-2 flex flex-col gap-1">
                               <div className="flex items-center gap-1.5 text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-md px-2 py-1 w-fit">
                                 <span>ℹ️</span>
-                                <span>Sujeito a <strong>IOF 0,38%</strong> + taxa Wise (variável por valor e moeda)</span>
+                                <span>Taxa Wise variável (~4% para R$ 3.000) — <strong>sem IOF</strong> nesta modalidade</span>
                               </div>
                             </div>
                           </Label>
