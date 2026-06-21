@@ -208,11 +208,6 @@ const ProductDetail: React.FC = () => {
                   )}
                 </div>
 
-                <div className="bg-secondary/30 rounded-xl p-4 mb-6">
-                  <p className="text-sm text-muted-foreground mb-1">{t('productDetail.flavor')}</p>
-                  <p className="font-semibold">{translatedFlavor}</p>
-                </div>
-
                 {/* Seletor de tamanho/variante */}
                 {productVariants.length > 1 && (
                   <div className="mb-6">
@@ -309,11 +304,6 @@ const ProductDetail: React.FC = () => {
                   </Button>
                 </div>
 
-                <div className="border-t border-border pt-6 space-y-3 text-sm text-muted-foreground">
-                  <p>{t('productDetail.info1')}</p>
-                  <p>{t('productDetail.info2')}</p>
-                  <p>{t('productDetail.info3')}</p>
-                </div>
               </div>
             </div>
 
