@@ -1,5 +1,5 @@
 import React from 'react';
-import { Heart, Star, Users, Award, MessageCircle, MapPin } from 'lucide-react';
+import { Heart, Star, Users, Award, MessageCircle, MapPin, Mail, Phone } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import { useLanguage } from '@/context/LanguageContext';
 
@@ -81,6 +81,51 @@ const About: React.FC = () => {
                 </p>
               </div>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Contato */}
+      <section className="py-16 bg-background">
+        <div className="container mx-auto px-4">
+          <div className="max-w-2xl mx-auto text-center mb-10">
+            <h2 className="font-display text-3xl font-bold text-foreground mb-3">
+              {t('aboutPage.contactTitle')}
+            </h2>
+            <p className="text-muted-foreground">{t('aboutPage.contactSubtitle')}</p>
+          </div>
+          <div className="grid sm:grid-cols-3 gap-6 max-w-3xl mx-auto">
+            <div className="flex flex-col items-center gap-3 p-6 rounded-2xl border border-border bg-card text-center">
+              <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                <MapPin className="w-6 h-6 text-primary" />
+              </div>
+              <h3 className="font-semibold text-foreground">{t('aboutPage.contact.addressLabel')}</h3>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                Hiroshima Prefecture<br />Japan 🇯🇵
+              </p>
+            </div>
+            <a
+              href="https://wa.me/817013671679"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex flex-col items-center gap-3 p-6 rounded-2xl border border-border bg-card text-center hover:border-green-500/50 hover:bg-green-50 dark:hover:bg-green-950/20 transition-colors group"
+            >
+              <div className="w-12 h-12 rounded-full bg-green-500/10 flex items-center justify-center group-hover:bg-green-500/20 transition-colors">
+                <MessageCircle className="w-6 h-6 text-green-600" />
+              </div>
+              <h3 className="font-semibold text-foreground">{t('aboutPage.contact.whatsappLabel')}</h3>
+              <p className="text-sm text-muted-foreground">+81 70-1367-1679</p>
+            </a>
+            <a
+              href="mailto:contato@japanexpress-store.com"
+              className="flex flex-col items-center gap-3 p-6 rounded-2xl border border-border bg-card text-center hover:border-primary/50 hover:bg-primary/5 transition-colors group"
+            >
+              <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
+                <Mail className="w-6 h-6 text-primary" />
+              </div>
+              <h3 className="font-semibold text-foreground">{t('aboutPage.contact.emailLabel')}</h3>
+              <p className="text-sm text-muted-foreground break-all">contato@japanexpress-store.com</p>
+            </a>
           </div>
         </div>
       </section>
