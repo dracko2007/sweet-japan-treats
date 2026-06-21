@@ -130,6 +130,26 @@ const Checkout: React.FC = () => {
     if (!activeNegId) return;
     return negotiationService.listenById(activeNegId, (neg) => {
       if (!neg) return;
+
+      const clearNeg = () => {
+        setActiveNegId(null);
+        setActiveNeg(null);
+        setPsFeeDiscountYen(0);
+        setShippingDiscountYen(0);
+        localStorage.removeItem('activeNegId');
+      };
+
+      // Negociação já usada, rejeitada, expirada ou fora do prazo de 24h → limpa
+      if (
+        neg.status === 'used' ||
+        neg.status === 'rejected' ||
+        neg.status === 'expired' ||
+        new Date(neg.expiresAt) < new Date()
+      ) {
+        clearNeg();
+        return;
+      }
+
       setActiveNeg(neg);
       if ((neg.status === 'approved' || neg.status === 'auto_approved') && neg.approvedDiscountYen != null) {
         if (neg.type === 'ps_fee') setPsFeeDiscountYen(neg.approvedDiscountYen);
