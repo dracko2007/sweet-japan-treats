@@ -829,6 +829,16 @@ const OrderReview: React.FC = () => {
                           <p className="text-xs text-muted-foreground leading-relaxed">
                             Mostraremos o QR Code e a chave Copia e Cola na próxima página. Após pagar, envie o comprovante para confirmarmos.
                           </p>
+                          <div className="mt-2 flex flex-col gap-1">
+                            <div className="flex items-center gap-1.5 text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-2 py-1 w-fit">
+                              <span>⏱</span>
+                              <span>Remessa internacional em até <strong>3 dias úteis</strong> após confirmação</span>
+                            </div>
+                            <div className="flex items-center gap-1.5 text-[11px] text-blue-700 bg-blue-50 border border-blue-200 rounded-md px-2 py-1 w-fit">
+                              <span>ℹ️</span>
+                              <span>Sujeito a <strong>IOF 0,38%</strong> + taxa bancária de remessa internacional</span>
+                            </div>
+                          </div>
                         </Label>
                       </div>
 
@@ -862,6 +872,12 @@ const OrderReview: React.FC = () => {
                             <p className="text-xs text-muted-foreground leading-relaxed">
                               Pague em qualquer moeda com câmbio justo. Mostraremos o link de pagamento Wise na próxima tela.
                             </p>
+                            <div className="mt-2 flex flex-col gap-1">
+                              <div className="flex items-center gap-1.5 text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-md px-2 py-1 w-fit">
+                                <span>ℹ️</span>
+                                <span>Sujeito a <strong>IOF 0,38%</strong> + taxa Wise (variável por valor e moeda)</span>
+                              </div>
+                            </div>
                           </Label>
                         </div>
                       )}
