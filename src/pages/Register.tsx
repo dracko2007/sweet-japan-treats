@@ -15,7 +15,7 @@ const Register: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
-  const { register: registerUser, isAuthenticated } = useUser();
+  const { register: registerUser, isAuthenticated, authReady } = useUser();
   const redirectTo = (location.state as any)?.from || '/perfil';
   const { t, selectedCountry } = useLanguage();
 
@@ -42,10 +42,10 @@ const Register: React.FC = () => {
 
   // Redirect after login — volta pra onde o usuário estava (ex: /checkout)
   React.useEffect(() => {
-    if (isAuthenticated) {
+    if (authReady && isAuthenticated) {
       navigate(redirectTo);
     }
-  }, [isAuthenticated, navigate, redirectTo]);
+  }, [isAuthenticated, authReady, navigate, redirectTo]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;

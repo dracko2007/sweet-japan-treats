@@ -34,7 +34,7 @@ const devError = isDev ? console.error.bind(console) : () => {};
 
 const Checkout: React.FC = () => {
   const { items, totalPrice } = useCart();
-  const { user, isAuthenticated } = useUser();
+  const { user, isAuthenticated, authReady } = useUser();
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
@@ -159,10 +159,10 @@ const Checkout: React.FC = () => {
 
   // Exige login — pedido sem conta não é salvo no Firestore e o admin nunca vê
   useEffect(() => {
-    if (!isAuthenticated) {
+    if (authReady && !isAuthenticated) {
       navigate('/cadastro', { state: { from: '/checkout' } });
     }
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, authReady, navigate]);
 
   // Redirect if cart is empty
   useEffect(() => {

@@ -15,7 +15,7 @@ import { productEnglishName } from '@/utils/productName';
 
 const Wishlist: React.FC = () => {
   const navigate = useNavigate();
-  const { user, isAuthenticated } = useUser();
+  const { user, isAuthenticated, authReady } = useUser();
   const { products } = useProducts();
   const { addToCart } = useCart();
   const { selectedCountry, t } = useLanguage();
@@ -23,13 +23,14 @@ const Wishlist: React.FC = () => {
   const [wishlistItems, setWishlistItems] = useState<WishlistItem[]>([]);
 
   useEffect(() => {
+    if (!authReady) return;
     if (!isAuthenticated) {
       navigate('/cadastro');
       return;
     }
 
     loadWishlist();
-  }, [isAuthenticated, navigate, user]);
+  }, [isAuthenticated, authReady, navigate, user]);
 
   const loadWishlist = () => {
     if (user?.email) {

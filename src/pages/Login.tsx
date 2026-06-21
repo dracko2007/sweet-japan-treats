@@ -19,7 +19,7 @@ const Login: React.FC = () => {
   const verificationEmailFailed = Boolean(registeredEmail) && loginState?.verificationEmailSent === false;
   const verifiedFromLink = new URLSearchParams(location.search).get('verified') === '1';
   const { toast } = useToast();
-  const { login, isAuthenticated, sendPasswordReset, isAdminAccount } = useUser();
+  const { login, isAuthenticated, authReady, sendPasswordReset, isAdminAccount } = useUser();
   const { t } = useLanguage();
 
   const [formData, setFormData] = useState({
@@ -41,9 +41,9 @@ const Login: React.FC = () => {
   // Conta admin → painel; conta usuário → volta pra onde estava (ou perfil)
   const redirectTo = loginState?.from || '/perfil';
   React.useEffect(() => {
-    if (!isAuthenticated) return;
+    if (!authReady || !isAuthenticated) return;
     navigate(isAdminAccount ? '/admin' : redirectTo);
-  }, [isAuthenticated, isAdminAccount, navigate, redirectTo]);
+  }, [isAuthenticated, authReady, isAdminAccount, navigate, redirectTo]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;

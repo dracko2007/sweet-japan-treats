@@ -50,6 +50,7 @@ export interface Coupon {
   isUsed: boolean;
   freeShipping?: boolean;
   affiliateCode?: string; // se preenchido, é um código de influencer (gera comissão)
+  minOrderValue?: number; // valor mínimo do pedido em ¥ para usar o cupom
 }
 
 // Fábrica do cupom de boas-vindas concedido no cadastro.
@@ -97,6 +98,7 @@ export interface Order {
 interface UserContextType {
   user: UserProfile | null;
   isAuthenticated: boolean;
+  authReady: boolean;        // true após o primeiro disparo do onAuthChange (sem flash de login)
   isAdmin: boolean;          // agindo como admin (conta admin E modo != cliente)
   isAdminAccount: boolean;   // a conta É admin (independente do modo escolhido)
   adminRole: number;         // 0=não admin, 1/2/3
@@ -139,6 +141,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [authReady, setAuthReady] = useState(false);
   // Modo da sessão para contas admin: 'admin' (painel) ou 'user' (cliente).
   // Escolhido no login; separa o admin do cliente para as telas não se misturarem.
   const [loginAs, setLoginAsState] = useState<'admin' | 'user' | null>(
@@ -160,15 +163,6 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     return safe as UserProfile;
   };
 
-  const canRestoreStoredSession = (u: Partial<UserProfile>): boolean => {
-    const isAdminUser = u.id === ADMIN_USER_ID || isAdminEmail(u.email);
-    if (isAdminUser) {
-      // Admin session from localStorage só é confiada quando Firebase pode verificar.
-      // Se a sessão Firebase expirou, o listener (linha ~440) limpa e exige re-login.
-      return firebaseConfigReady || allowLocalOnly;
-    }
-    return !firebaseConfigReady && allowLocalOnly;
-  };
 
   const clearCurrentSession = () => {
     setUser(null);
@@ -426,25 +420,13 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       try {
         const userData = JSON.parse(storedUser);
         devLog('⚡ [INIT] Restoring user from safeStorage:', userData.email);
-        if (canRestoreStoredSession(userData)) {
-          setUser(userData);
+        // Restaura imediatamente para todos os usuários — Firebase valida via onAuthChange
+        setUser(userData);
         setIsAuthenticated(true);
         const userCoupons = resolveUserCoupons(userData);
         const userOrders = getUserOrders(userData.id, userData.email).map(fixTrackingUrl);
         setCoupons(userCoupons);
         setOrders(userOrders);
-
-        // Se a sessão restaurada for do admin mas o Firebase perdeu a sessão,
-        // encerra e exige re-login — não há senha em memória para re-autenticar silenciosamente.
-        const isAdminSession = userData.id === ADMIN_USER_ID || isAdminEmail(userData.email);
-        if (isAdminSession && auth && !auth.currentUser) {
-          devWarn('⚠️ Admin session in localStorage but Firebase Auth gone — requiring re-login');
-          clearCurrentSession();
-          }
-        } else {
-          devLog('[INIT] Ignoring customer safeStorage session until Firebase verifies email:', userData.email);
-          safeStorage.removeItem('user');
-        }
       } catch (e) {
         devError('❌ [INIT] Failed to parse stored user:', e);
       }
@@ -452,6 +434,8 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
 
     // Listener do Firebase Auth (will update/enrich data when ready)
     const unsubscribe = firebaseSyncService.onAuthChange(async (firebaseUser) => {
+      setAuthReady(true); // marca auth como resolvido — elimina flash de login
+
       if (firebaseUser) {
         devLog('🔥 [FIREBASE] Auth state changed - user logged in:', firebaseUser.uid);
 
@@ -522,21 +506,22 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
         }
       } else {
         devLog('🔥 [FIREBASE] Auth state changed - no Firebase user');
-        // DON'T clear session - safeStorage user may be valid (e.g. admin login)
-        // Only clear if there's no stored user either
         const storedUser = safeStorage.getItem('user');
         if (storedUser) {
           try {
             const userData = JSON.parse(storedUser);
-            devLog('🔥 [FIREBASE] Keeping safeStorage session for:', userData.email);
-            if (canRestoreStoredSession(userData)) {
+            const isAdminSession = userData.id === ADMIN_USER_ID || isAdminEmail(userData.email);
+            if (isAdminSession || allowLocalOnly || !firebaseConfigReady) {
+              // Admin: mantém sessão local (Firebase pode estar com token vencido temporariamente)
+              // Local-only: sem Firebase, sessão local é válida
+              devLog('🔥 [FIREBASE] Keeping session for:', userData.email);
               setUser(userData);
-            setIsAuthenticated(true);
-            const userCoupons = resolveUserCoupons(userData);
-            const userOrders = getUserOrders(userData.id, userData.email);
-            setCoupons(userCoupons);
-              setOrders(userOrders);
+              setIsAuthenticated(true);
+              setCoupons(resolveUserCoupons(userData));
+              setOrders(getUserOrders(userData.id, userData.email));
             } else {
+              // Usuário normal: Firebase diz "não logado" → limpar sessão
+              devLog('🔥 [FIREBASE] No Firebase session for regular user — clearing');
               clearCurrentSession();
             }
           } catch (e) {
@@ -1123,6 +1108,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
   const value: UserContextType = {
     user,
     isAuthenticated,
+    authReady,
     // Admin = logou pela sessão de admin (usuário/nome). Cliente = login por e-mail.
     isAdminAccount: user?.id === ADMIN_USER_ID && adminRole > 0,
     isAdmin: user?.id === ADMIN_USER_ID && adminRole > 0,

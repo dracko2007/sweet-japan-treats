@@ -29,7 +29,7 @@ const devError = isDev ? console.error.bind(console) : () => {};
 
 
 const Profile: React.FC = () => {
-  const { user, isAuthenticated, coupons, orders, updateProfile, logout } = useUser();
+  const { user, isAuthenticated, authReady, coupons, orders, updateProfile, logout } = useUser();
   const { t, selectedCountry } = useLanguage();
   const { products } = useProducts();
   const { addToCart, clearCart } = useCart();
@@ -113,12 +113,12 @@ const Profile: React.FC = () => {
 
 
 
-  // Redirect if not authenticated
+  // Redirect if not authenticated (aguarda authReady para evitar flash de login)
   React.useEffect(() => {
-    if (!isAuthenticated) {
+    if (authReady && !isAuthenticated) {
       navigate('/cadastro');
     }
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, authReady, navigate]);
 
   if (!user) {
     return null;
