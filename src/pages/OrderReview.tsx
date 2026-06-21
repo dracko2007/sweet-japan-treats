@@ -153,9 +153,10 @@ const OrderReview: React.FC = () => {
   // Grand Total only includes products + shipping + PS fee (NO TAXES ADDED!)
   const grandTotal = priceAfterPix + finalShippingCost + psFeeDisplay;
 
-  // PIX: IOF 1% + taxa bancária de remessa 4% sobre o total base
+  // PIX: IOF 1% sobre o total + taxa bancária de remessa fixa R$32
+  const PIX_BANK_FEE = 32; // taxa fixa do banco para remessa internacional em BRL
   const pixIofFee = isPix ? Math.round(grandTotal * 0.01) : 0;
-  const pixBankFee = isPix ? Math.round(grandTotal * 0.04) : 0;
+  const pixBankFee = isPix ? PIX_BANK_FEE : 0;
   const pixTotalFees = pixIofFee + pixBankFee;
   const finalGrandTotal = grandTotal + pixTotalFees;
 
@@ -683,17 +684,20 @@ const OrderReview: React.FC = () => {
 
                   {isPix && (
                     <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 space-y-1.5 mt-1">
+                      <p className="text-[10px] text-orange-600 font-semibold mb-1">
+                        Taxas aplicadas por pagamento via PIX (remessa internacional)
+                      </p>
                       <div className="flex justify-between text-xs text-gray-500 border-b border-orange-100 pb-1.5">
                         <span>Subtotal (antes das taxas PIX)</span>
                         <span>{formatPrice(grandTotal, currency)}</span>
                       </div>
                       <div className="flex justify-between text-xs text-orange-700">
-                        <span>+ IOF (1%)</span>
+                        <span>+ IOF (1% sobre o subtotal)</span>
                         <span>+ {formatPrice(pixIofFee, currency)}</span>
                       </div>
                       <div className="flex justify-between text-xs text-orange-700">
-                        <span>+ Taxa bancária de remessa (4%)</span>
-                        <span>+ {formatPrice(pixBankFee, currency)}</span>
+                        <span>+ Taxa bancária de remessa (fixa)</span>
+                        <span>+ R$ 32</span>
                       </div>
                       <div className="flex justify-between text-xs font-bold text-orange-900 bg-orange-100 rounded px-1.5 py-1 mt-0.5">
                         <span>= Total com taxas PIX</span>
@@ -866,7 +870,7 @@ const OrderReview: React.FC = () => {
                             </div>
                             <div className="flex items-center gap-1.5 text-[11px] text-blue-700 bg-blue-50 border border-blue-200 rounded-md px-2 py-1 w-fit">
                               <span>ℹ️</span>
-                              <span>Sujeito a <strong>IOF 1%</strong> + taxa bancária de remessa internacional</span>
+                              <span>Taxas aplicadas <strong>somente nesta opção</strong>: IOF 1% + R$ 32 (banco)</span>
                             </div>
                           </div>
                         </Label>

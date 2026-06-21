@@ -129,8 +129,6 @@ const Checkout: React.FC = () => {
   useEffect(() => {
     if (!activeNegId) return;
     return negotiationService.listenById(activeNegId, (neg) => {
-      if (!neg) return;
-
       const clearNeg = () => {
         setActiveNegId(null);
         setActiveNeg(null);
@@ -138,6 +136,9 @@ const Checkout: React.FC = () => {
         setShippingDiscountYen(0);
         localStorage.removeItem('activeNegId');
       };
+
+      // Documento deletado ou negociação inválida → limpa estado
+      if (!neg) { clearNeg(); return; }
 
       // Negociação já usada, rejeitada, expirada ou fora do prazo de 24h → limpa
       if (
