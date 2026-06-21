@@ -32,7 +32,7 @@ const About: React.FC = () => {
                 </div>
                 <div className="absolute -bottom-5 -left-5 bg-card rounded-2xl shadow-card px-4 py-3 flex items-center gap-2">
                   <MapPin className="w-4 h-4 text-primary shrink-0" />
-                  <span className="text-sm font-semibold text-foreground">Hiroshima, Japão 🇯🇵</span>
+                  <span className="text-sm font-semibold text-foreground">Fukuyama, Hiroshima 🇯🇵</span>
                 </div>
               </div>
             </div>
@@ -101,7 +101,7 @@ const About: React.FC = () => {
               </div>
               <h3 className="font-semibold text-foreground">{t('aboutPage.contact.addressLabel')}</h3>
               <p className="text-sm text-muted-foreground leading-relaxed">
-                Hiroshima Prefecture<br />Japan 🇯🇵
+                〒720 広島県福山市<br />駅家町下山守257-18 🇯🇵
               </p>
             </div>
             <a

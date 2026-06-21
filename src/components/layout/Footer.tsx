@@ -149,7 +149,7 @@ const Footer: React.FC = () => {
               <div className="flex items-start gap-2">
                 <MapPin className="w-4 h-4 mt-0.5 text-primary" />
                 <span className="text-sm text-accent-foreground/80">
-                  Hiroshima Prefecture, Japan
+                  広島県福山市駅家町下山守257-18
                 </span>
               </div>
               <a href={`mailto:${CONTACT_EMAIL}`} className="flex items-start gap-2 group">
