@@ -52,7 +52,7 @@ const CartItemComponent: React.FC<CartItemProps> = ({ item, couponDiscount = 0 }
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-2">
-            <div>
+            <div className="min-w-0 flex-1">
               <span className="inline-block text-[10px] font-bold text-purple-700 bg-purple-100 dark:bg-purple-900 px-2 py-0.5 rounded-full mb-1">🎁 Presente da promoção</span>
               <h3 className="font-display font-semibold text-foreground truncate">{productName}</h3>
               <p className="text-sm text-muted-foreground">{productFlavor}</p>
@@ -84,7 +84,7 @@ const CartItemComponent: React.FC<CartItemProps> = ({ item, couponDiscount = 0 }
       {/* Info */}
       <div className="flex-1 min-w-0">
         <div className="flex items-start justify-between gap-2">
-          <div>
+          <div className="min-w-0 flex-1">
             <h3 className="font-display font-semibold text-foreground truncate">
               {productName}
             </h3>
