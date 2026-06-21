@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Handshake, CheckCircle2, XCircle, Hourglass, ChevronDown, ChevronUp, Package, User, Truck, Clock } from 'lucide-react';
+import { Handshake, CheckCircle2, XCircle, Hourglass, ChevronDown, ChevronUp, Package, User, Truck, Clock, Trash2, AlertTriangle } from 'lucide-react';
 import { negotiationService } from '@/services/negotiationService';
 import { Negotiation, NegotiationStatus } from '@/types/negotiation';
 import { formatPrice } from '@/utils/currency';
@@ -13,6 +13,7 @@ const STATUS_LABELS: Record<NegotiationStatus, string> = {
   approved: 'Aprovado',
   rejected: 'Recusado',
   expired: 'Expirado',
+  used: 'Finalizado',
 };
 
 const STATUS_COLORS: Record<NegotiationStatus, string> = {
@@ -21,6 +22,7 @@ const STATUS_COLORS: Record<NegotiationStatus, string> = {
   approved: 'bg-green-100 text-green-700 border-green-300',
   rejected: 'bg-red-100 text-red-700 border-red-300',
   expired: 'bg-gray-100 text-gray-500 border-gray-300',
+  used: 'bg-blue-100 text-blue-700 border-blue-300',
 };
 
 function fmt(yen: number) {
@@ -55,6 +57,7 @@ const NegotiationRow: React.FC<{ neg: Negotiation }> = ({ neg }) => {
   const [approveInput, setApproveInput] = useState(String(neg.requestedDiscountYen));
   const [adminNote, setAdminNote] = useState('');
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const displayCurrency = (neg.currency || 'BRL') as 'BRL' | 'EUR' | 'JPY';
 
@@ -106,6 +109,19 @@ const NegotiationRow: React.FC<{ neg: Negotiation }> = ({ neg }) => {
     setSaving(false);
   };
 
+  const handleDelete = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!confirm(`Deletar esta negociação de ${neg.userName}?\nEla sumirá do perfil do cliente.`)) return;
+    setDeleting(true);
+    try {
+      await negotiationService.deleteNegotiation(neg.id);
+      toast({ title: '🗑️ Negociação deletada' });
+    } catch {
+      toast({ title: 'Erro ao deletar', variant: 'destructive' });
+      setDeleting(false);
+    }
+  };
+
   return (
     <div className={`rounded-2xl border overflow-hidden ${isPending ? 'border-orange-300 bg-orange-50/30 dark:bg-orange-950/10' : isExpiredNow ? 'border-gray-200 opacity-60' : 'border-border bg-card'}`}>
       {/* Header row */}
@@ -136,6 +152,14 @@ const NegotiationRow: React.FC<{ neg: Negotiation }> = ({ neg }) => {
           </div>
         </div>
         {expanded ? <ChevronUp className="w-4 h-4 text-muted-foreground shrink-0" /> : <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />}
+        <button
+          onClick={handleDelete}
+          disabled={deleting}
+          title="Deletar negociação"
+          className="shrink-0 p-1.5 rounded-lg text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors disabled:opacity-40"
+        >
+          <Trash2 className="w-4 h-4" />
+        </button>
       </button>
 
       {/* Expanded detail */}
@@ -281,10 +305,24 @@ const NegotiationRow: React.FC<{ neg: Negotiation }> = ({ neg }) => {
 const NegotiationManager: React.FC = () => {
   const [negotiations, setNegotiations] = useState<Negotiation[]>([]);
   const [filter, setFilter] = useState<'all' | 'pending' | 'resolved'>('pending');
+  const [deletingAll, setDeletingAll] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
     return negotiationService.listenAll(setNegotiations);
   }, []);
+
+  const handleDeleteAll = async () => {
+    if (!confirm(`⚠️ Apagar TODAS as ${negotiations.length} negociações?\n\nElas sumirão do perfil de todos os clientes.`)) return;
+    setDeletingAll(true);
+    try {
+      await negotiationService.deleteAllNegotiations();
+      toast({ title: `🗑️ ${negotiations.length} negociações deletadas` });
+    } catch {
+      toast({ title: 'Erro ao deletar', variant: 'destructive' });
+    }
+    setDeletingAll(false);
+  };
 
   // Runtime expiry check: treat Firestore-pending-but-past-24h as expired for display
   const withRuntimeStatus = (neg: Negotiation) =>
@@ -300,7 +338,7 @@ const NegotiationManager: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
         <div className="bg-card border border-border rounded-2xl p-4 text-center">
           <p className="text-3xl font-black text-orange-500">{pending.length}</p>
           <p className="text-xs text-muted-foreground font-semibold uppercase mt-1">Aguardando</p>
@@ -308,6 +346,10 @@ const NegotiationManager: React.FC = () => {
         <div className="bg-card border border-border rounded-2xl p-4 text-center">
           <p className="text-3xl font-black text-green-600">{enriched.filter(n => n.status === 'approved' || n.status === 'auto_approved').length}</p>
           <p className="text-xs text-muted-foreground font-semibold uppercase mt-1">Aprovadas</p>
+        </div>
+        <div className="bg-card border border-border rounded-2xl p-4 text-center">
+          <p className="text-3xl font-black text-blue-600">{enriched.filter(n => n.status === 'used').length}</p>
+          <p className="text-xs text-muted-foreground font-semibold uppercase mt-1">Finalizadas</p>
         </div>
         <div className="bg-card border border-border rounded-2xl p-4 text-center">
           <p className="text-3xl font-black text-red-500">{enriched.filter(n => n.status === 'rejected').length}</p>
@@ -318,6 +360,22 @@ const NegotiationManager: React.FC = () => {
           <p className="text-xs text-muted-foreground font-semibold uppercase mt-1">Expiradas</p>
         </div>
       </div>
+
+      {/* Bulk delete */}
+      {enriched.length > 0 && (
+        <div className="flex justify-end">
+          <Button
+            size="sm"
+            variant="outline"
+            className="text-red-600 border-red-200 hover:bg-red-50 dark:hover:bg-red-950/20 gap-1.5"
+            onClick={handleDeleteAll}
+            disabled={deletingAll}
+          >
+            <Trash2 className="w-4 h-4" />
+            {deletingAll ? 'Apagando...' : `Apagar todas (${enriched.length})`}
+          </Button>
+        </div>
+      )}
 
       {/* Filter pills */}
       <div className="flex gap-2 flex-wrap">

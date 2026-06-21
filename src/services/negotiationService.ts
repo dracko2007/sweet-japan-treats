@@ -3,6 +3,8 @@ import {
   doc,
   setDoc,
   updateDoc,
+  deleteDoc,
+  getDocs,
   onSnapshot,
   getDoc,
   query,
@@ -118,5 +120,20 @@ export const negotiationService = {
   isExpired(neg: Negotiation): boolean {
     if (neg.status === 'used' || neg.status === 'rejected' || neg.status === 'expired') return false;
     return neg.status === 'pending' && new Date(neg.expiresAt) < new Date();
+  },
+
+  async deleteNegotiation(id: string): Promise<void> {
+    await deleteDoc(doc(db, COL, id));
+  },
+
+  async deleteAllNegotiations(): Promise<void> {
+    const snap = await getDocs(collection(db, COL));
+    await Promise.all(snap.docs.map(d => deleteDoc(d.ref)));
+  },
+
+  async deleteNegotiationsByEmail(email: string): Promise<void> {
+    const q = query(collection(db, COL), where('userEmail', '==', email));
+    const snap = await getDocs(q);
+    await Promise.all(snap.docs.map(d => deleteDoc(d.ref)));
   },
 };

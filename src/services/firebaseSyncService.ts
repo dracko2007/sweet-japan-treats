@@ -571,5 +571,33 @@ export const firebaseSyncService = {
       devError('❌ [FIREBASE] Migration error:', error);
       return { success: false, error };
     }
-  }
+  },
+
+  // Zera pedidos, pontos e cupons de todos os usuários — mantém contas e produtos.
+  async resetAllUsersData(): Promise<{ success: boolean; users: number; error?: unknown }> {
+    try {
+      ensureFirebaseReady();
+      const snap = await getDocs(collection(db, 'users'));
+      await Promise.all(snap.docs.map((d) =>
+        updateDoc(doc(db, 'users', d.id), { orders: [], points: 0, coupons: [] })
+      ));
+      return { success: true, users: snap.size };
+    } catch (error) {
+      devError('❌ [FIREBASE] resetAllUsersData error:', error);
+      return { success: false, users: 0, error };
+    }
+  },
+
+  // Apaga toda a coleção coupon_usage (histórico de uso de cupons).
+  async deleteAllCouponUsage(): Promise<boolean> {
+    try {
+      ensureFirebaseReady();
+      const snap = await getDocs(collection(db, 'coupon_usage'));
+      await Promise.all(snap.docs.map((d) => deleteDoc(d.ref)));
+      return true;
+    } catch (error) {
+      devError('❌ [FIREBASE] deleteAllCouponUsage error:', error);
+      return false;
+    }
+  },
 };

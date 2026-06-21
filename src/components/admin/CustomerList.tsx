@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Users, ShoppingBag, DollarSign, TrendingUp, Package, Calendar, Mail, Phone, Trash2, AlertTriangle, Gift, X, Sparkles, Megaphone } from 'lucide-react';
+import { Users, ShoppingBag, DollarSign, TrendingUp, Package, Calendar, Mail, Phone, Trash2, AlertTriangle, Gift, X, Sparkles, Megaphone, RefreshCw, Handshake } from 'lucide-react';
 import { affiliateService, AffiliateRequest } from '@/services/affiliateService';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,6 +8,7 @@ import { useToast } from '@/hooks/use-toast';
 import { usePagination } from '@/hooks/usePagination';
 import Pagination from '@/components/Pagination';
 import { firebaseSyncService } from '@/services/firebaseSyncService';
+import { negotiationService } from '@/services/negotiationService';
 import { ensureAdminAuth } from '@/utils/adminAuth';
 import { requireAdminPassword } from '@/utils/adminGuard';
 import { useUser } from '@/context/UserContext';
@@ -269,6 +270,48 @@ const CustomerList: React.FC = () => {
     }
   };
 
+  const handleDeleteCustomerNegotiations = async (email: string, customerName: string) => {
+    if (!permissions.canDelete) return denyDelete();
+    if (!confirm(`Deletar todas as negociações de "${customerName}"?\n\nElas sumirão do perfil do cliente.`)) return;
+    if (!(await requireAdminPassword(`deletar negociações de ${customerName}`))) return;
+    try {
+      await negotiationService.deleteNegotiationsByEmail(email);
+      toast({ title: '🗑️ Negociações deletadas', description: `Negociações de ${customerName} removidas` });
+    } catch {
+      toast({ title: '❌ Erro ao deletar negociações', variant: 'destructive' });
+    }
+  };
+
+  const handleFullSiteReset = async () => {
+    if (!permissions.canFinancial) {
+      toast({ title: 'Sem permissão', description: 'Reset completo requer nível financeiro (Nível 3).', variant: 'destructive' });
+      return;
+    }
+    if (!confirm('⚠️ RESET COMPLETO DO SITE?\n\nIsso vai apagar:\n• Todos os pedidos\n• Todas as negociações\n• Todos os pontos de fidelidade\n• Todos os cupons dos clientes\n• Histórico de uso de cupons\n\n✅ Mantém: contas, produtos, configurações.')) return;
+    if (!confirm('Tem CERTEZA ABSOLUTA? Esta ação é IRREVERSÍVEL!')) return;
+    if (!(await requireAdminPassword('reset completo do site'))) return;
+
+    toast({ title: '⏳ Iniciando reset...', description: 'Aguarde, isso pode levar alguns segundos.' });
+    try {
+      await Promise.all([
+        firebaseSyncService.deleteAllOrdersFromFirestore(),
+        negotiationService.deleteAllNegotiations(),
+        firebaseSyncService.deleteAllCouponUsage(),
+        firebaseSyncService.resetAllUsersData(),
+      ]);
+      // Limpa também o localStorage relevante
+      safeStorage.removeItem('sakura_orders');
+      safeStorage.removeItem('redeem_points');
+      safeStorage.removeItem('sakura_cart');
+      safeStorage.removeItem('activeNegId');
+      toast({ title: '✅ Reset completo realizado!', description: 'Pedidos, negociações, pontos e cupons foram zerados.' });
+      loadCustomers();
+      setSelectedCustomer(null);
+    } catch {
+      toast({ title: '❌ Erro durante o reset', description: 'Alguns dados podem não ter sido apagados.', variant: 'destructive' });
+    }
+  };
+
   // overview pode ser null se Firestore travou — usa objeto vazio para não quebrar a UI
   const ov = overview ?? {
     totalCustomers: customers.length,
@@ -347,6 +390,15 @@ const CustomerList: React.FC = () => {
             >
               <Trash2 className="w-4 h-4 mr-1" />
               Deletar Todos
+            </Button>
+            <Button
+              size="sm"
+              variant="destructive"
+              className="whitespace-nowrap bg-red-800 hover:bg-red-900"
+              onClick={handleFullSiteReset}
+            >
+              <RefreshCw className="w-4 h-4 mr-1" />
+              Reset Completo do Site
             </Button>
           </div>
         </div>
@@ -478,6 +530,15 @@ const CustomerList: React.FC = () => {
                     >
                       <Trash2 className="w-3 h-3 mr-1" />
                       Limpar Histórico
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-xs flex-1 text-blue-600 border-blue-200 hover:bg-blue-50"
+                      onClick={() => handleDeleteCustomerNegotiations(customer.email, customer.name)}
+                    >
+                      <Handshake className="w-3 h-3 mr-1" />
+                      Limpar Negociações
                     </Button>
                     <Button
                       size="sm"
@@ -626,6 +687,14 @@ const CustomerList: React.FC = () => {
                   >
                     <Trash2 className="w-4 h-4 mr-2" />
                     Limpar Histórico de Pedidos
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start text-blue-600 border-blue-200 hover:bg-blue-50"
+                    onClick={() => handleDeleteCustomerNegotiations(selectedCustomer.email, selectedCustomer.name)}
+                  >
+                    <Handshake className="w-4 h-4 mr-2" />
+                    Limpar Negociações
                   </Button>
                   <Button
                     variant="destructive"
