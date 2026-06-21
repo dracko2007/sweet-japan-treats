@@ -17,7 +17,7 @@ import { useLanguage } from '@/context/LanguageContext';
 import { useProducts } from '@/context/ProductsContext';
 import { formatPrice } from '@/utils/currency';
 import { effectiveYen } from '@/utils/pricing';
-import { convertYen as fxConvert } from '@/services/fxService';
+import { convertYen as fxConvert, yenFromConverted } from '@/services/fxService';
 import { negotiationService } from '@/services/negotiationService';
 import { productService } from '@/services/productService';
 import { pointsForSpendYen, POINTS } from '@/services/pointsService';
@@ -159,6 +159,9 @@ const OrderReview: React.FC = () => {
   const pixBankFee = isPix ? PIX_BANK_FEE : 0;
   const pixTotalFees = pixIofFee + pixBankFee;
   const finalGrandTotal = grandTotal + pixTotalFees;
+
+  // Total em ¥ para exibir no badge da Wise (sem taxas PIX)
+  const grandTotalYen = currency === 'JPY' ? grandTotal : yenFromConverted(grandTotal, currency);
 
   const handleApplyCoupon = async () => {
     const code = couponInput.trim().toUpperCase();
@@ -907,9 +910,17 @@ const OrderReview: React.FC = () => {
                               Pague em qualquer moeda com câmbio justo. Mostraremos o link de pagamento Wise na próxima tela.
                             </p>
                             <div className="mt-2 flex flex-col gap-1">
-                              <div className="flex items-center gap-1.5 text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-md px-2 py-1 w-fit">
+                              <div className="flex items-start gap-1.5 text-[11px] text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-md px-2 py-1.5">
+                                <span className="mt-0.5">💱</span>
+                                <span>
+                                  No campo <strong>Valor</strong> do Wise, insira{' '}
+                                  <strong className="text-emerald-900">¥ {grandTotalYen.toLocaleString()}</strong>{' '}
+                                  (ienes). A Wise converte automaticamente para a sua moeda.
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-1.5 text-[11px] text-gray-500 bg-gray-50 border border-gray-200 rounded-md px-2 py-1 w-fit">
                                 <span>ℹ️</span>
-                                <span>Taxa Wise variável (~4% para R$ 3.000) — <strong>sem IOF</strong> nesta modalidade</span>
+                                <span>Taxa Wise variável (~4%) — <strong>sem IOF</strong></span>
                               </div>
                             </div>
                           </Label>
