@@ -99,8 +99,8 @@ const Checkout: React.FC = () => {
   const totalQty = items.reduce((s, i) => i.freeGift ? s : s + i.quantity, 0);
   const psFeeYen = totalQty * 1000;
 
-  // Negociação ativa (persiste via sessionStorage entre refreshes)
-  const [activeNegId, setActiveNegId] = useState<string | null>(() => sessionStorage.getItem('activeNegId'));
+  // Negociação ativa (persiste via localStorage entre sessões e abas)
+  const [activeNegId, setActiveNegId] = useState<string | null>(() => localStorage.getItem('activeNegId'));
   const [activeNeg, setActiveNeg] = useState<Negotiation | null>(null);
   const [psFeeDiscountYen, setPsFeeDiscountYen] = useState(0);
   const [shippingDiscountYen, setShippingDiscountYen] = useState(0);
@@ -119,6 +119,30 @@ const Checkout: React.FC = () => {
       country: selectedCountry
     }));
   }, [selectedCountry]);
+
+  // Auto-restaura a negociação ativa do Firestore quando volta ao checkout sem ID local
+  useEffect(() => {
+    if (!user || activeNegId) return;
+    let unsub: (() => void) | null = null;
+    unsub = negotiationService.listenByUser(user.id || user.email || '', (negs) => {
+      const active = negs.find(n =>
+        (n.status === 'pending' || n.status === 'approved' || n.status === 'auto_approved') &&
+        new Date(n.expiresAt) > new Date()
+      );
+      if (active) {
+        setActiveNegId(active.id);
+        localStorage.setItem('activeNegId', active.id);
+        if (active.status === 'approved' || active.status === 'auto_approved') {
+          if (active.approvedDiscountYen != null) {
+            if (active.type === 'ps_fee') setPsFeeDiscountYen(active.approvedDiscountYen);
+            else setShippingDiscountYen(active.approvedDiscountYen);
+          }
+        }
+      }
+      if (unsub) { unsub(); unsub = null; }
+    });
+    return () => { if (unsub) unsub(); };
+  }, [user?.id, user?.email]);
 
   // Escuta em tempo real a negociação ativa
   useEffect(() => {
@@ -380,7 +404,7 @@ const Checkout: React.FC = () => {
         clientSeen: false,
       });
       setActiveNegId(neg.id);
-      sessionStorage.setItem('activeNegId', neg.id);
+      localStorage.setItem('activeNegId', neg.id);
       setActiveNeg(neg);
       if (autoApprove) {
         if (negModalType === 'ps_fee') setPsFeeDiscountYen(requestedYen);
@@ -882,7 +906,7 @@ const Checkout: React.FC = () => {
                           Negociação expirada sem resposta.
                           <button
                             type="button"
-                            onClick={() => { setActiveNegId(null); setPsFeeDiscountYen(0); setShippingDiscountYen(0); sessionStorage.removeItem('activeNegId'); }}
+                            onClick={() => { setActiveNegId(null); setPsFeeDiscountYen(0); setShippingDiscountYen(0); localStorage.removeItem('activeNegId'); }}
                             className="block mx-auto mt-1 text-primary hover:underline font-semibold"
                           >
                             Limpar e tentar novamente
@@ -893,6 +917,7 @@ const Checkout: React.FC = () => {
                         </Button>
                       </div>
                     ) : (
+
                       <>
                         <Button
                           type="submit"

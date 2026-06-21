@@ -427,6 +427,7 @@ const OrderReview: React.FC = () => {
     // Clear cart upon final purchase order creation
     clearCart();
     safeStorage.removeItem('redeem_points');
+    localStorage.removeItem('activeNegId');
 
     // E-mail automático de confirmação (fire-and-forget — não trava a navegação)
     void emailServiceSimple.sendOrderConfirmation({

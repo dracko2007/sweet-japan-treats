@@ -1069,7 +1069,10 @@ const Profile: React.FC = () => {
                           {isApproved && (
                             <a
                               href="/checkout"
-                              onClick={() => negotiationService.markSeen(neg.id)}
+                              onClick={() => {
+                                negotiationService.markSeen(neg.id);
+                                localStorage.setItem('activeNegId', neg.id);
+                              }}
                               className="shrink-0 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-bold hover:bg-primary/90 transition-colors"
                             >
                               Continuar pedido
