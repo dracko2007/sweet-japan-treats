@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Plus, Pencil, Trash2, X, Image as ImageIcon, Loader2, PackageOpen, Sparkles, GripVertical, Save, Gift, Infinity } from 'lucide-react';
+import { Plus, Pencil, Trash2, X, Image as ImageIcon, Loader2, PackageOpen, Sparkles, GripVertical, Save, Gift, Infinity, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Product, ProductVariant } from '@/types';
@@ -137,11 +137,20 @@ const ProductManager: React.FC = () => {
   const marginPct = 100;
   const [tagInput, setTagInput] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterCat, setFilterCat] = useState<string>('all');
+
+  const filteredProducts = products.filter((p) => {
+    const matchCat = filterCat === 'all' || p.category === filterCat;
+    const q = searchQuery.trim().toLowerCase();
+    const matchSearch = !q || p.name.toLowerCase().includes(q) || (p.description || '').toLowerCase().includes(q);
+    return matchCat && matchSearch;
+  });
 
   const grouped = CATEGORIES.map((c) => ({
     ...c,
-    items: products.filter((p) => p.category === c.id),
-  })).filter((g) => g.items.length > 0 || true);
+    items: filteredProducts.filter((p) => p.category === c.id),
+  })).filter((g) => g.items.length > 0);
 
   const openNew = () => {
     setEditing(emptyForm());
@@ -441,7 +450,68 @@ const ProductManager: React.FC = () => {
         </Button>
       </div>
 
-      {/* Categorias */}
+      {/* Filtros */}
+      <div className="mb-6 space-y-3">
+        {/* Barra de pesquisa */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <input
+            type="text"
+            placeholder="Buscar produto por nome..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-border bg-card text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+          />
+          {searchQuery && (
+            <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+
+        {/* Filtro de categoria */}
+        <div className="flex flex-wrap gap-1.5">
+          <button
+            onClick={() => setFilterCat('all')}
+            className={cn('px-3 py-1.5 rounded-full text-xs font-semibold border transition-all', filterCat === 'all' ? 'bg-primary text-primary-foreground border-primary' : 'bg-card border-border text-muted-foreground hover:border-primary/50')}
+          >
+            Todos ({products.length})
+          </button>
+          {CATEGORIES.map((c) => {
+            const count = products.filter((p) => p.category === c.id).length;
+            if (count === 0) return null;
+            return (
+              <button
+                key={c.id}
+                onClick={() => setFilterCat(filterCat === c.id ? 'all' : c.id)}
+                className={cn('px-3 py-1.5 rounded-full text-xs font-semibold border transition-all', filterCat === c.id ? 'bg-primary text-primary-foreground border-primary' : 'bg-card border-border text-muted-foreground hover:border-primary/50')}
+              >
+                {c.icon} {c.label} ({count})
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Resultado da busca */}
+        {(searchQuery || filterCat !== 'all') && (
+          <p className="text-xs text-muted-foreground">
+            {filteredProducts.length} produto{filteredProducts.length !== 1 ? 's' : ''} encontrado{filteredProducts.length !== 1 ? 's' : ''}
+            {searchQuery && <> para "<strong>{searchQuery}</strong>"</>}
+            {filterCat !== 'all' && <> em <strong>{CATEGORIES.find(c => c.id === filterCat)?.label}</strong></>}
+          </p>
+        )}
+      </div>
+
+      {/* Lista */}
+      {grouped.length === 0 && (
+        <div className="text-center py-16 text-muted-foreground">
+          <Search className="w-10 h-10 mx-auto mb-3 opacity-30" />
+          <p className="font-medium">Nenhum produto encontrado</p>
+          <button onClick={() => { setSearchQuery(''); setFilterCat('all'); }} className="text-xs text-primary hover:underline mt-1">
+            Limpar filtros
+          </button>
+        </div>
+      )}
       <div className="space-y-8">
         {grouped.map((group) => (
           <div key={group.id}>
@@ -449,10 +519,7 @@ const ProductManager: React.FC = () => {
               <span className="text-lg">{group.icon}</span> {group.label}
               <span className="text-xs font-normal">({group.items.length})</span>
             </h3>
-            {group.items.length === 0 ? (
-              <p className="text-sm text-muted-foreground/60 italic pl-7">Nenhum produto nesta categoria ainda.</p>
-            ) : (
-              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {group.items.map((p) => (
                   <div key={p.id} className={`bg-card border rounded-xl overflow-hidden flex shadow-sm ${p.hidden ? 'border-dashed border-gray-300 opacity-70' : 'border-border'}`}>
                     <div className="w-24 h-24 bg-secondary/40 flex-shrink-0 relative">
@@ -500,7 +567,6 @@ const ProductManager: React.FC = () => {
                   </div>
                 ))}
               </div>
-            )}
           </div>
         ))}
       </div>
