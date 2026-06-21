@@ -5,6 +5,9 @@ import {
   updateDoc,
   onSnapshot,
   getDoc,
+  query,
+  where,
+  orderBy,
 } from 'firebase/firestore';
 import { db } from '@/config/firebase';
 import { Negotiation } from '@/types/negotiation';
@@ -35,20 +38,18 @@ export const negotiationService = {
   },
 
   listenAll(cb: (negs: Negotiation[]) => void): () => void {
-    return onSnapshot(collection(db, COL), (snap) => {
-      const negs = snap.docs.map((d) => d.data() as Negotiation);
-      cb(negs.sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
-    });
+    return onSnapshot(
+      query(collection(db, COL), orderBy('createdAt', 'desc')),
+      (snap) => cb(snap.docs.map((d) => d.data() as Negotiation))
+    );
   },
 
+  // userId pode ser o Firebase UID ou o email do usuário
   listenByUser(userId: string, cb: (negs: Negotiation[]) => void): () => void {
-    return onSnapshot(collection(db, COL), (snap) => {
-      const negs = snap.docs
-        .map((d) => d.data() as Negotiation)
-        .filter((n) => n.userId === userId)
-        .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-      cb(negs);
-    });
+    const q = userId.includes('@')
+      ? query(collection(db, COL), where('userEmail', '==', userId), orderBy('createdAt', 'desc'))
+      : query(collection(db, COL), where('userId', '==', userId), orderBy('createdAt', 'desc'));
+    return onSnapshot(q, (snap) => cb(snap.docs.map((d) => d.data() as Negotiation)));
   },
 
   async approve(id: string, approvedDiscountYen: number, adminNote: string, adminEmail: string): Promise<void> {

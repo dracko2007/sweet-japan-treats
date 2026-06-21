@@ -146,15 +146,20 @@ service cloud.firestore {
 
     // ---------- Negociações ----------
     match /negotiations/{negId} {
-      // Criação: usuário autenticado, apenas para o próprio userId
+      // Criação: usuário autenticado + dono da negociação (por UID ou email)
       allow create: if request.auth != null
-        && request.resource.data.userId == request.auth.uid;
-      // Leitura: admin vê tudo; cliente vê as próprias
+        && (request.resource.data.userId == request.auth.uid
+            || request.resource.data.userEmail == request.auth.token.email);
+      // Leitura: admin vê tudo; cliente vê as próprias (por UID ou email)
       allow read: if isAdmin()
-        || (request.auth != null && resource.data.userId == request.auth.uid);
+        || (request.auth != null
+            && (resource.data.userId == request.auth.uid
+                || resource.data.userEmail == request.auth.token.email));
       // Atualização: admin pode tudo; cliente só pode marcar como visto ou expirar
       allow update: if isAdmin()
-        || (request.auth != null && resource.data.userId == request.auth.uid
+        || (request.auth != null
+            && (resource.data.userId == request.auth.uid
+                || resource.data.userEmail == request.auth.token.email)
             && request.resource.data.diff(resource.data).affectedKeys()
                .hasOnly(['clientSeen', 'status', 'resolvedAt', 'clientNotified']));
       allow delete: if isAdmin();

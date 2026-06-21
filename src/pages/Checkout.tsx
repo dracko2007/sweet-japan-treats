@@ -418,7 +418,8 @@ const Checkout: React.FC = () => {
       setNegModalType(null);
       setNegRequest('');
       setNegNote('');
-    } catch {
+    } catch (err) {
+      devError('Erro ao criar negociação:', err);
       toast({ title: 'Erro ao enviar solicitação', variant: 'destructive' });
     }
     setNegSubmitting(false);
