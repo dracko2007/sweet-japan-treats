@@ -870,7 +870,7 @@ const OrderReview: React.FC = () => {
                             </div>
                             <div className="flex items-center gap-1.5 text-[11px] text-blue-700 bg-blue-50 border border-blue-200 rounded-md px-2 py-1 w-fit">
                               <span>ℹ️</span>
-                              <span>Taxas aplicadas <strong>somente nesta opção</strong>: IOF 1% + R$ 32 (banco)</span>
+                              <span>Taxas <strong>só nesta opção</strong>: IOF 1% + R$ 32 banco — <strong>Wise não cobra IOF</strong></span>
                             </div>
                           </div>
                         </Label>
@@ -948,7 +948,7 @@ const OrderReview: React.FC = () => {
             <div className="flex flex-col sm:flex-row gap-4 print:hidden">
               <Button
                 variant="outline"
-                onClick={() => navigate('/checkout', { state: { formData } })}
+                onClick={() => navigate('/checkout', { state: { formData, activeNegId: negotiationId } })}
                 className="flex-1 rounded-xl py-6 text-lg border-2"
               >
                 Voltar e Editar Dados

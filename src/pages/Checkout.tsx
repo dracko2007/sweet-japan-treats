@@ -101,8 +101,9 @@ const Checkout: React.FC = () => {
   const totalQty = items.reduce((s, i) => i.freeGift ? s : s + i.quantity, 0);
   const psFeeYen = totalQty * 1000;
 
-  // Negociação ativa (persiste via localStorage entre sessões e abas)
-  const [activeNegId, setActiveNegId] = useState<string | null>(() => localStorage.getItem('activeNegId'));
+  // Negociação ativa — carregada APENAS via router state (Continuar pedido ou auto-aprovação).
+  // Não usa localStorage no init: assim Ctrl+Shift+R limpa qualquer negociação pendente.
+  const [activeNegId, setActiveNegId] = useState<string | null>(location.state?.activeNegId || null);
   const [activeNeg, setActiveNeg] = useState<Negotiation | null>(null);
   const [psFeeDiscountYen, setPsFeeDiscountYen] = useState(0);
   const [shippingDiscountYen, setShippingDiscountYen] = useState(0);
@@ -422,7 +423,6 @@ const Checkout: React.FC = () => {
         clientSeen: false,
       });
       setActiveNegId(neg.id);
-      localStorage.setItem('activeNegId', neg.id);
       setActiveNeg(neg);
       if (autoApprove) {
         if (negModalType === 'ps_fee') setPsFeeDiscountYen(requestedYen);

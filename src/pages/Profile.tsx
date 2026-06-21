@@ -1091,16 +1091,15 @@ const Profile: React.FC = () => {
                             </p>
                           </div>
                           {isApproved && (
-                            <a
-                              href="/checkout"
+                            <button
                               onClick={() => {
                                 negotiationService.markSeen(neg.id);
-                                localStorage.setItem('activeNegId', neg.id);
+                                navigate('/checkout', { state: { activeNegId: neg.id } });
                               }}
                               className="shrink-0 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-bold hover:bg-primary/90 transition-colors"
                             >
                               Continuar pedido
-                            </a>
+                            </button>
                           )}
                         </div>
                       </div>
