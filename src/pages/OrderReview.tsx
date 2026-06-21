@@ -153,6 +153,12 @@ const OrderReview: React.FC = () => {
   // Grand Total only includes products + shipping + PS fee (NO TAXES ADDED!)
   const grandTotal = priceAfterPix + finalShippingCost + psFeeDisplay;
 
+  // PIX: IOF 1% + taxa bancária de remessa 4% sobre o total base
+  const pixIofFee = isPix ? Math.round(grandTotal * 0.01) : 0;
+  const pixBankFee = isPix ? Math.round(grandTotal * 0.04) : 0;
+  const pixTotalFees = pixIofFee + pixBankFee;
+  const finalGrandTotal = grandTotal + pixTotalFees;
+
   const handleApplyCoupon = async () => {
     const code = couponInput.trim().toUpperCase();
     if (!code) return;
@@ -251,7 +257,10 @@ const OrderReview: React.FC = () => {
       psFeeFinalYen,
       psFee: psFeeDisplay,
       negotiationId: negotiationId || '',
-      total: grandTotal,
+      pixIofFee,
+      pixBankFee,
+      pixTotalFees,
+      total: finalGrandTotal,
       currency,
       paymentMethod,
       status: 'Pendente',
@@ -309,9 +318,9 @@ const OrderReview: React.FC = () => {
       status: 'pending',
       orderDate: orderCreatedAt,
       date: mockOrder.date,
-      totalPrice: grandTotal,
-      total: grandTotal,
-      totalAmount: grandTotal,
+      totalPrice: finalGrandTotal,
+      total: finalGrandTotal,
+      totalAmount: finalGrandTotal,
       currency,
       paymentMethod,
       trackingCode,
@@ -411,7 +420,7 @@ const OrderReview: React.FC = () => {
 
     // Track referral progress (only when purchase is in BRL)
     if (user?.id && currency === 'BRL') {
-      referralService.onPurchaseCompleted(user.id, grandTotal).catch(() => {});
+      referralService.onPurchaseCompleted(user.id, finalGrandTotal).catch(() => {});
     }
 
     // Registra itens promocionais comprados (só agora, após pedido confirmado)
@@ -452,7 +461,7 @@ const OrderReview: React.FC = () => {
         price: it.price,
         size: it.size,
       })),
-      totalPrice: grandTotal,
+      totalPrice: finalGrandTotal,
       orderNumber: orderId,
       paymentMethod,
     });
@@ -672,10 +681,27 @@ const OrderReview: React.FC = () => {
                     </div>
                   )}
 
+                  {isPix && (
+                    <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 space-y-1.5 mt-1">
+                      <div className="flex justify-between text-xs text-orange-700">
+                        <span>IOF (1% sobre o total)</span>
+                        <span>+ {formatPrice(pixIofFee, currency)}</span>
+                      </div>
+                      <div className="flex justify-between text-xs text-orange-700">
+                        <span>Taxa bancária de remessa (4%)</span>
+                        <span>+ {formatPrice(pixBankFee, currency)}</span>
+                      </div>
+                      <div className="flex justify-between text-xs font-bold text-orange-800 border-t border-orange-200 pt-1.5">
+                        <span>Total de taxas PIX</span>
+                        <span>+ {formatPrice(pixTotalFees, currency)}</span>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="flex justify-between pt-3 border-t border-border font-black text-lg">
                     <span>Total Geral</span>
                     <span className="text-2xl text-orange-600">
-                      {formatPrice(grandTotal, currency)}
+                      {formatPrice(finalGrandTotal, currency)}
                     </span>
                   </div>
                 </div>
@@ -924,7 +950,7 @@ const OrderReview: React.FC = () => {
                 className="flex-1 btn-primary rounded-xl py-6 text-lg font-bold"
               >
                 <CheckCircle className="w-5 h-5 mr-2" />
-                Confirmar e Pagar {formatPrice(grandTotal, currency)}
+                Confirmar e Pagar {formatPrice(finalGrandTotal, currency)}
                 <ArrowRight className="w-5 h-5 ml-2" />
               </Button>
             </div>
