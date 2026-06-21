@@ -10,6 +10,7 @@ import { safeStorage } from '@/utils/storage';
 import { formatPrice, getCurrencyByCountry } from '@/utils/currency';
 import { askQwen, qwenEnabled, QwenMsg, AdminCatalogItem } from '@/services/qwenService';
 import { productEnglishName } from '@/utils/productName';
+import { effectiveYen } from '@/utils/pricing';
 import { toast } from 'sonner';
 
 interface ShippingOption {
@@ -464,7 +465,7 @@ const KimiClawAssistant: React.FC = () => {
       );
 
       const responseText = language === 'pt'
-        ? `Feito! Adicionei o **${targetProduct.name}** (Tamanho Pequeno) ao seu carrinho. O preço exibido é de **${formatPrice(targetProduct.prices.small, selectedCountry === 'Japão' ? 'JPY' : 'BRL')}**.`
+        ? `Feito! Adicionei o **${targetProduct.name}** (Tamanho Pequeno) ao seu carrinho. O preço exibido é de **${formatPrice(effectiveYen(targetProduct, 'small'), selectedCountry === 'Japão' ? 'JPY' : 'BRL')}**.`
         : `Success! Added **${targetProduct.name}** (Small Size) to your cart.`;
 
       await addKimiMessageWithTyping(responseText, steps);
@@ -859,7 +860,7 @@ const KimiClawAssistant: React.FC = () => {
                               <p className="text-[11px] font-semibold text-foreground truncate">{productEnglishName(product)}</p>
                               <p className="text-[10px] text-muted-foreground">{product.category}</p>
                               <p className="text-[11px] font-bold text-primary mt-1">
-                                {formatPrice(product.prices.small, getCurrencyByCountry(selectedCountry))}
+                                {formatPrice(effectiveYen(product, 'small'), getCurrencyByCountry(selectedCountry))}
                               </p>
                             </div>
                             <button

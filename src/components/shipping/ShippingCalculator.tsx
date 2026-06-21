@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 import { formatPrice } from '@/utils/currency';
 import { calculateCartShippingBoxes } from '@/utils/shippingDimensions';
 import { getELightRate, getKozutsumiRate, getEmsRate, MAX_WEIGHT_G, MAX_DIM_SUM_CM, type JapanPostZone } from '@/utils/japanPostRates';
+import { effectiveYen } from '@/utils/pricing';
 
 interface ShippingCalculatorProps {
   selectedPrefecture?: string;
@@ -53,9 +54,8 @@ const ShippingCalculator: React.FC<ShippingCalculatorProps> = ({
 
   const displaySubtotal = useMemo(() => {
     return items.reduce((sum, item) => {
-      const basePrice = item.size === 'small' ? item.product.prices.small : item.product.prices.large;
       const cur = isJapan ? 'JPY' : isEurope ? 'EUR' : 'BRL';
-      const unitPrice = fxConvert(basePrice, cur);
+      const unitPrice = fxConvert(effectiveYen(item.product, item.size), cur);
       return sum + unitPrice * item.quantity;
     }, 0);
   }, [items, isJapan, isEurope]);

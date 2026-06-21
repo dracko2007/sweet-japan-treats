@@ -7,7 +7,7 @@ import { useLanguage } from '@/context/LanguageContext';
 import { getTranslatedProductDesc } from '@/data/translations';
 import { i18nDesc } from '@/utils/productI18n';
 import { formatPrice } from '@/utils/currency';
-import { effectiveYen, hasDiscount } from '@/utils/pricing';
+import { effectiveYen, baseYen, hasDiscount } from '@/utils/pricing';
 import { convertYen as fxConvert } from '@/services/fxService';
 import { cn } from '@/lib/utils';
 import { productEnglishName } from '@/utils/productName';
@@ -52,7 +52,7 @@ const FeaturedProducts: React.FC = () => {
           )) : featuredProducts.map((product) => {
             const promo = hasDiscount(product);
             const smallPrice = getDisplayPrice(effectiveYen(product, 'small'));
-            const smallOriginal = getDisplayPrice(product.prices.small);
+            const smallOriginal = getDisplayPrice(baseYen(product, 'small'));
 
             return (
               <Link
