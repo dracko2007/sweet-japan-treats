@@ -4,8 +4,10 @@
 import { safeStorage } from '@/utils/storage';
 
 const BUFFER_YEN = 5;    // margem fixa somada ao ¥ (proteção em itens pequenos)
-const RATE_CUSHION = 0.015; // 1,5% de fallback — taxa de transferência da Wise
-                             // (só aplica quando /api/wise-rate não está disponível)
+// Quando a taxa vem da própria Wise: sem cushion — a taxa já bate com o app.
+// Quando usa fallback (open.er-api, atualização diária): +4% cobre a defasagem.
+const RATE_CUSHION_WISE = 0;
+const RATE_CUSHION_FALLBACK = 0.04;
 const FALLBACK = { BRL: 1 / 28, EUR: 0.16 / 28 };
 const CACHE_KEY = 'fx_rates';
 
@@ -29,19 +31,19 @@ export function yenFromConverted(amount: number, currency: string): number {
   if (currency === 'JPY') return Math.round(amount);
   const baseRate = currency === 'EUR' ? _rates.EUR : _rates.BRL;
   if (!baseRate) return 0;
-  const cushion = _source === 'wise' ? RATE_CUSHION : 0.04;
+  const cushion = _source === 'wise' ? RATE_CUSHION_WISE : RATE_CUSHION_FALLBACK;
   return Math.round(amount / (baseRate * (1 + cushion)));
 }
 
 /** Converte ¥ para a moeda informada.
- *  - Quando a taxa vem da Wise: RATE_CUSHION reduzido (1,5%) — apenas fee de transferência
- *  - Quando a taxa vem de outra fonte: RATE_CUSHION completo para compensar defasagem
+ *  - Taxa da Wise: sem cushion — bate exato com o app da Wise.
+ *  - Fallback (open.er-api): +4% compensa a defasagem diária da taxa.
  *  noBuffer=true omite todas as margens — use para taxas fixas (ex.: taxa PS). */
 export function convertYen(yen: number, currency: string, noBuffer = false): number {
   if (currency === 'JPY') return Math.round(yen);
   if (!yen || yen <= 0) return 0;
   const baseRate = currency === 'EUR' ? _rates.EUR : _rates.BRL;
-  const cushion = _source === 'wise' ? RATE_CUSHION : 0.04;
+  const cushion = _source === 'wise' ? RATE_CUSHION_WISE : RATE_CUSHION_FALLBACK;
   const rate = noBuffer ? baseRate : baseRate * (1 + cushion);
   return Math.round((yen + (noBuffer ? 0 : BUFFER_YEN)) * rate);
 }
