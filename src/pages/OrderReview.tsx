@@ -683,17 +683,21 @@ const OrderReview: React.FC = () => {
 
                   {isPix && (
                     <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 space-y-1.5 mt-1">
+                      <div className="flex justify-between text-xs text-gray-500 border-b border-orange-100 pb-1.5">
+                        <span>Subtotal (antes das taxas PIX)</span>
+                        <span>{formatPrice(grandTotal, currency)}</span>
+                      </div>
                       <div className="flex justify-between text-xs text-orange-700">
-                        <span>IOF (1% sobre o total)</span>
+                        <span>+ IOF (1%)</span>
                         <span>+ {formatPrice(pixIofFee, currency)}</span>
                       </div>
                       <div className="flex justify-between text-xs text-orange-700">
-                        <span>Taxa bancária de remessa (4%)</span>
+                        <span>+ Taxa bancária de remessa (4%)</span>
                         <span>+ {formatPrice(pixBankFee, currency)}</span>
                       </div>
-                      <div className="flex justify-between text-xs font-bold text-orange-800 border-t border-orange-200 pt-1.5">
-                        <span>Total de taxas PIX</span>
-                        <span>+ {formatPrice(pixTotalFees, currency)}</span>
+                      <div className="flex justify-between text-xs font-bold text-orange-900 bg-orange-100 rounded px-1.5 py-1 mt-0.5">
+                        <span>= Total com taxas PIX</span>
+                        <span>{formatPrice(finalGrandTotal, currency)}</span>
                       </div>
                     </div>
                   )}
