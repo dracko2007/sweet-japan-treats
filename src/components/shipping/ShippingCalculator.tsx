@@ -12,7 +12,7 @@ import { effectiveYen } from '@/utils/pricing';
 
 interface ShippingCalculatorProps {
   selectedPrefecture?: string;
-  onShippingSelect?: (shipping: { carrier: string; cost: number; estimatedDays: string } | null) => void;
+  onShippingSelect?: (shipping: { carrier: string; cost: number; costYen: number; estimatedDays: string } | null) => void;
   destinationCountry?: 'Brasil' | 'Japão' | 'Portugal' | 'França' | 'Itália' | 'Espanha';
   couponDiscount?: number;
 }
@@ -117,7 +117,7 @@ const ShippingCalculator: React.FC<ShippingCalculatorProps> = ({
         cost: fxConvert(eLightYen, currency),
         costYen: eLightYen,
         originalCost: undefined,
-        estimatedDays: isEurope ? '7-12' : '10-15',
+        estimatedDays: isEurope ? '7-12' : '30-40',
       });
     } else {
       const salYen = getKozutsumiRate(weightG, jpZone, 'sal');
@@ -152,7 +152,7 @@ const ShippingCalculator: React.FC<ShippingCalculatorProps> = ({
       cost: fxConvert(emsYen, currency),
       costYen: emsYen,
       originalCost: undefined,
-      estimatedDays: isEurope ? '5-8' : '7-12',
+      estimatedDays: isEurope ? '5-8' : '20-25',
     });
 
     // Maritime — always show as "Consultar"
@@ -178,7 +178,7 @@ const ShippingCalculator: React.FC<ShippingCalculatorProps> = ({
     if (onShippingSelect && selectedCarrier && shippingOptions.length > 0) {
       const selected = shippingOptions.find(opt => opt.carrier === selectedCarrier);
       if (selected) {
-        onShippingSelect({ carrier: selected.name, cost: selected.cost, estimatedDays: selected.estimatedDays });
+        onShippingSelect({ carrier: selected.name, cost: selected.cost, costYen: selected.costYen ?? 0, estimatedDays: selected.estimatedDays });
       }
     } else if (onShippingSelect && !selectedCarrier) {
       onShippingSelect(null);

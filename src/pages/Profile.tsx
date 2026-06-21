@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { User, Mail, Phone, MapPin, Calendar, Gift, ShoppingBag, Edit2, LogOut, Package, RotateCcw, Cloud, Truck, Tag, Megaphone, ArrowRight } from 'lucide-react';
+import { User, Mail, Phone, MapPin, Calendar, Gift, ShoppingBag, Edit2, LogOut, Package, RotateCcw, Cloud, Truck, Tag, Megaphone, ArrowRight, Handshake, CheckCircle2, XCircle, Hourglass } from 'lucide-react';
+import { negotiationService } from '@/services/negotiationService';
+import type { Negotiation } from '@/types/negotiation';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -57,6 +59,13 @@ const Profile: React.FC = () => {
   const [isAffiliate, setIsAffiliate] = useState(false);
   const [affRequest, setAffRequest] = useState<AffiliateRequest | null>(null);
   const [requesting, setRequesting] = useState(false);
+
+  // Negociações do usuário
+  const [negotiations, setNegotiations] = useState<Negotiation[]>([]);
+  useEffect(() => {
+    if (!user?.id && !user?.email) return;
+    return negotiationService.listenByUser(user.id || user.email || '', setNegotiations);
+  }, [user?.id, user?.email]);
   useEffect(() => {
     if (user?.email) {
       affiliateService.getByOwnerEmail(user.email).then((list) => setIsAffiliate(list.length > 0));
@@ -1010,6 +1019,66 @@ const Profile: React.FC = () => {
                 </div>
               )}
             </div>
+
+            {/* Negociações */}
+            {negotiations.length > 0 && (
+              <div className="bg-card rounded-2xl border border-border p-6 lg:p-8">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                    <Handshake className="w-5 h-5 text-primary" />
+                  </div>
+                  <h2 className="font-display text-2xl font-semibold text-foreground">Negociações</h2>
+                </div>
+                <div className="space-y-3">
+                  {negotiations.map((neg) => {
+                    const isPending = neg.status === 'pending';
+                    const isApproved = neg.status === 'approved' || neg.status === 'auto_approved';
+                    const isRejected = neg.status === 'rejected';
+                    return (
+                      <div key={neg.id} className={`rounded-xl border p-4 ${isPending ? 'border-orange-200 bg-orange-50/30 dark:bg-orange-950/10' : isApproved ? 'border-green-200 bg-green-50/30 dark:bg-green-950/10' : 'border-red-200 bg-red-50/20 dark:bg-red-950/10'}`}>
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex flex-wrap items-center gap-2 mb-1">
+                              <span className="font-semibold text-sm text-foreground">
+                                {neg.type === 'ps_fee' ? '🤝 Taxa Personal Shopper' : '🚚 Frete'}
+                              </span>
+                              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold border ${isPending ? 'bg-orange-100 text-orange-700 border-orange-300' : isApproved ? 'bg-green-100 text-green-700 border-green-300' : 'bg-red-100 text-red-700 border-red-300'}`}>
+                                {isPending && <><Hourglass className="w-3 h-3" /> Aguardando</>}
+                                {isApproved && <><CheckCircle2 className="w-3 h-3" /> Aprovado</>}
+                                {isRejected && <><XCircle className="w-3 h-3" /> Recusado</>}
+                              </span>
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              Desconto pedido: ¥{neg.requestedDiscountYen.toLocaleString()} em ¥{neg.originalAmountYen.toLocaleString()}
+                            </p>
+                            {isApproved && neg.approvedDiscountYen != null && (
+                              <p className="text-xs text-green-600 font-semibold mt-1">
+                                ✅ Desconto aprovado: ¥{neg.approvedDiscountYen.toLocaleString()} — Valor final: ¥{(neg.originalAmountYen - neg.approvedDiscountYen).toLocaleString()}
+                              </p>
+                            )}
+                            {neg.adminNote && (
+                              <p className="text-xs text-muted-foreground mt-1 italic">"{neg.adminNote}"</p>
+                            )}
+                            <p className="text-[10px] text-muted-foreground mt-1">
+                              {new Date(neg.createdAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}
+                            </p>
+                          </div>
+                          {isApproved && (
+                            <a
+                              href="/checkout"
+                              onClick={() => negotiationService.markSeen(neg.id)}
+                              className="shrink-0 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-bold hover:bg-primary/90 transition-colors"
+                            >
+                              Continuar pedido
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* Logout Button */}
             <div className="flex justify-center pt-6">

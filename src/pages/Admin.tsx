@@ -1,7 +1,7 @@
 import { safeStorage } from '@/utils/storage';
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Package, Printer, ShoppingBag, User, MapPin, Phone, Mail, Calendar, TestTube, Tag, Truck, CheckCircle, XCircle, Trash2, BarChart3, Users, PackagePlus, Video, Megaphone, Clapperboard, Building2, Sparkles, ShieldCheck, Calculator, CloudUpload, FileText } from 'lucide-react';
+import { Package, Printer, ShoppingBag, User, MapPin, Phone, Mail, Calendar, TestTube, Tag, Truck, CheckCircle, XCircle, Trash2, BarChart3, Users, PackagePlus, Video, Megaphone, Clapperboard, Building2, Sparkles, ShieldCheck, Calculator, CloudUpload, FileText, Handshake } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { useUser } from '@/context/UserContext';
@@ -23,6 +23,7 @@ import AdminAccessManager from '@/components/admin/AdminAccessManager';
 import VideoReviewManager from '@/components/admin/VideoReviewManager';
 import ImageMigration from '@/components/admin/ImageMigration';
 import PromotionManager from '@/components/admin/PromotionManager';
+import NegotiationManager from '@/components/admin/NegotiationManager';
 import TrackingModal from '@/components/admin/TrackingModal';
 import AdminCalculator from '@/components/admin/AdminCalculator';
 import CN23Modal from '@/components/admin/CN23Modal';
@@ -31,6 +32,7 @@ import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { orderService } from '@/services/orderService';
 import { customerService } from '@/services/customerService';
 import { requireAdminPassword } from '@/utils/adminGuard';
+import { negotiationService } from '@/services/negotiationService';
 import { usePagination } from '@/hooks/usePagination';
 import Pagination from '@/components/Pagination';
 
@@ -43,7 +45,7 @@ const devError = isDev ? console.error.bind(console) : () => {};
 type AdminTab =
   | 'orders' | 'coupons' | 'dashboard' | 'customers' | 'products'
   | 'home' | 'vlog' | 'affiliates' | 'requests' | 'b2b' | 'admins' | 'videos'
-  | 'calculator' | 'migration' | 'promotion';
+  | 'calculator' | 'migration' | 'promotion' | 'negotiations';
 
 interface AdminTabItem {
   id: AdminTab;
@@ -66,6 +68,7 @@ const Admin: React.FC = () => {
   const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
   const [cn23Order, setCn23Order] = useState<any | null>(null);
   const [promoModalOpen, setPromoModalOpen] = useState(false);
+  const [pendingNegotiationsCount, setPendingNegotiationsCount] = useState(0);
   const { settings, saveSettings } = useSiteSettings();
 
   // Paginação da lista de pedidos (10 por página)
@@ -109,6 +112,12 @@ const Admin: React.FC = () => {
       window.removeEventListener('focus', debouncedRefresh);
     };
   }, [user, navigate]);
+
+  useEffect(() => {
+    return negotiationService.listenAll((negs) => {
+      setPendingNegotiationsCount(negs.filter(n => n.status === 'pending').length);
+    });
+  }, []);
 
   const loadOrders = async () => {
     const orders = await orderService.getAllOrdersAsync();
@@ -430,6 +439,7 @@ _This is an automated test message_
     { title: 'Visão geral', items: [{ id: 'dashboard', label: 'Dashboard', icon: BarChart3 }] },
     { title: 'Vendas', items: [
       { id: 'orders', label: 'Pedidos', icon: Package, badge: pendingOrdersCount },
+      { id: 'negotiations', label: 'Negociações', icon: Handshake, badge: pendingNegotiationsCount || 0 },
       { id: 'customers', label: 'Clientes', icon: Users, badge: newCustomers },
       { id: 'affiliates', label: 'Afiliados', icon: Megaphone },
     ] },
@@ -885,6 +895,8 @@ _This is an automated test message_
               <AdminCalculator />
             ) : activeTab === 'migration' ? (
               <ImageMigration />
+            ) : activeTab === 'negotiations' ? (
+              <NegotiationManager />
             ) : (
               <CustomerList />
             )}

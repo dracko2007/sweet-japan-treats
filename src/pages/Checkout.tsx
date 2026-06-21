@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Package, ArrowRight, MapPin, User, Phone, Mail, Clock, Tag, CreditCard, Sparkles } from 'lucide-react';
+import { Package, ArrowRight, MapPin, User, Phone, Mail, Clock, Tag, CreditCard, Sparkles, Handshake, X, CheckCircle2, AlertCircle, Hourglass } from 'lucide-react';
+import { negotiationService } from '@/services/negotiationService';
+import type { Negotiation } from '@/types/negotiation';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -71,6 +73,7 @@ const Checkout: React.FC = () => {
   const [selectedShipping, setSelectedShipping] = useState<{
     carrier: string;
     cost: number;
+    costYen: number;
     estimatedDays: string;
   } | null>(null);
 
@@ -93,6 +96,22 @@ const Checkout: React.FC = () => {
   // Erros de validação do formulário
   const [errors, setErrors] = useState<FieldErrors>({});
 
+  // PS fee — ¥1000 por unidade comprada
+  const totalQty = items.reduce((s, i) => i.freeGift ? s : s + i.quantity, 0);
+  const psFeeYen = totalQty * 1000;
+
+  // Negociação ativa (persiste via sessionStorage entre refreshes)
+  const [activeNegId, setActiveNegId] = useState<string | null>(() => sessionStorage.getItem('activeNegId'));
+  const [activeNeg, setActiveNeg] = useState<Negotiation | null>(null);
+  const [psFeeDiscountYen, setPsFeeDiscountYen] = useState(0);
+  const [shippingDiscountYen, setShippingDiscountYen] = useState(0);
+
+  // Modal de negociação
+  const [negModalType, setNegModalType] = useState<'ps_fee' | 'shipping' | null>(null);
+  const [negRequest, setNegRequest] = useState('');
+  const [negNote, setNegNote] = useState('');
+  const [negSubmitting, setNegSubmitting] = useState(false);
+
   // When the header language/country changes, mirror it into the form.
   // The reverse sync happens in the SELECT's onChange (calls setSelectedCountry directly).
   useEffect(() => {
@@ -101,6 +120,19 @@ const Checkout: React.FC = () => {
       country: selectedCountry
     }));
   }, [selectedCountry]);
+
+  // Escuta em tempo real a negociação ativa
+  useEffect(() => {
+    if (!activeNegId) return;
+    return negotiationService.listenById(activeNegId, (neg) => {
+      if (!neg) return;
+      setActiveNeg(neg);
+      if ((neg.status === 'approved' || neg.status === 'auto_approved') && neg.approvedDiscountYen != null) {
+        if (neg.type === 'ps_fee') setPsFeeDiscountYen(neg.approvedDiscountYen);
+        else setShippingDiscountYen(neg.approvedDiscountYen);
+      }
+    });
+  }, [activeNegId]);
 
   // Aplica um cupom do perfil (já validado pelo CouponSelector)
   const handleCouponApply = (coupon: Coupon, discount: number) => {
@@ -293,6 +325,69 @@ const Checkout: React.FC = () => {
     }
   };
 
+  const handleNegotiationSubmit = async () => {
+    if (!user || !negModalType) return;
+    const requestedYen = parseInt(negRequest, 10) || 0;
+    if (requestedYen <= 0) {
+      toast({ title: 'Informe o desconto desejado em ienes', variant: 'destructive' });
+      return;
+    }
+    const originalYen = negModalType === 'ps_fee' ? psFeeYen : (selectedShipping?.costYen || 0);
+    if (requestedYen >= originalYen) {
+      toast({ title: 'O desconto não pode ser igual ou maior que o valor total', variant: 'destructive' });
+      return;
+    }
+    setNegSubmitting(true);
+    try {
+      const autoApprove = negModalType === 'ps_fee' && requestedYen <= 300 * totalQty;
+      const neg = await negotiationService.create({
+        userId: user.id || user.email || '',
+        userEmail: user.email || '',
+        userName: user.name || '',
+        cartItems: items.filter(i => !i.freeGift).map(i => ({
+          productId: i.product.id,
+          productName: i.product.name,
+          productImage: i.product.image,
+          size: i.size,
+          variantLabel: i.variantLabel,
+          quantity: i.quantity,
+          priceYen: effectiveYen(i.product, i.size),
+        })),
+        checkoutForm: formData,
+        shipping: selectedShipping || null,
+        deliveryTime,
+        currency,
+        type: negModalType,
+        originalAmountYen: originalYen,
+        numUnits: totalQty,
+        requestedDiscountYen: requestedYen,
+        clientNote: negNote,
+        approvedDiscountYen: autoApprove ? requestedYen : null,
+        adminNote: '',
+        status: autoApprove ? 'auto_approved' : 'pending',
+        autoApproved: autoApprove,
+        clientNotified: autoApprove,
+        clientSeen: false,
+      });
+      setActiveNegId(neg.id);
+      sessionStorage.setItem('activeNegId', neg.id);
+      setActiveNeg(neg);
+      if (autoApprove) {
+        if (negModalType === 'ps_fee') setPsFeeDiscountYen(requestedYen);
+        else setShippingDiscountYen(requestedYen);
+        toast({ title: '✅ Desconto aprovado automaticamente!', description: `Taxa PS reduzida em ¥${requestedYen.toLocaleString()}` });
+      } else {
+        toast({ title: '📩 Solicitação enviada!', description: 'A vendedora irá analisar e responder em breve.' });
+      }
+      setNegModalType(null);
+      setNegRequest('');
+      setNegNote('');
+    } catch {
+      toast({ title: 'Erro ao enviar solicitação', variant: 'destructive' });
+    }
+    setNegSubmitting(false);
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -340,13 +435,24 @@ const Checkout: React.FC = () => {
         shipping: selectedShipping,
         deliveryTime,
         coupon: appliedCoupon,
-        couponDiscount
+        couponDiscount,
+        psFeeYen,
+        psFeeDiscountYen,
+        shippingDiscountYen,
+        negotiationId: activeNegId,
       }
     });
   };
 
   // Apply free shipping override if coupon gives free shipping
-  const actualShippingCost = appliedCoupon?.freeShipping ? 0 : (selectedShipping?.cost || 0);
+  const rawShippingCost = appliedCoupon?.freeShipping ? 0 : (selectedShipping?.cost || 0);
+  const shippingDiscountDisplay = convertYen(shippingDiscountYen);
+  const actualShippingCost = Math.max(0, rawShippingCost - shippingDiscountDisplay);
+
+  // PS fee final (after negotiation discount)
+  const psFeeFinalYen = Math.max(0, psFeeYen - psFeeDiscountYen);
+  const psFeeDisplay = convertYen(psFeeFinalYen);
+  const psFeeOriginalDisplay = convertYen(psFeeYen);
 
   const subtotalWithCoupon = baseTotalPrice - couponDiscount;
   
@@ -364,10 +470,98 @@ const Checkout: React.FC = () => {
   }
     
   // Taxes are completely omitted from checkout final price!
-  const grandTotal = subtotalWithCoupon - pointsDiscount + actualShippingCost;
+  const grandTotal = subtotalWithCoupon - pointsDiscount + actualShippingCost + psFeeDisplay;
+
+  const negIsPending = activeNeg?.status === 'pending';
+  const negIsApproved = activeNeg?.status === 'approved' || activeNeg?.status === 'auto_approved';
+  const negIsRejected = activeNeg?.status === 'rejected';
 
   return (
     <Layout>
+      {/* Modal de negociação */}
+      {negModalType && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-card rounded-2xl border border-border p-6 w-full max-w-md shadow-2xl">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Handshake className="w-5 h-5 text-primary" />
+                <h3 className="font-display font-bold text-lg text-foreground">
+                  {negModalType === 'ps_fee' ? 'Negociar Taxa Personal Shopper' : 'Negociar Frete'}
+                </h3>
+              </div>
+              <button onClick={() => { setNegModalType(null); setNegRequest(''); setNegNote(''); }} className="text-muted-foreground hover:text-foreground">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="bg-secondary/40 rounded-xl p-4 mb-4 text-sm space-y-1">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">
+                  {negModalType === 'ps_fee' ? `Taxa PS (${totalQty} itens × ¥1.000)` : 'Frete selecionado'}
+                </span>
+                <span className="font-semibold">
+                  ¥{(negModalType === 'ps_fee' ? psFeeYen : (selectedShipping?.costYen || 0)).toLocaleString()}
+                </span>
+              </div>
+              {negModalType === 'ps_fee' && (
+                <p className="text-xs text-primary font-medium">
+                  Desconto até ¥{(300 * totalQty).toLocaleString()} é aprovado automaticamente.
+                </p>
+              )}
+              {negModalType === 'shipping' && (
+                <p className="text-xs text-orange-500 font-medium">
+                  Desconto no frete requer aprovação manual da vendedora.
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-semibold text-foreground mb-1">
+                  Desconto solicitado (em ienes ¥)
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  value={negRequest}
+                  onChange={e => setNegRequest(e.target.value)}
+                  placeholder="Ex: 500"
+                  className="w-full px-3 py-2.5 rounded-lg border border-border bg-background text-foreground focus:ring-2 focus:ring-primary focus:border-primary text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-foreground mb-1">
+                  Mensagem (opcional)
+                </label>
+                <textarea
+                  rows={2}
+                  value={negNote}
+                  onChange={e => setNegNote(e.target.value)}
+                  placeholder="Ex: Compra recorrente, posso fechar logo..."
+                  className="w-full px-3 py-2.5 rounded-lg border border-border bg-background text-foreground focus:ring-2 focus:ring-primary focus:border-primary text-sm resize-none"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-5">
+              <button
+                onClick={() => { setNegModalType(null); setNegRequest(''); setNegNote(''); }}
+                className="flex-1 py-2.5 rounded-xl border border-border text-sm font-semibold text-muted-foreground hover:bg-secondary/60 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleNegotiationSubmit}
+                disabled={negSubmitting || !negRequest}
+                className="flex-1 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-bold hover:bg-primary/90 transition-colors disabled:opacity-50"
+              >
+                {negSubmitting ? 'Enviando...' : 'Enviar Proposta'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="gradient-hero py-16">
         <div className="container mx-auto px-4">
           <div className="text-center">
@@ -679,18 +873,35 @@ const Checkout: React.FC = () => {
                   )}
 
                   <div className="pt-4 border-t border-border">
-                    <Button 
-                      type="submit" 
-                      className="w-full btn-primary rounded-xl py-6 text-lg font-bold"
-                      disabled={!selectedShipping}
-                    >
-                      Ir para a Revisão do Pedido
-                      <ArrowRight className="w-5 h-5 ml-2" />
-                    </Button>
-                    {!selectedShipping && (
-                      <p className="text-xs text-muted-foreground text-center mt-2">
-                        Selecione uma forma de entrega para continuar
-                      </p>
+                    {negIsPending ? (
+                      <div className="w-full rounded-xl border-2 border-dashed border-orange-300 bg-orange-50 dark:bg-orange-950/20 p-4 text-center space-y-1">
+                        <div className="flex items-center justify-center gap-2 text-orange-600 font-bold">
+                          <Hourglass className="w-4 h-4 animate-pulse" />
+                          Aguardando resposta da vendedora
+                        </div>
+                        <p className="text-xs text-orange-500">
+                          Você receberá uma notificação quando a proposta for avaliada.
+                        </p>
+                        <p className="text-[10px] text-muted-foreground">
+                          Acompanhe em Perfil → Negociações
+                        </p>
+                      </div>
+                    ) : (
+                      <>
+                        <Button
+                          type="submit"
+                          className="w-full btn-primary rounded-xl py-6 text-lg font-bold"
+                          disabled={!selectedShipping}
+                        >
+                          Ir para a Revisão do Pedido
+                          <ArrowRight className="w-5 h-5 ml-2" />
+                        </Button>
+                        {!selectedShipping && (
+                          <p className="text-xs text-muted-foreground text-center mt-2">
+                            Selecione uma forma de entrega para continuar
+                          </p>
+                        )}
+                      </>
                     )}
                   </div>
                 </form>
@@ -840,20 +1051,85 @@ const Checkout: React.FC = () => {
                       </div>
                     )}
 
+                    {/* Taxa Personal Shopper */}
+                    {totalQty > 0 && (
+                      <div className="pt-2 border-t border-border/60">
+                        <div className="flex justify-between items-center">
+                          <span className="text-muted-foreground">Taxa Personal Shopper</span>
+                          <div className="text-right">
+                            {psFeeDiscountYen > 0 ? (
+                              <>
+                                <span className="text-[10px] text-muted-foreground line-through mr-1">{formatPrice(psFeeOriginalDisplay, currency)}</span>
+                                <span className="font-semibold text-green-600">{formatPrice(psFeeDisplay, currency)}</span>
+                              </>
+                            ) : (
+                              <span className="font-semibold">{formatPrice(psFeeDisplay, currency)}</span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between mt-1">
+                          <span className="text-[10px] text-muted-foreground">{totalQty}x ¥1.000 • serviço de compra</span>
+                          {!activeNeg && (
+                            <button
+                              type="button"
+                              onClick={() => setNegModalType('ps_fee')}
+                              className="flex items-center gap-1 text-[10px] font-semibold text-primary hover:underline"
+                            >
+                              <Handshake className="w-3 h-3" /> Negociar
+                            </button>
+                          )}
+                          {negIsApproved && activeNeg?.type === 'ps_fee' && (
+                            <span className="text-[10px] text-green-600 font-bold flex items-center gap-0.5">
+                              <CheckCircle2 className="w-3 h-3" /> Aprovado
+                            </span>
+                          )}
+                          {negIsPending && activeNeg?.type === 'ps_fee' && (
+                            <span className="text-[10px] text-orange-500 font-bold flex items-center gap-0.5">
+                              <Hourglass className="w-3 h-3" /> Aguardando
+                            </span>
+                          )}
+                          {negIsRejected && activeNeg?.type === 'ps_fee' && (
+                            <span className="text-[10px] text-red-500 font-bold flex items-center gap-0.5">
+                              <AlertCircle className="w-3 h-3" /> Recusado
+                            </span>
+                          )}
+                        </div>
+                        {/* Negociar frete (aparece só depois de selecionar frete e sem negociação ativa) */}
+                        {selectedShipping && !activeNeg && (
+                          <div className="flex items-center justify-between mt-2 pt-1 border-t border-border/40">
+                            <span className="text-[10px] text-muted-foreground">Negociar frete</span>
+                            <button
+                              type="button"
+                              onClick={() => setNegModalType('shipping')}
+                              className="flex items-center gap-1 text-[10px] font-semibold text-primary hover:underline"
+                            >
+                              <Handshake className="w-3 h-3" /> Negociar
+                            </button>
+                          </div>
+                        )}
+                        {selectedShipping && shippingDiscountYen > 0 && (
+                          <div className="flex items-center justify-between mt-1 text-[10px] text-green-600 font-bold">
+                            <span>Desconto frete</span>
+                            <span>-{formatPrice(shippingDiscountDisplay, currency)}</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
                     <div className="flex justify-between pt-2 border-t border-border font-bold items-start">
                       <span className="text-sm">Total a pagar</span>
                       <div className="text-right">
-                        {(couponDiscount > 0 || pointsDiscount > 0) && (
+                        {(couponDiscount > 0 || pointsDiscount > 0 || psFeeDiscountYen > 0 || shippingDiscountYen > 0) && (
                           <p className="text-xs text-muted-foreground line-through font-normal">
-                            {formatPrice(baseTotalPrice + actualShippingCost, currency)}
+                            {formatPrice(baseTotalPrice + rawShippingCost + psFeeOriginalDisplay, currency)}
                           </p>
                         )}
                         <span className="text-base text-orange-600">
                           {formatPrice(grandTotal, currency)}
                         </span>
-                        {(couponDiscount + pointsDiscount) > 0 && (
+                        {(couponDiscount + pointsDiscount + convertYen(psFeeDiscountYen) + shippingDiscountDisplay) > 0 && (
                           <p className="text-[10px] text-green-600 font-bold mt-0.5">
-                            Você economiza {formatPrice(couponDiscount + pointsDiscount, currency)}
+                            Você economiza {formatPrice(couponDiscount + pointsDiscount + convertYen(psFeeDiscountYen) + shippingDiscountDisplay, currency)}
                           </p>
                         )}
                       </div>

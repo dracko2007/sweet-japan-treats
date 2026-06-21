@@ -52,6 +52,10 @@ const OrderReview: React.FC = () => {
   const shipping = location.state?.shipping;
   const [couponDiscount, setCouponDiscount] = useState<number>(location.state?.couponDiscount || 0);
   const [appliedCoupon, setAppliedCoupon] = useState<any>(location.state?.coupon || null);
+  const psFeeYen: number = location.state?.psFeeYen || 0;
+  const psFeeDiscountYen: number = location.state?.psFeeDiscountYen || 0;
+  const shippingDiscountYen: number = location.state?.shippingDiscountYen || 0;
+  const negotiationId: string | null = location.state?.negotiationId || null;
   const [couponInput, setCouponInput] = useState('');
   const [couponError, setCouponError] = useState('');
   const [couponLoading, setCouponLoading] = useState(false);
@@ -139,9 +143,13 @@ const OrderReview: React.FC = () => {
   
   const taxAmount = estimatedTax; // Saved in mockOrder for administrative visibility
   
-  const finalShippingCost = appliedCoupon?.freeShipping ? 0 : shipping.cost;
-  // Grand Total only includes products + shipping (NO TAXES ADDED!)
-  const grandTotal = priceAfterPix + finalShippingCost;
+  const rawShippingCost = appliedCoupon?.freeShipping ? 0 : shipping.cost;
+  const shippingDiscountDisplay = convertYen(shippingDiscountYen);
+  const finalShippingCost = Math.max(0, rawShippingCost - shippingDiscountDisplay);
+  const psFeeFinalYen = Math.max(0, psFeeYen - psFeeDiscountYen);
+  const psFeeDisplay = convertYen(psFeeFinalYen);
+  // Grand Total only includes products + shipping + PS fee (NO TAXES ADDED!)
+  const grandTotal = priceAfterPix + finalShippingCost + psFeeDisplay;
 
   const handleApplyCoupon = async () => {
     const code = couponInput.trim().toUpperCase();
@@ -236,6 +244,11 @@ const OrderReview: React.FC = () => {
       federalTax,
       icmsTax,
       taxAmount,
+      psFeeYen,
+      psFeeDiscountYen,
+      psFeeFinalYen,
+      psFee: psFeeDisplay,
+      negotiationId: negotiationId || '',
       total: grandTotal,
       currency,
       paymentMethod,
@@ -636,6 +649,18 @@ const OrderReview: React.FC = () => {
                   <div className="text-[10px] text-gray-400 text-right">
                     {isJapan ? 'Envio doméstico seguro de Hiroshima Prefecture.' : `Voo internacional Tóquio para ${formData.country}.`} Entrega estimada: {shipping.estimatedDays} dias úteis
                   </div>
+
+                  {psFeeYen > 0 && (
+                    <div className="flex justify-between text-muted-foreground">
+                      <span>Taxa Personal Shopper</span>
+                      <div className="text-right">
+                        {psFeeDiscountYen > 0 && (
+                          <span className="text-xs line-through text-muted-foreground mr-1">{formatPrice(convertYen(psFeeYen), currency)}</span>
+                        )}
+                        <span className={psFeeDiscountYen > 0 ? 'text-green-600 font-semibold' : ''}>{formatPrice(psFeeDisplay, currency)}</span>
+                      </div>
+                    </div>
+                  )}
 
                   <div className="flex justify-between pt-3 border-t border-border font-black text-lg">
                     <span>Total Geral</span>
