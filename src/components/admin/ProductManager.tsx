@@ -3,7 +3,7 @@ import { Plus, Pencil, Trash2, X, Image as ImageIcon, Loader2, PackageOpen, Spar
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Product, ProductVariant } from '@/types';
-import { getVariants } from '@/utils/pricing';
+import { getVariants, roundYen } from '@/utils/pricing';
 import { useLanguage } from '@/context/LanguageContext';
 
 const VARIANT_PRESETS = ['Pequeno', 'Médio', 'Grande', 'Kit'];
@@ -386,10 +386,10 @@ const ProductManager: React.FC = () => {
 
       const cleanVariants: ProductVariant[] = (editing.variants || [])
         .filter((v) => v.label.trim() && Number(v.price) > 0)
-        .map((v) => ({ id: v.id, label: v.label.trim(), price: Number(v.price) }));
+        .map((v) => ({ id: v.id, label: v.label.trim(), price: roundYen(Number(v.price)) }));
       const priceVals = cleanVariants.map((v) => v.price);
-      const small = priceVals.length ? Math.min(...priceVals) : Number(editing.prices?.small) || 0;
-      const large = priceVals.length ? Math.max(...priceVals) : Number(editing.prices?.large) || small;
+      const small = roundYen(priceVals.length ? Math.min(...priceVals) : Number(editing.prices?.small) || 0);
+      const large = roundYen(priceVals.length ? Math.max(...priceVals) : Number(editing.prices?.large) || small);
       const packageDimensionsCm = sanitizePackageDimensions(editing.packageDimensionsCm);
 
       const product: Product = {

@@ -11,6 +11,7 @@ import { formatPrice, getCurrencyByCountry } from '@/utils/currency';
 import { askQwen, qwenEnabled, QwenMsg, AdminCatalogItem } from '@/services/qwenService';
 import { productEnglishName } from '@/utils/productName';
 import { effectiveYen } from '@/utils/pricing';
+import { orderService } from '@/services/orderService';
 import { toast } from 'sonner';
 
 interface ShippingOption {
@@ -529,7 +530,40 @@ const KimiClawAssistant: React.FC = () => {
       return;
     }
 
-    // 7A. ADMIN: frete de produto específico pelo catálogo (com peso real/estimado)
+    // 7A. ADMIN: queries financeiras/dashboard → dados reais do orderService
+    if (isAdmin && (
+      query.includes('faturamento') || query.includes('faturou') || query.includes('faturei') ||
+      query.includes('receita') || query.includes('vendas') || query.includes('vendeu') ||
+      query.includes('pedidos este mes') || query.includes('pedidos do mes') ||
+      query.includes('dashboard') || query.includes('estatística') || query.includes('estatistica') ||
+      query.includes('métricas') || query.includes('metricas') || query.includes('relatório') || query.includes('relatorio') ||
+      (query.includes('pedidos') && (query.includes('quantos') || query.includes('total') || query.includes('mes')))
+    )) {
+      const stats = orderService.getStatistics();
+      const monthName = new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+      const fmt = (v: number) => `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      const pct = stats.revenueLastMonth > 0
+        ? ((stats.revenueThisMonth - stats.revenueLastMonth) / stats.revenueLastMonth * 100).toFixed(1)
+        : null;
+      const trend = pct !== null ? (Number(pct) >= 0 ? `📈 +${pct}%` : `📉 ${pct}%`) + ' vs mês passado' : '';
+
+      const response =
+        `📊 **Dashboard — ${monthName}**\n\n` +
+        `**Este mês:** ${stats.ordersThisMonth} pedido${stats.ordersThisMonth !== 1 ? 's' : ''} · ${fmt(stats.revenueThisMonth)} ${trend}\n` +
+        `**Mês passado:** ${stats.ordersLastMonth} pedido${stats.ordersLastMonth !== 1 ? 's' : ''} · ${fmt(stats.revenueLastMonth)}\n` +
+        `**Total histórico:** ${stats.totalOrders} pedidos · ${fmt(stats.totalRevenue)}\n\n` +
+        `**Status dos pedidos:**\n` +
+        `• ⏳ Pendentes: ${stats.pendingOrders}\n` +
+        `• 🚚 Enviados: ${stats.shippedOrders}\n` +
+        `• ✅ Entregues: ${stats.deliveredOrders}\n` +
+        (stats.cancelledOrders > 0 ? `• ❌ Cancelados: ${stats.cancelledOrders}\n` : '') +
+        `\nAcesse o painel **/admin** para detalhes completos de cada pedido.`;
+
+      await addKimiMessageWithTyping(response, ['📊 Consultando pedidos...']);
+      return;
+    }
+
+    // 7B. ADMIN: frete de produto específico pelo catálogo (com peso real/estimado)
     if (isAdmin && (query.includes('frete') || query.includes('shipping') || query.includes('envio'))) {
       const productMatch = searchProducts(query, { requireStrong: true });
       if (productMatch.length > 0) {
@@ -642,8 +676,23 @@ const KimiClawAssistant: React.FC = () => {
     // 9. GENERAL RESPONSE
     let responseText = '';
     if (query.includes('oi') || query.includes('ola') || query.includes('hello')) {
-      responseText = 'Olá! Sou o KimiClaw AI. Posso buscar produtos, adicionar itens ao carrinho, mudar o idioma, calcular o frete ou inscrever você em novidades. O que deseja?';
+      if (isAdmin) {
+        responseText = '👋 Olá, Admin! Aqui estão seus dados de negócio. Pergunte sobre **faturamento**, **pedidos**, **margem/custo** de produtos ou **frete**. Para o painel completo acesse **/admin**.';
+      } else {
+        responseText = 'Olá! Sou o KimiClaw AI. Posso buscar produtos, adicionar itens ao carrinho, mudar o idioma, calcular o frete ou inscrever você em novidades. O que deseja?';
+      }
       await addKimiMessageWithTyping(responseText);
+      return;
+    }
+
+    // 9.3 USUÁRIO: deflexão para perguntas financeiras/administrativas
+    if (!isAdmin && (
+      query.includes('faturamento') || query.includes('receita') || query.includes('lucro') ||
+      query.includes('dashboard') || query.includes('estatística') || query.includes('estatistica') ||
+      query.includes('métricas') || query.includes('metricas') || query.includes('relatório') ||
+      query.includes('vendas da loja') || query.includes('pedidos da loja')
+    )) {
+      await addKimiMessageWithTyping('Sou a assistente de compras! Posso ajudar com **produtos**, **preços** e **frete** 🛍️\n\nTente: "buscar anessa", "calcular frete" ou "quanto custa o biore".');
       return;
     }
 
@@ -792,7 +841,7 @@ const KimiClawAssistant: React.FC = () => {
                 </h3>
                 <p className="text-[11px] text-muted-foreground">
                   {isAdmin
-                    ? (language === 'pt' ? 'Modo Admin — catálogo completo + frete real' : 'Admin Mode — full catalog + real shipping')
+                    ? (language === 'pt' ? 'Modo Admin — dashboard · pedidos · catálogo' : 'Admin Mode — dashboard · orders · catalog')
                     : t('kimiclaw.subtitle')}
                 </p>
               </div>
@@ -958,6 +1007,12 @@ const KimiClawAssistant: React.FC = () => {
                 </button>
                 {isAdmin ? (
                   <>
+                    <button
+                      onClick={() => handleSuggestionClick('Qual o faturamento desse mês?', 'faturamento')}
+                      className="text-[11px] bg-green-500/10 hover:bg-green-500/20 border border-green-500/30 rounded-full px-2.5 py-1 text-green-700 dark:text-green-400 font-bold flex items-center gap-1 transition-all duration-200"
+                    >
+                      📊 {language === 'pt' ? 'Faturamento' : 'Revenue'}
+                    </button>
                     <button
                       onClick={() => handleSuggestionClick('Calcular frete do biore para Brasil', 'frete biore brasil')}
                       className="text-[11px] bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 rounded-full px-2.5 py-1 text-amber-700 dark:text-amber-400 font-bold flex items-center gap-1 transition-all duration-200"
