@@ -23,6 +23,16 @@ export const FX_BUFFER_YEN = BUFFER_YEN;
 export const getRates = () => _rates;
 export const getRateSource = () => _source;
 
+/** Converte BRL/EUR de volta para ¥, desfazendo o mesmo cushion aplicado em convertYen.
+ *  Usado pelo formatPrice para exibir o ¥ real do produto, não o valor inflado. */
+export function yenFromConverted(amount: number, currency: string): number {
+  if (currency === 'JPY') return Math.round(amount);
+  const baseRate = currency === 'EUR' ? _rates.EUR : _rates.BRL;
+  if (!baseRate) return 0;
+  const cushion = _source === 'wise' ? RATE_CUSHION : 0.04;
+  return Math.round(amount / (baseRate * (1 + cushion)));
+}
+
 /** Converte ¥ para a moeda informada.
  *  - Quando a taxa vem da Wise: RATE_CUSHION reduzido (1,5%) — apenas fee de transferência
  *  - Quando a taxa vem de outra fonte: RATE_CUSHION completo para compensar defasagem
