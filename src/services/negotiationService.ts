@@ -40,16 +40,20 @@ export const negotiationService = {
   listenAll(cb: (negs: Negotiation[]) => void): () => void {
     return onSnapshot(
       query(collection(db, COL), orderBy('createdAt', 'desc')),
-      (snap) => cb(snap.docs.map((d) => d.data() as Negotiation))
+      (snap) => cb(snap.docs.map((d) => d.data() as Negotiation)),
+      (err) => console.error('[negotiations] listenAll error:', err)
     );
   },
 
   // userId pode ser o Firebase UID ou o email do usuário
   listenByUser(userId: string, cb: (negs: Negotiation[]) => void): () => void {
-    const q = userId.includes('@')
-      ? query(collection(db, COL), where('userEmail', '==', userId), orderBy('createdAt', 'desc'))
-      : query(collection(db, COL), where('userId', '==', userId), orderBy('createdAt', 'desc'));
-    return onSnapshot(q, (snap) => cb(snap.docs.map((d) => d.data() as Negotiation)));
+    const field = userId.includes('@') ? 'userEmail' : 'userId';
+    const q = query(collection(db, COL), where(field, '==', userId), orderBy('createdAt', 'desc'));
+    return onSnapshot(
+      q,
+      (snap) => cb(snap.docs.map((d) => d.data() as Negotiation)),
+      (err) => console.error('[negotiations] listenByUser error:', err)
+    );
   },
 
   async approve(id: string, approvedDiscountYen: number, adminNote: string, adminEmail: string): Promise<void> {
