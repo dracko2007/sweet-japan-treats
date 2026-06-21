@@ -122,29 +122,8 @@ const Checkout: React.FC = () => {
     }));
   }, [selectedCountry]);
 
-  // Auto-restaura a negociação ativa do Firestore quando volta ao checkout sem ID local
-  useEffect(() => {
-    if (!user || activeNegId) return;
-    let unsub: (() => void) | null = null;
-    unsub = negotiationService.listenByUser(user.id || user.email || '', (negs) => {
-      const active = negs.find(n =>
-        (n.status === 'pending' || n.status === 'approved' || n.status === 'auto_approved') &&
-        new Date(n.expiresAt) > new Date()
-      );
-      if (active) {
-        setActiveNegId(active.id);
-        localStorage.setItem('activeNegId', active.id);
-        if (active.status === 'approved' || active.status === 'auto_approved') {
-          if (active.approvedDiscountYen != null) {
-            if (active.type === 'ps_fee') setPsFeeDiscountYen(active.approvedDiscountYen);
-            else setShippingDiscountYen(active.approvedDiscountYen);
-          }
-        }
-      }
-      if (unsub) { unsub(); unsub = null; }
-    });
-    return () => { if (unsub) unsub(); };
-  }, [user?.id, user?.email]);
+  // Negociação ativa só é restaurada via localStorage (definido pelo botão "Continuar pedido"
+  // no perfil). Não buscamos no Firestore para evitar aplicar descontos de pedidos anteriores.
 
   // Escuta em tempo real a negociação ativa
   useEffect(() => {
