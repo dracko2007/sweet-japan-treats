@@ -23,12 +23,13 @@ export const FX_BUFFER_YEN = BUFFER_YEN;
 export const getRates = () => _rates;
 
 /** Converte ¥ para a moeda informada, com cotação do dia + margem de +5¥.
- *  JPY permanece em ienes (sem conversão nem margem). */
-export function convertYen(yen: number, currency: string): number {
+ *  JPY permanece em ienes (sem conversão nem margem).
+ *  noBuffer=true omite a margem — use para taxas fixas (ex.: taxa PS). */
+export function convertYen(yen: number, currency: string, noBuffer = false): number {
   if (currency === 'JPY') return Math.round(yen);
   if (!yen || yen <= 0) return 0;
   const rate = currency === 'EUR' ? _rates.EUR : _rates.BRL;
-  return Math.round((yen + BUFFER_YEN) * rate);
+  return Math.round((yen + (noBuffer ? 0 : BUFFER_YEN)) * rate);
 }
 
 /** Busca a cotação do dia (¥→BRL/EUR) e cacheia por dia. Retorna as taxas. */

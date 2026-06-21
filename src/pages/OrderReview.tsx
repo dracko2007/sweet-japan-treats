@@ -98,6 +98,7 @@ const OrderReview: React.FC = () => {
   const currency = isJapan ? 'JPY' : (isEurope ? 'EUR' : 'BRL');
 
   const convertYen = (yen: number) => fxConvert(yen, currency);
+  const convertYenExact = (yen: number) => fxConvert(yen, currency, true);
 
   // Subtotal dos produtos em ¥ (já com desconto promocional, sem frete) — base dos pontos
   const productSubtotalYen = items.reduce(
@@ -147,7 +148,7 @@ const OrderReview: React.FC = () => {
   const shippingDiscountDisplay = convertYen(shippingDiscountYen);
   const finalShippingCost = Math.max(0, rawShippingCost - shippingDiscountDisplay);
   const psFeeFinalYen = Math.max(0, psFeeYen - psFeeDiscountYen);
-  const psFeeDisplay = convertYen(psFeeFinalYen);
+  const psFeeDisplay = convertYenExact(psFeeFinalYen);
   // Grand Total only includes products + shipping + PS fee (NO TAXES ADDED!)
   const grandTotal = priceAfterPix + finalShippingCost + psFeeDisplay;
 
@@ -656,9 +657,13 @@ const OrderReview: React.FC = () => {
                       <span>Taxa Personal Shopper</span>
                       <div className="text-right">
                         {psFeeDiscountYen > 0 && (
-                          <span className="text-xs line-through text-muted-foreground mr-1">{formatPrice(convertYen(psFeeYen), currency)}</span>
+                          <span className="text-xs line-through text-muted-foreground mr-1">
+                            {currency === 'JPY' ? `¥ ${psFeeYen.toLocaleString()}` : `${formatPrice(convertYenExact(psFeeYen), currency, true)} (¥ ${psFeeYen.toLocaleString()})`}
+                          </span>
                         )}
-                        <span className={psFeeDiscountYen > 0 ? 'text-green-600 font-semibold' : ''}>{formatPrice(psFeeDisplay, currency)}</span>
+                        <span className={psFeeDiscountYen > 0 ? 'text-green-600 font-semibold' : ''}>
+                          {currency === 'JPY' ? `¥ ${psFeeFinalYen.toLocaleString()}` : `${formatPrice(psFeeDisplay, currency, true)} (¥ ${psFeeFinalYen.toLocaleString()})`}
+                        </span>
                       </div>
                     </div>
                   )}

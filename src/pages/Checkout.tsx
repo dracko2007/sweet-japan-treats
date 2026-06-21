@@ -88,6 +88,8 @@ const Checkout: React.FC = () => {
   const [pointsToUse, setPointsToUse] = useState(0);
   const productSubtotalYen = items.reduce((s, i) => i.freeGift ? s : s + effectiveYen(i.product, i.size) * i.quantity, 0);
   const convertYen = (yen: number) => fxConvert(yen, formData.country === 'Japão' ? 'JPY' : isEuro ? 'EUR' : 'BRL');
+  // Sem buffer para taxas fixas em ¥ (ex.: taxa PS): evita exibir ¥2.050 em vez de ¥2.000
+  const convertYenExact = (yen: number) => fxConvert(yen, formData.country === 'Japão' ? 'JPY' : isEuro ? 'EUR' : 'BRL', true);
   const maxRedeemable = canRedeem ? Math.min(availablePoints, Math.floor(productSubtotalYen / POINTS.yenPerPoint)) : 0;
   const redeemPoints = Math.max(0, Math.min(pointsToUse, maxRedeemable));
   const pointsDiscount = convertYen(redeemPoints * POINTS.yenPerPoint);
@@ -488,8 +490,8 @@ const Checkout: React.FC = () => {
   const maxAutoApprovable = 300 * totalQty;
   const effectivePsFeeDiscountYen = Math.min(psFeeDiscountYen, maxAutoApprovable);
   const psFeeFinalYen = Math.max(0, psFeeYen - effectivePsFeeDiscountYen);
-  const psFeeDisplay = convertYen(psFeeFinalYen);
-  const psFeeOriginalDisplay = convertYen(psFeeYen);
+  const psFeeDisplay = convertYenExact(psFeeFinalYen);
+  const psFeeOriginalDisplay = convertYenExact(psFeeYen);
 
   const subtotalWithCoupon = baseTotalPrice - couponDiscount;
   
@@ -1090,11 +1092,17 @@ const Checkout: React.FC = () => {
                           <div className="text-right">
                             {effectivePsFeeDiscountYen > 0 ? (
                               <>
-                                <span className="text-[10px] text-muted-foreground line-through mr-1">{formatPrice(psFeeOriginalDisplay, currency)}</span>
-                                <span className="font-semibold text-green-600">{formatPrice(psFeeDisplay, currency)}</span>
+                                <span className="text-[10px] text-muted-foreground line-through mr-1">
+                                  {currency === 'JPY' ? `¥ ${psFeeYen.toLocaleString()}` : `${formatPrice(psFeeOriginalDisplay, currency, true)} (¥ ${psFeeYen.toLocaleString()})`}
+                                </span>
+                                <span className="font-semibold text-green-600">
+                                  {currency === 'JPY' ? `¥ ${psFeeFinalYen.toLocaleString()}` : `${formatPrice(psFeeDisplay, currency, true)} (¥ ${psFeeFinalYen.toLocaleString()})`}
+                                </span>
                               </>
                             ) : (
-                              <span className="font-semibold">{formatPrice(psFeeDisplay, currency)}</span>
+                              <span className="font-semibold">
+                                {currency === 'JPY' ? `¥ ${psFeeFinalYen.toLocaleString()}` : `${formatPrice(psFeeDisplay, currency, true)} (¥ ${psFeeFinalYen.toLocaleString()})`}
+                              </span>
                             )}
                           </div>
                         </div>
