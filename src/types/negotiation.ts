@@ -1,4 +1,4 @@
-export type NegotiationStatus = 'pending' | 'auto_approved' | 'approved' | 'rejected';
+export type NegotiationStatus = 'pending' | 'auto_approved' | 'approved' | 'rejected' | 'expired';
 export type NegotiationType = 'ps_fee' | 'shipping';
 
 export interface CartItemSnapshot {
@@ -39,6 +39,10 @@ export interface Negotiation {
   deliveryTime: string;
   currency: string;
 
+  // Taxa de câmbio congelada no momento da criação (¥ → moeda do cliente).
+  // Garante que ¥1000 de desconto vale o mesmo em R$ na hora da aprovação.
+  exchangeRateAtCreation: number;
+
   type: NegotiationType;
   originalAmountYen: number;
   numUnits: number;
@@ -52,7 +56,12 @@ export interface Negotiation {
   status: NegotiationStatus;
   autoApproved: boolean;
 
+  // Audit trail
+  approvedBy: string;     // 'auto' | email do admin
+  approvedAt: string | null;
+
   createdAt: string;
+  expiresAt: string;      // createdAt + 24h — depois disso vira 'expired'
   resolvedAt: string | null;
 
   clientNotified: boolean;

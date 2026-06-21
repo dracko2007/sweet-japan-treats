@@ -20,7 +20,7 @@ import { usePostalCodeLookup } from '@/hooks/usePostalCodeLookup';
 import { useLanguage, CountryType } from '@/context/LanguageContext';
 import { formatPrice } from '@/utils/currency';
 import { effectiveYen } from '@/utils/pricing';
-import { convertYen as fxConvert } from '@/services/fxService';
+import { convertYen as fxConvert, getRates } from '@/services/fxService';
 import { POINTS } from '@/services/pointsService';
 import { safeStorage } from '@/utils/storage';
 import { productEnglishName } from '@/utils/productName';
@@ -130,6 +130,10 @@ const Checkout: React.FC = () => {
       if ((neg.status === 'approved' || neg.status === 'auto_approved') && neg.approvedDiscountYen != null) {
         if (neg.type === 'ps_fee') setPsFeeDiscountYen(neg.approvedDiscountYen);
         else setShippingDiscountYen(neg.approvedDiscountYen);
+      }
+      // Auto-expire: se o prazo passou e ainda está pending, marca expirado no Firestore
+      if (neg.status === 'pending' && negotiationService.isExpired(neg)) {
+        negotiationService.expire(neg.id).catch(() => {});
       }
     });
   }, [activeNegId]);
@@ -340,6 +344,10 @@ const Checkout: React.FC = () => {
     setNegSubmitting(true);
     try {
       const autoApprove = negModalType === 'ps_fee' && requestedYen <= 300 * totalQty;
+      // Freeze the exchange rate at this exact moment so approved ¥ → R$ never drifts
+      const rates = getRates();
+      const frozenRate = currency === 'EUR' ? rates.EUR : currency === 'JPY' ? 1 : rates.BRL;
+
       const neg = await negotiationService.create({
         userId: user.id || user.email || '',
         userEmail: user.email || '',
@@ -357,6 +365,7 @@ const Checkout: React.FC = () => {
         shipping: selectedShipping || null,
         deliveryTime,
         currency,
+        exchangeRateAtCreation: frozenRate,
         type: negModalType,
         originalAmountYen: originalYen,
         numUnits: totalQty,
@@ -366,6 +375,8 @@ const Checkout: React.FC = () => {
         adminNote: '',
         status: autoApprove ? 'auto_approved' : 'pending',
         autoApproved: autoApprove,
+        approvedBy: autoApprove ? 'auto' : '',
+        approvedAt: autoApprove ? new Date().toISOString() : null,
         clientNotified: autoApprove,
         clientSeen: false,
       });
@@ -437,7 +448,7 @@ const Checkout: React.FC = () => {
         coupon: appliedCoupon,
         couponDiscount,
         psFeeYen,
-        psFeeDiscountYen,
+        psFeeDiscountYen: effectivePsFeeDiscountYen,  // capped to current cart — anti-manipulation
         shippingDiscountYen,
         negotiationId: activeNegId,
       }
@@ -449,8 +460,11 @@ const Checkout: React.FC = () => {
   const shippingDiscountDisplay = convertYen(shippingDiscountYen);
   const actualShippingCost = Math.max(0, rawShippingCost - shippingDiscountDisplay);
 
-  // PS fee final (after negotiation discount)
-  const psFeeFinalYen = Math.max(0, psFeeYen - psFeeDiscountYen);
+  // PS fee final — cap the approved discount at 300×currentQty (prevents cart manipulation exploit:
+  // client negotiates with 50 items, removes 49, claims the full discount)
+  const maxAutoApprovable = 300 * totalQty;
+  const effectivePsFeeDiscountYen = Math.min(psFeeDiscountYen, maxAutoApprovable);
+  const psFeeFinalYen = Math.max(0, psFeeYen - effectivePsFeeDiscountYen);
   const psFeeDisplay = convertYen(psFeeFinalYen);
   const psFeeOriginalDisplay = convertYen(psFeeYen);
 
@@ -472,9 +486,13 @@ const Checkout: React.FC = () => {
   // Taxes are completely omitted from checkout final price!
   const grandTotal = subtotalWithCoupon - pointsDiscount + actualShippingCost + psFeeDisplay;
 
-  const negIsPending = activeNeg?.status === 'pending';
+  // Check expiry (client-side) — purely derived, no side-effects here
+  const negIsExpired = activeNeg ? negotiationService.isExpired(activeNeg) : false;
+
+  const negIsPending = activeNeg?.status === 'pending' && !negIsExpired;
   const negIsApproved = activeNeg?.status === 'approved' || activeNeg?.status === 'auto_approved';
   const negIsRejected = activeNeg?.status === 'rejected';
+  const negActuallyExpired = activeNeg?.status === 'expired' || negIsExpired;
 
   return (
     <Layout>
@@ -880,11 +898,24 @@ const Checkout: React.FC = () => {
                           Aguardando resposta da vendedora
                         </div>
                         <p className="text-xs text-orange-500">
-                          Você receberá uma notificação quando a proposta for avaliada.
+                          Expira em 24h · Acompanhe em Perfil → Negociações
                         </p>
-                        <p className="text-[10px] text-muted-foreground">
-                          Acompanhe em Perfil → Negociações
-                        </p>
+                      </div>
+                    ) : negActuallyExpired ? (
+                      <div className="space-y-2">
+                        <div className="w-full rounded-xl border border-gray-300 bg-gray-50 dark:bg-gray-900/30 p-3 text-center text-xs text-muted-foreground">
+                          Negociação expirada sem resposta.
+                          <button
+                            type="button"
+                            onClick={() => { setActiveNegId(null); setPsFeeDiscountYen(0); setShippingDiscountYen(0); sessionStorage.removeItem('activeNegId'); }}
+                            className="block mx-auto mt-1 text-primary hover:underline font-semibold"
+                          >
+                            Limpar e tentar novamente
+                          </button>
+                        </div>
+                        <Button type="submit" className="w-full btn-primary rounded-xl py-6 text-lg font-bold" disabled={!selectedShipping}>
+                          Ir para a Revisão do Pedido <ArrowRight className="w-5 h-5 ml-2" />
+                        </Button>
                       </div>
                     ) : (
                       <>
@@ -1057,7 +1088,7 @@ const Checkout: React.FC = () => {
                         <div className="flex justify-between items-center">
                           <span className="text-muted-foreground">Taxa Personal Shopper</span>
                           <div className="text-right">
-                            {psFeeDiscountYen > 0 ? (
+                            {effectivePsFeeDiscountYen > 0 ? (
                               <>
                                 <span className="text-[10px] text-muted-foreground line-through mr-1">{formatPrice(psFeeOriginalDisplay, currency)}</span>
                                 <span className="font-semibold text-green-600">{formatPrice(psFeeDisplay, currency)}</span>
@@ -1091,6 +1122,11 @@ const Checkout: React.FC = () => {
                           {negIsRejected && activeNeg?.type === 'ps_fee' && (
                             <span className="text-[10px] text-red-500 font-bold flex items-center gap-0.5">
                               <AlertCircle className="w-3 h-3" /> Recusado
+                            </span>
+                          )}
+                          {negActuallyExpired && activeNeg?.type === 'ps_fee' && (
+                            <span className="text-[10px] text-gray-400 font-bold flex items-center gap-0.5">
+                              <AlertCircle className="w-3 h-3" /> Expirado
                             </span>
                           )}
                         </div>
@@ -1127,9 +1163,9 @@ const Checkout: React.FC = () => {
                         <span className="text-base text-orange-600">
                           {formatPrice(grandTotal, currency)}
                         </span>
-                        {(couponDiscount + pointsDiscount + convertYen(psFeeDiscountYen) + shippingDiscountDisplay) > 0 && (
+                        {(couponDiscount + pointsDiscount + convertYen(effectivePsFeeDiscountYen) + shippingDiscountDisplay) > 0 && (
                           <p className="text-[10px] text-green-600 font-bold mt-0.5">
-                            Você economiza {formatPrice(couponDiscount + pointsDiscount + convertYen(psFeeDiscountYen) + shippingDiscountDisplay, currency)}
+                            Você economiza {formatPrice(couponDiscount + pointsDiscount + convertYen(effectivePsFeeDiscountYen) + shippingDiscountDisplay, currency)}
                           </p>
                         )}
                       </div>

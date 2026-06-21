@@ -1031,11 +1031,13 @@ const Profile: React.FC = () => {
                 </div>
                 <div className="space-y-3">
                   {negotiations.map((neg) => {
-                    const isPending = neg.status === 'pending';
+                    const isExpiredClient = negotiationService.isExpired(neg);
+                    const isPending = neg.status === 'pending' && !isExpiredClient;
                     const isApproved = neg.status === 'approved' || neg.status === 'auto_approved';
                     const isRejected = neg.status === 'rejected';
+                    const isExpired = neg.status === 'expired' || isExpiredClient;
                     return (
-                      <div key={neg.id} className={`rounded-xl border p-4 ${isPending ? 'border-orange-200 bg-orange-50/30 dark:bg-orange-950/10' : isApproved ? 'border-green-200 bg-green-50/30 dark:bg-green-950/10' : 'border-red-200 bg-red-50/20 dark:bg-red-950/10'}`}>
+                      <div key={neg.id} className={`rounded-xl border p-4 ${isPending ? 'border-orange-200 bg-orange-50/30 dark:bg-orange-950/10' : isApproved ? 'border-green-200 bg-green-50/30 dark:bg-green-950/10' : isExpired ? 'border-gray-200 opacity-60' : 'border-red-200 bg-red-50/20 dark:bg-red-950/10'}`}>
                         <div className="flex items-start justify-between gap-3">
                           <div className="flex-1 min-w-0">
                             <div className="flex flex-wrap items-center gap-2 mb-1">
@@ -1046,6 +1048,7 @@ const Profile: React.FC = () => {
                                 {isPending && <><Hourglass className="w-3 h-3" /> Aguardando</>}
                                 {isApproved && <><CheckCircle2 className="w-3 h-3" /> Aprovado</>}
                                 {isRejected && <><XCircle className="w-3 h-3" /> Recusado</>}
+                                {isExpired && <><XCircle className="w-3 h-3" /> Expirado</>}
                               </span>
                             </div>
                             <p className="text-xs text-muted-foreground">
