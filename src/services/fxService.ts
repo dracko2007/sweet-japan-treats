@@ -4,7 +4,8 @@
 // (ou um fallback fixo). Assim o preço em real/euro acompanha o iene sozinho.
 import { safeStorage } from '@/utils/storage';
 
-const BUFFER_YEN = 5; // margem de segurança somada ao ¥ antes de converter
+const BUFFER_YEN = 5;   // margem fixa somada ao ¥ antes de converter (pequenos itens)
+const RATE_CUSHION = 0.04; // 4% sobre a taxa — cobre spread da Wise + defasagem da API diária
 // Fallback fixo (≈ o que era usado antes) caso a API e o cache falhem.
 const FALLBACK = { BRL: 1 / 28, EUR: 0.16 / 28 };
 const CACHE_KEY = 'fx_rates';
@@ -22,13 +23,15 @@ export const FX_BUFFER_YEN = BUFFER_YEN;
 /** Taxas atuais (¥→BRL e ¥→EUR). */
 export const getRates = () => _rates;
 
-/** Converte ¥ para a moeda informada, com cotação do dia + margem de +5¥.
- *  JPY permanece em ienes (sem conversão nem margem).
- *  noBuffer=true omite a margem — use para taxas fixas (ex.: taxa PS). */
+/** Converte ¥ para a moeda informada, com cotação do dia + margens:
+ *  - BUFFER_YEN: +5¥ fixos por conversão
+ *  - RATE_CUSHION: +4% sobre a taxa para cobrir spread da Wise e defasagem diária da API
+ *  noBuffer=true omite ambas as margens — use para taxas fixas (ex.: taxa PS). */
 export function convertYen(yen: number, currency: string, noBuffer = false): number {
   if (currency === 'JPY') return Math.round(yen);
   if (!yen || yen <= 0) return 0;
-  const rate = currency === 'EUR' ? _rates.EUR : _rates.BRL;
+  const baseRate = currency === 'EUR' ? _rates.EUR : _rates.BRL;
+  const rate = noBuffer ? baseRate : baseRate * (1 + RATE_CUSHION);
   return Math.round((yen + (noBuffer ? 0 : BUFFER_YEN)) * rate);
 }
 
