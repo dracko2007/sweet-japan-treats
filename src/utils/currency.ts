@@ -1,4 +1,5 @@
 import { getRates } from '@/services/fxService';
+import { roundYen } from '@/utils/pricing';
 
 export const BRL_TO_JPY_RATE = 28;
 export const BRL_TO_EUR_RATE = 0.16;
@@ -38,13 +39,13 @@ export const formatPrice = (price: number, currency: 'BRL' | 'JPY' | 'EUR' | str
     const rounded = Math.round(price);
     const mainStr = `€ ${rounded.toLocaleString('pt-BR')}`;
     if (noConvert) return mainStr;
-    return `${mainStr} (¥ ${yenRefFromEur(price).toLocaleString()})`;
+    return `${mainStr} (¥ ${roundYen(yenRefFromEur(price)).toLocaleString()})`;
   }
   // BRL — arredonda para inteiro (sem centavos quebrados)
   const rounded = Math.round(price);
   const mainStr = `R$ ${rounded.toLocaleString('pt-BR')}`;
   if (noConvert) return mainStr;
-  return `${mainStr} (¥ ${yenRefFromBrl(price).toLocaleString()})`;
+  return `${mainStr} (¥ ${roundYen(yenRefFromBrl(price)).toLocaleString()})`;
 };
 
 /**
