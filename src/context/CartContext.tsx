@@ -112,6 +112,13 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setRawItems([]);
   }, []);
 
+  // Limpa o carrinho quando o usuário faz logout (evento disparado pelo UserContext)
+  useEffect(() => {
+    const onLogout = () => setRawItems([]);
+    window.addEventListener('japan-express:logout', onLogout);
+    return () => window.removeEventListener('japan-express:logout', onLogout);
+  }, []);
+
   const totalItems = useMemo(
     () => items.reduce((sum, item) => sum + item.quantity, 0),
     [items]

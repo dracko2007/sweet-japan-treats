@@ -502,10 +502,13 @@ const Checkout: React.FC = () => {
   const shippingDiscountDisplay = convertYen(shippingDiscountYen);
   const actualShippingCost = Math.max(0, rawShippingCost - shippingDiscountDisplay);
 
-  // PS fee final — cap the approved discount at 300×currentQty (prevents cart manipulation exploit:
-  // client negotiates with 50 items, removes 49, claims the full discount)
+  // PS fee final — para auto-aprovação, cap em 300×qty impede manipulação de carrinho.
+  // Para aprovação manual pelo admin, respeita o valor aprovado (apenas cap no valor real da taxa).
   const maxAutoApprovable = 300 * totalQty;
-  const effectivePsFeeDiscountYen = Math.min(psFeeDiscountYen, maxAutoApprovable);
+  const isManualApproval = activeNeg?.status === 'approved';
+  const effectivePsFeeDiscountYen = isManualApproval
+    ? Math.min(psFeeDiscountYen, psFeeYen)
+    : Math.min(psFeeDiscountYen, maxAutoApprovable);
   const psFeeFinalYen = Math.max(0, psFeeYen - effectivePsFeeDiscountYen);
   const psFeeDisplay = convertYenExact(psFeeFinalYen);
   const psFeeOriginalDisplay = convertYenExact(psFeeYen);

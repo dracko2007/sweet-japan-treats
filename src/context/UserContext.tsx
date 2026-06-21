@@ -172,6 +172,13 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     setLoginAsState(null);
     safeStorage.removeItem('user');
     safeStorage.removeItem('loginAs');
+    // Limpa dados específicos do usuário — privacidade em computadores compartilhados.
+    // CartContext escuta o evento para limpar o estado React antes que o useEffect re-persista.
+    safeStorage.removeItem('sakura_cart');
+    safeStorage.removeItem('activeNegId');
+    safeStorage.removeItem('redeem_points');
+    safeStorage.removeItem('sakura_orders');
+    window.dispatchEvent(new Event('japan-express:logout'));
   };
 
   // Helper functions for users database

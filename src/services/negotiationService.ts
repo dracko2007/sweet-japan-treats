@@ -45,13 +45,21 @@ export const negotiationService = {
     );
   },
 
-  // userId pode ser o Firebase UID ou o email do usuário
+  // userId pode ser o Firebase UID ou o email do usuário.
+  // Sem orderBy para não exigir índice composto — ordena em JS.
   listenByUser(userId: string, cb: (negs: Negotiation[]) => void): () => void {
-    const field = userId.includes('@') ? 'userEmail' : 'userId';
-    const q = query(collection(db, COL), where(field, '==', userId), orderBy('createdAt', 'desc'));
+    const isEmail = userId.includes('@');
+    // Quando userId é email, pode estar gravado em userEmail ou userId (legado)
+    const field = isEmail ? 'userEmail' : 'userId';
+    const q = query(collection(db, COL), where(field, '==', userId));
     return onSnapshot(
       q,
-      (snap) => cb(snap.docs.map((d) => d.data() as Negotiation)),
+      (snap) => {
+        const sorted = snap.docs
+          .map(d => d.data() as Negotiation)
+          .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        cb(sorted);
+      },
       (err) => console.error('[negotiations] listenByUser error:', err)
     );
   },
