@@ -5,6 +5,8 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts';
 import { orderService } from '@/services/orderService';
+import { affiliateService } from '@/services/affiliateService';
+import { getMarketingExpenses } from '@/components/admin/MarketingManager';
 import type { Order, OrderStatistics } from '@/types';
 import { toYen } from '@/utils/currency';
 import { useProducts } from '@/context/ProductsContext';
@@ -28,6 +30,9 @@ interface FinanceSummary {
   receitaPS: number;
   custo: number;
   lucro: number;
+  comissoesYen: number;
+  marketingBRL: number;
+  lucroLiquido: number;
 }
 
 function SectionHeader({ title, open, onToggle }: { title: string; open: boolean; onToggle: () => void }) {
@@ -50,7 +55,7 @@ const Dashboard: React.FC = () => {
     ordersThisMonth: 0, ordersLastMonth: 0,
   };
   const [stats, setStats] = useState<OrderStatistics | null>(null);
-  const [finance, setFinance] = useState<FinanceSummary>({ receitaComFrete: 0, receitaSemFrete: 0, receitaProduto: 0, receitaPS: 0, custo: 0, lucro: 0 });
+  const [finance, setFinance] = useState<FinanceSummary>({ receitaComFrete: 0, receitaSemFrete: 0, receitaProduto: 0, receitaPS: 0, custo: 0, lucro: 0, comissoesYen: 0, marketingBRL: 0, lucroLiquido: 0 });
   const [monthlyData, setMonthlyData] = useState<MonthlyFin[]>([]);
   const [topProducts, setTopProducts] = useState<{ name: string; count: number }[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<{ method: string; revenue: number }[]>([]);
@@ -99,6 +104,21 @@ const Dashboard: React.FC = () => {
     } catch {
       orders = [];
     }
+
+    // Comissões de afiliados pendentes (em ¥)
+    let comissoesYen = 0;
+    try {
+      const pending = await withTimeout(affiliateService.getPendingCommissions(), 5_000, []);
+      comissoesYen = pending.reduce((s, p) => s + (p.commissionYen || 0), 0);
+    } catch { /* ignora */ }
+
+    // Gastos de marketing (em BRL, convertido para ¥ via taxa implícita média ou 1 BRL≈28¥ como fallback)
+    let marketingBRL = 0;
+    try {
+      const mkt = await withTimeout(getMarketingExpenses(), 5_000, []);
+      marketingBRL = mkt.filter(e => e.currency === 'BRL').reduce((s, e) => s + e.amount, 0);
+    } catch { /* ignora */ }
+
     const statistics = orderService.getStatistics(orders);
     const active = orders.filter((o) => o.status !== 'cancelled');
 
@@ -117,6 +137,10 @@ const Dashboard: React.FC = () => {
     });
     const receitaProduto = Math.max(receitaSemFrete - receitaPS, 0);
     const lucro = receitaProduto - custo;
+    // Lucro Líquido: inclui PS como receita, deduz afiliados e marketing
+    const receitaTotal = receitaProduto + receitaPS;
+    const marketingYen = Math.round(marketingBRL * 28); // fallback ¥28/BRL se não tiver taxa exata
+    const lucroLiquido = receitaTotal - custo - comissoesYen - marketingYen;
 
     const now = new Date();
     const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -170,7 +194,7 @@ const Dashboard: React.FC = () => {
     const payment = Object.entries(byMethod).map(([method, revenue]) => ({ method, revenue: revenue as number }));
 
     setStats({ ...statistics, totalRevenue: receitaComFrete, revenueThisMonth, revenueLastMonth });
-    setFinance({ receitaComFrete, receitaSemFrete, receitaProduto, receitaPS, custo, lucro });
+    setFinance({ receitaComFrete, receitaSemFrete, receitaProduto, receitaPS, custo, lucro, comissoesYen, marketingBRL, lucroLiquido });
     setMonthlyData(monthly);
     setTopProducts(top5);
     setPaymentMethods(payment);
@@ -347,17 +371,49 @@ const Dashboard: React.FC = () => {
             </div>
           </div>
 
-          {/* Custo e Lucro */}
-          <div className="grid grid-cols-2 gap-3">
+          {/* Custo, Lucro Bruto e Deduções */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             <div className="bg-card rounded-xl border border-border p-4">
               <p className="text-xs text-muted-foreground mb-1">Custo dos Produtos</p>
               <p className="text-xl font-bold text-gray-500">¥{finance.custo.toLocaleString()}</p>
               <p className="text-[11px] text-muted-foreground mt-1">Quanto você pagou</p>
             </div>
-            <div className={`rounded-xl border p-4 ${finance.lucro >= 0 ? 'bg-green-50 dark:bg-green-950/20 border-green-300 dark:border-green-800' : 'bg-red-50 dark:bg-red-950/20 border-red-300'}`}>
-              <p className="text-xs text-muted-foreground mb-1">Lucro Estimado</p>
-              <p className={`text-xl font-bold ${finance.lucro >= 0 ? 'text-green-600' : 'text-red-600'}`}>¥{finance.lucro.toLocaleString()}</p>
+            <div className="bg-card rounded-xl border border-border p-4">
+              <p className="text-xs text-muted-foreground mb-1">Lucro Bruto</p>
+              <p className={`text-xl font-bold ${finance.lucro >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>¥{finance.lucro.toLocaleString()}</p>
               <p className="text-[11px] text-muted-foreground mt-1">Produto − custo</p>
+            </div>
+            <div className="bg-card rounded-xl border border-border p-4">
+              <p className="text-xs text-muted-foreground mb-1">Comissões Afiliados</p>
+              <p className="text-xl font-bold text-orange-500">−¥{finance.comissoesYen.toLocaleString()}</p>
+              <p className="text-[11px] text-muted-foreground mt-1">Pendentes de pagamento</p>
+            </div>
+            <div className="bg-card rounded-xl border border-border p-4">
+              <p className="text-xs text-muted-foreground mb-1">Marketing</p>
+              <p className="text-xl font-bold text-blue-500">−R${finance.marketingBRL.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+              <p className="text-[11px] text-muted-foreground mt-1">Ads + influencers</p>
+            </div>
+          </div>
+
+          {/* Lucro Líquido */}
+          <div className={`rounded-xl border-2 p-5 ${finance.lucroLiquido >= 0 ? 'bg-green-50 dark:bg-green-950/20 border-green-400 dark:border-green-700' : 'bg-red-50 dark:bg-red-950/20 border-red-400'}`}>
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div>
+                <p className="text-sm font-semibold text-muted-foreground mb-1">💵 Lucro Líquido</p>
+                <p className={`text-3xl font-bold ${finance.lucroLiquido >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  ¥{finance.lucroLiquido.toLocaleString()}
+                </p>
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  (Produto + PS) − Custo − Afiliados − Marketing
+                </p>
+              </div>
+              <div className="text-right text-xs text-muted-foreground space-y-0.5">
+                <p>Produto: <span className="font-semibold text-foreground">+¥{finance.receitaProduto.toLocaleString()}</span></p>
+                <p>PS: <span className="font-semibold text-foreground">+¥{finance.receitaPS.toLocaleString()}</span></p>
+                <p>Custo: <span className="font-semibold text-foreground">−¥{finance.custo.toLocaleString()}</span></p>
+                <p>Afiliados: <span className="font-semibold text-foreground">−¥{finance.comissoesYen.toLocaleString()}</span></p>
+                <p>Marketing: <span className="font-semibold text-foreground">−R${finance.marketingBRL.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}</span></p>
+              </div>
             </div>
           </div>
         </div>

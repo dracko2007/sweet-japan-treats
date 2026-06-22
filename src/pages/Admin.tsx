@@ -26,6 +26,7 @@ import PromotionManager from '@/components/admin/PromotionManager';
 import NegotiationManager from '@/components/admin/NegotiationManager';
 import TrackingModal from '@/components/admin/TrackingModal';
 import AdminCalculator from '@/components/admin/AdminCalculator';
+import MarketingManager from '@/components/admin/MarketingManager';
 import CN23Modal from '@/components/admin/CN23Modal';
 import PromoNotificationModal from '@/components/admin/PromoNotificationModal';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
@@ -45,7 +46,7 @@ const devError = isDev ? console.error.bind(console) : () => {};
 type AdminTab =
   | 'orders' | 'coupons' | 'dashboard' | 'customers' | 'products'
   | 'home' | 'vlog' | 'affiliates' | 'requests' | 'b2b' | 'admins' | 'videos'
-  | 'calculator' | 'migration' | 'promotion' | 'negotiations';
+  | 'calculator' | 'migration' | 'promotion' | 'negotiations' | 'marketing';
 
 interface AdminTabItem {
   id: AdminTab;
@@ -455,6 +456,9 @@ _This is an automated test message_
     { title: 'Conteúdo', items: [
       { id: 'home', label: 'Início', icon: Video },
       { id: 'vlog', label: 'Vlog', icon: Clapperboard },
+    ] },
+    { title: 'Marketing', items: [
+      { id: 'marketing', label: 'Gastos Marketing', icon: Megaphone },
     ] },
     { title: 'Ferramentas', items: [
       { id: 'promotion', label: 'Promoção Início', icon: Sparkles },
@@ -907,6 +911,8 @@ _This is an automated test message_
               <ImageMigration />
             ) : activeTab === 'negotiations' ? (
               <NegotiationManager />
+            ) : activeTab === 'marketing' ? (
+              <MarketingManager />
             ) : (
               <CustomerList />
             )}

@@ -108,6 +108,11 @@ service cloud.firestore {
       allow update, delete: if isAdmin();
     }
 
+    // ---------- Gastos de Marketing ----------
+    match /marketing_expenses/{id} {
+      allow read, write, delete: if isAdmin();
+    }
+
     // ---------- Administradores ----------
     // 'get' individual necessário antes da autenticação Firebase (login por username).
     // 'list' restrito para evitar enumeração em massa.
