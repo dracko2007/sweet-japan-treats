@@ -118,6 +118,15 @@ service cloud.firestore {
       allow read, write, delete: if isAdmin();
     }
 
+    // ---------- Funcionários ----------
+    match /employees/{id} {
+      allow read, write, delete: if isAdmin();
+    }
+
+    match /employee_payments/{id} {
+      allow read, write, delete: if isAdmin();
+    }
+
     // ---------- Administradores ----------
     // 'get' individual necessário antes da autenticação Firebase (login por username).
     // 'list' restrito para evitar enumeração em massa.
