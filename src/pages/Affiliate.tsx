@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Megaphone, Link2, Copy, Check, DollarSign, Package, TrendingUp, Percent } from 'lucide-react';
+import { Megaphone, Link2, Copy, Check, DollarSign, Package, TrendingUp, Percent, Clock } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { useUser } from '@/context/UserContext';
 import { useProducts } from '@/context/ProductsContext';
 import { useToast } from '@/hooks/use-toast';
-import { affiliateService, Affiliate } from '@/services/affiliateService';
+import { affiliateService, Affiliate, PendingCommission } from '@/services/affiliateService';
 
 const SITE_URL = 'https://japanexpress-store.com';
 
@@ -15,7 +15,7 @@ const AffiliatePage: React.FC = () => {
   const { products } = useProducts();
   const { toast } = useToast();
   const [affiliates, setAffiliates] = useState<Affiliate[]>([]);
-  const [pendingByCode, setPendingByCode] = useState<Record<string, number>>({});
+  const [pendingByCode, setPendingByCode] = useState<Record<string, { commissionYen: number; netYen: number; orders: number }>>({});
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState<string | null>(null);
   const [selectedProductId, setSelectedProductId] = useState('');
@@ -27,12 +27,15 @@ const AffiliatePage: React.FC = () => {
     }
     affiliateService.getByOwnerEmail(user.email).then(async (list) => {
       setAffiliates(list);
-      // Soma das comissões pendentes (a liberar) por código
-      const map: Record<string, number> = {};
+      const map: Record<string, { commissionYen: number; netYen: number; orders: number }> = {};
       await Promise.all(
         list.map(async (aff) => {
           const pend = await affiliateService.getPendingByCode(aff.code);
-          map[aff.code] = pend.reduce((sum, p) => sum + (p.commissionYen || 0), 0);
+          map[aff.code] = {
+            commissionYen: pend.reduce((sum, p) => sum + (p.commissionYen || 0), 0),
+            netYen: pend.reduce((sum, p) => sum + (p.netYen || 0), 0),
+            orders: pend.length,
+          };
         })
       );
       setPendingByCode(map);
@@ -89,6 +92,9 @@ const AffiliatePage: React.FC = () => {
               {affiliates.map((aff) => {
                 const link = `${SITE_URL}/?ref=${aff.code}`;
                 const expired = new Date(aff.expiresAt) < new Date();
+                const pend = pendingByCode[aff.code] || { commissionYen: 0, netYen: 0, orders: 0 };
+                const totalVendas = (aff.totalOrders || 0) + pend.orders;
+                const totalReceita = (aff.totalRevenue || 0) + pend.netYen;
                 return (
                   <div key={aff.code} className="bg-card rounded-2xl border border-border p-6 lg:p-8 space-y-6">
                     {/* Header com código */}
@@ -111,19 +117,32 @@ const AffiliatePage: React.FC = () => {
                       </div>
                       <div className="bg-secondary/30 rounded-xl p-4">
                         <p className="text-xs text-muted-foreground flex items-center gap-1 mb-1"><Package className="w-3 h-3" /> Vendas</p>
-                        <p className="text-xl font-bold">{aff.totalOrders || 0}</p>
+                        <p className="text-xl font-bold">{totalVendas}</p>
+                        {pend.orders > 0 && (
+                          <p className="text-[10px] text-amber-600">{pend.orders} aguardando entrega</p>
+                        )}
                       </div>
                       <div className="bg-secondary/30 rounded-xl p-4">
                         <p className="text-xs text-muted-foreground flex items-center gap-1 mb-1"><TrendingUp className="w-3 h-3" /> Receita gerada</p>
-                        <p className="text-xl font-bold">{yen(aff.totalRevenue)}</p>
+                        <p className="text-xl font-bold">{yen(totalReceita)}</p>
+                        {pend.netYen > 0 && (
+                          <p className="text-[10px] text-amber-600">{yen(pend.netYen)} pendente</p>
+                        )}
                       </div>
                       <div className="bg-primary/10 rounded-xl p-4 border border-primary/20">
                         <p className="text-xs text-primary flex items-center gap-1 mb-1"><DollarSign className="w-3 h-3" /> Comissão liberada</p>
                         <p className="text-xl font-bold text-primary">{yen(aff.totalEarnings)}</p>
-                        <p className="text-[10px] text-muted-foreground">
-                          {aff.commissionPercent}% das vendas
-                          {pendingByCode[aff.code] > 0 && ` · ¥${pendingByCode[aff.code].toLocaleString()} a liberar`}
-                        </p>
+                        <p className="text-[10px] text-muted-foreground">{aff.commissionPercent}% das vendas</p>
+                        {pend.commissionYen > 0 && (
+                          <div className="mt-2 bg-amber-50 dark:bg-amber-950/30 rounded-lg p-2 border border-amber-200 dark:border-amber-800">
+                            <p className="text-[11px] text-amber-700 dark:text-amber-400 flex items-center gap-1 font-semibold">
+                              <Clock className="w-3 h-3" /> {yen(pend.commissionYen)} a liberar
+                            </p>
+                            <p className="text-[10px] text-amber-600/80 dark:text-amber-500/80">
+                              Liberado após confirmação de entrega
+                            </p>
+                          </div>
+                        )}
                       </div>
                     </div>
 

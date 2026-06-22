@@ -44,6 +44,7 @@ export interface PendingCommission {
   commissionYen: number;   // comissão calculada (¥)
   orderId: string;
   buyerEmail: string;
+  ownerEmail?: string;     // e-mail do dono do código (para regras de leitura)
   status: 'pending' | 'confirmed';
   createdAt: string;
 }
@@ -274,6 +275,7 @@ export const affiliateService = {
       const code = normalize(params.affiliateCode);
       const affSnap = await getDoc(doc(db, COL, code));
       const commissionPercent = affSnap.exists() ? (affSnap.data() as Affiliate).commissionPercent || 0 : 0;
+      const ownerEmail = affSnap.exists() ? (affSnap.data() as Affiliate).ownerEmail || '' : '';
       const id = `${code}-${params.orderId || Date.now()}`;
       const record: PendingCommission = {
         id,
@@ -282,6 +284,7 @@ export const affiliateService = {
         commissionYen: Math.round((params.netYen * commissionPercent) / 100),
         orderId: params.orderId || id,
         buyerEmail: params.buyerEmail || '',
+        ownerEmail,
         status: 'pending',
         createdAt: new Date().toISOString(),
       };

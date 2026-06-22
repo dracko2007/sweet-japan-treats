@@ -97,7 +97,8 @@ service cloud.firestore {
       allow create: if request.auth != null
         && request.resource.data.status == 'pending';
       allow read, update, delete: if isAdmin()
-        || (request.auth != null && resource.data.buyerEmail == request.auth.token.email);
+        || (request.auth != null && resource.data.buyerEmail == request.auth.token.email)
+        || (request.auth != null && resource.data.ownerEmail == request.auth.token.email);
     }
 
     // Solicitações para virar afiliado — validação mínima evita spam de bots
