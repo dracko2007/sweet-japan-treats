@@ -508,7 +508,7 @@ const OrderReview: React.FC = () => {
               </Button>
             </div>
 
-            <div className="lg:grid lg:grid-cols-3 lg:gap-8 items-start">
+            <div className="lg:grid lg:grid-cols-3 lg:gap-8">
 
               {/* ── COLUNA ESQUERDA ── */}
               <div className="lg:col-span-2 space-y-6">
@@ -952,7 +952,7 @@ const OrderReview: React.FC = () => {
 
               {/* ── COLUNA DIREITA STICKY ── */}
               <div className="lg:col-span-1 mt-6 lg:mt-0">
-                <div className="sticky top-24 space-y-4">
+                <div className="sticky top-20 space-y-4 self-start">
 
                   {/* Resumo de pagamento */}
                   <div className="bg-card rounded-2xl border-2 border-primary/20 shadow-lg p-5">
