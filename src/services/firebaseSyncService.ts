@@ -4,17 +4,18 @@ import { safeStorage } from '@/utils/storage';
  * Sincroniza safeStorage com Firestore para acesso multi-dispositivo
  */
 
-import { 
-  collection, 
-  doc, 
-  setDoc, 
-  getDoc, 
-  getDocs, 
+import {
+  collection,
+  doc,
+  setDoc,
+  getDoc,
+  getDocs,
   updateDoc,
   deleteDoc,
+  deleteField,
   query,
   where,
-  onSnapshot 
+  onSnapshot
 } from 'firebase/firestore';
 
 import { 
@@ -574,6 +575,37 @@ export const firebaseSyncService = {
   },
 
   // Zera pedidos, pontos e cupons de todos os usuários — mantém contas e produtos.
+  async unlinkAffiliateFromUser(email: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      ensureFirebaseReady();
+      const snap = await getDocs(query(collection(db, 'users'), where('email', '==', email)));
+      if (snap.empty) return { success: false, error: 'Usuário não encontrado' };
+      await Promise.all(snap.docs.map(d =>
+        updateDoc(doc(db, 'users', d.id), {
+          affiliateCode: deleteField(),
+          referredBy: deleteField(),
+          referralRewardPaid: deleteField(),
+        })
+      ));
+      return { success: true };
+    } catch (e: unknown) {
+      return { success: false, error: String(e) };
+    }
+  },
+
+  async resetAllPoints(): Promise<{ success: boolean; users: number; error?: unknown }> {
+    try {
+      ensureFirebaseReady();
+      const snap = await getDocs(collection(db, 'users'));
+      await Promise.all(snap.docs.map(d =>
+        updateDoc(doc(db, 'users', d.id), { points: 0 })
+      ));
+      return { success: true, users: snap.size };
+    } catch (error) {
+      return { success: false, users: 0, error };
+    }
+  },
+
   async resetAllUsersData(): Promise<{ success: boolean; users: number; error?: unknown }> {
     try {
       ensureFirebaseReady();

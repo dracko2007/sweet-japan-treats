@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Users, ShoppingBag, DollarSign, TrendingUp, Package, Calendar, Mail, Phone, Trash2, AlertTriangle, Gift, X, Sparkles, Megaphone, RefreshCw, Handshake } from 'lucide-react';
+import { Users, ShoppingBag, DollarSign, TrendingUp, Package, Calendar, Mail, Phone, Trash2, AlertTriangle, Gift, X, Sparkles, Megaphone, RefreshCw, Handshake, UserX } from 'lucide-react';
 import { affiliateService, AffiliateRequest } from '@/services/affiliateService';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -282,6 +282,19 @@ const CustomerList: React.FC = () => {
     }
   };
 
+  const handleUnlinkAffiliate = async (email: string, name: string) => {
+    if (!confirm(`Desvincular afiliado de "${name}"?\n\nIsso remove o código de afiliado e referral do perfil do cliente.`)) return;
+    if (!(await requireAdminPassword(`desvincular afiliado de ${name}`))) return;
+    await ensureAdminAuth();
+    const res = await firebaseSyncService.unlinkAffiliateFromUser(email);
+    if (res.success) {
+      toast({ title: '✅ Afiliado desvinculado', description: `${name} não tem mais afiliado vinculado.` });
+      loadCustomers();
+    } else {
+      toast({ title: 'Erro ao desvincular', description: res.error, variant: 'destructive' });
+    }
+  };
+
   const handleFullSiteReset = async () => {
     if (!permissions.canFinancial) {
       toast({ title: 'Sem permissão', description: 'Reset completo requer nível financeiro (Nível 3).', variant: 'destructive' });
@@ -542,6 +555,15 @@ const CustomerList: React.FC = () => {
                     </Button>
                     <Button
                       size="sm"
+                      variant="outline"
+                      className="text-xs flex-1 text-amber-600 border-amber-200 hover:bg-amber-50"
+                      onClick={() => handleUnlinkAffiliate(customer.email, customer.name)}
+                    >
+                      <UserX className="w-3 h-3 mr-1" />
+                      Desvincular Afiliado
+                    </Button>
+                    <Button
+                      size="sm"
                       variant="destructive"
                       className="text-xs flex-1"
                       onClick={() => handleDeleteCustomer(customer.email, customer.name)}
@@ -695,6 +717,14 @@ const CustomerList: React.FC = () => {
                   >
                     <Handshake className="w-4 h-4 mr-2" />
                     Limpar Negociações
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start text-amber-600 border-amber-200 hover:bg-amber-50"
+                    onClick={() => handleUnlinkAffiliate(selectedCustomer.email, selectedCustomer.name)}
+                  >
+                    <UserX className="w-4 h-4 mr-2" />
+                    Desvincular Afiliado
                   </Button>
                   <Button
                     variant="destructive"
