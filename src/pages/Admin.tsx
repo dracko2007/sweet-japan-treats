@@ -820,7 +820,7 @@ _This is an automated test message_
                           Confirmar Pagamento
                         </Button>
                       )}
-                      {(order.status === 'pending' || order.status === 'processing') && (
+                      {order.status === 'processing' && (
                         <Button
                           onClick={() => {
                             setSelectedOrder(order);
