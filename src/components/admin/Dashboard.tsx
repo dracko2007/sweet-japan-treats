@@ -292,20 +292,20 @@ const Dashboard: React.FC = () => {
   return (
     <div className="space-y-4">
 
-      {/* ── Botão atualizar ── */}
-      <div className="flex justify-end">
+      {/* ── Configurações ── */}
+      <div className="flex items-center gap-2">
+        <div className="flex-1">
+          <SectionHeader title="⚙️ Configurações" open={openConfig} onToggle={() => setOpenConfig(v => !v)} />
+        </div>
         <button
           onClick={refresh}
           disabled={refreshing}
-          className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+          className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50 whitespace-nowrap px-3 py-2 rounded-xl border border-border bg-muted/40 hover:bg-muted/70"
         >
-          <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
-          {refreshing ? 'Atualizando…' : 'Atualizar dados'}
+          <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+          {refreshing ? 'Atualizando…' : 'Atualizar'}
         </button>
       </div>
-
-      {/* ── Configurações ── */}
-      <SectionHeader title="⚙️ Configurações" open={openConfig} onToggle={() => setOpenConfig(v => !v)} />
       {openConfig && (
         <div className="space-y-4">
           <MaintenanceToggle />
