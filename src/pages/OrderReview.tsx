@@ -154,9 +154,9 @@ const OrderReview: React.FC = () => {
   // Grand Total only includes products + shipping + PS fee (NO TAXES ADDED!)
   const grandTotal = priceAfterPix + finalShippingCost + psFeeDisplay;
 
-  // PIX: IOF 1% sobre o total + taxa bancária de remessa fixa R$32
+  // PIX: IOF 3,5% sobre o total + taxa bancária de remessa fixa R$32
   const PIX_BANK_FEE = 32; // taxa fixa do banco para remessa internacional em BRL
-  const pixIofFee = isPix ? Math.round(grandTotal * 0.01) : 0;
+  const pixIofFee = isPix ? Math.round(grandTotal * 0.035) : 0;
   const pixBankFee = isPix ? PIX_BANK_FEE : 0;
   const pixTotalFees = pixIofFee + pixBankFee;
   const finalGrandTotal = grandTotal + pixTotalFees;
@@ -711,7 +711,7 @@ const OrderReview: React.FC = () => {
                         <span>{formatPrice(grandTotal, currency)}</span>
                       </div>
                       <div className="flex justify-between text-xs text-orange-700">
-                        <span>+ IOF (1% sobre o subtotal)</span>
+                        <span>+ IOF (3,5% sobre o subtotal)</span>
                         <span>+ {formatPrice(pixIofFee, currency)}</span>
                       </div>
                       <div className="flex justify-between text-xs text-orange-700">
@@ -889,7 +889,7 @@ const OrderReview: React.FC = () => {
                             </div>
                             <div className="flex items-center gap-1.5 text-[11px] text-blue-700 bg-blue-50 border border-blue-200 rounded-md px-2 py-1 w-fit">
                               <span>ℹ️</span>
-                              <span>Taxas <strong>só nesta opção</strong>: IOF 1% + R$ 32 banco — <strong>Wise não cobra IOF</strong></span>
+                              <span>Taxas <strong>só nesta opção</strong>: IOF 3,5% + R$ 32 banco — <strong>Wise não cobra IOF</strong></span>
                             </div>
                           </div>
                         </Label>
@@ -1024,7 +1024,7 @@ const OrderReview: React.FC = () => {
                             <span>{formatPrice(grandTotal, currency)}</span>
                           </div>
                           <div className="flex justify-between text-xs text-orange-700">
-                            <span>+ IOF (1%)</span>
+                            <span>+ IOF (3,5%)</span>
                             <span>+ {formatPrice(pixIofFee, currency)}</span>
                           </div>
                           <div className="flex justify-between text-xs text-orange-700">
