@@ -106,7 +106,7 @@ const AdminCalculator: React.FC = () => {
                     <span>
                       <span className="font-black text-primary">{yenFmt(sell)}</span>
                       <span className="text-[11px] text-muted-foreground ml-1.5">
-                        {formatPrice(sell * rates.BRL, 'BRL')} · {formatPrice(sell * rates.EUR, 'EUR')}
+                        {formatPrice(sell * rates.BRL, 'BRL', true)} · {formatPrice(sell * rates.EUR, 'EUR', true)}
                       </span>
                     </span>
                   ) : (
@@ -145,8 +145,8 @@ const AdminCalculator: React.FC = () => {
           {psFeeYen > 0 && (
             <div className="mt-4 flex gap-4 text-sm font-semibold text-orange-700 dark:text-orange-300">
               <span>{yenFmt(psFeeYen)}</span>
-              <span>{formatPrice(psFeeYen * rates.BRL, 'BRL')}</span>
-              <span>{formatPrice(psFeeYen * rates.EUR, 'EUR')}</span>
+              <span>{formatPrice(psFeeYen * rates.BRL, 'BRL', true)}</span>
+              <span>{formatPrice(psFeeYen * rates.EUR, 'EUR', true)}</span>
             </div>
           )}
         </div>
@@ -160,11 +160,11 @@ const AdminCalculator: React.FC = () => {
         </div>
         <div className="bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-2xl p-4 text-center">
           <p className="text-[11px] font-bold text-green-700 dark:text-green-400 mb-1 uppercase tracking-wide">Total em Reais</p>
-          <p className="text-2xl font-black text-green-900 dark:text-green-200">{formatPrice(grandTotalYen * rates.BRL, 'BRL')}</p>
+          <p className="text-2xl font-black text-green-900 dark:text-green-200">{formatPrice(grandTotalYen * rates.BRL, 'BRL', true)}</p>
         </div>
         <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-2xl p-4 text-center">
           <p className="text-[11px] font-bold text-blue-700 dark:text-blue-400 mb-1 uppercase tracking-wide">Total em Euro</p>
-          <p className="text-2xl font-black text-blue-900 dark:text-blue-200">{formatPrice(grandTotalYen * rates.EUR, 'EUR')}</p>
+          <p className="text-2xl font-black text-blue-900 dark:text-blue-200">{formatPrice(grandTotalYen * rates.EUR, 'EUR', true)}</p>
         </div>
       </div>
 
@@ -178,11 +178,11 @@ const AdminCalculator: React.FC = () => {
           </div>
           <div>
             <p className="text-xs text-emerald-600 dark:text-emerald-400 mb-0.5">Em Reais</p>
-            <p className="text-3xl font-black text-emerald-800 dark:text-emerald-200">{formatPrice(profitYen * rates.BRL, 'BRL')}</p>
+            <p className="text-3xl font-black text-emerald-800 dark:text-emerald-200">{formatPrice(profitYen * rates.BRL, 'BRL', true)}</p>
           </div>
           <div>
             <p className="text-xs text-emerald-600 dark:text-emerald-400 mb-0.5">Em Euro</p>
-            <p className="text-3xl font-black text-emerald-800 dark:text-emerald-200">{formatPrice(profitYen * rates.EUR, 'EUR')}</p>
+            <p className="text-3xl font-black text-emerald-800 dark:text-emerald-200">{formatPrice(profitYen * rates.EUR, 'EUR', true)}</p>
           </div>
         </div>
       </div>
@@ -244,7 +244,7 @@ const AdminCalculator: React.FC = () => {
               {yenFmt(eRaitoYen)}
             </p>
             <p className="text-sm text-emerald-600 dark:text-emerald-400 mt-0.5">
-              ≈ {formatPrice(eRaitoYen * rates.BRL, 'BRL')} · {formatPrice(eRaitoYen * rates.EUR, 'EUR')}
+              ≈ {formatPrice(eRaitoYen * rates.BRL, 'BRL', true)} · {formatPrice(eRaitoYen * rates.EUR, 'EUR', true)}
             </p>
           </div>
         )}
@@ -258,7 +258,7 @@ const AdminCalculator: React.FC = () => {
                 </span>
                 <p className="text-2xl font-black text-blue-800 dark:text-blue-200">{yenFmt(kAirYen)}</p>
                 <p className="text-sm text-blue-600 dark:text-blue-400 mt-0.5">
-                  ≈ {formatPrice(kAirYen * rates.BRL, 'BRL')} · {formatPrice(kAirYen * rates.EUR, 'EUR')}
+                  ≈ {formatPrice(kAirYen * rates.BRL, 'BRL', true)} · {formatPrice(kAirYen * rates.EUR, 'EUR', true)}
                 </p>
               </div>
             )}
@@ -269,7 +269,7 @@ const AdminCalculator: React.FC = () => {
                 </span>
                 <p className="text-2xl font-black text-orange-800 dark:text-orange-200">{yenFmt(kSalYen)}</p>
                 <p className="text-sm text-orange-600 dark:text-orange-400 mt-0.5">
-                  ≈ {formatPrice(kSalYen * rates.BRL, 'BRL')} · {formatPrice(kSalYen * rates.EUR, 'EUR')}
+                  ≈ {formatPrice(kSalYen * rates.BRL, 'BRL', true)} · {formatPrice(kSalYen * rates.EUR, 'EUR', true)}
                 </p>
               </div>
             )}
@@ -289,8 +289,8 @@ const AdminCalculator: React.FC = () => {
                   <span className="text-xs font-bold text-gray-400 w-40 shrink-0">{opt.label}</span>
                   <div className="flex gap-4 flex-wrap">
                     <span className="text-xl font-black text-white">{yenFmt(total)}</span>
-                    <span className="text-xl font-black text-green-400">{formatPrice(total * rates.BRL, 'BRL')}</span>
-                    <span className="text-xl font-black text-blue-400">{formatPrice(total * rates.EUR, 'EUR')}</span>
+                    <span className="text-xl font-black text-green-400">{formatPrice(total * rates.BRL, 'BRL', true)}</span>
+                    <span className="text-xl font-black text-blue-400">{formatPrice(total * rates.EUR, 'EUR', true)}</span>
                   </div>
                 </div>
               );
