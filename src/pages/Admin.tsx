@@ -1,7 +1,7 @@
 import { safeStorage } from '@/utils/storage';
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Package, Printer, ShoppingBag, User, MapPin, Phone, Mail, Calendar, TestTube, Tag, Truck, CheckCircle, XCircle, Trash2, BarChart3, Users, PackagePlus, Video, Megaphone, Clapperboard, Building2, Sparkles, ShieldCheck, Calculator, CloudUpload, FileText, Handshake } from 'lucide-react';
+import { Package, Printer, ShoppingBag, User, MapPin, Phone, Mail, Calendar, TestTube, Tag, Truck, CheckCircle, XCircle, Trash2, BarChart3, Users, PackagePlus, Video, Megaphone, Clapperboard, Building2, Sparkles, ShieldCheck, Calculator, CloudUpload, FileText, Handshake, Flag } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { useUser } from '@/context/UserContext';
@@ -31,6 +31,7 @@ import EmployeeManager from '@/components/admin/EmployeeManager';
 import CouponUsageReport from '@/components/admin/CouponUsageReport';
 import FraudDashboard from '@/components/admin/FraudDashboard';
 import ThermalPrinterSettings from '@/components/admin/ThermalPrinterSettings';
+import ReviewModeration from '@/components/admin/ReviewModeration';
 import CN23Modal from '@/components/admin/CN23Modal';
 import PromoNotificationModal from '@/components/admin/PromoNotificationModal';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
@@ -51,7 +52,7 @@ type AdminTab =
   | 'orders' | 'coupons' | 'dashboard' | 'customers' | 'products'
   | 'home' | 'vlog' | 'affiliates' | 'requests' | 'b2b' | 'admins' | 'videos'
   | 'calculator' | 'migration' | 'promotion' | 'negotiations' | 'marketing' | 'employees' | 'coupon-usage' | 'fraud'
-  | 'thermal-printer';
+  | 'thermal-printer' | 'review-moderation';
 
 interface AdminTabItem {
   id: AdminTab;
@@ -610,6 +611,7 @@ _This is an automated test message_
     { title: 'Catálogo', items: [
       { id: 'products', label: 'Produtos', icon: PackagePlus },
       { id: 'coupons', label: 'Cupons', icon: Tag },
+      { id: 'review-moderation', label: 'Moderação Reviews', icon: Flag },
     ] },
     { title: 'Solicitações', items: [
       { id: 'requests', label: 'Personalizados', icon: Sparkles },
@@ -1106,6 +1108,8 @@ _This is an automated test message_
               <FraudDashboard />
             ) : activeTab === 'thermal-printer' ? (
               <ThermalPrinterSettings />
+            ) : activeTab === 'review-moderation' ? (
+              <ReviewModeration />
             ) : (
               <CustomerList />
             )}
