@@ -34,6 +34,7 @@ interface FinanceSummary {
   comissoesYen: number;       // pendentes (a pagar)
   comissoesConfirmYen: number; // já liberadas/pagas
   marketingBRL: number;
+  marketingJPY: number;
   salariosBRL: number;
   salariosJPY: number;
   descontosCupomYen: number;  // informativo apenas (não afeta lucro)
@@ -60,7 +61,7 @@ const Dashboard: React.FC = () => {
     ordersThisMonth: 0, ordersLastMonth: 0,
   };
   const [stats, setStats] = useState<OrderStatistics | null>(null);
-  const [finance, setFinance] = useState<FinanceSummary>({ receitaComFrete: 0, receitaSemFrete: 0, receitaProduto: 0, receitaPS: 0, custo: 0, lucro: 0, comissoesYen: 0, comissoesConfirmYen: 0, marketingBRL: 0, salariosBRL: 0, salariosJPY: 0, descontosCupomYen: 0, lucroLiquido: 0 });
+  const [finance, setFinance] = useState<FinanceSummary>({ receitaComFrete: 0, receitaSemFrete: 0, receitaProduto: 0, receitaPS: 0, custo: 0, lucro: 0, comissoesYen: 0, comissoesConfirmYen: 0, marketingBRL: 0, marketingJPY: 0, salariosBRL: 0, salariosJPY: 0, descontosCupomYen: 0, lucroLiquido: 0 });
   const [monthlyData, setMonthlyData] = useState<MonthlyFin[]>([]);
   const [topProducts, setTopProducts] = useState<{ name: string; count: number }[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<{ method: string; revenue: number }[]>([]);
@@ -128,11 +129,13 @@ const Dashboard: React.FC = () => {
       comissoesConfirmYen = allAffiliates.reduce((s, a) => s + (a.totalEarnings || 0), 0);
     } catch { /* ignora */ }
 
-    // Gastos de marketing (em BRL)
+    // Gastos de marketing (BRL + JPY convertido)
     let marketingBRL = 0;
+    let marketingJPY = 0;
     try {
       const mkt = await withTimeout(getMarketingExpenses(), 5_000, []);
       marketingBRL = mkt.filter(e => e.currency === 'BRL').reduce((s, e) => s + e.amount, 0);
+      marketingJPY = mkt.filter(e => e.currency === 'JPY').reduce((s, e) => s + e.amount, 0);
     } catch { /* ignora */ }
 
     // Salários de funcionários
@@ -188,7 +191,7 @@ const Dashboard: React.FC = () => {
     const receitaTotal = receitaProduto + receitaPS;
     const YEN_PER_BRL = 28; // fallback ¥28/BRL
     const totalComissoesYen = comissoesYen + comissoesConfirmYen;
-    const marketingYen = Math.round(marketingBRL * YEN_PER_BRL);
+    const marketingYen = marketingJPY + Math.round(marketingBRL * YEN_PER_BRL);
     const salariosYen = salariosJPY + Math.round(salariosBRL * YEN_PER_BRL);
     const lucroLiquido = receitaTotal - custo - totalComissoesYen - marketingYen - salariosYen;
 
@@ -244,7 +247,7 @@ const Dashboard: React.FC = () => {
     const payment = Object.entries(byMethod).map(([method, revenue]) => ({ method, revenue: revenue as number }));
 
     setStats({ ...statistics, totalRevenue: receitaComFrete, revenueThisMonth, revenueLastMonth });
-    setFinance({ receitaComFrete, receitaSemFrete, receitaProduto, receitaPS, custo, lucro, comissoesYen, comissoesConfirmYen, marketingBRL, salariosBRL, salariosJPY, descontosCupomYen, lucroLiquido });
+    setFinance({ receitaComFrete, receitaSemFrete, receitaProduto, receitaPS, custo, lucro, comissoesYen, comissoesConfirmYen, marketingBRL, marketingJPY, salariosBRL, salariosJPY, descontosCupomYen, lucroLiquido });
     setMonthlyData(monthly);
     setTopProducts(top5);
     setPaymentMethods(payment);
@@ -460,7 +463,15 @@ const Dashboard: React.FC = () => {
             </div>
             <div className="bg-card rounded-xl border border-border p-4">
               <p className="text-xs text-muted-foreground mb-1">Marketing</p>
-              <p className="text-xl font-bold text-blue-500">−R${finance.marketingBRL.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+              {finance.marketingBRL > 0 && (
+                <p className="text-xl font-bold text-blue-500">−R${finance.marketingBRL.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+              )}
+              {finance.marketingJPY > 0 && (
+                <p className="text-xl font-bold text-blue-500">−¥{finance.marketingJPY.toLocaleString()}</p>
+              )}
+              {finance.marketingBRL === 0 && finance.marketingJPY === 0 && (
+                <p className="text-xl font-bold text-blue-500">−R$ 0,00</p>
+              )}
               <p className="text-[11px] text-muted-foreground mt-1">Ads + influencers</p>
             </div>
             <div className="bg-card rounded-xl border border-border p-4">
@@ -488,7 +499,7 @@ const Dashboard: React.FC = () => {
           {(() => {
             const YEN_PER_BRL = 28;
             const totalComissoesYen = finance.comissoesYen + finance.comissoesConfirmYen;
-            const marketingYen = Math.round(finance.marketingBRL * YEN_PER_BRL);
+            const marketingYen = finance.marketingJPY + Math.round(finance.marketingBRL * YEN_PER_BRL);
             const salariosYen = finance.salariosJPY + Math.round(finance.salariosBRL * YEN_PER_BRL);
             return (
               <div className={`rounded-xl border-2 p-5 ${finance.lucroLiquido >= 0 ? 'bg-green-50 dark:bg-green-950/20 border-green-400 dark:border-green-700' : 'bg-red-50 dark:bg-red-950/20 border-red-400'}`}>

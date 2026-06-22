@@ -87,7 +87,9 @@ const MarketingManager: React.FC = () => {
   const totalJPY = filtered.filter(e => e.currency === 'JPY').reduce((s, e) => s + e.amount, 0);
 
   const adsBRL = expenses.filter(e => e.type === 'ads' && e.currency === 'BRL').reduce((s, e) => s + e.amount, 0);
+  const adsJPY = expenses.filter(e => e.type === 'ads' && e.currency === 'JPY').reduce((s, e) => s + e.amount, 0);
   const infBRL = expenses.filter(e => e.type === 'influencer' && e.currency === 'BRL').reduce((s, e) => s + e.amount, 0);
+  const infJPY = expenses.filter(e => e.type === 'influencer' && e.currency === 'JPY').reduce((s, e) => s + e.amount, 0);
 
   const platforms = form.type === 'ads' ? PLATFORMS_ADS : PLATFORMS_INF;
 
@@ -102,6 +104,7 @@ const MarketingManager: React.FC = () => {
             <span className="text-sm font-semibold text-blue-700 dark:text-blue-400">Impulsionamento / Ads</span>
           </div>
           <p className="text-2xl font-bold">R$ {adsBRL.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+          {adsJPY > 0 && <p className="text-sm text-muted-foreground mt-1">+ ¥{adsJPY.toLocaleString()}</p>}
         </div>
         <div className="bg-card rounded-xl border border-border p-5">
           <div className="flex items-center gap-2 mb-2">
@@ -109,6 +112,7 @@ const MarketingManager: React.FC = () => {
             <span className="text-sm font-semibold text-purple-700 dark:text-purple-400">Influencers</span>
           </div>
           <p className="text-2xl font-bold">R$ {infBRL.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+          {infJPY > 0 && <p className="text-sm text-muted-foreground mt-1">+ ¥{infJPY.toLocaleString()}</p>}
         </div>
         <div className="bg-red-50 dark:bg-red-950/20 rounded-xl border border-red-200 dark:border-red-800 p-5">
           <div className="flex items-center gap-2 mb-2">
@@ -116,6 +120,7 @@ const MarketingManager: React.FC = () => {
             <span className="text-sm font-semibold text-red-700 dark:text-red-400">Total Marketing</span>
           </div>
           <p className="text-2xl font-bold text-red-600">R$ {(adsBRL + infBRL).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+          {(adsJPY + infJPY) > 0 && <p className="text-sm text-red-500 mt-1">+ ¥{(adsJPY + infJPY).toLocaleString()}</p>}
         </div>
       </div>
 
