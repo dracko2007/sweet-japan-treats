@@ -101,6 +101,8 @@ const Checkout: React.FC = () => {
   const totalQty = items.reduce((s, i) => i.freeGift ? s : s + i.quantity, 0);
   const psFeeYen = totalQty * 1000;
 
+  const isGuest = !!location.state?.isGuest;
+
   // Negociação ativa — carregada APENAS via router state (Continuar pedido ou auto-aprovação).
   // Não usa localStorage no init: assim Ctrl+Shift+R limpa qualquer negociação pendente.
   const [activeNegId, setActiveNegId] = useState<string | null>(location.state?.activeNegId || null);
@@ -221,10 +223,10 @@ const Checkout: React.FC = () => {
 
   // Exige login — pedido sem conta não é salvo no Firestore e o admin nunca vê
   useEffect(() => {
-    if (authReady && !isAuthenticated) {
+    if (authReady && !isAuthenticated && !isGuest) {
       navigate('/cadastro', { state: { from: '/checkout' } });
     }
-  }, [isAuthenticated, authReady, navigate]);
+  }, [isAuthenticated, authReady, navigate, isGuest]);
 
   // Redirect if cart is empty
   useEffect(() => {
@@ -493,6 +495,7 @@ const Checkout: React.FC = () => {
         psFeeDiscountYen: effectivePsFeeDiscountYen,  // capped to current cart — anti-manipulation
         shippingDiscountYen,
         negotiationId: activeNegId,
+        isGuest,
       }
     });
   };
@@ -654,6 +657,16 @@ const Checkout: React.FC = () => {
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-6">
+                  {isGuest && (
+                    <div className="mb-4 p-3 rounded-xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 text-xs text-amber-800 dark:text-amber-300 flex items-start gap-2">
+                      <span className="text-base shrink-0">👤</span>
+                      <span>
+                        <strong>Compra como Convidado</strong> — Sem pontos, cupons ou histórico de pedidos.{' '}
+                        <button type="button" onClick={() => navigate('/cadastro')} className="underline ml-1 font-semibold hover:text-amber-900">Criar conta</button> para aproveitar todos os benefícios.
+                      </span>
+                    </div>
+                  )}
+
                   {/* Personal Information */}
                   <div className="space-y-4">
                     <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wide">
@@ -1010,7 +1023,7 @@ const Checkout: React.FC = () => {
                   />
 
                   {/* Points Redemption */}
-                  {isAuthenticated && (
+                  {isAuthenticated && !isGuest && (
                     <div className={`rounded-xl p-3 border text-xs ${canRedeem ? 'bg-purple-50 dark:bg-purple-950/20 border-dashed border-purple-300' : 'bg-muted/40 border-border'}`}>
                       <div className="flex items-center gap-1.5 mb-1.5">
                         <Sparkles className={`w-3.5 h-3.5 ${canRedeem ? 'text-purple-600' : 'text-muted-foreground'}`} />

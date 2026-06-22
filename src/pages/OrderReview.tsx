@@ -57,6 +57,7 @@ const OrderReview: React.FC = () => {
   const psFeeDiscountYen: number = location.state?.psFeeDiscountYen || 0;
   const shippingDiscountYen: number = location.state?.shippingDiscountYen || 0;
   const negotiationId: string | null = location.state?.negotiationId || null;
+  const isGuest: boolean = !!location.state?.isGuest;
   const [couponInput, setCouponInput] = useState('');
   const [couponError, setCouponError] = useState('');
   const [couponLoading, setCouponLoading] = useState(false);
@@ -309,10 +310,12 @@ const OrderReview: React.FC = () => {
     // CPF is omitted from the local cache — it lives only in Firestore (LGPD)
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { cpf: _cpf, ...localOrder } = mockOrder;
-    const existingOrders = JSON.parse(safeStorage.getItem('sakura_orders') || '[]');
-    // Remove any previous entry with the same orderNumber to avoid stale duplicates
-    const deduped = existingOrders.filter((o: any) => o.orderNumber !== orderId && o.id !== orderId);
-    safeStorage.setItem('sakura_orders', JSON.stringify([localOrder, ...deduped]));
+    if (!isGuest) {
+      const existingOrders = JSON.parse(safeStorage.getItem('sakura_orders') || '[]');
+      // Remove any previous entry with the same orderNumber to avoid stale duplicates
+      const deduped = existingOrders.filter((o: any) => o.orderNumber !== orderId && o.id !== orderId);
+      safeStorage.setItem('sakura_orders', JSON.stringify([localOrder, ...deduped]));
+    }
 
     // ⭐ GRAVA NO FIRESTORE — sem isto o pedido só fica no navegador do comprador
     // e o admin (em outro dispositivo) NUNCA vê. Formato exato que o painel espera:
@@ -340,6 +343,7 @@ const OrderReview: React.FC = () => {
       shippingCost: finalShippingCost,
       shipping: { cost: finalShippingCost, carrier: shipping.carrier, estimatedDays: shipping.estimatedDays },
       affiliateCode: appliedCoupon?.affiliateCode || '',
+      customerType: isGuest ? 'guest' : 'registered',
       shippingAddress: {
         name: formData.name,
         phone: formData.phone || '',
@@ -363,8 +367,8 @@ const OrderReview: React.FC = () => {
       })),
     };
 
-    // Fire-and-forget: não trava a confirmação para o comprador
-    if (user) {
+    // Guest orders: save to Firestore for admin visibility but not to user profile
+    if (user && !isGuest) {
       void addOrder(firestoreOrder as any);
     }
 
@@ -408,11 +412,13 @@ const OrderReview: React.FC = () => {
       safeStorage.removeItem('affiliate_ref');
     } else if (appliedCoupon?.code) {
       // Cupom pessoal → consome (uso único, some do perfil)
-      consumeCouponByCode(appliedCoupon.code);
+      if (!isGuest) {
+        consumeCouponByCode(appliedCoupon.code);
+      }
     }
 
     // 🎁 Pontos de fidelidade: deduz o resgate e credita o ganho pelo gasto.
-    if (user) {
+    if (user && !isGuest) {
       const net = earnedPoints - redeemPoints;
       if (net !== 0) addPoints(net);
       if (redeemPoints > 0 || earnedPoints > 0) {
@@ -477,7 +483,8 @@ const OrderReview: React.FC = () => {
     // Navigate to confirmation page
     navigate('/order-confirmation', {
       state: {
-        order: mockOrder
+        order: mockOrder,
+        isGuest,
       }
     });
   };

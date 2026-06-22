@@ -20,7 +20,9 @@ const OrderConfirmation: React.FC = () => {
   const { toast } = useToast();
   const { t } = useLanguage();
   const order = location.state?.order;
-  
+  const isGuest = !!location.state?.isGuest;
+  const [showGuestModal, setShowGuestModal] = useState(isGuest);
+
   const [copied, setCopied] = useState(false);
   const [cardData, setCardData] = useState({ number: '', name: '', expiry: '', cvv: '' });
   const [cardStatus, setCardStatus] = useState<'idle' | 'processing' | 'success'>('idle');
@@ -666,6 +668,47 @@ const OrderConfirmation: React.FC = () => {
           </div>
         </div>
       </section>
+
+      {/* Guest account benefits popup */}
+      {isGuest && showGuestModal && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-card border border-border rounded-2xl shadow-2xl max-w-sm w-full p-6 animate-fade-up">
+            <div className="text-center mb-4">
+              <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-3">
+                <span className="text-2xl">🎉</span>
+              </div>
+              <h2 className="text-lg font-bold text-foreground">Pedido confirmado!</h2>
+              <p className="text-sm text-muted-foreground mt-1">Você comprou como convidado.</p>
+            </div>
+
+            <div className="bg-muted/50 rounded-xl p-4 mb-5">
+              <p className="text-xs font-bold text-foreground mb-3 uppercase tracking-wide">Crie uma conta e aproveite:</p>
+              <ul className="space-y-2 text-sm text-foreground">
+                <li className="flex items-center gap-2"><span>🎁</span> <span><strong>Pontos de fidelidade</strong> a cada compra</span></li>
+                <li className="flex items-center gap-2"><span>📦</span> <span><strong>Histórico</strong> de todos os seus pedidos</span></li>
+                <li className="flex items-center gap-2"><span>🚚</span> <span><strong>Rastreamento</strong> do envio em tempo real</span></li>
+                <li className="flex items-center gap-2"><span>🎟️</span> <span><strong>Cupons</strong> e promoções exclusivas</span></li>
+                <li className="flex items-center gap-2"><span>🤝</span> <span><strong>Negociações</strong> de desconto personalizadas</span></li>
+              </ul>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={() => navigate('/cadastro')}
+                className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-bold text-sm hover:bg-primary/90 transition-colors"
+              >
+                Criar conta grátis agora
+              </button>
+              <button
+                onClick={() => setShowGuestModal(false)}
+                className="w-full py-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Continuar sem conta
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </Layout>
   );
 };

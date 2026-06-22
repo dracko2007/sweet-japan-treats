@@ -495,11 +495,17 @@ const Cart: React.FC = () => {
                   </Button>
                   
                   <p className="text-center text-xs text-muted-foreground">
-                    {selectedCountry === 'Japão' 
+                    {selectedCountry === 'Japão'
                       ? '🏠 Envio direto de Hiroshima - Frete rápido e seguro.'
                       : '✈️ Despachado de Tóquio com entrega expressa pelos Correios.'
                     }
                   </p>
+                  <button
+                    onClick={() => navigate('/checkout', { state: { coupon: activeCoupon, isGuest: true } })}
+                    className="w-full text-sm text-muted-foreground hover:text-foreground underline underline-offset-2 transition-colors py-1"
+                  >
+                    Continuar como Convidado (sem cadastro)
+                  </button>
                 </div>
               </div>
             </div>
