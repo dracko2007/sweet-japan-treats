@@ -16,7 +16,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useLanguage } from '@/context/LanguageContext';
 import { useProducts } from '@/context/ProductsContext';
 import { formatPrice } from '@/utils/currency';
-import { effectiveYen } from '@/utils/pricing';
+import { effectiveYen, roundYen } from '@/utils/pricing';
 import { convertYen as fxConvert, yenFromConverted } from '@/services/fxService';
 import { negotiationService } from '@/services/negotiationService';
 import { productService } from '@/services/productService';
@@ -161,7 +161,7 @@ const OrderReview: React.FC = () => {
   const finalGrandTotal = grandTotal + pixTotalFees;
 
   // Total em ¥ para exibir no badge da Wise (sem taxas PIX)
-  const grandTotalYen = currency === 'JPY' ? grandTotal : yenFromConverted(grandTotal, currency);
+  const grandTotalYen = currency === 'JPY' ? grandTotal : roundYen(yenFromConverted(grandTotal, currency));
 
   const handleApplyCoupon = async () => {
     const code = couponInput.trim().toUpperCase();
