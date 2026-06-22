@@ -35,7 +35,11 @@ service cloud.firestore {
         && request.resource.data.customerEmail is string
         && request.resource.data.customerEmail.size() > 3;
 
-      allow update: if isAdmin();
+      allow update: if isAdmin()
+        || (request.auth != null
+            && resource.data.customerEmail == request.auth.token.email
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])
+            && request.resource.data.status == 'delivered');
       allow delete: if isAdmin();
     }
 

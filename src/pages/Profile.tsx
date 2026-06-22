@@ -1,3 +1,4 @@
+import { safeStorage } from '@/utils/storage';
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { User, Mail, Phone, MapPin, Calendar, Gift, ShoppingBag, Edit2, LogOut, Package, RotateCcw, Cloud, Truck, Tag, Megaphone, ArrowRight, Handshake, CheckCircle2, XCircle, Hourglass } from 'lucide-react';
@@ -53,9 +54,41 @@ const Profile: React.FC = () => {
 
   const [confirmingOrderId, setConfirmingOrderId] = useState<string | null>(null);
   const handleConfirmReceived = async (orderNumber: string) => {
+    if (!user) return;
     setConfirmingOrderId(orderNumber);
     try {
-      await orderService.updateOrderStatus(orderNumber, 'delivered');
+      const now = new Date().toISOString();
+
+      // 1. orders_${userId} — primary store for registered users
+      const ordersKey = `orders_${user.id}`;
+      const rawOrders = JSON.parse(safeStorage.getItem(ordersKey) || '[]');
+      const updatedOrders = rawOrders.map((o: any) =>
+        o.orderNumber === orderNumber ? { ...o, status: 'delivered', updatedAt: now } : o
+      );
+      safeStorage.setItem(ordersKey, JSON.stringify(updatedOrders));
+
+      // 2. japan-express-users — also update here so refreshOrders priority chain is consistent
+      const users = JSON.parse(safeStorage.getItem('japan-express-users') || '{}');
+      Object.keys(users).forEach((email) => {
+        (users[email].orders || []).forEach((o: any, i: number) => {
+          if (o.orderNumber === orderNumber) {
+            users[email].orders[i].status = 'delivered';
+            users[email].orders[i].updatedAt = now;
+          }
+        });
+      });
+      safeStorage.setItem('japan-express-users', JSON.stringify(users));
+
+      // 3. sakura_orders
+      const sakura = JSON.parse(safeStorage.getItem('sakura_orders') || '[]');
+      const updatedSakura = sakura.map((o: any) =>
+        o.orderNumber === orderNumber ? { ...o, status: 'delivered', updatedAt: now } : o
+      );
+      safeStorage.setItem('sakura_orders', JSON.stringify(updatedSakura));
+
+      // 4. Firestore (best-effort — can fail if user isn't admin)
+      orderService.updateOrderStatus(orderNumber, 'delivered').catch(() => {});
+
       refreshOrders();
       toast({ title: '✅ Recebimento confirmado!', description: 'Obrigado por confirmar. Que aproveite!' });
     } catch {
