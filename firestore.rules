@@ -26,8 +26,8 @@ service cloud.firestore {
         || (request.auth != null && resource.data.userId == request.auth.uid)
         || (request.auth != null && resource.data.customerEmail == request.auth.token.email);
 
-      // Criação: exige autenticação + campos mínimos válidos (evita spam/bots).
-      allow create: if request.auth != null
+      // Criação: usuário autenticado OU convidado (customerType == 'guest') com campos mínimos.
+      allow create: if (request.auth != null || request.resource.data.get('customerType', '') == 'guest')
         && request.resource.data.status == 'pending'
         && request.resource.data.keys().hasAll(['totalAmount', 'items', 'customerEmail'])
         && request.resource.data.totalAmount > 0
