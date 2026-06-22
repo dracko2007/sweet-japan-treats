@@ -14,7 +14,7 @@
  */
 
 import { db } from '@/config/firebase';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, addDoc, collection } from 'firebase/firestore';
 
 const COL = 'cpf_index';
 
@@ -106,6 +106,35 @@ export const cpfGuardService = {
     } catch {
       // Falha silenciosa — não bloqueia a finalização do pedido
     }
+  },
+
+  /**
+   * Registra uma tentativa de fraude bloqueada para o dashboard admin.
+   * Falha silenciosa para não expor ao usuário.
+   */
+  async logFraudAttempt(params: {
+    cpfRaw: string;
+    attemptType: 'product_limit' | 'affiliate_reuse';
+    productId?: string;
+    affiliateCode?: string;
+    customerEmail?: string;
+    customerName?: string;
+  }): Promise<void> {
+    if (!db) return;
+    const cpf = normalizeCPF(params.cpfRaw);
+    if (cpf.length !== 11) return;
+    try {
+      await addDoc(collection(db, 'fraud_attempts'), {
+        cpf: cpf.slice(0, 3) + '***' + cpf.slice(6),  // mascarado para log
+        cpfFull: cpf,
+        attemptType: params.attemptType,
+        productId: params.productId || '',
+        affiliateCode: params.affiliateCode || '',
+        customerEmail: params.customerEmail || '',
+        customerName: params.customerName || '',
+        blockedAt: new Date().toISOString(),
+      });
+    } catch { /* silencioso */ }
   },
 
   normalizeCPF,

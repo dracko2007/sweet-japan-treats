@@ -29,6 +29,7 @@ import AdminCalculator from '@/components/admin/AdminCalculator';
 import MarketingManager from '@/components/admin/MarketingManager';
 import EmployeeManager from '@/components/admin/EmployeeManager';
 import CouponUsageReport from '@/components/admin/CouponUsageReport';
+import FraudDashboard from '@/components/admin/FraudDashboard';
 import CN23Modal from '@/components/admin/CN23Modal';
 import PromoNotificationModal from '@/components/admin/PromoNotificationModal';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
@@ -48,7 +49,7 @@ const devError = isDev ? console.error.bind(console) : () => {};
 type AdminTab =
   | 'orders' | 'coupons' | 'dashboard' | 'customers' | 'products'
   | 'home' | 'vlog' | 'affiliates' | 'requests' | 'b2b' | 'admins' | 'videos'
-  | 'calculator' | 'migration' | 'promotion' | 'negotiations' | 'marketing' | 'employees' | 'coupon-usage';
+  | 'calculator' | 'migration' | 'promotion' | 'negotiations' | 'marketing' | 'employees' | 'coupon-usage' | 'fraud';
 
 interface AdminTabItem {
   id: AdminTab;
@@ -465,6 +466,7 @@ _This is an automated test message_
       { id: 'marketing', label: 'Gastos Marketing', icon: Megaphone },
       { id: 'employees', label: 'Funcionários', icon: Users },
       { id: 'coupon-usage', label: 'Gastos c/ Cupons', icon: Tag },
+      { id: 'fraud', label: 'Anti-Fraude', icon: ShieldCheck },
     ] },
     { title: 'Ferramentas', items: [
       { id: 'promotion', label: 'Promoção Início', icon: Sparkles },
@@ -933,6 +935,8 @@ _This is an automated test message_
               <EmployeeManager />
             ) : activeTab === 'coupon-usage' ? (
               <CouponUsageReport />
+            ) : activeTab === 'fraud' ? (
+              <FraudDashboard />
             ) : (
               <CustomerList />
             )}

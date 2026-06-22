@@ -113,6 +113,12 @@ service cloud.firestore {
       allow update, delete: if isAdmin();
     }
 
+    // ---------- Tentativas de fraude (log para o admin) ----------
+    match /fraud_attempts/{id} {
+      allow create: if request.auth != null;  // qualquer auth (inclusive anônimo) pode criar
+      allow read, update, delete: if isAdmin();
+    }
+
     // ---------- Índice anti-fraude de CPF ----------
     // Cada documento tem id = CPF (só dígitos) e campos:
     //   productIds: string[]  — produtos já comprados com esse CPF

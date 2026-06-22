@@ -231,6 +231,9 @@ const OrderReview: React.FC = () => {
     // ── Verificações anti-fraude por CPF ─────────────────────────────────────
     const cpfRaw = formData.cpf || '';
     if (cpfRaw) {
+      const customerEmail = String(formData.email || user?.email || '').trim().toLowerCase();
+      const customerName = formData.name || '';
+
       // 1. Limite de produto por CPF (burla via guest)
       const productIdsWithLimit = items
         .filter(i => !i.freeGift && i.product.stock && !i.product.stock.unlimited)
@@ -238,7 +241,16 @@ const OrderReview: React.FC = () => {
       if (productIdsWithLimit.length > 0) {
         const limitCheck = await cpfGuardService.checkProductLimit(cpfRaw, productIdsWithLimit);
         if (limitCheck.blocked) {
-          toast({ title: 'Compra bloqueada', description: limitCheck.reason, variant: 'destructive' });
+          toast({
+            title: '⚠️ Limite de compra atingido',
+            description: 'Este produto tem limite de 1 unidade por pessoa (CPF). Seu CPF já possui um pedido com este produto.',
+            variant: 'destructive',
+          });
+          cpfGuardService.logFraudAttempt({
+            cpfRaw, attemptType: 'product_limit',
+            productId: productIdsWithLimit[0],
+            customerEmail, customerName,
+          });
           return;
         }
       }
@@ -249,9 +261,14 @@ const OrderReview: React.FC = () => {
         const affCheck = await cpfGuardService.hasUsedAffiliateDiscount(cpfRaw);
         if (affCheck.used) {
           toast({
-            title: 'Cupom de indicação inválido',
-            description: `Este CPF já utilizou desconto de indicação em uma compra anterior. O desconto de indicação é válido apenas na primeira compra. Cupons de produto específico podem ser usados normalmente.`,
+            title: '🏷️ Cupom de indicação não aplicável',
+            description: 'O desconto de indicação é exclusivo para a primeira compra. Sua compra continuará normalmente sem o desconto de indicação. Cupons de produto específico são sempre válidos!',
             variant: 'destructive',
+          });
+          cpfGuardService.logFraudAttempt({
+            cpfRaw, attemptType: 'affiliate_reuse',
+            affiliateCode: appliedCoupon.affiliateCode,
+            customerEmail, customerName,
           });
           setCouponDiscount(0);
           setAppliedCoupon(null);
