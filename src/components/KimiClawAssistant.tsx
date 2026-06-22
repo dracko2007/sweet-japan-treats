@@ -890,8 +890,9 @@ const KimiClawAssistant: React.FC = () => {
                     )}
                   </div>
                   
-                  {/* CONSENT PROMPT ACTION BUTTONS (somem após responder) */}
+                  {/* CONSENT PROMPT ACTION BUTTONS (somem após responder ou se já inscrito) */}
                   {msg.isConsentPrompt &&
+                    !user?.whatsappMarketing &&
                     !respondedOrders.includes(msg.orderToShare?.orderNumber || msg.orderToShare?.id) && (
                     <div className="flex gap-2 mt-1">
                       <button

@@ -31,7 +31,7 @@ const devError = isDev ? console.error.bind(console) : () => {};
 
 
 const Profile: React.FC = () => {
-  const { user, isAuthenticated, authReady, coupons, orders, updateProfile, logout } = useUser();
+  const { user, isAuthenticated, authReady, coupons, orders, updateProfile, logout, refreshOrders } = useUser();
   const { t, selectedCountry } = useLanguage();
   const { products } = useProducts();
   const { addToCart, clearCart } = useCart();
@@ -61,6 +61,9 @@ const Profile: React.FC = () => {
   const [requesting, setRequesting] = useState(false);
 
   // Negociações do usuário
+  // Refresh orders from localStorage on mount so tracking updates from admin are visible
+  useEffect(() => { refreshOrders(); }, []);
+
   const [negotiations, setNegotiations] = useState<Negotiation[]>([]);
   useEffect(() => {
     if (!user?.id && !user?.email) return;
@@ -825,6 +828,46 @@ const Profile: React.FC = () => {
                           </span>
                         </div>
                       </div>
+
+                      {/* Acompanhamento do pedido — sempre visível */}
+                      {(() => {
+                        const hasTracking = !!(order as any).trackingNumber;
+                        const st = order.status as string;
+                        const statusStep =
+                          st === 'delivered' ? 3
+                          : st === 'shipped' ? 2
+                          : (st === 'processing' || st === 'confirmed') ? 1
+                          : 0;
+                        const steps = ['Pagamento', 'Preparando', 'Enviado', 'Entregue'];
+                        return (
+                          <div className="mt-2 p-3 rounded-xl bg-muted/40 border border-border">
+                            <p className="text-xs font-semibold text-foreground mb-2 flex items-center gap-1">
+                              <Package className="w-3.5 h-3.5" />
+                              Acompanhamento do Pedido
+                            </p>
+                            <div className="flex items-center gap-1 mb-2">
+                              {steps.map((label, i) => (
+                                <React.Fragment key={i}>
+                                  <div className={`flex flex-col items-center ${i === 0 ? 'flex-shrink-0' : 'flex-1'}`}>
+                                    <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${i <= statusStep ? 'bg-primary text-white' : 'bg-muted-foreground/20 text-muted-foreground'}`}>
+                                      {i < statusStep ? '✓' : i + 1}
+                                    </div>
+                                    <span className={`text-[9px] mt-0.5 text-center leading-tight ${i <= statusStep ? 'text-primary font-semibold' : 'text-muted-foreground'}`}>{label}</span>
+                                  </div>
+                                  {i < steps.length - 1 && (
+                                    <div className={`flex-1 h-0.5 mb-3.5 ${i < statusStep ? 'bg-primary' : 'bg-muted-foreground/20'}`} />
+                                  )}
+                                </React.Fragment>
+                              ))}
+                            </div>
+                            {!hasTracking && (
+                              <p className="text-[11px] text-muted-foreground">
+                                {statusStep === 0 ? 'Aguardando confirmação do pagamento.' : 'Seu pedido está sendo preparado. O código de rastreio aparecerá aqui após o envio.'}
+                              </p>
+                            )}
+                          </div>
+                        );
+                      })()}
 
                       {/* Tracking Info — shown whenever a tracking number exists */}
                       {(order as any).trackingNumber && (() => {

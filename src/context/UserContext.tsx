@@ -118,6 +118,7 @@ interface UserContextType {
   validateProfileCoupon: (code: string, orderTotalYen?: number) => { valid: boolean; coupon?: Coupon; error?: string };
   addOrder: (order: Omit<Order, 'id' | 'date'> & { orderNumber?: string }) => Promise<void> | void;
   clearOrderHistory: () => void;
+  refreshOrders: () => void;
   sendPasswordReset: (email: string) => Promise<{ success: boolean; error?: string }>;
   resendVerificationEmail: () => Promise<boolean>;
 }
@@ -271,12 +272,16 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
 
   const getUserOrders = (userId: string, email?: string): Order[] => {
     const orderMap = new Map<string, Order>();
-    const addOrders = (list: unknown) => {
+    const addOrders = (list: unknown, overwrite = true) => {
       if (!Array.isArray(list)) return;
       list.forEach((order: any) => {
         const normalized = normalizeStoredOrder(order);
         const key = normalized?.orderNumber || normalized?.id;
-        if (key && normalized) orderMap.set(String(key), normalized);
+        if (!key || !normalized) return;
+        const k = String(key);
+        // overwrite=true: this source has priority over previous ones
+        // overwrite=false: only add if not yet seen (lower priority)
+        if (overwrite || !orderMap.has(k)) orderMap.set(k, normalized);
       });
     };
 
@@ -289,29 +294,39 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
 
     try {
       const normalizedEmail = email ? normalizeEmail(email) : '';
-      const users = JSON.parse(safeStorage.getItem('japan-express-users') || '{}');
-      addOrders(users[normalizedEmail]?.orders || users[email || '']?.orders);
-    } catch {
-      // Ignore malformed local users backup.
-    }
-
-    try {
-      const normalizedEmail = email ? normalizeEmail(email) : '';
       const legacyOrders = JSON.parse(safeStorage.getItem('sakura_orders') || '[]');
+      // sakura_orders: only add if not already seen from orders_ (lower priority,
+      // and may contain older duplicate entries with wrong paymentMethod)
       addOrders(
         Array.isArray(legacyOrders)
           ? legacyOrders.filter((order: any) =>
               normalizeEmail(order?.customerEmail || order?.email || order?.shippingAddress?.email || '') === normalizedEmail
             )
-          : []
+          : [],
+        false // don't overwrite orders_ entries
       );
     } catch {
       // Ignore malformed legacy orders backup.
     }
 
+    try {
+      const normalizedEmail = email ? normalizeEmail(email) : '';
+      const users = JSON.parse(safeStorage.getItem('japan-express-users') || '{}');
+      // japan-express-users has tracking updates → highest priority, overwrites all
+      addOrders(users[normalizedEmail]?.orders || users[email || '']?.orders, true);
+    } catch {
+      // Ignore malformed local users backup.
+    }
+
     return Array.from(orderMap.values()).sort((a: any, b: any) =>
       new Date(b.orderDate || b.date).getTime() - new Date(a.orderDate || a.date).getTime()
     );
+  };
+
+  const refreshOrders = () => {
+    if (!user) return;
+    const fresh = getUserOrders(user.id, user.email).map(fixTrackingUrl);
+    setOrders(fresh);
   };
 
   const saveUserOrders = (userId: string, orders: Order[]) => {
@@ -1140,6 +1155,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     validateProfileCoupon,
     addOrder,
     clearOrderHistory,
+    refreshOrders,
     sendPasswordReset,
     resendVerificationEmail,
   };

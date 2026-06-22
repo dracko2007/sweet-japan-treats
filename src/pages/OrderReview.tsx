@@ -310,7 +310,9 @@ const OrderReview: React.FC = () => {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { cpf: _cpf, ...localOrder } = mockOrder;
     const existingOrders = JSON.parse(safeStorage.getItem('sakura_orders') || '[]');
-    safeStorage.setItem('sakura_orders', JSON.stringify([localOrder, ...existingOrders]));
+    // Remove any previous entry with the same orderNumber to avoid stale duplicates
+    const deduped = existingOrders.filter((o: any) => o.orderNumber !== orderId && o.id !== orderId);
+    safeStorage.setItem('sakura_orders', JSON.stringify([localOrder, ...deduped]));
 
     // ⭐ GRAVA NO FIRESTORE — sem isto o pedido só fica no navegador do comprador
     // e o admin (em outro dispositivo) NUNCA vê. Formato exato que o painel espera:
