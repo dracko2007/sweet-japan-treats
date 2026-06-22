@@ -343,6 +343,7 @@ const OrderReview: React.FC = () => {
       shippingCost: finalShippingCost,
       shipping: { cost: finalShippingCost, carrier: shipping.carrier, estimatedDays: shipping.estimatedDays },
       affiliateCode: appliedCoupon?.affiliateCode || '',
+      psFeeFinalYen,
       customerType: isGuest ? 'guest' : 'registered',
       shippingAddress: {
         name: formData.name,
