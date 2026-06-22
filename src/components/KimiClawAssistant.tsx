@@ -127,14 +127,25 @@ const KimiClawAssistant: React.FC = () => {
     setIsOpen(true);
     const timer = setTimeout(() => {
       const clientName = order.name || (user ? user.name : 'Cliente');
+      const alreadySubscribed = !!user?.whatsappMarketing;
 
       let confirmationText = '';
-      if (language === 'pt') {
-        confirmationText = `Parabéns pela sua compra, **${clientName}**! 🎉 Seu pedido **${orderNum}** foi recebido. \n\nQuer receber **novidades e cupons exclusivos**? É só confirmar que eu marco no seu perfil. 🎁`;
-      } else if (language === 'ja') {
-        confirmationText = `ご購入ありがとうございます、**${clientName}** 様！🎉 ご注文 **${orderNum}** を承りました。\n\n**新着情報と限定クーポン**を受け取りますか？確認するとマイページに登録します。🎁`;
+      if (alreadySubscribed) {
+        if (language === 'pt') {
+          confirmationText = `Parabéns pela sua compra, **${clientName}**! 🎉 Seu pedido **${orderNum}** foi recebido. Você já está inscrito para receber novidades — avisaremos assim que o pedido for enviado! 📦`;
+        } else if (language === 'ja') {
+          confirmationText = `ご購入ありがとうございます、**${clientName}** 様！🎉 ご注文 **${orderNum}** を承りました。すでに新着情報を受け取る設定になっています 📦`;
+        } else {
+          confirmationText = `Thank you for your purchase, **${clientName}**! 🎉 Your order **${orderNum}** has been received. You're already subscribed to updates — we'll notify you when it ships! 📦`;
+        }
       } else {
-        confirmationText = `Thank you for your purchase, **${clientName}**! 🎉 Your order **${orderNum}** has been received.\n\nWant to receive **news and exclusive coupons**? Just confirm and I'll enable it on your profile. 🎁`;
+        if (language === 'pt') {
+          confirmationText = `Parabéns pela sua compra, **${clientName}**! 🎉 Seu pedido **${orderNum}** foi recebido. \n\nQuer receber **novidades e cupons exclusivos**? É só confirmar que eu marco no seu perfil. 🎁`;
+        } else if (language === 'ja') {
+          confirmationText = `ご購入ありがとうございます、**${clientName}** 様！🎉 ご注文 **${orderNum}** を承りました。\n\n**新着情報と限定クーポン**を受け取りますか？確認するとマイページに登録します。🎁`;
+        } else {
+          confirmationText = `Thank you for your purchase, **${clientName}**! 🎉 Your order **${orderNum}** has been received.\n\nWant to receive **news and exclusive coupons**? Just confirm and I'll enable it on your profile. 🎁`;
+        }
       }
 
       setMessages(prev => [
@@ -144,8 +155,8 @@ const KimiClawAssistant: React.FC = () => {
           sender: 'kimi',
           text: confirmationText,
           timestamp: new Date(),
-          isConsentPrompt: true,
-          orderToShare: order
+          isConsentPrompt: !alreadySubscribed,
+          orderToShare: alreadySubscribed ? undefined : order
         }
       ]);
     }, 1200);
