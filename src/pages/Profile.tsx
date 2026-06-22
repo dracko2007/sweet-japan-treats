@@ -18,6 +18,7 @@ import { formatPrice } from '@/utils/currency';
 import { useProducts } from '@/context/ProductsContext';
 import { isValidEmail, isValidPhone, isNonEmpty, maskPhone, isValidCPF, isValidCNPJ, maskCPF, maskCNPJ } from '@/utils/validation';
 import { affiliateService, AffiliateRequest } from '@/services/affiliateService';
+import { orderService } from '@/services/orderService';
 import { reviewService } from '@/services/reviewService';
 import ReviewModal from '@/components/products/ReviewModal';
 import { Star } from 'lucide-react';
@@ -49,6 +50,19 @@ const Profile: React.FC = () => {
   const isEuropeAddress = EUROPE.includes(addressCountry);
   // Lista de estados/províncias (Japão/Brasil têm lista; Europa é texto livre).
   const addressList = isJapanAddress ? japanPrefectures : prefectures;
+
+  const [confirmingOrderId, setConfirmingOrderId] = useState<string | null>(null);
+  const handleConfirmReceived = async (orderNumber: string) => {
+    setConfirmingOrderId(orderNumber);
+    try {
+      await orderService.updateOrderStatus(orderNumber, 'delivered');
+      refreshOrders();
+      toast({ title: '✅ Recebimento confirmado!', description: 'Obrigado por confirmar. Que aproveite!' });
+    } catch {
+      toast({ title: 'Erro ao confirmar', description: 'Tente novamente.', variant: 'destructive' });
+    }
+    setConfirmingOrderId(null);
+  };
 
   // Avaliação a partir do histórico de pedidos
   const [reviewTarget, setReviewTarget] = useState<{ id: string; name: string } | null>(null);
@@ -868,6 +882,23 @@ const Profile: React.FC = () => {
                           </div>
                         );
                       })()}
+
+                      {/* Confirmar recebimento — visível quando pedido está enviado */}
+                      {order.status === 'shipped' && (
+                        <div className="mb-3 p-3 bg-green-50 dark:bg-green-950/20 rounded-lg border border-green-200 dark:border-green-800 flex items-center justify-between gap-3 flex-wrap">
+                          <div>
+                            <p className="text-sm font-semibold text-green-800 dark:text-green-200">📦 Produto chegou?</p>
+                            <p className="text-xs text-green-700 dark:text-green-400">Confirme o recebimento para encerrar o pedido.</p>
+                          </div>
+                          <button
+                            onClick={() => handleConfirmReceived(order.orderNumber)}
+                            disabled={confirmingOrderId === order.orderNumber}
+                            className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:opacity-60 text-white text-sm font-semibold rounded-lg transition-colors shrink-0"
+                          >
+                            {confirmingOrderId === order.orderNumber ? 'Confirmando…' : '✅ Confirmar Recebimento'}
+                          </button>
+                        </div>
+                      )}
 
                       {/* Tracking Info — shown whenever a tracking number exists */}
                       {(order as any).trackingNumber && (() => {
