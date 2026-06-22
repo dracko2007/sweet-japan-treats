@@ -124,13 +124,21 @@ const KimiClawAssistant: React.FC = () => {
     if (promptedOrderRef.current === orderNum) return; // já mostrou para este pedido
     promptedOrderRef.current = orderNum;
 
+    // Compra como convidado: Kimi só confirma o pedido — sem prompt de notificações
+    // (convidados não têm conta; o popup de benefícios já é exibido pelo OrderConfirmation)
+    const isGuest = !!location.state?.isGuest;
+
     setIsOpen(true);
     const timer = setTimeout(() => {
       const clientName = order.name || (user ? user.name : 'Cliente');
       const alreadySubscribed = !!user?.whatsappMarketing;
 
       let confirmationText = '';
-      if (alreadySubscribed) {
+      if (isGuest) {
+        confirmationText = language === 'ja'
+          ? `ご購入ありがとうございます！🎉 ご注文 **${orderNum}** を承りました。`
+          : `Pedido **${orderNum}** confirmado! 🎉 Assim que pagar, seu pedido entra em preparo.`;
+      } else if (alreadySubscribed) {
         if (language === 'pt') {
           confirmationText = `Parabéns pela sua compra, **${clientName}**! 🎉 Seu pedido **${orderNum}** foi recebido. Você já está inscrito para receber novidades — avisaremos assim que o pedido for enviado! 📦`;
         } else if (language === 'ja') {
@@ -155,8 +163,8 @@ const KimiClawAssistant: React.FC = () => {
           sender: 'kimi',
           text: confirmationText,
           timestamp: new Date(),
-          isConsentPrompt: !alreadySubscribed,
-          orderToShare: alreadySubscribed ? undefined : order
+          isConsentPrompt: !isGuest && !alreadySubscribed,
+          orderToShare: (!isGuest && !alreadySubscribed) ? order : undefined
         }
       ]);
     }, 1200);
