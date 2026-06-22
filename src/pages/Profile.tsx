@@ -862,6 +862,7 @@ const Profile: React.FC = () => {
                           <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${
                             order.status === 'delivered' ? 'bg-green-100 text-green-800' :
                             order.status === 'shipped' ? 'bg-blue-100 text-blue-800' :
+                            (order.status as string) === 'packing' ? 'bg-orange-100 text-orange-800' :
                             (order.status as string) === 'processing' ? 'bg-orange-100 text-orange-800' :
                             order.status === 'confirmed' ? 'bg-yellow-100 text-yellow-800' :
                             order.status === 'cancelled' ? 'bg-red-100 text-red-800' :
@@ -869,6 +870,7 @@ const Profile: React.FC = () => {
                           }`}>
                             {order.status === 'delivered' ? t('profile.orders.status.delivered') :
                              order.status === 'shipped' ? t('profile.orders.status.shipped') :
+                             (order.status as string) === 'packing' ? 'Preparando Pacote' :
                              (order.status as string) === 'processing' ? t('profile.orders.status.processing') :
                              order.status === 'confirmed' ? t('profile.orders.status.confirmed') :
                              order.status === 'cancelled' ? t('profile.orders.status.cancelled') : t('profile.orders.status.pending')}
@@ -883,7 +885,7 @@ const Profile: React.FC = () => {
                         const statusStep =
                           st === 'delivered' ? 3
                           : st === 'shipped' ? 2
-                          : (st === 'processing' || st === 'confirmed') ? 1
+                          : (st === 'processing' || st === 'confirmed' || st === 'packing') ? 1
                           : 0;
                         const steps = ['Pagamento', 'Preparando', 'Enviado', 'Entregue'];
                         return (

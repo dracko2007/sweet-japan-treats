@@ -14,7 +14,7 @@ const devWarn = isDev ? console.warn.bind(console) : () => {};
 const devError = isDev ? console.error.bind(console) : () => {};
 
 export interface OrderStatus {
-  status: 'pending' | 'processing' | 'confirmed' | 'shipped' | 'delivered' | 'cancelled';
+  status: 'pending' | 'processing' | 'packing' | 'confirmed' | 'shipped' | 'delivered' | 'cancelled';
   updatedAt: string;
   updatedBy?: string;
 }

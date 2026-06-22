@@ -159,7 +159,7 @@ const Admin: React.FC = () => {
     }
   }, [activeTab, customerCount]);
 
-  const handleUpdateStatus = async (orderNumber: string, newStatus: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled') => {
+  const handleUpdateStatus = async (orderNumber: string, newStatus: 'pending' | 'processing' | 'packing' | 'shipped' | 'delivered' | 'cancelled') => {
     const success = await orderService.updateOrderStatus(orderNumber, newStatus);
     
     if (success) {
@@ -208,6 +208,7 @@ const Admin: React.FC = () => {
     const labels: Record<string, string> = {
       pending: 'Aguardando Pagamento',
       processing: 'Pago / Preparando',
+      packing: 'Preparando Pacote',
       shipped: 'Enviado',
       delivered: 'Entregue',
       cancelled: 'Cancelado',
@@ -219,6 +220,7 @@ const Admin: React.FC = () => {
     const colors: Record<string, string> = {
       pending: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
       processing: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
+      packing: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200',
       shipped: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200',
       delivered: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
       cancelled: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
@@ -821,6 +823,16 @@ _This is an automated test message_
                         </Button>
                       )}
                       {order.status === 'processing' && (
+                        <Button
+                          onClick={() => handleUpdateStatus(order.orderNumber, 'packing')}
+                          size="sm"
+                          className="gap-2 bg-orange-500 hover:bg-orange-600 text-white"
+                        >
+                          <Package className="w-4 h-4" />
+                          Preparando Pacote
+                        </Button>
+                      )}
+                      {order.status === 'packing' && (
                         <Button
                           onClick={() => {
                             setSelectedOrder(order);
