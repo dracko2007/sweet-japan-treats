@@ -49,8 +49,9 @@ export interface Coupon {
   expiresAt: string;
   isUsed: boolean;
   freeShipping?: boolean;
-  affiliateCode?: string; // se preenchido, é um código de influencer (gera comissão)
-  minOrderValue?: number; // valor mínimo do pedido em ¥ para usar o cupom
+  affiliateCode?: string;     // se preenchido, é um código de influencer (gera comissão)
+  affiliateProductId?: string; // se preenchido, cupom vinculado a produto específico (permite reuso por CPF)
+  minOrderValue?: number;     // valor mínimo do pedido em ¥ para usar o cupom
 }
 
 // Fábrica do cupom de boas-vindas concedido no cadastro.

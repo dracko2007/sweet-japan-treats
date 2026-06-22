@@ -17,7 +17,7 @@ import { couponService as globalCouponService } from '@/services/couponService';
 import { safeStorage } from '@/utils/storage';
 
 // Converte um afiliado num "cupom" aplicável (carrega o código para gerar comissão)
-const affiliateToCoupon = (aff: Affiliate): Coupon => ({
+const affiliateToCoupon = (aff: Affiliate, productId?: string | null): Coupon => ({
   id: `aff-${aff.code}`,
   code: aff.code,
   description: `Indicação de ${aff.ownerName} — ${aff.discountPercent}% OFF`,
@@ -26,6 +26,7 @@ const affiliateToCoupon = (aff: Affiliate): Coupon => ({
   expiresAt: aff.expiresAt,
   isUsed: false,
   affiliateCode: aff.code,
+  affiliateProductId: productId || undefined,
 });
 
 const Cart: React.FC = () => {
@@ -93,8 +94,10 @@ const Cart: React.FC = () => {
     // 3) Código de afiliado/influencer (público)
     const aff = await affiliateService.validate(code);
     if (aff.valid && aff.affiliate) {
-      applyCouponObject(affiliateToCoupon(aff.affiliate));
+      // Quando digitado manualmente (não via link de produto), não há productId
+      applyCouponObject(affiliateToCoupon(aff.affiliate, null));
       safeStorage.setItem('affiliate_ref', aff.affiliate.code);
+      safeStorage.removeItem('affiliate_ref_product');
       return;
     }
 
@@ -111,9 +114,10 @@ const Cart: React.FC = () => {
   useEffect(() => {
     const ref = safeStorage.getItem('affiliate_ref');
     if (ref && !activeCoupon) {
+      const productId = safeStorage.getItem('affiliate_ref_product') || null;
       affiliateService.validate(ref).then((res) => {
         if (res.valid && res.affiliate) {
-          setActiveCoupon(affiliateToCoupon(res.affiliate));
+          setActiveCoupon(affiliateToCoupon(res.affiliate, productId));
         }
       });
     }

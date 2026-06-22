@@ -243,16 +243,16 @@ const OrderReview: React.FC = () => {
         }
       }
 
-      // 2. Cupom de afiliado só na primeira compra por CPF
-      if (appliedCoupon?.affiliateCode) {
+      // 2. Cupom de afiliado genérico só na primeira compra por CPF.
+      //    Cupons vinculados a produto específico (affiliateProductId) são permitidos sempre.
+      if (appliedCoupon?.affiliateCode && !appliedCoupon?.affiliateProductId) {
         const affCheck = await cpfGuardService.hasUsedAffiliateDiscount(cpfRaw);
         if (affCheck.used) {
           toast({
-            title: 'Cupom de afiliado inválido',
-            description: `Este CPF já utilizou desconto de afiliado em uma compra anterior. O desconto de indicação é válido apenas na primeira compra.`,
+            title: 'Cupom de indicação inválido',
+            description: `Este CPF já utilizou desconto de indicação em uma compra anterior. O desconto de indicação é válido apenas na primeira compra. Cupons de produto específico podem ser usados normalmente.`,
             variant: 'destructive',
           });
-          // Remove o cupom afiliado sem bloquear a compra
           setCouponDiscount(0);
           setAppliedCoupon(null);
           return;
@@ -376,6 +376,7 @@ const OrderReview: React.FC = () => {
       shippingCost: finalShippingCost,
       shipping: { cost: finalShippingCost, carrier: shipping.carrier, estimatedDays: shipping.estimatedDays },
       affiliateCode: appliedCoupon?.affiliateCode || '',
+      affiliateProductId: appliedCoupon?.affiliateProductId || '',
       psFeeFinalYen,
       cpf: normalizeCPF(formData.cpf || ''),
       customerType: isGuest ? 'guest' : 'registered',
@@ -450,18 +451,24 @@ const OrderReview: React.FC = () => {
           });
         });
         safeStorage.removeItem('affiliate_ref');
+        safeStorage.removeItem('affiliate_ref_product');
       }
 
-      // Registra no índice de CPF: produtos comprados e afiliado usado
+      // Registra no índice de CPF: produtos comprados e (se genérico) afiliado usado
       const cpfRaw = formData.cpf || '';
       if (cpfRaw) {
         const purchasedProductIds = items
           .filter(i => !i.freeGift && i.product.stock && !i.product.stock.unlimited)
           .map(i => i.product.id);
+        // Só marca o affiliateCode no índice se for cupom GENÉRICO (sem affiliateProductId).
+        // Cupons vinculados a produto específico podem ser reutilizados pelo mesmo CPF.
+        const affiliateCodeToRegister = (appliedCoupon?.affiliateCode && !appliedCoupon?.affiliateProductId)
+          ? appliedCoupon.affiliateCode
+          : undefined;
         cpfGuardService.registerOrder({
           cpfRaw,
           productIds: purchasedProductIds,
-          affiliateCode: appliedCoupon?.affiliateCode || undefined,
+          affiliateCode: affiliateCodeToRegister,
         });
       }
     };
