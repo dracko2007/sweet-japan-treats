@@ -498,15 +498,20 @@ const OrderReview: React.FC = () => {
 
       <section className="py-12 bg-background">
         <div className="container mx-auto px-4">
-          <div className="max-w-4xl mx-auto space-y-6">
-            
+          <div className="max-w-7xl mx-auto">
+
             {/* Print Button */}
-            <div className="flex justify-end print:hidden">
+            <div className="flex justify-end mb-6 print:hidden">
               <Button onClick={handlePrint} variant="outline" className="gap-2 font-semibold">
                 <Printer className="w-4 h-4" />
                 Imprimir Recibo
               </Button>
             </div>
+
+            <div className="lg:grid lg:grid-cols-3 lg:gap-8 items-start">
+
+              {/* ── COLUNA ESQUERDA ── */}
+              <div className="lg:col-span-2 space-y-6">
 
             {/* Order Items Summary */}
             <div className="bg-card rounded-2xl border border-border p-6 lg:p-8">
@@ -932,48 +937,169 @@ const OrderReview: React.FC = () => {
               </RadioGroup>
             </div>
 
-            {/* Selos de segurança */}
-            <div className="flex flex-wrap items-center justify-center gap-4 py-4 px-6 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-2xl print:hidden">
-              <div className="flex items-center gap-2 text-green-700 dark:text-green-400">
-                <span className="text-lg">🔒</span>
-                <span className="text-xs font-semibold">Conexão segura HTTPS</span>
-              </div>
-              <div className="hidden sm:block w-px h-5 bg-green-300" />
-              <div className="flex items-center gap-2 text-green-700 dark:text-green-400">
-                <span className="text-lg">🛡️</span>
-                <span className="text-xs font-semibold">Dados protegidos pela LGPD</span>
-              </div>
-              <div className="hidden sm:block w-px h-5 bg-green-300" />
-              <div className="flex items-center gap-2 text-green-700 dark:text-green-400">
-                <span className="text-lg">✅</span>
-                <span className="text-xs font-semibold">Compra 100% garantida</span>
-              </div>
-              <div className="hidden sm:block w-px h-5 bg-green-300" />
-              <div className="flex items-center gap-2 text-green-700 dark:text-green-400">
-                <span className="text-lg">📦</span>
-                <span className="text-xs font-semibold">Rastreamento por e-mail</span>
-              </div>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex flex-col sm:flex-row gap-4 print:hidden">
+            {/* Back Button */}
+            <div className="print:hidden">
               <Button
                 variant="outline"
                 onClick={() => navigate('/checkout', { state: { formData, activeNegId: negotiationId } })}
-                className="flex-1 rounded-xl py-6 text-lg border-2"
+                className="w-full rounded-xl py-5 text-base border-2"
               >
-                Voltar e Editar Dados
-              </Button>
-              <Button
-                onClick={handleProceedToPayment}
-                className="flex-1 btn-primary rounded-xl py-6 text-lg font-bold"
-              >
-                <CheckCircle className="w-5 h-5 mr-2" />
-                Confirmar e Pagar {formatPrice(finalGrandTotal, currency)}
-                <ArrowRight className="w-5 h-5 ml-2" />
+                ← Voltar e Editar Dados
               </Button>
             </div>
-          </div>
+
+              </div>{/* end COLUNA ESQUERDA */}
+
+              {/* ── COLUNA DIREITA STICKY ── */}
+              <div className="lg:col-span-1 mt-6 lg:mt-0">
+                <div className="sticky top-24 space-y-4">
+
+                  {/* Resumo de pagamento */}
+                  <div className="bg-card rounded-2xl border-2 border-primary/20 shadow-lg p-5">
+                    <h3 className="font-bold text-base text-foreground mb-4 flex items-center gap-2">
+                      <CheckCircle className="w-5 h-5 text-primary" />
+                      Resumo do Pedido
+                    </h3>
+
+                    <div className="space-y-2 text-sm">
+                      {/* Itens */}
+                      <div className="flex justify-between text-muted-foreground">
+                        <span>Itens ({items.filter(i => !i.freeGift).length}x)</span>
+                        <span>{formatPrice(baseTotalPrice, currency)}</span>
+                      </div>
+
+                      {couponDiscount > 0 && (
+                        <div className="flex justify-between text-green-600 font-semibold">
+                          <span>Cupom ({appliedCoupon?.code})</span>
+                          <span>−{formatPrice(couponDiscount, currency)}</span>
+                        </div>
+                      )}
+
+                      {pointsDiscount > 0 && (
+                        <div className="flex justify-between text-purple-600 font-semibold">
+                          <span>Pontos ({redeemPoints} pts)</span>
+                          <span>−{formatPrice(pointsDiscount, currency)}</span>
+                        </div>
+                      )}
+
+                      <div className="flex justify-between text-muted-foreground">
+                        <span>Frete</span>
+                        <span>{finalShippingCost === 0 ? 'Grátis' : formatPrice(finalShippingCost, currency)}</span>
+                      </div>
+
+                      {psFeeYen > 0 && (
+                        <div className="flex justify-between text-muted-foreground">
+                          <span>Taxa PS</span>
+                          <span className={psFeeDiscountYen > 0 ? 'text-green-600 font-semibold' : ''}>
+                            {currency === 'JPY' ? `¥ ${psFeeFinalYen.toLocaleString()}` : formatPrice(psFeeDisplay, currency, true)}
+                          </span>
+                        </div>
+                      )}
+
+                      {estimatedTax > 0 && (
+                        <p className="text-[10px] text-orange-600 bg-orange-50 rounded px-2 py-1 leading-snug">
+                          ⚠️ {taxLabel} ~{formatPrice(estimatedTax, currency)} (cobrado pela alfândega, NÃO incluso)
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="border-t border-border mt-4 pt-4">
+                      {/* PIX block */}
+                      {isPix && (
+                        <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 mb-3 space-y-1.5">
+                          <p className="text-[10px] font-bold text-orange-700 uppercase tracking-wide">Pagamento via PIX</p>
+                          <div className="flex justify-between text-xs text-orange-700">
+                            <span>Subtotal</span>
+                            <span>{formatPrice(grandTotal, currency)}</span>
+                          </div>
+                          <div className="flex justify-between text-xs text-orange-700">
+                            <span>+ IOF (1%)</span>
+                            <span>+ {formatPrice(pixIofFee, currency)}</span>
+                          </div>
+                          <div className="flex justify-between text-xs text-orange-700">
+                            <span>+ Taxa bancária</span>
+                            <span>+ R$ 32</span>
+                          </div>
+                          <div className="flex justify-between text-xs font-bold text-orange-900 border-t border-orange-200 pt-1 mt-1">
+                            <span>Total PIX</span>
+                            <span className="text-base">{formatPrice(finalGrandTotal, currency)}</span>
+                          </div>
+                          <p className="text-[10px] text-amber-600 mt-1">⏱ Remessa em até 3 dias úteis após confirmação</p>
+                        </div>
+                      )}
+
+                      {/* Wise block */}
+                      {paymentMethod === 'wise' && (
+                        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 mb-3 space-y-1.5">
+                          <p className="text-[10px] font-bold text-emerald-700 uppercase tracking-wide">Pagamento via Wise</p>
+                          <div className="flex justify-between text-xs text-emerald-700">
+                            <span>Total</span>
+                            <span className="font-bold">{formatPrice(grandTotal, currency)}</span>
+                          </div>
+                          <div className="bg-emerald-100 rounded-lg p-2 text-center mt-1">
+                            <p className="text-[10px] text-emerald-700 mb-0.5">No campo <strong>Valor</strong> do Wise, insira:</p>
+                            <p className="text-xl font-black text-emerald-900">¥ {grandTotalYen.toLocaleString()}</p>
+                            <p className="text-[10px] text-emerald-600">A Wise converte automaticamente</p>
+                          </div>
+                          <p className="text-[10px] text-gray-500 mt-1">Taxa Wise ~4% • Sem IOF</p>
+                        </div>
+                      )}
+
+                      {/* Total sem método específico */}
+                      {!isPix && paymentMethod !== 'wise' && (
+                        <div className="flex justify-between font-black text-xl mb-3">
+                          <span>Total</span>
+                          <span className="text-orange-600">{formatPrice(finalGrandTotal, currency)}</span>
+                        </div>
+                      )}
+
+                      {/* Total geral (sempre visível abaixo dos blocos PIX/Wise) */}
+                      {(isPix || paymentMethod === 'wise') && (
+                        <div className="flex justify-between font-black text-base text-muted-foreground mb-3">
+                          <span>Total Geral</span>
+                          <span className="text-orange-600 text-xl">{formatPrice(finalGrandTotal, currency)}</span>
+                        </div>
+                      )}
+
+                      <Button
+                        onClick={handleProceedToPayment}
+                        className="w-full btn-primary rounded-xl py-5 text-base font-bold"
+                      >
+                        <CheckCircle className="w-5 h-5 mr-2" />
+                        Confirmar e Pagar
+                        <ArrowRight className="w-5 h-5 ml-2" />
+                      </Button>
+
+                      {user && earnedPoints > 0 && (
+                        <div className="flex justify-center gap-1 text-green-700 text-xs mt-3 bg-green-50 rounded-lg py-2">
+                          <Sparkles className="w-3.5 h-3.5 mt-0.5" />
+                          <span>+{earnedPoints} pontos após a compra</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Selos de segurança compactos */}
+                  <div className="grid grid-cols-2 gap-2 text-[11px] text-green-700 print:hidden">
+                    <div className="flex items-center gap-1.5 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+                      <span>🔒</span><span className="font-semibold">HTTPS Seguro</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+                      <span>✅</span><span className="font-semibold">100% Garantido</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+                      <span>🛡️</span><span className="font-semibold">LGPD</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+                      <span>📦</span><span className="font-semibold">Rastreamento</span>
+                    </div>
+                  </div>
+
+                </div>
+              </div>{/* end COLUNA DIREITA */}
+
+            </div>{/* end grid */}
+          </div>{/* end max-w-7xl */}
         </div>
       </section>
 
