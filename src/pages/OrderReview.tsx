@@ -30,6 +30,7 @@ import { Wallet } from 'lucide-react';
 import { referralService } from '@/services/referralService';
 import { calcBrazilTax, calcEuVat, EU_VAT_RATES } from '@/utils/taxRules';
 import { cpfGuardService, normalizeCPF } from '@/services/cpfGuardService';
+import { thermalPrintService } from '@/services/thermalPrintService';
 
 const isDev = import.meta.env.DEV;
 const devLog = isDev ? console.log.bind(console) : () => {};
@@ -573,6 +574,9 @@ const OrderReview: React.FC = () => {
       orderNumber: orderId,
       paymentMethod,
     });
+
+    // Impressão térmica silenciosa (não bloqueia o fluxo)
+    void thermalPrintService.printOrder(mockOrder);
 
     // Navigate to confirmation page
     navigate('/order-confirmation', {

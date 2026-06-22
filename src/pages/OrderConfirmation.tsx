@@ -12,7 +12,6 @@ import { QRCodeSVG } from 'qrcode.react';
 import { formatPrice } from '@/utils/currency';
 import { paymentSettingsService } from '@/services/paymentSettingsService';
 import { buildPixPayload } from '@/utils/pixPayload';
-import DemoBanner from '@/components/DemoBanner';
 
 const OrderConfirmation: React.FC = () => {
   const navigate = useNavigate();
@@ -91,9 +90,6 @@ const OrderConfirmation: React.FC = () => {
       <section className="py-12 bg-background min-h-screen">
         <div className="container mx-auto px-4">
           <div className="max-w-3xl mx-auto">
-
-            {/* Aviso de modo demonstração */}
-            <DemoBanner className="mb-6 print:hidden" />
 
             {/* Header Success Message */}
             <div className="text-center mb-8 print:hidden">

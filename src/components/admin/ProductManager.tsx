@@ -1034,6 +1034,21 @@ const ProductManager: React.FC = () => {
                 <p className="text-[11px] text-orange-700 dark:text-orange-300 mt-2 leading-relaxed">
                   O frete soma automaticamente +{PACKAGE_SAFETY_MARGIN_CM}cm em largura, comprimento e altura. Fonte: {editing.packageDimensionsCm?.source || 'manual/nao informado'}.
                 </p>
+                <div className="mt-3">
+                  <span className="text-[11px] text-muted-foreground">Peso da embalagem (g)</span>
+                  <input
+                    type="number"
+                    min={0}
+                    step="1"
+                    value={editing.weightGrams ?? ''}
+                    onChange={(e) => setEditing({ ...editing, weightGrams: e.target.value === '' ? undefined : Number(e.target.value) })}
+                    placeholder="ex: 500"
+                    className="w-full px-3 py-2 rounded-lg border border-orange-200 bg-background text-sm mt-1"
+                  />
+                  <p className="text-[11px] text-orange-700 dark:text-orange-300 mt-1">
+                    Usado pelo Japan Post para calcular o custo do frete por peso.
+                  </p>
+                </div>
               </div>
 
               {/* Descrição */}

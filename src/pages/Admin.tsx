@@ -30,6 +30,7 @@ import MarketingManager from '@/components/admin/MarketingManager';
 import EmployeeManager from '@/components/admin/EmployeeManager';
 import CouponUsageReport from '@/components/admin/CouponUsageReport';
 import FraudDashboard from '@/components/admin/FraudDashboard';
+import ThermalPrinterSettings from '@/components/admin/ThermalPrinterSettings';
 import CN23Modal from '@/components/admin/CN23Modal';
 import PromoNotificationModal from '@/components/admin/PromoNotificationModal';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
@@ -49,7 +50,8 @@ const devError = isDev ? console.error.bind(console) : () => {};
 type AdminTab =
   | 'orders' | 'coupons' | 'dashboard' | 'customers' | 'products'
   | 'home' | 'vlog' | 'affiliates' | 'requests' | 'b2b' | 'admins' | 'videos'
-  | 'calculator' | 'migration' | 'promotion' | 'negotiations' | 'marketing' | 'employees' | 'coupon-usage' | 'fraud';
+  | 'calculator' | 'migration' | 'promotion' | 'negotiations' | 'marketing' | 'employees' | 'coupon-usage' | 'fraud'
+  | 'thermal-printer';
 
 interface AdminTabItem {
   id: AdminTab;
@@ -345,6 +347,162 @@ _This is an automated test message_
     }
   };
 
+  const printOrder = (order: any) => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    const statusLabel: Record<string, string> = {
+      pending: '⏳ Pendente',
+      processing: '✅ Pagamento Confirmado',
+      packing: '📦 Preparando Pacote',
+      shipped: '🚚 Enviado',
+      delivered: '🎉 Entregue',
+      cancelled: '❌ Cancelado',
+    };
+
+    const paymentLabel: Record<string, string> = {
+      pix: '📱 PIX',
+      card: '💳 Cartão de Crédito',
+      boleto: '📄 Boleto Bancário',
+      wise: '💸 Wise (Transferência)',
+      paypal: '🅿️ PayPal',
+      yucho: '🏦 Banco Yucho',
+    };
+
+    const itemsSubtotal = order.items.reduce((s: number, i: any) => s + i.price * i.quantity, 0);
+    const discount = order.couponDiscount || (itemsSubtotal > order.totalPrice ? itemsSubtotal - order.totalPrice : 0);
+    const shippingCost = order.shipping?.cost ?? null;
+    const grandTotal = order.totalPrice ?? order.total ?? 0;
+    const grandTotalYen = (order as any).grandTotalYen;
+
+    const itemsHtml = order.items.map((item: any) => `
+      <tr>
+        <td style="padding:6px 8px;border-bottom:1px solid #eee;">${item.productName || item.name}${item.size ? ` <span style="color:#888;font-size:12px;">(${item.size})</span>` : ''}</td>
+        <td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:center;">${item.quantity}</td>
+        <td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:right;">R$ ${(item.price * item.quantity).toFixed(2)}</td>
+      </tr>
+    `).join('');
+
+    const html = `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8"/>
+  <title>Pedido ${order.orderNumber}</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, sans-serif; font-size: 14px; color: #111; background: #fff; padding: 24px; }
+    .no-print { margin-bottom: 16px; }
+    @media print { .no-print { display: none; } body { padding: 0; } }
+    .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid #e4003a; padding-bottom: 14px; margin-bottom: 18px; }
+    .logo { font-size: 22px; font-weight: 900; color: #e4003a; }
+    .logo span { color: #111; }
+    .order-id { font-size: 18px; font-weight: bold; }
+    .order-date { font-size: 12px; color: #666; margin-top: 4px; }
+    .status-badge { display: inline-block; background: #fef3c7; color: #92400e; font-weight: bold; font-size: 12px; padding: 3px 10px; border-radius: 20px; margin-top: 6px; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+    .section { border: 1px solid #e5e7eb; border-radius: 8px; padding: 14px; }
+    .section h3 { font-size: 13px; font-weight: 700; text-transform: uppercase; color: #555; margin-bottom: 10px; border-bottom: 1px solid #eee; padding-bottom: 6px; }
+    .section p { font-size: 13px; margin: 4px 0; line-height: 1.5; }
+    .section p.label { color: #888; font-size: 11px; margin-bottom: 0; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
+    th { background: #f9fafb; text-align: left; padding: 6px 8px; font-size: 12px; color: #666; }
+    th:last-child, td:last-child { text-align: right; }
+    th:nth-child(2), td:nth-child(2) { text-align: center; }
+    .totals { margin-top: 4px; }
+    .totals tr td { padding: 4px 8px; font-size: 13px; }
+    .totals tr.grand td { font-weight: bold; font-size: 15px; border-top: 2px solid #111; padding-top: 8px; }
+    .totals tr.discount td { color: #16a34a; }
+    .footer { margin-top: 24px; border-top: 1px dashed #ccc; padding-top: 14px; text-align: center; font-size: 11px; color: #aaa; }
+  </style>
+</head>
+<body>
+  <div class="no-print">
+    <button onclick="window.print()" style="padding:8px 20px;font-size:14px;cursor:pointer;background:#e4003a;color:#fff;border:none;border-radius:6px;margin-right:8px;">🖨️ Imprimir</button>
+    <button onclick="window.close()" style="padding:8px 16px;font-size:14px;cursor:pointer;border:1px solid #ccc;border-radius:6px;">✕ Fechar</button>
+  </div>
+
+  <div class="header">
+    <div>
+      <div class="logo">🌸 Japan <span>Express</span></div>
+      <div style="font-size:11px;color:#888;margin-top:2px;">Importação Direta Japão-Brasil</div>
+    </div>
+    <div style="text-align:right;">
+      <div class="order-id">Pedido: ${order.orderNumber || 'N/A'}</div>
+      <div class="order-date">${new Date(order.orderDate || order.date || Date.now()).toLocaleString('pt-BR')}</div>
+      <div class="status-badge">${statusLabel[order.status] || order.status}</div>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="section">
+      <h3>👤 Cliente</h3>
+      <p><strong>${order.shippingAddress?.name || order.customerName || 'N/A'}</strong></p>
+      <p class="label">E-mail</p>
+      <p>${order.customerEmail || 'N/A'}</p>
+      <p class="label">Telefone</p>
+      <p>${order.shippingAddress?.phone || order.phone || 'N/A'}</p>
+      ${order.cpf ? `<p class="label">CPF</p><p>${order.cpf}</p>` : ''}
+    </div>
+    <div class="section">
+      <h3>📍 Endereço de Entrega</h3>
+      <p>〒 ${order.shippingAddress?.postalCode || 'N/A'}</p>
+      <p>${order.shippingAddress?.prefecture || ''} ${order.shippingAddress?.city || ''}</p>
+      <p>${order.shippingAddress?.address || ''}</p>
+      ${order.shippingAddress?.building ? `<p>${order.shippingAddress.building}</p>` : ''}
+    </div>
+  </div>
+
+  <div class="section" style="margin-bottom:20px;">
+    <h3>📦 Itens do Pedido</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Produto</th>
+          <th>Qtd</th>
+          <th>Valor</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${itemsHtml}
+      </tbody>
+    </table>
+    <table class="totals">
+      <tr>
+        <td>Subtotal</td>
+        <td></td>
+        <td>R$ ${itemsSubtotal.toFixed(2)}</td>
+      </tr>
+      ${discount > 0 ? `<tr class="discount"><td>Cupom ${order.couponCode ? `(${order.couponCode})` : ''}</td><td></td><td>-R$ ${discount.toFixed(2)}</td></tr>` : ''}
+      <tr>
+        <td>Frete ${order.shippingCarrier ? `(${order.shippingCarrier})` : ''}</td>
+        <td></td>
+        <td>${shippingCost != null ? (shippingCost === 0 ? 'Grátis' : `R$ ${shippingCost.toFixed(2)}`) : 'N/A'}</td>
+      </tr>
+      ${(order.federalTax > 0 || order.icmsTax > 0 || order.taxAmount > 0) ? `<tr><td style="color:#888;font-size:12px;">Impostos (II + ICMS)</td><td></td><td style="color:#888;font-size:12px;">R$ ${Number(order.federalTax && order.icmsTax ? (order.federalTax + order.icmsTax) : order.taxAmount || 0).toFixed(2)}</td></tr>` : ''}
+      <tr class="grand">
+        <td>Total Geral</td>
+        <td></td>
+        <td style="color:#e4003a;">R$ ${grandTotal.toFixed(2)}${grandTotalYen ? ` (¥ ${Number(grandTotalYen).toLocaleString()})` : ''}</td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="section">
+    <h3>💳 Pagamento</h3>
+    <p>${paymentLabel[order.paymentMethod] || order.paymentMethod || 'N/A'}</p>
+    <p style="margin-top:6px;">Status: <strong>${statusLabel[order.status] || order.status}</strong></p>
+  </div>
+
+  <div class="footer">
+    Japan Express · www.japanexpress-store.com · Impresso em ${new Date().toLocaleString('pt-BR')}
+  </div>
+</body>
+</html>`;
+
+    printWindow.document.write(html);
+    printWindow.document.close();
+  };
+
   const printShippingLabel = (order: any) => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
@@ -472,6 +630,7 @@ _This is an automated test message_
       { id: 'promotion', label: 'Promoção Início', icon: Sparkles },
       { id: 'calculator', label: 'Calculadora', icon: Calculator },
       { id: 'migration', label: 'Migrar Imagens', icon: CloudUpload },
+      { id: 'thermal-printer', label: 'Impressora Térmica', icon: Printer },
     ] },
     // Só nível 3 vê o gerenciamento de administradores
     ...(permissions.canManageAdmins
@@ -692,6 +851,14 @@ _This is an automated test message_
                         >
                           <FileText className="w-4 h-4" />
                           CN22/CN23
+                        </Button>
+                        <Button
+                          onClick={() => printOrder(order)}
+                          variant="outline"
+                          className="gap-2"
+                        >
+                          <Printer className="w-4 h-4" />
+                          Imprimir Pedido
                         </Button>
                         <Button
                           onClick={() => printShippingLabel(order)}
@@ -937,6 +1104,8 @@ _This is an automated test message_
               <CouponUsageReport />
             ) : activeTab === 'fraud' ? (
               <FraudDashboard />
+            ) : activeTab === 'thermal-printer' ? (
+              <ThermalPrinterSettings />
             ) : (
               <CustomerList />
             )}
