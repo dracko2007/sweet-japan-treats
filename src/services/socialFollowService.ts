@@ -1,5 +1,5 @@
 import { db } from '@/config/firebase';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { firebaseSyncService } from '@/services/firebaseSyncService';
 
 export type SocialNetwork = 'instagram' | 'facebook' | 'tiktok' | 'x';
@@ -28,10 +28,10 @@ export const socialFollowService = {
       const snap = await getDoc(doc(db, 'users', userId));
       const follows = (snap.data()?.socialFollows || {}) as Record<string, boolean>;
       if (follows[network]) return { ok: false, alreadyClaimed: true };
-      // Mark as followed and award points
-      await updateDoc(doc(db, 'users', userId), {
-        [`socialFollows.${network}`]: true,
-      });
+      // Mark as followed — setDoc+merge creates the doc if it doesn't exist yet
+      await setDoc(doc(db, 'users', userId), {
+        socialFollows: { [network]: true },
+      }, { merge: true });
       // Award points via firebaseSyncService
       const current = snap.data()?.points || 0;
       await firebaseSyncService.syncUserToFirestore(userId, { points: current + SOCIAL_POINTS });
