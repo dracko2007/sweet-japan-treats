@@ -593,17 +593,33 @@ export const firebaseSyncService = {
     }
   },
 
-  async resetAllPoints(): Promise<{ success: boolean; users: number; error?: unknown }> {
+  async resetAllPoints(): Promise<{ success: boolean; users: number; error?: string }> {
     try {
       ensureFirebaseReady();
+      // Garante auth de admin antes de escrever
+      const { ensureAdminAuth } = await import('@/utils/adminAuth');
+      await ensureAdminAuth();
       const snap = await getDocs(collection(db, 'users'));
-      await Promise.all(snap.docs.map(d =>
-        updateDoc(doc(db, 'users', d.id), { points: 0 })
-      ));
+      const results = await Promise.allSettled(
+        snap.docs.map(d => updateDoc(doc(db, 'users', d.id), { points: 0 }))
+      );
+      const failed = results.filter(r => r.status === 'rejected');
+      if (failed.length > 0) {
+        const reason = (failed[0] as PromiseRejectedResult).reason;
+        devError('❌ [FIREBASE] resetAllPoints partial failure:', reason);
+        return { success: false, users: snap.size, error: String(reason) };
+      }
       return { success: true, users: snap.size };
     } catch (error) {
-      return { success: false, users: 0, error };
+      devError('❌ [FIREBASE] resetAllPoints error:', error);
+      return { success: false, users: 0, error: String(error) };
     }
+  },
+
+  clearAllReviews(): void {
+    try {
+      localStorage.removeItem('japan-express-reviews');
+    } catch { /* ignora */ }
   },
 
   async resetAllUsersData(): Promise<{ success: boolean; users: number; error?: unknown }> {
