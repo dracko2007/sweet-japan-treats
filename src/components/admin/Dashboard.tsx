@@ -45,9 +45,18 @@ const Dashboard: React.FC = () => {
     loadData();
   }, [products]);
 
-  // Helpers: tudo convertido para IENE (¥) conforme a moeda de cada pedido
-  const orderRevYen = (o: Order) => toYen(o.totalPrice || o.totalAmount || 0, o.currency);
-  const orderShipYen = (o: Order) => toYen(o.shippingCost ?? o.shipping?.cost ?? 0, o.currency);
+  // Helpers: tudo convertido para IENE (¥) conforme a moeda de cada pedido.
+  // Prefere grandTotalYen (travado na taxa do momento da compra) para consistência com o que o cliente viu.
+  const orderRevYen = (o: Order) =>
+    (o as any).grandTotalYen || toYen(o.totalPrice || o.totalAmount || 0, o.currency);
+  const orderShipYen = (o: Order) => {
+    const shipBrl = o.shippingCost ?? o.shipping?.cost ?? 0;
+    if ((o as any).grandTotalYen && (o.totalPrice || o.totalAmount)) {
+      const impliedRate = (o as any).grandTotalYen / (o.totalPrice || o.totalAmount || 1);
+      return Math.round(shipBrl * impliedRate);
+    }
+    return toYen(shipBrl, o.currency);
+  };
   // Custo (¥): snapshot no item, ou busca no produto atual (fallback p/ pedidos antigos)
   const orderCostYen = (o: Order) =>
     (o.items || []).reduce((sum, it) => {
