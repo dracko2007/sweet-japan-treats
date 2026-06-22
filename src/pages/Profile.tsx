@@ -805,7 +805,9 @@ const Profile: React.FC = () => {
                         </div>
                         <div className="text-right">
                           <p className="font-bold text-lg text-foreground">
-                            {formatPrice(order.totalAmount, (order as any).currency || 'JPY')}
+                            {(order as any).grandTotalYen && (order as any).currency !== 'JPY'
+                              ? `${formatPrice(order.totalAmount, (order as any).currency || 'BRL', true)} (¥ ${((order as any).grandTotalYen as number).toLocaleString()})`
+                              : formatPrice(order.totalAmount, (order as any).currency || 'JPY')}
                           </p>
                           <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${
                             order.status === 'delivered' ? 'bg-green-100 text-green-800' :
@@ -975,7 +977,11 @@ const Profile: React.FC = () => {
                             )}
                             <div className="flex justify-between font-semibold pt-1 border-t border-border">
                               <span>{t('profile.orders.total')}</span>
-                              <span className="text-primary">{formatPrice(order.totalAmount, oc)}</span>
+                              <span className="text-primary">
+                                {(order as any).grandTotalYen && oc !== 'JPY'
+                                  ? `${formatPrice(order.totalAmount, oc, true)} (¥ ${((order as any).grandTotalYen as number).toLocaleString()})`
+                                  : formatPrice(order.totalAmount, oc)}
+                              </span>
                             </div>
                           </div>
                         );
@@ -985,7 +991,14 @@ const Profile: React.FC = () => {
                         <div className="flex items-center justify-between">
                           <p className="text-xs text-muted-foreground">
                             <Package className="w-3 h-3 inline mr-1" />
-                            {t('profile.orders.payment')} {order.paymentMethod === 'bank' ? t('profile.orders.payment.bank') : 'PayPay'}
+                            {t('profile.orders.payment')}{' '}
+                            {order.paymentMethod === 'pix' ? 'PIX'
+                              : order.paymentMethod === 'wise' ? 'Wise'
+                              : order.paymentMethod === 'paypay' ? 'PayPay'
+                              : order.paymentMethod === 'yucho' ? 'Yucho'
+                              : order.paymentMethod === 'card' ? 'Cartão de Crédito'
+                              : order.paymentMethod === 'bank' ? t('profile.orders.payment.bank')
+                              : order.paymentMethod || 'N/A'}
                           </p>
                           <Button
                             onClick={() => handleReorder(order)}

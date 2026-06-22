@@ -662,7 +662,13 @@ _This is an automated test message_
                           {new Date(order.orderDate).toLocaleString('pt-BR')}
                         </p>
                         <p className="text-sm text-muted-foreground font-semibold">
-                          💳 {order.paymentMethod === 'pix' ? 'PIX' : order.paymentMethod === 'card' ? 'Cartão de Crédito' : order.paymentMethod === 'boleto' ? 'Boleto Bancário' : order.paymentMethod}
+                          💳 {order.paymentMethod === 'pix' ? 'PIX'
+                            : order.paymentMethod === 'wise' ? 'Wise'
+                            : order.paymentMethod === 'paypay' ? 'PayPay'
+                            : order.paymentMethod === 'yucho' ? 'Yucho'
+                            : order.paymentMethod === 'card' ? 'Cartão de Crédito'
+                            : order.paymentMethod === 'boleto' ? 'Boleto Bancário'
+                            : order.paymentMethod || 'N/A'}
                         </p>
                       </div>
                       
@@ -785,7 +791,11 @@ _This is an automated test message_
                                 {/* Total */}
                                 <div className="flex justify-between font-bold pt-1 border-t border-border text-base">
                                   <span>Total Geral</span>
-                                  <span className="text-primary font-mono">R$ {order.totalPrice ? order.totalPrice.toFixed(2) : order.total ? order.total.toFixed(2) : '0.00'}</span>
+                                  <span className="text-primary font-mono">
+                                    {order.currency !== 'JPY' && (order as any).grandTotalYen
+                                      ? `R$ ${(order.totalPrice ?? order.total ?? 0).toFixed(2)} (¥ ${((order as any).grandTotalYen as number).toLocaleString()})`
+                                      : `R$ ${(order.totalPrice ?? order.total ?? 0).toFixed(2)}`}
+                                  </span>
                                 </div>
                               </div>
                             );
