@@ -388,11 +388,36 @@ const OrderReview: React.FC = () => {
       ).then(() => refreshProducts()).catch(() => {});
     }
 
-    const doSync = () =>
+    // Comissão de afiliado — calculada aqui para ser capturada no closure
+    const affiliateNetYen = appliedCoupon?.affiliateCode
+      ? Math.round(
+          items.reduce((sum, item) => {
+            if (item.freeGift) return sum;
+            return sum + effectiveYen(item.product, item.size) * item.quantity;
+          }, 0) * (1 - (appliedCoupon.discountType === 'percentage' ? appliedCoupon.discount / 100 : 0))
+        )
+      : 0;
+
+    // Todas as escritas ao Firestore que precisam de auth ficam aqui.
+    // Para guests, só executam APÓS signInAnonymously completar.
+    const doFirestoreWrites = () => {
       firebaseSyncService
         .syncOrderToFirestore(user?.id || customerEmail || 'guest', firestoreOrder)
-        .then((ok) => devLog(ok ? '✅ Pedido salvo no Firestore' : '⚠️ Falha ao salvar pedido no Firestore'))
-        .catch((e) => devError('❌ Erro ao salvar pedido no Firestore:', e));
+        .then((ok) => devLog(ok ? '✅ Pedido salvo no Firestore' : '⚠️ Falha ao salvar pedido'))
+        .catch((e) => devError('❌ Erro ao salvar pedido:', e));
+
+      if (appliedCoupon?.affiliateCode && affiliateNetYen > 0) {
+        import('@/services/affiliateService').then(({ affiliateService }) => {
+          affiliateService.addPendingCommission({
+            affiliateCode: appliedCoupon.affiliateCode,
+            netYen: affiliateNetYen,
+            orderId,
+            buyerEmail: customerEmail,
+          });
+        });
+        safeStorage.removeItem('affiliate_ref');
+      }
+    };
 
     if (isGuest) {
       // Guest has no Firebase Auth session — Firestore rules require request.auth != null.
@@ -401,32 +426,14 @@ const OrderReview: React.FC = () => {
         import('firebase/auth'),
         import('@/config/firebase'),
       ]).then(([{ signInAnonymously }, { auth }]) => {
-        if (!auth) { doSync(); return; }
-        signInAnonymously(auth).catch(() => {}).finally(() => doSync());
-      }).catch(() => doSync());
+        if (!auth) { doFirestoreWrites(); return; }
+        signInAnonymously(auth).catch(() => {}).finally(() => doFirestoreWrites());
+      }).catch(() => doFirestoreWrites());
     } else {
-      doSync();
+      doFirestoreWrites();
     }
 
-    // Cupom de afiliado/influencer → registra comissão PENDENTE (liberada só
-    // quando o admin confirmar a entrega do pedido)
-    if (appliedCoupon?.affiliateCode) {
-      const netYenBase = items.reduce((sum, item) => {
-        if (item.freeGift) return sum;
-        return sum + effectiveYen(item.product, item.size) * item.quantity;
-      }, 0);
-      const fraction = appliedCoupon.discountType === 'percentage' ? appliedCoupon.discount / 100 : 0;
-      const netYen = Math.round(netYenBase * (1 - fraction));
-      import('@/services/affiliateService').then(({ affiliateService }) => {
-        affiliateService.addPendingCommission({
-          affiliateCode: appliedCoupon.affiliateCode,
-          netYen,
-          orderId,
-          buyerEmail: customerEmail,
-        });
-      });
-      safeStorage.removeItem('affiliate_ref');
-    } else if (appliedCoupon?.code) {
+    if (!appliedCoupon?.affiliateCode && appliedCoupon?.code) {
       // Cupom pessoal → consome (uso único, some do perfil)
       if (!isGuest) {
         consumeCouponByCode(appliedCoupon.code);
