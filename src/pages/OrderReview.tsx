@@ -29,6 +29,7 @@ import { paymentSettingsService } from '@/services/paymentSettingsService';
 import { Wallet } from 'lucide-react';
 import { referralService } from '@/services/referralService';
 import { calcBrazilTax, calcEuVat, EU_VAT_RATES } from '@/utils/taxRules';
+import { cpfGuardService, normalizeCPF } from '@/services/cpfGuardService';
 
 const isDev = import.meta.env.DEV;
 const devLog = isDev ? console.log.bind(console) : () => {};
@@ -226,7 +227,39 @@ const OrderReview: React.FC = () => {
   };
 
   // Passo 1: monta os dados do pedido e abre o modal de pagamento (sem salvar nada ainda)
-  const handleProceedToPayment = () => {
+  const handleProceedToPayment = async () => {
+    // ── Verificações anti-fraude por CPF ─────────────────────────────────────
+    const cpfRaw = formData.cpf || '';
+    if (cpfRaw) {
+      // 1. Limite de produto por CPF (burla via guest)
+      const productIdsWithLimit = items
+        .filter(i => !i.freeGift && i.product.stock && !i.product.stock.unlimited)
+        .map(i => i.product.id);
+      if (productIdsWithLimit.length > 0) {
+        const limitCheck = await cpfGuardService.checkProductLimit(cpfRaw, productIdsWithLimit);
+        if (limitCheck.blocked) {
+          toast({ title: 'Compra bloqueada', description: limitCheck.reason, variant: 'destructive' });
+          return;
+        }
+      }
+
+      // 2. Cupom de afiliado só na primeira compra por CPF
+      if (appliedCoupon?.affiliateCode) {
+        const affCheck = await cpfGuardService.hasUsedAffiliateDiscount(cpfRaw);
+        if (affCheck.used) {
+          toast({
+            title: 'Cupom de afiliado inválido',
+            description: `Este CPF já utilizou desconto de afiliado em uma compra anterior. O desconto de indicação é válido apenas na primeira compra.`,
+            variant: 'destructive',
+          });
+          // Remove o cupom afiliado sem bloquear a compra
+          setCouponDiscount(0);
+          setAppliedCoupon(null);
+          return;
+        }
+      }
+    }
+    // ─────────────────────────────────────────────────────────────────────────
     const countryPrefix = isJapan ? 'JP' : formData.country === 'Brasil' ? 'BR' : formData.country === 'Portugal' ? 'PT' : formData.country === 'França' ? 'FR' : formData.country === 'Itália' ? 'IT' : 'ES';
     const orderId = isJapan
       ? `SC-JP-${Math.floor(100000 + Math.random() * 900000)}`
@@ -344,6 +377,7 @@ const OrderReview: React.FC = () => {
       shipping: { cost: finalShippingCost, carrier: shipping.carrier, estimatedDays: shipping.estimatedDays },
       affiliateCode: appliedCoupon?.affiliateCode || '',
       psFeeFinalYen,
+      cpf: normalizeCPF(formData.cpf || ''),
       customerType: isGuest ? 'guest' : 'registered',
       shippingAddress: {
         name: formData.name,
@@ -416,6 +450,19 @@ const OrderReview: React.FC = () => {
           });
         });
         safeStorage.removeItem('affiliate_ref');
+      }
+
+      // Registra no índice de CPF: produtos comprados e afiliado usado
+      const cpfRaw = formData.cpf || '';
+      if (cpfRaw) {
+        const purchasedProductIds = items
+          .filter(i => !i.freeGift && i.product.stock && !i.product.stock.unlimited)
+          .map(i => i.product.id);
+        cpfGuardService.registerOrder({
+          cpfRaw,
+          productIds: purchasedProductIds,
+          affiliateCode: appliedCoupon?.affiliateCode || undefined,
+        });
       }
     };
 
