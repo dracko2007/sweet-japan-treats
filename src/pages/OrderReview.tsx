@@ -387,10 +387,25 @@ const OrderReview: React.FC = () => {
       ).then(() => refreshProducts()).catch(() => {});
     }
 
-    firebaseSyncService
-      .syncOrderToFirestore(user?.id || customerEmail || 'guest', firestoreOrder)
-      .then((ok) => devLog(ok ? '✅ Pedido salvo no Firestore' : '⚠️ Falha ao salvar pedido no Firestore'))
-      .catch((e) => devError('❌ Erro ao salvar pedido no Firestore:', e));
+    const doSync = () =>
+      firebaseSyncService
+        .syncOrderToFirestore(user?.id || customerEmail || 'guest', firestoreOrder)
+        .then((ok) => devLog(ok ? '✅ Pedido salvo no Firestore' : '⚠️ Falha ao salvar pedido no Firestore'))
+        .catch((e) => devError('❌ Erro ao salvar pedido no Firestore:', e));
+
+    if (isGuest) {
+      // Guest has no Firebase Auth session — Firestore rules require request.auth != null.
+      // Signing in anonymously gives a valid token without creating a real account.
+      Promise.all([
+        import('firebase/auth'),
+        import('@/config/firebase'),
+      ]).then(([{ signInAnonymously }, { auth }]) => {
+        if (!auth) { doSync(); return; }
+        signInAnonymously(auth).catch(() => {}).finally(() => doSync());
+      }).catch(() => doSync());
+    } else {
+      doSync();
+    }
 
     // Cupom de afiliado/influencer → registra comissão PENDENTE (liberada só
     // quando o admin confirmar a entrega do pedido)
