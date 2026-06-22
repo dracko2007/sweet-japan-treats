@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { TrendingUp, TrendingDown, Package, DollarSign, ShoppingBag, CheckCircle, XCircle, ChevronDown, ChevronUp } from 'lucide-react';
+import React, { useEffect, useState, useCallback } from 'react';
+import { TrendingUp, TrendingDown, Package, DollarSign, ShoppingBag, CheckCircle, XCircle, ChevronDown, ChevronUp, RefreshCw } from 'lucide-react';
 import {
   BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
@@ -70,9 +70,14 @@ const Dashboard: React.FC = () => {
   const [openGraficos, setOpenGraficos] = useState(false);
   const [openConfig, setOpenConfig] = useState(false);
 
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const refresh = useCallback(() => setRefreshKey(k => k + 1), []);
+
   useEffect(() => {
     loadData();
-  }, [products]);
+  }, [products, refreshKey]);
 
   // Prefere grandTotalYen (travado na taxa do momento da compra) para consistência com o que o cliente viu.
   const orderRevYen = (o: Order) =>
@@ -100,6 +105,7 @@ const Dashboard: React.FC = () => {
     }, 0);
 
   const loadData = async () => {
+    setRefreshing(true);
     const withTimeout = <T,>(p: Promise<T>, ms: number, fallback: T): Promise<T> =>
       Promise.race([p, new Promise<T>((res) => setTimeout(() => res(fallback), ms))]);
 
@@ -242,6 +248,7 @@ const Dashboard: React.FC = () => {
     setMonthlyData(monthly);
     setTopProducts(top5);
     setPaymentMethods(payment);
+    setRefreshing(false);
   };
 
   if (!stats) {
@@ -281,6 +288,18 @@ const Dashboard: React.FC = () => {
 
   return (
     <div className="space-y-4">
+
+      {/* ── Botão atualizar ── */}
+      <div className="flex justify-end">
+        <button
+          onClick={refresh}
+          disabled={refreshing}
+          className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+        >
+          <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+          {refreshing ? 'Atualizando…' : 'Atualizar dados'}
+        </button>
+      </div>
 
       {/* ── Configurações ── */}
       <SectionHeader title="⚙️ Configurações" open={openConfig} onToggle={() => setOpenConfig(v => !v)} />
