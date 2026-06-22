@@ -143,11 +143,20 @@ const Dashboard: React.FC = () => {
     try {
       const allOrds = orders.filter(o => o.status !== 'cancelled');
       descontosCupomYen = allOrds.reduce((s, o) => {
-        const disc = (o as any).discountAmount || 0;
-        const rate = (o as any).grandTotalYen && (o.totalPrice || o.totalAmount)
-          ? (o as any).grandTotalYen / ((o.totalPrice || o.totalAmount) || 1)
-          : 28;
-        return s + Math.round(disc * rate);
+        const disc = (o as any).couponDiscount || 0;
+        if (!disc) return s;
+        const cur = (o as any).currency || 'BRL';
+        const grandTotalYen = (o as any).grandTotalYen || 0;
+        const totalBrl = o.totalPrice || o.totalAmount || 0;
+        let discYen = 0;
+        if (cur === 'JPY') {
+          discYen = Math.round(disc);
+        } else if (grandTotalYen > 0 && totalBrl > 0) {
+          discYen = Math.round(disc * (grandTotalYen / totalBrl));
+        } else {
+          discYen = toYen(disc, cur);
+        }
+        return s + discYen;
       }, 0);
     } catch { /* ignora */ }
 
