@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { useUser } from '@/context/UserContext';
 import { useProducts } from '@/context/ProductsContext';
 import { useToast } from '@/hooks/use-toast';
-import { affiliateService, Affiliate, PendingCommission } from '@/services/affiliateService';
+import { affiliateService, Affiliate, PendingCommission, TIER_CONFIG, AffiliateTier } from '@/services/affiliateService';
 
 const SITE_URL = 'https://japanexpress-store.com';
 
@@ -133,6 +133,38 @@ const AffiliatePage: React.FC = () => {
                         <p className="text-xs text-primary flex items-center gap-1 mb-1"><DollarSign className="w-3 h-3" /> Comissão liberada</p>
                         <p className="text-xl font-bold text-primary">{yen(aff.totalEarnings)}</p>
                         <p className="text-[10px] text-muted-foreground">{aff.commissionPercent}% das vendas</p>
+                        {/* Badge de nível */}
+                        {(() => {
+                          const tier: AffiliateTier = aff.tier || 'bronze';
+                          const cfg = TIER_CONFIG[tier];
+                          const monthRev = aff.currentMonthRevenue || 0;
+                          const progress = Math.min(100, Math.round((monthRev / cfg.goalYen) * 100));
+                          const nextCfg = cfg.nextTier ? TIER_CONFIG[cfg.nextTier] : null;
+                          return (
+                            <div className="mt-2 space-y-1.5">
+                              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold ${
+                                tier === 'gold'   ? 'bg-yellow-100 text-yellow-700' :
+                                tier === 'silver' ? 'bg-gray-100 text-gray-600' :
+                                                    'bg-orange-100 text-orange-700'
+                              }`}>{cfg.emoji} {cfg.label}</span>
+                              <div>
+                                <div className="flex justify-between text-[10px] text-muted-foreground mb-0.5">
+                                  <span>Este mês: ¥{monthRev.toLocaleString()}</span>
+                                  <span>Meta: ¥{cfg.goalYen.toLocaleString()}</span>
+                                </div>
+                                <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
+                                  <div className={`h-full rounded-full ${progress >= 100 ? 'bg-green-500' : progress >= 60 ? 'bg-amber-400' : 'bg-red-400'}`}
+                                    style={{ width: `${progress}%` }} />
+                                </div>
+                                <p className="text-[10px] text-muted-foreground mt-0.5">
+                                  {progress >= 100
+                                    ? `✅ Meta batida!${nextCfg ? ` → ${nextCfg.emoji} ${nextCfg.label} no próximo mês` : ''}`
+                                    : `Faltam ¥${(cfg.goalYen - monthRev).toLocaleString()} para ${nextCfg ? `subir para ${nextCfg.emoji} ${nextCfg.label}` : 'manter Ouro'}`}
+                                </p>
+                              </div>
+                            </div>
+                          );
+                        })()}
                         {pend.commissionYen > 0 && (
                           <div className="mt-2 bg-amber-50 dark:bg-amber-950/30 rounded-lg p-2 border border-amber-200 dark:border-amber-800">
                             <p className="text-[11px] text-amber-700 dark:text-amber-400 flex items-center gap-1 font-semibold">

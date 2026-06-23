@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { Megaphone, Plus, Trash2, Link2, TrendingUp, DollarSign, Package, X, CheckCircle, Clock } from 'lucide-react';
+import { Megaphone, Plus, Trash2, Link2, TrendingUp, DollarSign, Package, X, CheckCircle, Clock, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { affiliateService, Affiliate, PendingCommission } from '@/services/affiliateService';
+import { affiliateService, Affiliate, PendingCommission, TIER_CONFIG, AffiliateTier } from '@/services/affiliateService';
 
 const SITE_URL = 'https://japanexpress-store.com';
 
@@ -39,6 +39,19 @@ const AffiliateManager: React.FC = () => {
   useEffect(() => {
     load();
   }, []);
+
+  const [evaluating, setEvaluating] = useState(false);
+  const handleEvaluateTiers = async () => {
+    if (!confirm('Avaliar e atualizar o nível de todos os afiliados agora?\n\nIsso processa as vendas do mês atual e sobe/desce os níveis conforme as metas.')) return;
+    setEvaluating(true);
+    const res = await affiliateService.evaluateAllTiers();
+    toast({
+      title: '🏆 Níveis atualizados',
+      description: `${res.updated} afiliado(s) processado(s)${res.errors ? ` · ${res.errors} erro(s)` : ''}`,
+    });
+    setEvaluating(false);
+    load();
+  };
 
   const handleConfirm = async (pc: PendingCommission) => {
     if (!confirm(`Confirmar entrega e liberar comissão de ${pc.affiliateCode}?`)) return;
@@ -212,46 +225,105 @@ const AffiliateManager: React.FC = () => {
           <p className="text-muted-foreground">Nenhum afiliado cadastrado</p>
         </div>
       ) : (
-        <div className="grid gap-4">
-          {affiliates.map((aff) => {
-            const expired = new Date(aff.expiresAt) < new Date();
-            return (
-              <div key={aff.code} className={`bg-card rounded-xl border p-6 ${!aff.active || expired ? 'border-border opacity-70' : 'border-primary/20'}`}>
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-1 flex-wrap">
-                      <h3 className="font-bold text-lg font-mono">{aff.code}</h3>
-                      <span className={`px-2 py-0.5 rounded-full text-xs ${aff.active && !expired ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
-                        {expired ? 'Expirado' : aff.active ? 'Ativo' : 'Inativo'}
-                      </span>
+        <div className="space-y-3">
+          {/* Botão avaliar tiers */}
+          <div className="flex justify-end">
+            <Button variant="outline" size="sm" onClick={handleEvaluateTiers} disabled={evaluating} className="gap-2">
+              <RefreshCw className={`w-4 h-4 ${evaluating ? 'animate-spin' : ''}`} />
+              {evaluating ? 'Avaliando...' : 'Avaliar Níveis Agora'}
+            </Button>
+          </div>
+
+          {/* Legenda de tiers */}
+          <div className="flex gap-3 flex-wrap text-xs">
+            {(Object.entries(TIER_CONFIG) as [AffiliateTier, typeof TIER_CONFIG[AffiliateTier]][]).map(([key, cfg]) => (
+              <div key={key} className="flex items-center gap-1.5 bg-secondary/40 rounded-lg px-3 py-1.5">
+                <span>{cfg.emoji}</span>
+                <span className="font-semibold">{cfg.label}</span>
+                <span className="text-muted-foreground">{cfg.commissionPercent}% · meta ¥{cfg.goalYen.toLocaleString()}/mês</span>
+              </div>
+            ))}
+          </div>
+
+          <div className="grid gap-4">
+            {affiliates.map((aff) => {
+              const expired = new Date(aff.expiresAt) < new Date();
+              const tier: AffiliateTier = aff.tier || 'bronze';
+              const tierCfg = TIER_CONFIG[tier];
+              const monthRev = aff.currentMonthRevenue || 0;
+              const progress = Math.min(100, Math.round((monthRev / tierCfg.goalYen) * 100));
+              const nextTierCfg = tierCfg.nextTier ? TIER_CONFIG[tierCfg.nextTier] : null;
+
+              return (
+                <div key={aff.code} className={`bg-card rounded-xl border p-6 ${!aff.active || expired ? 'border-border opacity-70' : 'border-primary/20'}`}>
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-1 flex-wrap">
+                        <h3 className="font-bold text-lg font-mono">{aff.code}</h3>
+                        <span className={`px-2 py-0.5 rounded-full text-xs ${aff.active && !expired ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
+                          {expired ? 'Expirado' : aff.active ? 'Ativo' : 'Inativo'}
+                        </span>
+                        {/* Badge de nível */}
+                        <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${
+                          tier === 'gold'   ? 'bg-yellow-100 text-yellow-700' :
+                          tier === 'silver' ? 'bg-gray-100 text-gray-600' :
+                                              'bg-orange-100 text-orange-700'
+                        }`}>
+                          {tierCfg.emoji} {tierCfg.label} · {tierCfg.commissionPercent}%
+                        </span>
+                      </div>
+                      <p className="text-sm text-muted-foreground">{aff.ownerName} · {aff.ownerEmail}</p>
+
+                      {/* Progresso da meta mensal */}
+                      <div className="mt-3 space-y-1">
+                        <div className="flex justify-between text-xs text-muted-foreground">
+                          <span>Vendas este mês: <strong className="text-foreground">¥{monthRev.toLocaleString()}</strong></span>
+                          <span>Meta {nextTierCfg ? `→ ${nextTierCfg.emoji}` : '✓'}: ¥{tierCfg.goalYen.toLocaleString()}</span>
+                        </div>
+                        <div className="h-2 bg-secondary rounded-full overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all ${
+                              progress >= 100 ? 'bg-green-500' :
+                              progress >= 60  ? 'bg-amber-400' : 'bg-red-400'
+                            }`}
+                            style={{ width: `${progress}%` }}
+                          />
+                        </div>
+                        <p className="text-[11px] text-muted-foreground">
+                          {progress >= 100
+                            ? `✅ Meta batida! ${nextTierCfg ? `Sobe para ${nextTierCfg.emoji} ${nextTierCfg.label} no próximo mês` : 'Mantém Ouro'}`
+                            : tierCfg.prevTier
+                              ? `⚠️ Faltam ¥${(tierCfg.goalYen - monthRev).toLocaleString()} para manter ${tierCfg.emoji} ${tierCfg.label}`
+                              : `¥${(tierCfg.goalYen - monthRev).toLocaleString()} para subir para ${nextTierCfg?.emoji} ${nextTierCfg?.label}`}
+                        </p>
+                      </div>
+
+                      <div className="mt-3 flex items-center gap-2 bg-secondary/40 rounded-lg p-2">
+                        <Link2 className="w-3.5 h-3.5 text-primary shrink-0" />
+                        <code className="text-xs text-foreground truncate flex-1">{`${SITE_URL}/?ref=${aff.code}`}</code>
+                        <button onClick={() => copyLink(aff.code)} className="text-xs font-semibold text-primary hover:underline shrink-0">copiar</button>
+                      </div>
+                      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm mt-4">
+                        <div><p className="text-muted-foreground text-xs">Desconto</p><p className="font-semibold">{aff.discountPercent}%</p></div>
+                        <div><p className="text-muted-foreground text-xs">Comissão</p><p className="font-semibold">{aff.commissionPercent}%</p></div>
+                        <div><p className="text-muted-foreground text-xs flex items-center gap-1"><Package className="w-3 h-3" /> Pedidos</p><p className="font-semibold">{aff.totalOrders || 0}</p></div>
+                        <div><p className="text-muted-foreground text-xs flex items-center gap-1"><TrendingUp className="w-3 h-3" /> Receita total</p><p className="font-semibold">{yen(aff.totalRevenue)}</p></div>
+                        <div><p className="text-muted-foreground text-xs flex items-center gap-1"><DollarSign className="w-3 h-3" /> Comissão acum.</p><p className="font-semibold text-green-600">{yen(aff.totalEarnings)}</p></div>
+                      </div>
                     </div>
-                    <p className="text-sm text-muted-foreground">{aff.ownerName} · {aff.ownerEmail}</p>
-                    {/* Link de indicação visível (para o admin copiar/enviar ao afiliado) */}
-                    <div className="mt-3 flex items-center gap-2 bg-secondary/40 rounded-lg p-2">
-                      <Link2 className="w-3.5 h-3.5 text-primary shrink-0" />
-                      <code className="text-xs text-foreground truncate flex-1">{`${SITE_URL}/?ref=${aff.code}`}</code>
-                      <button onClick={() => copyLink(aff.code)} className="text-xs font-semibold text-primary hover:underline shrink-0">copiar</button>
+                    <div className="flex flex-col gap-2">
+                      <Button variant="outline" size="sm" onClick={() => copyLink(aff.code)} title="Copiar link">
+                        <Link2 className="w-4 h-4" />
+                      </Button>
+                      <Button variant="destructive" size="sm" onClick={() => handleDelete(aff.code)} title="Remover">
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
                     </div>
-                    <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm mt-4">
-                      <div><p className="text-muted-foreground text-xs">Desconto</p><p className="font-semibold">{aff.discountPercent}%</p></div>
-                      <div><p className="text-muted-foreground text-xs">Comissão</p><p className="font-semibold">{aff.commissionPercent}%</p></div>
-                      <div><p className="text-muted-foreground text-xs flex items-center gap-1"><Package className="w-3 h-3" /> Vendas</p><p className="font-semibold">{aff.totalOrders || 0}</p></div>
-                      <div><p className="text-muted-foreground text-xs flex items-center gap-1"><TrendingUp className="w-3 h-3" /> Receita</p><p className="font-semibold">{yen(aff.totalRevenue)}</p></div>
-                      <div><p className="text-muted-foreground text-xs flex items-center gap-1"><DollarSign className="w-3 h-3" /> Comissão acum.</p><p className="font-semibold text-green-600">{yen(aff.totalEarnings)}</p></div>
-                    </div>
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <Button variant="outline" size="sm" onClick={() => copyLink(aff.code)} title="Copiar link de indicação">
-                      <Link2 className="w-4 h-4" />
-                    </Button>
-                    <Button variant="destructive" size="sm" onClick={() => handleDelete(aff.code)} title="Remover">
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
                   </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
       )}
     </div>

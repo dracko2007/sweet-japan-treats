@@ -49,22 +49,54 @@ export interface PendingCommission {
   createdAt: string;
 }
 
+export type AffiliateTier = 'bronze' | 'silver' | 'gold';
+
+export const TIER_CONFIG: Record<AffiliateTier, {
+  label: string;
+  emoji: string;
+  commissionPercent: number;
+  goalYen: number;          // venda mensal mínima para subir/manter
+  nextTier: AffiliateTier | null;
+  prevTier: AffiliateTier | null;
+}> = {
+  bronze: { label: 'Bronze', emoji: '🥉', commissionPercent: 10, goalYen: 200_000, nextTier: 'silver', prevTier: null },
+  silver: { label: 'Prata',  emoji: '🥈', commissionPercent: 15, goalYen: 500_000, nextTier: 'gold',   prevTier: 'bronze' },
+  gold:   { label: 'Ouro',   emoji: '🥇', commissionPercent: 20, goalYen: 500_000, nextTier: null,     prevTier: 'silver' },
+};
+
 export interface Affiliate {
-  code: string;            // código anunciado (ex: GANHA10)
-  ownerName: string;       // nome do influencer
-  ownerEmail: string;      // e-mail da conta do influencer (vê o painel)
-  discountPercent: number; // desconto que o comprador ganha
-  commissionPercent: number; // comissão do influencer sobre o valor líquido
+  code: string;
+  ownerName: string;
+  ownerEmail: string;
+  discountPercent: number;
+  commissionPercent: number;
   active: boolean;
-  expiresAt: string;       // ISO
-  createdAt: string;       // ISO
+  expiresAt: string;
+  createdAt: string;
   // métricas acumuladas
   totalOrders: number;
-  totalRevenue: number;    // soma do valor líquido das vendas
-  totalEarnings: number;   // comissão acumulada
+  totalRevenue: number;
+  totalEarnings: number;
+  // sistema de níveis
+  tier: AffiliateTier;             // nível atual
+  currentMonthRevenue: number;     // vendas acumuladas no mês corrente (¥)
+  currentMonthKey: string;         // "YYYY-MM" do mês sendo acumulado
+  tierUpdatedAt?: string;          // quando o nível foi atualizado
 }
 
 const normalize = (code: string) => code.trim().toUpperCase();
+
+function monthKey(date = new Date()) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+}
+
+/** Calcula o próximo tier com base nas vendas do mês. */
+function computeNextTier(currentTier: AffiliateTier, monthRevenue: number): AffiliateTier {
+  const cfg = TIER_CONFIG[currentTier];
+  if (monthRevenue >= cfg.goalYen && cfg.nextTier) return cfg.nextTier;   // subiu
+  if (monthRevenue < cfg.goalYen && cfg.prevTier) return cfg.prevTier;    // caiu
+  return currentTier;                                                       // manteve
+}
 
 export const affiliateService = {
   /** Lista todos os afiliados (admin). */
@@ -201,18 +233,23 @@ export const affiliateService = {
       const ref = doc(db, COL, code);
       const existing = await getDoc(ref);
       const prev = existing.exists() ? (existing.data() as Affiliate) : null;
+      const tier: AffiliateTier = prev?.tier || 'bronze';
       const affiliate: Affiliate = {
         code,
         ownerName: input.ownerName,
         ownerEmail: input.ownerEmail.toLowerCase(),
         discountPercent: input.discountPercent,
-        commissionPercent: input.commissionPercent,
+        commissionPercent: TIER_CONFIG[tier].commissionPercent, // sempre sincroniza com o tier
         active: input.active,
         expiresAt: input.expiresAt,
         createdAt: prev?.createdAt || input.createdAt || new Date().toISOString(),
         totalOrders: prev?.totalOrders ?? 0,
         totalRevenue: prev?.totalRevenue ?? 0,
         totalEarnings: prev?.totalEarnings ?? 0,
+        tier,
+        currentMonthRevenue: prev?.currentMonthRevenue ?? 0,
+        currentMonthKey: prev?.currentMonthKey ?? monthKey(),
+        tierUpdatedAt: prev?.tierUpdatedAt,
       };
       await setDoc(ref, affiliate);
       return true;
@@ -248,15 +285,67 @@ export const affiliateService = {
         const snap = await tx.get(ref);
         if (!snap.exists()) return;
         const aff = snap.data() as Affiliate;
-        const earning = Math.round((netValue * (aff.commissionPercent || 0)) / 100);
+
+        const now = new Date();
+        const mk = monthKey(now);
+        const currentTier: AffiliateTier = aff.tier || 'bronze';
+
+        // Virou o mês? Avalia tier com base no mês anterior e zera contador
+        let tier = currentTier;
+        let monthRevenue = (aff.currentMonthRevenue || 0) + netValue;
+        if (aff.currentMonthKey && aff.currentMonthKey !== mk) {
+          // Avalia com as vendas do mês anterior
+          tier = computeNextTier(currentTier, aff.currentMonthRevenue || 0);
+          monthRevenue = netValue; // zera e começa o novo mês com esta venda
+        }
+
+        const commissionPercent = TIER_CONFIG[tier].commissionPercent;
+        const earning = Math.round((netValue * commissionPercent) / 100);
+
         tx.update(ref, {
           totalOrders: (aff.totalOrders || 0) + 1,
           totalRevenue: (aff.totalRevenue || 0) + netValue,
           totalEarnings: (aff.totalEarnings || 0) + earning,
+          tier,
+          commissionPercent,
+          currentMonthRevenue: monthRevenue,
+          currentMonthKey: mk,
+          ...(tier !== currentTier ? { tierUpdatedAt: now.toISOString() } : {}),
         });
       });
     } catch (e) {
       devWarn('affiliateService.creditSale falhou:', e);
+    }
+  },
+
+  /** Avalia e atualiza o tier de todos os afiliados (chamado pelo admin no virar do mês). */
+  async evaluateAllTiers(): Promise<{ updated: number; errors: number }> {
+    if (!db) return { updated: 0, errors: 0 };
+    try {
+      await ensureAdminAuth();
+      const snap = await getDocs(collection(db, COL));
+      let updated = 0, errors = 0;
+      const mk = monthKey();
+      await Promise.all(snap.docs.map(async (d) => {
+        try {
+          const aff = d.data() as Affiliate;
+          const currentTier: AffiliateTier = aff.tier || 'bronze';
+          const newTier = computeNextTier(currentTier, aff.currentMonthRevenue || 0);
+          const commissionPercent = TIER_CONFIG[newTier].commissionPercent;
+          await updateDoc(doc(db!, COL, d.id), {
+            tier: newTier,
+            commissionPercent,
+            currentMonthRevenue: 0,
+            currentMonthKey: mk,
+            ...(newTier !== currentTier ? { tierUpdatedAt: new Date().toISOString() } : {}),
+          });
+          updated++;
+        } catch { errors++; }
+      }));
+      return { updated, errors };
+    } catch (e) {
+      devError('evaluateAllTiers falhou:', e);
+      return { updated: 0, errors: 1 };
     }
   },
 
