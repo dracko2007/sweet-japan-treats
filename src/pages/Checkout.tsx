@@ -254,8 +254,11 @@ const Checkout: React.FC = () => {
   // Auto address lookup by CEP/Postal Code
   const handlePostalCodeChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
-    
-    if (formData.country === 'Japão') {
+    // Lê o país do DOM diretamente para evitar closure stale quando o país acabou de mudar
+    const countrySelect = document.getElementById('country') as HTMLSelectElement | null;
+    const currentCountry = countrySelect?.value || formData.country;
+
+    if (currentCountry === 'Japão') {
       const cleanVal = val.replace(/[-\s]/g, '').slice(0, 7);
       let formatted = cleanVal;
       if (cleanVal.length > 3) {
@@ -290,7 +293,7 @@ const Checkout: React.FC = () => {
           devError('Erro ao buscar CEP japonês:', error);
         }
       }
-    } else if (formData.country === 'Brasil') {
+    } else if (currentCountry === 'Brasil') {
       const cleanVal = val.replace(/\D/g, '').slice(0, 8);
       let formatted = cleanVal;
       if (cleanVal.length > 5) {
@@ -330,16 +333,16 @@ const Checkout: React.FC = () => {
           }
         }
       }
-    } else if (['Portugal', 'França', 'Itália', 'Espanha'].includes(formData.country)) {
+    } else if (['Portugal', 'França', 'Itália', 'Espanha'].includes(currentCountry)) {
       // Formata e busca via zippopotam.us (gratuito, sem key)
       const countryCode: Record<string, string> = {
         'Portugal': 'PT', 'França': 'FR', 'Itália': 'IT', 'Espanha': 'ES',
       };
-      const cc = countryCode[formData.country];
+      const cc = countryCode[currentCountry];
 
       // Formatação automática: Portugal XXXX-XXX, demais XXXXX
       let formatted = val;
-      if (formData.country === 'Portugal') {
+      if (currentCountry === 'Portugal') {
         const digits = val.replace(/\D/g, '').slice(0, 7);
         formatted = digits.length > 4 ? `${digits.slice(0, 4)}-${digits.slice(4)}` : digits;
       } else {
@@ -349,7 +352,7 @@ const Checkout: React.FC = () => {
 
       // Busca quando completo: PT = 7 dígitos, demais = 5 dígitos
       const cleanVal = formatted.replace(/\D/g, '');
-      const expectedLen = formData.country === 'Portugal' ? 7 : 5;
+      const expectedLen = currentCountry === 'Portugal' ? 7 : 5;
       if (cc && cleanVal.length === expectedLen) {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 6000);
@@ -871,10 +874,12 @@ const Checkout: React.FC = () => {
                           required
                         />
                         <p className="text-[10px] text-gray-400">
-                          {formData.country === 'Japão' 
-                            ? 'Preenche o endereço japonês automaticamente (7 dígitos).' 
-                            : ['Portugal', 'França', 'Itália', 'Espanha'].includes(formData.country) 
-                            ? 'Digite o código postal de entrega.' 
+                          {formData.country === 'Japão'
+                            ? 'Preenche o endereço japonês automaticamente (7 dígitos).'
+                            : formData.country === 'Portugal'
+                            ? 'Formato XXXX-XXX (ex: 2910-112) — preenche cidade automaticamente.'
+                            : ['França', 'Itália', 'Espanha'].includes(formData.country)
+                            ? 'Formato XXXXX (5 dígitos) — preenche cidade automaticamente.'
                             : 'Preenche o endereço brasileiro automaticamente (8 dígitos).'}
                         </p>
                       </div>
