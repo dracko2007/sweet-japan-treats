@@ -138,6 +138,8 @@ function makePackageDimensions(a, b, c, unitHint, raw, source) {
 }
 
 // ---- Extrai peso em gramas do texto ou de campos estruturados ---------------
+// Objetivo: peso TOTAL da embalagem para cálculo de frete (総重量/梱包重量),
+// NÃO a quantidade de conteúdo (内容量/容量/net weight).
 function extractWeightGrams(item, extraText) {
   // 1. Campo estruturado da API Rakuten: soujyuuryou (総重量) em gramas
   const raw = item?.soujyuuryou ?? item?.itemWeight ?? item?.weight ?? null;
@@ -146,27 +148,54 @@ function extractWeightGrams(item, extraText) {
     if (n > 0 && n < 50000) return Math.round(n);
   }
 
-  // 2. Extrai do texto livre (descrição/nome/specs)
+  // 2. Extrai do texto livre — priorizando peso de embalagem, ignorando conteúdo
   const text = normalizeDimensionText(
     [item?.itemName, item?.itemCaption, item?.itemDescription, extraText].filter(Boolean).join('\n')
   );
 
-  // Padrões japoneses: "重量: 250g", "総重量 300g", "内容量：120g", "本体重量：150 g"
-  const patterns = [
-    /(?:総重量|本体重量|梱包重量|重量|ウエイト|净重|净含量)\s*[：:]\s*(\d+(?:[.,]\d+)?)\s*(kg|g|グラム|ｇ)/i,
-    /(\d+(?:[.,]\d+)?)\s*(kg|g|グラム|ｇ)\s*(?:入り|入|程度|以上|以下|±\d+)?(?:\s|$|、|。|,)/,
+  const toGrams = (val, unit) => {
+    const n = parseFloat(String(val).replace(',', '.'));
+    if (!n || n <= 0) return null;
+    const g = unit.toLowerCase().startsWith('k') ? Math.round(n * 1000) : Math.round(n);
+    return (g > 0 && g < 50000) ? g : null;
+  };
+
+  // PRIORIDADE 1 — peso de embalagem/envio explícito (総重量, 梱包重量, 発送重量, shipping weight)
+  const highPriority = [
+    /(?:総重量|梱包重量|発送重量|配送重量|shipping\s*weight|gross\s*weight)\s*[：:=]?\s*(\d+(?:[.,]\d+)?)\s*(kg|g)/i,
+    /(?:package\s*weight|パッケージ重量)\s*[：:=]?\s*(\d+(?:[.,]\d+)?)\s*(kg|g)/i,
+  ];
+  for (const p of highPriority) {
+    const m = text.match(p);
+    if (m) { const g = toGrams(m[1], m[2]); if (g) return g; }
+  }
+
+  // PRIORIDADE 2 — peso do produto/frasco (本体重量, 製品重量, product weight)
+  // Mas só se >= 10g (evita confundir com conteúdo de cosméticos pequenos)
+  const midPriority = [
+    /(?:本体重量|製品重量|商品重量|net\s*weight|重量)\s*[：:=]?\s*(\d+(?:[.,]\d+)?)\s*(kg|g)/i,
     /(?:weight|wt\.?)\s*[：:=]?\s*(\d+(?:[.,]\d+)?)\s*(kg|g)/i,
   ];
-
-  for (const pattern of patterns) {
-    const m = text.match(pattern);
-    if (!m) continue;
-    const val = parseFloat(String(m[1]).replace(',', '.'));
-    const unit = (m[2] || '').toLowerCase();
-    if (!val || val <= 0) continue;
-    const grams = unit.startsWith('k') ? Math.round(val * 1000) : Math.round(val);
-    if (grams > 0 && grams < 50000) return grams;
+  for (const p of midPriority) {
+    const m = text.match(p);
+    if (m) { const g = toGrams(m[1], m[2]); if (g && g >= 10) return g; }
   }
+
+  // PRIORIDADE 3 — qualquer "Xg" ou "X kg" no texto, mas:
+  //   • ignora se precedido por 内容量/容量/net/content (é quantidade de produto)
+  //   • ignora se < 10g (provavelmente conteúdo em pó/líquido)
+  //   • ignora se > 10kg (improvável para cosmético)
+  const ignoreContext = /(?:内容量|容量|内容|content|net\s*wt|正味重量|成分|有効成分)\s*[：:]?\s*[\d.]*\s*(?:kg|g)?/gi;
+  const cleaned = text.replace(ignoreContext, ' ');
+
+  const genericPattern = /(\d+(?:[.,]\d+)?)\s*(kg|g)\b/gi;
+  const candidates = [];
+  for (const m of cleaned.matchAll(genericPattern)) {
+    const g = toGrams(m[1], m[2]);
+    if (g && g >= 10 && g <= 10000) candidates.push(g);
+  }
+  // Retorna o maior valor encontrado (mais provável ser peso total, não uma medida parcial)
+  if (candidates.length) return Math.max(...candidates);
 
   return null;
 }
