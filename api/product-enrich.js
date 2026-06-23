@@ -137,6 +137,40 @@ function makePackageDimensions(a, b, c, unitHint, raw, source) {
   };
 }
 
+// ---- Extrai peso em gramas do texto ou de campos estruturados ---------------
+function extractWeightGrams(item, extraText) {
+  // 1. Campo estruturado da API Rakuten: soujyuuryou (総重量) em gramas
+  const raw = item?.soujyuuryou ?? item?.itemWeight ?? item?.weight ?? null;
+  if (raw != null) {
+    const n = Number(String(raw).replace(/[^0-9.]/g, ''));
+    if (n > 0 && n < 50000) return Math.round(n);
+  }
+
+  // 2. Extrai do texto livre (descrição/nome/specs)
+  const text = normalizeDimensionText(
+    [item?.itemName, item?.itemCaption, item?.itemDescription, extraText].filter(Boolean).join('\n')
+  );
+
+  // Padrões japoneses: "重量: 250g", "総重量 300g", "内容量：120g", "本体重量：150 g"
+  const patterns = [
+    /(?:総重量|本体重量|梱包重量|重量|ウエイト|净重|净含量)\s*[：:]\s*(\d+(?:[.,]\d+)?)\s*(kg|g|グラム|ｇ)/i,
+    /(\d+(?:[.,]\d+)?)\s*(kg|g|グラム|ｇ)\s*(?:入り|入|程度|以上|以下|±\d+)?(?:\s|$|、|。|,)/,
+    /(?:weight|wt\.?)\s*[：:=]?\s*(\d+(?:[.,]\d+)?)\s*(kg|g)/i,
+  ];
+
+  for (const pattern of patterns) {
+    const m = text.match(pattern);
+    if (!m) continue;
+    const val = parseFloat(String(m[1]).replace(',', '.'));
+    const unit = (m[2] || '').toLowerCase();
+    if (!val || val <= 0) continue;
+    const grams = unit.startsWith('k') ? Math.round(val * 1000) : Math.round(val);
+    if (grams > 0 && grams < 50000) return grams;
+  }
+
+  return null;
+}
+
 function extractPackageDimensions(text, source) {
   const normalized = normalizeDimensionText(text || '');
   if (!normalized) return null;
@@ -273,7 +307,9 @@ async function searchRakuten(productName) {
       .map(u => u.replace('?_ex=128x128', '')) // tenta versão maior
       .slice(0, 5);
 
-    return { priceYen, descJa, descSource, images, suggestName, source: 'rakuten', packageDimensionsCm };
+    const weightGrams = extractWeightGrams(item, [item.itemName, item.itemCaption, item.itemDescription].filter(Boolean).join('\n'));
+
+    return { priceYen, descJa, descSource, images, suggestName, source: 'rakuten', packageDimensionsCm, weightGrams };
   } catch (e) {
     lastRakutenDebug.error = String(e?.message || e);
     return null;
@@ -336,7 +372,10 @@ async function searchYahoo(productName) {
     // Sobe a resolução das URLs do yimg para a maior versão (/i/z/ = HD)
     const upscale = (u) => u.replace(/\/i\/[a-z]\//, '/i/z/');
     const images = [...new Set((hd.length ? hd : med).map(upscale))].slice(0, 5);
-    return { priceYen, descJa, descSource, images, suggestName, source: 'yahoo', packageDimensionsCm };
+    const weightGrams = extractWeightGrams(item, [item.name, item.description, item.headLine, descJa, pageDesc].filter(Boolean).join('\n'));
+    yahooDebug.weightGrams = weightGrams;
+
+    return { priceYen, descJa, descSource, images, suggestName, source: 'yahoo', packageDimensionsCm, weightGrams };
   } catch (e) {
     yahooDebug.error = String(e?.message || e);
     return null;
@@ -749,6 +788,7 @@ export default async function handler(req, res) {
       costYen:                wantPrice ? costYen : undefined,
       sellingPriceYen:        wantPrice ? sellingPriceYen : undefined,
       packageDimensionsCm:    rakuten?.packageDimensionsCm || null,
+      weightGrams:            rakuten?.weightGrams ?? null,
       images:                 wantImages ? (rakuten?.images || []) : [],
       suggestName: nameEn,
       source:      rakuten?.source || 'ai',

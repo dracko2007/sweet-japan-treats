@@ -268,6 +268,10 @@ const ProductManager: React.FC = () => {
         if (dimensions) updatedEditing.packageDimensionsCm = dimensions;
       }
 
+      if (data.weightGrams != null && Number(data.weightGrams) > 0) {
+        updatedEditing.weightGrams = Number(data.weightGrams);
+      }
+
       if (canPrice && enrichFields.price) {
         if (data.costYen) updatedEditing.cost = data.costYen;
         if (data.sellingPriceYen) {
