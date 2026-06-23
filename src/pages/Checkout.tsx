@@ -330,8 +330,62 @@ const Checkout: React.FC = () => {
           }
         }
       }
+    } else if (['Portugal', 'França', 'Itália', 'Espanha'].includes(formData.country)) {
+      // Formata e busca via zippopotam.us (gratuito, sem key)
+      const countryCode: Record<string, string> = {
+        'Portugal': 'PT', 'França': 'FR', 'Itália': 'IT', 'Espanha': 'ES',
+      };
+      const cc = countryCode[formData.country];
+
+      // Formatação automática: Portugal XXXX-XXX, demais XXXXX
+      let formatted = val;
+      if (formData.country === 'Portugal') {
+        const digits = val.replace(/\D/g, '').slice(0, 7);
+        formatted = digits.length > 4 ? `${digits.slice(0, 4)}-${digits.slice(4)}` : digits;
+      } else {
+        formatted = val.replace(/\D/g, '').slice(0, 5);
+      }
+      setFormData(prev => ({ ...prev, postalCode: formatted }));
+
+      // Busca quando completo: PT = 7 dígitos, demais = 5 dígitos
+      const cleanVal = formatted.replace(/\D/g, '');
+      const expectedLen = formData.country === 'Portugal' ? 7 : 5;
+      if (cc && cleanVal.length === expectedLen) {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 6000);
+        try {
+          const res = await fetch(
+            `https://api.zippopotam.us/${cc}/${formatted}`,
+            { signal: controller.signal }
+          );
+          clearTimeout(timeoutId);
+          if (res.ok) {
+            const data = await res.json();
+            const place = data.places?.[0];
+            if (place) {
+              setFormData(prev => ({
+                ...prev,
+                city: place['place name'] || '',
+                prefecture: place['state'] || '',
+              }));
+              toast({
+                title: 'Código Postal Encontrado!',
+                description: `${place['place name']} — ${place['state']}`,
+              });
+            } else {
+              toast({ title: 'Código postal não encontrado', description: 'Preencha o endereço manualmente.', variant: 'destructive' });
+            }
+          } else {
+            toast({ title: 'Código postal não encontrado', description: 'Preencha o endereço manualmente.', variant: 'destructive' });
+          }
+        } catch (error) {
+          clearTimeout(timeoutId);
+          if (error instanceof Error && error.name !== 'AbortError') {
+            devError('Erro ao buscar código postal europeu:', error);
+          }
+        }
+      }
     } else {
-      // European countries - free form format (e.g. 0000-000 for PT, 00000 for others)
       setFormData(prev => ({ ...prev, postalCode: val }));
     }
   };
