@@ -900,6 +900,27 @@ export default async function handler(req, res) {
     // 4. Preço de venda = custo × markup
     const sellingPriceYen = costYen ? Math.round(costYen * markup) : 0;
 
+    // 5. Baixa imagens server-side → base64, evitando bloqueio CORS no browser
+    let finalImages = [];
+    if (wantImages && rakuten?.images?.length) {
+      finalImages = await Promise.all(
+        rakuten.images.slice(0, 5).map(async (url) => {
+          try {
+            const r = await fetchWithTimeout(url, {
+              headers: { 'User-Agent': 'Mozilla/5.0', Referer: 'https://shopping.yahoo.co.jp/' },
+            }, 8000);
+            if (!r.ok) return url;
+            const buf = await r.arrayBuffer();
+            const b64 = Buffer.from(buf).toString('base64');
+            const ct = r.headers.get('content-type') || 'image/jpeg';
+            return `data:${ct};base64,${b64}`;
+          } catch {
+            return url; // fallback para URL se download falhar
+          }
+        })
+      );
+    }
+
     res.status(200).json({
       description:            wantDescription ? description : undefined,
       descriptionBaseSource,
@@ -909,7 +930,7 @@ export default async function handler(req, res) {
       sellingPriceYen:        wantPrice ? sellingPriceYen : undefined,
       packageDimensionsCm:    rakuten?.packageDimensionsCm || null,
       weightGrams:            rakuten?.weightGrams ?? null,
-      images:                 wantImages ? (rakuten?.images || []) : [],
+      images:                 wantImages ? finalImages : [],
       suggestName: nameEn,
       source:      rakuten?.source || 'ai',
       ...(body.debug === true ? { rakutenDebug: lastRakutenDebug, yahooDebug, searchTerm, searchTerms: terms, generatedNameEn, i18nDebug } : {}),

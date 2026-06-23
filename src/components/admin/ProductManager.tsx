@@ -84,6 +84,10 @@ function fileToThumbnailDataURL(file: File): Promise<string> {
 // Usada para imagens externas (Yahoo/Rakuten) que chegam em resolução full.
 function urlToCompressedDataURL(url: string, maxSize = 1920, quality = 0.90): Promise<string> {
   return new Promise((resolve) => {
+    // Timeout de 8s: se CORS ou rede travar, cai no fallback com a URL original
+    const timer = setTimeout(() => resolve(url), 8000);
+    const done = (result: string) => { clearTimeout(timer); resolve(result); };
+
     const img = new Image();
     img.crossOrigin = 'anonymous';
     img.onload = () => {
@@ -99,13 +103,17 @@ function urlToCompressedDataURL(url: string, maxSize = 1920, quality = 0.90): Pr
       canvas.width = width;
       canvas.height = height;
       const ctx = canvas.getContext('2d');
-      if (!ctx) { resolve(url); return; }
-      ctx.drawImage(img, 0, 0, width, height);
-      const webp = canvas.toDataURL('image/webp', quality);
-      resolve(webp.startsWith('data:image/webp') ? webp : canvas.toDataURL('image/jpeg', quality));
+      if (!ctx) { done(url); return; }
+      try {
+        ctx.drawImage(img, 0, 0, width, height);
+        const webp = canvas.toDataURL('image/webp', quality);
+        done(webp.startsWith('data:image/webp') ? webp : canvas.toDataURL('image/jpeg', quality));
+      } catch {
+        // Canvas tainted por CORS — devolve a URL original
+        done(url);
+      }
     };
-    // Se falhar (CORS, etc.), mantém a URL original
-    img.onerror = () => resolve(url);
+    img.onerror = () => done(url);
     img.src = url;
   });
 }
