@@ -834,7 +834,8 @@ export default async function handler(req, res) {
   const wantPrice = reqFields.price !== false;
   const wantImages = reqFields.images !== false;
   const wantDescription = reqFields.description !== false;
-  const needMarketplace = wantPrice || wantImages || wantDescription;
+  const wantWeight = reqFields.weight !== false;
+  const needMarketplace = wantPrice || wantImages || wantDescription || wantWeight;
 
   // OCR da imagem (opcional) — URL de imagem existente do produto
   const imageUrl = typeof body.imageUrl === 'string' && body.imageUrl.startsWith('http')
@@ -929,7 +930,7 @@ export default async function handler(req, res) {
       costYen:                wantPrice ? costYen : undefined,
       sellingPriceYen:        wantPrice ? sellingPriceYen : undefined,
       packageDimensionsCm:    rakuten?.packageDimensionsCm || null,
-      weightGrams:            rakuten?.weightGrams ?? null,
+      weightGrams:            wantWeight ? (rakuten?.weightGrams ?? null) : undefined,
       images:                 wantImages ? finalImages : [],
       suggestName: nameEn,
       source:      rakuten?.source || 'ai',
