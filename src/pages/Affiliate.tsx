@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Megaphone, Link2, Copy, Check, DollarSign, Package, TrendingUp, Percent, Clock } from 'lucide-react';
+import { Megaphone, Link2, Copy, Check, DollarSign, Package, TrendingUp, Percent, Clock, PlayCircle, X, Trophy } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { useUser } from '@/context/UserContext';
@@ -19,6 +19,7 @@ const AffiliatePage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState<string | null>(null);
   const [selectedProductId, setSelectedProductId] = useState('');
+  const [showTierModal, setShowTierModal] = useState(false);
 
   useEffect(() => {
     if (!user?.email) {
@@ -103,9 +104,20 @@ const AffiliatePage: React.FC = () => {
                         <p className="text-xs uppercase font-bold text-muted-foreground">Seu código</p>
                         <p className="font-display text-3xl font-extrabold text-primary font-mono">{aff.code}</p>
                       </div>
-                      <span className={`px-3 py-1 rounded-full text-sm font-semibold ${aff.active && !expired ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
-                        {expired ? 'Expirado' : aff.active ? 'Ativo' : 'Inativo'}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setShowTierModal(true)}
+                          className="gap-2 border-amber-300 text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/20"
+                        >
+                          <Trophy className="w-4 h-4" />
+                          Metas do Afiliado
+                        </Button>
+                        <span className={`px-3 py-1 rounded-full text-sm font-semibold ${aff.active && !expired ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
+                          {expired ? 'Expirado' : aff.active ? 'Ativo' : 'Inativo'}
+                        </span>
+                      </div>
                     </div>
 
                     {/* Métricas */}
@@ -241,6 +253,118 @@ const AffiliatePage: React.FC = () => {
           )}
         </div>
       </section>
+
+      {/* Modal Metas do Afiliado */}
+      {showTierModal && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" onClick={() => setShowTierModal(false)}>
+          <div className="bg-card rounded-2xl w-full max-w-lg shadow-2xl border border-border overflow-hidden" onClick={e => e.stopPropagation()}>
+
+            {/* Header */}
+            <div className="bg-gradient-to-r from-amber-500 to-yellow-400 p-5 text-white relative">
+              <button onClick={() => setShowTierModal(false)} className="absolute top-4 right-4 p-1 rounded-full hover:bg-white/20">
+                <X className="w-5 h-5" />
+              </button>
+              <div className="flex items-center gap-3">
+                <Trophy className="w-7 h-7" />
+                <div>
+                  <h2 className="font-bold text-xl">Sistema de Metas</h2>
+                  <p className="text-yellow-100 text-sm">Venda mais e aumente sua comissão</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-5 max-h-[70vh] overflow-y-auto">
+
+              {/* Vídeo do YouTube (quando tiver) */}
+              {(() => {
+                // URL do vídeo explicativo — troque pelo link real quando gravar
+                const videoUrl = '';
+                if (!videoUrl) return null;
+                const m = videoUrl.match(/(?:youtube\.com\/(?:watch\?v=|shorts\/)|youtu\.be\/)([\w-]{11})/);
+                if (!m) return null;
+                return (
+                  <div className="relative w-full aspect-video rounded-xl overflow-hidden border border-border">
+                    <iframe
+                      src={`https://www.youtube.com/embed/${m[1]}?autoplay=1`}
+                      className="absolute inset-0 w-full h-full"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                    />
+                  </div>
+                );
+              })()}
+
+              {/* Como funciona */}
+              <div className="bg-secondary/40 rounded-xl p-4 text-sm space-y-2">
+                <p className="font-semibold text-base">Como funciona?</p>
+                <p className="text-muted-foreground">Sua comissão aumenta conforme você vende mais a cada mês. Existem 3 níveis:</p>
+                <ul className="text-muted-foreground space-y-1 list-disc list-inside">
+                  <li>No início você está no nível <strong>Bronze</strong> com <strong>10%</strong> de comissão</li>
+                  <li>Bater a meta mensal sobe seu nível no mês seguinte</li>
+                  <li>Não bater a meta desce um nível</li>
+                </ul>
+              </div>
+
+              {/* Tabela de níveis */}
+              <div className="space-y-3">
+                <p className="font-semibold text-sm">Níveis e metas:</p>
+                {(Object.entries(TIER_CONFIG) as [AffiliateTier, typeof TIER_CONFIG[AffiliateTier]][]).map(([key, cfg]) => (
+                  <div key={key} className={`rounded-xl border-2 p-4 ${
+                    key === 'gold'   ? 'border-yellow-300 bg-yellow-50 dark:bg-yellow-950/20' :
+                    key === 'silver' ? 'border-gray-300 bg-gray-50 dark:bg-gray-900/30' :
+                                       'border-orange-200 bg-orange-50 dark:bg-orange-950/20'
+                  }`}>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-2xl">{cfg.emoji}</span>
+                        <div>
+                          <p className="font-bold">{cfg.label}</p>
+                          <p className="text-xs text-muted-foreground">Comissão: <strong>{cfg.commissionPercent}%</strong> de cada venda</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xs text-muted-foreground">Meta mensal</p>
+                        <p className="font-bold text-lg">¥{cfg.goalYen.toLocaleString()}</p>
+                      </div>
+                    </div>
+                    <div className="text-xs text-muted-foreground space-y-0.5">
+                      {cfg.nextTier && (
+                        <p>✅ Bater a meta → sobe para {TIER_CONFIG[cfg.nextTier].emoji} <strong>{TIER_CONFIG[cfg.nextTier].label}</strong> ({TIER_CONFIG[cfg.nextTier].commissionPercent}%)</p>
+                      )}
+                      {cfg.prevTier && (
+                        <p>❌ Não bater a meta → cai para {TIER_CONFIG[cfg.prevTier].emoji} <strong>{TIER_CONFIG[cfg.prevTier].label}</strong> ({TIER_CONFIG[cfg.prevTier].commissionPercent}%)</p>
+                      )}
+                      {!cfg.prevTier && (
+                        <p>🥉 Nível inicial — não cai. Comece a vender para subir!</p>
+                      )}
+                      {!cfg.nextTier && (
+                        <p>🏆 Nível máximo! Mantenha as vendas acima de ¥{cfg.goalYen.toLocaleString()} para manter o Ouro.</p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Exemplo prático */}
+              <div className="bg-primary/5 border border-primary/20 rounded-xl p-4 text-sm space-y-1">
+                <p className="font-semibold">Exemplo prático:</p>
+                <p className="text-muted-foreground">Você está no Bronze (10%) e em dezembro gera <strong>¥250.000</strong> em vendas → em janeiro sobe para 🥈 <strong>Prata (15%)</strong>.</p>
+                <p className="text-muted-foreground">Se em janeiro gerar <strong>¥600.000</strong> → em fevereiro sobe para 🥇 <strong>Ouro (20%)</strong>.</p>
+                <p className="text-muted-foreground">Se em fevereiro gerar apenas <strong>¥200.000</strong> → em março volta para 🥈 <strong>Prata (15%)</strong>.</p>
+              </div>
+
+              <p className="text-xs text-muted-foreground text-center">
+                A comissão é calculada sobre o valor líquido de cada venda e liberada após confirmação de entrega.
+              </p>
+
+            </div>
+
+            <div className="p-4 border-t border-border">
+              <Button onClick={() => setShowTierModal(false)} className="w-full btn-primary">Entendido!</Button>
+            </div>
+          </div>
+        </div>
+      )}
     </Layout>
   );
 };
