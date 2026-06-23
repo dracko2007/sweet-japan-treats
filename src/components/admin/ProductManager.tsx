@@ -228,6 +228,9 @@ const ProductManager: React.FC = () => {
           targetLang: language || 'pt',
           markup: 1.5,
           fields: enrichFields,
+          // Envia a primeira foto existente para OCR caso o nome não encontre resultado
+          imageUrl: (editing.image && editing.image.startsWith('http')) ? editing.image
+            : ((editing.gallery || []).find(g => g?.startsWith('http')) || undefined),
         }),
       });
       if (!res.ok) {

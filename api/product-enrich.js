@@ -567,30 +567,92 @@ function localJapaneseTerms(name) {
   const n = String(name || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
   const terms = [];
 
+  // Hada Labo
   if (/hada\s*labo|gokujyun|gokujun|goku-jyun/.test(n)) {
-    if (/lotion|toner|locao|化粧水/.test(n)) {
-      terms.push('肌ラボ 極潤 化粧水', 'ロート 肌ラボ 極潤 化粧水');
-    }
+    if (/lotion|toner|locao|化粧水/.test(n)) terms.push('肌ラボ 極潤 化粧水', 'ロート 肌ラボ 極潤 化粧水');
     terms.push('肌ラボ 極潤', 'ハダラボ ゴクジュン');
   }
 
-  if (/biore|biore|uv/.test(n) && /aqua\s*rich|アクアリッチ/.test(n)) {
-    if (/watery\s*essence|water/i.test(n)) {
-      terms.push('ビオレUV アクアリッチ ウォータリーエッセンス');
-    }
-    if (/light\s*up/i.test(n)) {
-      terms.push('ビオレUV アクアリッチ ライトアップエッセンス');
-    }
+  // Biore UV
+  if (/biore/.test(n) && /aqua\s*rich/.test(n)) {
+    if (/watery\s*essence|water/.test(n)) terms.push('ビオレUV アクアリッチ ウォータリーエッセンス');
+    if (/light\s*up/.test(n)) terms.push('ビオレUV アクアリッチ ライトアップエッセンス');
     terms.push('Biore UV アクアリッチ', 'ビオレUV アクアリッチ');
   }
 
-  if (/dhc/.test(n) && /(cleansing\s*oil|limpeza\s*profunda|oleo\s*de\s*limpeza|maquiagem)/.test(n)) {
+  // DHC
+  if (/dhc/.test(n) && /(cleansing|limpeza|oleo|maquiagem)/.test(n))
     terms.push('DHC ディープクレンジングオイル', 'DHC クレンジングオイル');
+
+  // ANESSA (Shiseido)
+  if (/anessa/.test(n)) {
+    if (/all.?in.?one|beauty\s*pact|pact/.test(n)) terms.push('アネッサ オールインワン ビューティーパクト', '資生堂 アネッサ オールインワン');
+    else if (/tone\s*up|brightening/.test(n)) terms.push('アネッサ トーンアップ UV', '資生堂 アネッサ トーンアップ');
+    else if (/brush/.test(n)) terms.push('アネッサ ブラッシュオン UV', '資生堂 アネッサ ブラッシュオン');
+    else if (/serum/.test(n)) terms.push('アネッサ デイセラム', '資生堂 アネッサ 美容液');
+    else if (/perfect/.test(n)) terms.push('アネッサ パーフェクトUV', '資生堂 アネッサ パーフェクト');
+    else if (/mild|baby/.test(n)) terms.push('アネッサ マイルドUV', '資生堂 アネッサ マイルド');
+    else if (/men/.test(n)) terms.push('アネッサ メンズ UV', '資生堂 アネッサ メン');
+    terms.push('アネッサ', '資生堂 アネッサ');
   }
-  if (/shiseido|senka/.test(n)) terms.push('専科', '資生堂 専科');
-  if (/kit\s*kat|kitkat/.test(n) && /matcha|green\s*tea/.test(n)) terms.push('キットカット 抹茶');
-  if (/melano\s*cc/.test(n)) terms.push('メラノCC');
-  if (/softymo|kose/.test(n) && /cleansing\s*oil/.test(n)) terms.push('ソフティモ クレンジングオイル');
+
+  // Elixir (Shiseido)
+  if (/elixir/.test(n)) {
+    if (/whitening|white/.test(n)) terms.push('エリクシール ホワイト', '資生堂 エリクシール ホワイト');
+    else if (/superieur|superior/.test(n)) terms.push('エリクシール シュペリエル', '資生堂 エリクシール シュペリエル');
+    terms.push('エリクシール', '資生堂 エリクシール');
+  }
+
+  // Maquillage (Shiseido)
+  if (/maquillage/.test(n)) {
+    if (/skin\s*sensor/.test(n)) terms.push('マキアージュ ドラマティックスキンセンサーベース');
+    else if (/powdery/.test(n)) terms.push('マキアージュ ドラマティックパウダリー');
+    terms.push('マキアージュ', '資生堂 マキアージュ');
+  }
+
+  // Shiseido geral / Senka / d program
+  if (/shiseido/.test(n) && !/anessa|elixir|maquillage/.test(n)) terms.push('資生堂');
+  if (/senka/.test(n)) terms.push('専科', '資生堂 専科');
+  if (/d[\s-]?program/.test(n)) terms.push('dプログラム', '資生堂 dプログラム');
+
+  // Kose / Sekkisei / Softymo
+  if (/softymo/.test(n)) terms.push('ソフティモ クレンジングオイル', 'コーセー ソフティモ');
+  if (/sekkisei/.test(n)) terms.push('雪肌精', 'コーセー 雪肌精');
+  if (/kose/.test(n)) terms.push('コーセー');
+
+  // Melano CC / Rohto / Obagi
+  if (/melano\s*cc/.test(n)) terms.push('メラノCC', 'ロート メラノCC');
+  if (/obagi/.test(n)) terms.push('オバジ', 'ロート オバジ');
+
+  // Curel (Kao)
+  if (/curel/.test(n)) {
+    if (/uv|sunscreen/.test(n)) terms.push('キュレル UV', '花王 キュレル UV');
+    terms.push('キュレル', '花王 キュレル');
+  }
+
+  // Nivea
+  if (/nivea/.test(n)) {
+    if (/sun|uv/.test(n)) terms.push('ニベア サン', 'ニベアUV');
+    terms.push('ニベア');
+  }
+
+  // SK-II
+  if (/sk[\s-]?ii|sk2/.test(n)) {
+    if (/treatment\s*essence|facial/.test(n)) terms.push('SK-II フェイシャルトリートメントエッセンス');
+    terms.push('SK-II', 'SK2');
+  }
+
+  // 8x4 / Nivea-Kao
+  if (/8[\s×x*]4|eight[\s×x]four/.test(n)) {
+    if (/men/.test(n)) terms.push('8×4メン 薬用ボディウォッシュ', '8×4 MEN');
+    terms.push('8×4', 'エイトフォー');
+  }
+
+  // KitKat
+  if (/kit\s*kat|kitkat/.test(n)) {
+    if (/matcha|green\s*tea/.test(n)) terms.push('キットカット 抒茶');
+    else terms.push('キットカット');
+  }
 
   return uniqueNonEmpty(terms);
 }
@@ -615,28 +677,36 @@ function parseJapaneseTermList(text) {
 
 async function toJapaneseKeywords(name) {
   if (!GROQ_API_KEY) return [];
-  const prompt = `Você conhece os produtos vendidos no Yahoo Shopping Japão.
-Crie 3 a 5 TERMOS DE BUSCA japoneses para encontrar o produto abaixo no Yahoo/Rakuten.
+  const prompt = `Você é especialista em produtos japoneses vendidos no Yahoo Shopping Japão e Rakuten.
+Converta o nome do produto abaixo para 3 a 5 TERMOS DE BUSCA em japonês (katakana/kanji) usados nas lojas.
 
-Regras:
-- Se o nome estiver em inglês/romaji, converta para o nome japonês oficial e/ou katakana usado nas lojas japonesas.
-- Preserve marca + linha + tipo do produto. Ex.: se tiver "lotion", inclua 化粧水; se tiver "watery essence", inclua ウォータリーエッセンス.
-- Use o nome real da marca/produto, não uma transliteração fonética inventada.
-- Inclua variações úteis misturando inglês da marca + japonês quando isso for comum no Yahoo.
+Regras OBRIGATÓRIAS:
+- Converta o nome comercial em inglês/romaji para o nome japonês OFICIAL da marca (não invente transliteração).
+- Shiseido: ANESSA→アネッサ, Elixir→エリクシール, Maquillage→マキアージュ, Senka→専科, d program→dプログラム.
+- Kao: Biore→ビオレ, Curel→キュレル, 8x4→8×4.
+- Kose: Softymo→ソフティモ, Sekkisei→雪肌精.
+- Rohto: Melano CC→メラノCC, Obagi→オバジ, Hada Labo→肌ラボ.
+- Inclua sempre o nome da empresa fabricante japonesa quando relevante (資生堂, 花王, コーセー, ロート).
+- Para tipos de produto: pact→パクト, foundation→ファンデーション, lotion→化粧水, serum→美容液, sunscreen→日焼け止め, cleansing oil→クレンジングオイル, body wash→ボディウォッシュ, shampoo→シャンプー, conditioner→コンディショナー.
+- Retorne variações do mais específico ao mais genérico.
 
 Exemplos:
+"ANESSA All-in-One Beauty Pact" → ["アネッサ オールインワン ビューティーパクト","資生堂 アネッサ オールインワン","アネッサ パクト"]
+"ANESSA Perfect UV Sunscreen Skincare Milk" → ["アネッサ パーフェクトUV スキンケアミルク","資生堂 アネッサ パーフェクトUV","アネッサ 日焼け止め"]
 "Hada Labo Gokujyun Lotion" → ["肌ラボ 極潤 化粧水","ロート 肌ラボ 極潤 化粧水","ハダラボ ゴクジュン 化粧水"]
-"Biore UV Aqua Rich Watery Essence" → ["Biore UV アクアリッチ","ビオレUV アクアリッチ ウォータリーエッセンス","花王 ビオレUV アクアリッチ"]
+"Biore UV Aqua Rich Watery Essence" → ["ビオレUV アクアリッチ ウォータリーエッセンス","花王 ビオレUV アクアリッチ"]
 "DHC Deep Cleansing Oil" → ["DHC ディープクレンジングオイル","DHC クレンジングオイル"]
+"Elixir Superieur Day Care Revolution" → ["エリクシール シュペリエル デイケアレボリューション","資生堂 エリクシール シュペリエル"]
+"Sabonete Corporal 8x4 MEN Foot + Body" → ["8×4メン 薬用ボディウォッシュ","8×4 MEN フット ボディ","エイトフォー メン"]
 
-Responda APENAS com um JSON array de strings.
+Responda APENAS com um JSON array de strings (sem markdown, sem explicação).
 Produto: "${name}"`;
   for (const model of GROQ_MODELS) {
     try {
       const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${GROQ_API_KEY}` },
-        body: JSON.stringify({ model, max_tokens: 180, temperature: 0.2, messages: [{ role: 'user', content: prompt }] }),
+        body: JSON.stringify({ model, max_tokens: 250, temperature: 0.15, messages: [{ role: 'user', content: prompt }] }),
       });
       if (!r.ok) continue;
       const data = await r.json();
@@ -645,6 +715,44 @@ Produto: "${name}"`;
     } catch {}
   }
   return [];
+}
+
+// ---- OCR via imagem: extrai nome japonês do produto a partir da foto --------
+async function ocrImageForJapaneseName(imageUrl) {
+  if (!GROQ_API_KEY || !imageUrl) return null;
+  // Groq suporta visão apenas em alguns modelos — tenta llama-4-scout ou llama-4-maverick
+  const visionModels = ['meta-llama/llama-4-scout-17b-16e-instruct', 'meta-llama/llama-4-maverick-17b-128e-instruct'];
+  const prompt = 'Esta é a foto de um produto japonês. Leia o texto em japonês (katakana/kanji/hiragana) que aparece na embalagem e retorne: 1) o nome completo do produto em japonês exatamente como aparece na embalagem, 2) o nome da marca. Responda APENAS com JSON: {"name_ja":"","brand_ja":""}';
+  for (const model of visionModels) {
+    try {
+      const r = await fetchWithTimeout('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${GROQ_API_KEY}` },
+        body: JSON.stringify({
+          model,
+          max_tokens: 150,
+          temperature: 0.1,
+          messages: [{
+            role: 'user',
+            content: [
+              { type: 'image_url', image_url: { url: imageUrl } },
+              { type: 'text', text: prompt },
+            ],
+          }],
+        }),
+      }, {}, 12000);
+      if (!r.ok) continue;
+      const data = await r.json();
+      const text = (data?.choices?.[0]?.message?.content || '').trim();
+      const m = text.match(/\{[\s\S]*\}/);
+      if (!m) continue;
+      const parsed = JSON.parse(m[0]);
+      const nameJa = (parsed.name_ja || '').trim();
+      const brandJa = (parsed.brand_ja || '').trim();
+      if (hasJapanese(nameJa)) return { nameJa, brandJa };
+    } catch {}
+  }
+  return null;
 }
 
 // ---- Estimativa de preço via IA (fallback sem Rakuten) ---------------------
@@ -728,11 +836,23 @@ export default async function handler(req, res) {
   const wantDescription = reqFields.description !== false;
   const needMarketplace = wantPrice || wantImages || wantDescription;
 
+  // OCR da imagem (opcional) — URL de imagem existente do produto
+  const imageUrl = typeof body.imageUrl === 'string' && body.imageUrl.startsWith('http')
+    ? body.imageUrl : null;
+
   try {
-    // 0. Monta termos de busca: original em inglês/romaji + japonês/katakana.
+    // 0. Monta termos de busca: local hardcoded + IA + OCR da imagem
     const localTerms = hasJapanese(productName) ? [] : localJapaneseTerms(productName);
     const aiTerms = hasJapanese(productName) ? [] : await toJapaneseKeywords(productName);
-    const terms = uniqueNonEmpty([productName, ...localTerms, ...aiTerms]).slice(0, 8);
+
+    // OCR: só roda se não achou termos japoneses ainda e tem imagem
+    let ocrTerms = [];
+    if (!localTerms.length && !aiTerms.length && imageUrl) {
+      const ocr = await ocrImageForJapaneseName(imageUrl);
+      if (ocr?.nameJa) ocrTerms = [ocr.nameJa, ocr.brandJa].filter(hasJapanese);
+    }
+
+    const terms = uniqueNonEmpty([productName, ...localTerms, ...aiTerms, ...ocrTerms]).slice(0, 10);
 
     // 1. Busca a fonte real: tenta cada termo no Yahoo → Rakuten até achar.
     let rakuten = null;
