@@ -91,19 +91,17 @@ function monthKey(date = new Date()) {
 }
 
 /** Calcula o próximo tier com base nas vendas do mês. */
-function computeNextTier(currentTier: AffiliateTier, monthRevenue: number): AffiliateTier {
-  const bronzeGoal = TIER_CONFIG.bronze.goalYen;
+function computeNextTier(_currentTier: AffiliateTier, monthRevenue: number): AffiliateTier {
+  const { bronze, silver } = TIER_CONFIG;
 
-  // Não bateu nem a meta do Bronze → cai direto para Bronze, seja qual for o nível
-  if (monthRevenue < bronzeGoal) return 'bronze';
+  // < ¥200k → Bronze direto, independente do nível atual
+  if (monthRevenue < bronze.goalYen) return 'bronze';
 
-  const cfg = TIER_CONFIG[currentTier];
-  // Bateu a meta do nível atual → sobe um nível
-  if (monthRevenue >= cfg.goalYen && cfg.nextTier) return cfg.nextTier;
-  // Bateu a meta do Bronze mas não a do nível atual → cai um nível
-  if (monthRevenue < cfg.goalYen && cfg.prevTier) return cfg.prevTier;
-  // Manteve (Bronze bateu meta mas não tem próximo, ou Ouro manteve)
-  return currentTier;
+  // ≥ ¥500k → Ouro direto, independente do nível atual
+  if (monthRevenue >= silver.goalYen) return 'gold';
+
+  // ¥200k–¥499k → Prata
+  return 'silver';
 }
 
 export const affiliateService = {
