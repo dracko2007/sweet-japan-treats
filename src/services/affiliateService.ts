@@ -92,10 +92,18 @@ function monthKey(date = new Date()) {
 
 /** Calcula o próximo tier com base nas vendas do mês. */
 function computeNextTier(currentTier: AffiliateTier, monthRevenue: number): AffiliateTier {
+  const bronzeGoal = TIER_CONFIG.bronze.goalYen;
+
+  // Não bateu nem a meta do Bronze → cai direto para Bronze, seja qual for o nível
+  if (monthRevenue < bronzeGoal) return 'bronze';
+
   const cfg = TIER_CONFIG[currentTier];
-  if (monthRevenue >= cfg.goalYen && cfg.nextTier) return cfg.nextTier;   // subiu
-  if (monthRevenue < cfg.goalYen && cfg.prevTier) return cfg.prevTier;    // caiu
-  return currentTier;                                                       // manteve
+  // Bateu a meta do nível atual → sobe um nível
+  if (monthRevenue >= cfg.goalYen && cfg.nextTier) return cfg.nextTier;
+  // Bateu a meta do Bronze mas não a do nível atual → cai um nível
+  if (monthRevenue < cfg.goalYen && cfg.prevTier) return cfg.prevTier;
+  // Manteve (Bronze bateu meta mas não tem próximo, ou Ouro manteve)
+  return currentTier;
 }
 
 export const affiliateService = {

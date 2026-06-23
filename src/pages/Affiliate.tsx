@@ -302,6 +302,7 @@ const AffiliatePage: React.FC = () => {
                   <li>No início você está no nível <strong>Bronze</strong> com <strong>10%</strong> de comissão</li>
                   <li>Bater a meta mensal sobe seu nível no mês seguinte</li>
                   <li>Não bater a meta desce um nível</li>
+                  <li>Vender menos de <strong>¥200.000</strong> em qualquer mês cai direto para Bronze, mesmo que esteja no Ouro</li>
                 </ul>
               </div>
 
@@ -334,6 +335,9 @@ const AffiliatePage: React.FC = () => {
                       {cfg.prevTier && (
                         <p>❌ Não bater a meta → cai para {TIER_CONFIG[cfg.prevTier].emoji} <strong>{TIER_CONFIG[cfg.prevTier].label}</strong> ({TIER_CONFIG[cfg.prevTier].commissionPercent}%)</p>
                       )}
+                      {key !== 'bronze' && (
+                        <p>⚠️ Vender menos de ¥200.000 → cai direto para 🥉 <strong>Bronze (10%)</strong></p>
+                      )}
                       {!cfg.prevTier && (
                         <p>🥉 Nível inicial — não cai. Comece a vender para subir!</p>
                       )}
@@ -350,7 +354,8 @@ const AffiliatePage: React.FC = () => {
                 <p className="font-semibold">Exemplo prático:</p>
                 <p className="text-muted-foreground">Você está no Bronze (10%) e em dezembro gera <strong>¥250.000</strong> em vendas → em janeiro sobe para 🥈 <strong>Prata (15%)</strong>.</p>
                 <p className="text-muted-foreground">Se em janeiro gerar <strong>¥600.000</strong> → em fevereiro sobe para 🥇 <strong>Ouro (20%)</strong>.</p>
-                <p className="text-muted-foreground">Se em fevereiro gerar apenas <strong>¥200.000</strong> → em março volta para 🥈 <strong>Prata (15%)</strong>.</p>
+                <p className="text-muted-foreground">Se em fevereiro gerar apenas <strong>¥300.000</strong> → em março volta para 🥈 <strong>Prata (15%)</strong>.</p>
+                <p className="text-muted-foreground">Se em qualquer mês gerar menos de <strong>¥200.000</strong>, mesmo no Ouro → cai direto para 🥉 <strong>Bronze (10%)</strong>.</p>
               </div>
 
               <p className="text-xs text-muted-foreground text-center">
