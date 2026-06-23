@@ -930,7 +930,10 @@ export default async function handler(req, res) {
       costYen:                wantPrice ? costYen : undefined,
       sellingPriceYen:        wantPrice ? sellingPriceYen : undefined,
       packageDimensionsCm:    rakuten?.packageDimensionsCm || null,
-      weightGrams:            wantWeight ? (rakuten?.weightGrams ?? null) : undefined,
+      // +50% sobre o peso encontrado para compensar embalagem/frasco não declarado
+      weightGrams:            wantWeight && rakuten?.weightGrams
+                                ? Math.round(rakuten.weightGrams * 1.5)
+                                : (wantWeight ? null : undefined),
       images:                 wantImages ? finalImages : [],
       suggestName: nameEn,
       source:      rakuten?.source || 'ai',
