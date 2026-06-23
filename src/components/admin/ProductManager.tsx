@@ -133,7 +133,7 @@ const ProductManager: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [enriching, setEnriching] = useState(false);
-  const [enrichFields, setEnrichFields] = useState({ price: true, images: true, description: true });
+  const [enrichFields, setEnrichFields] = useState({ price: true, images: true, description: true, weight: true });
   const marginPct = 100;
   const [tagInput, setTagInput] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
@@ -268,7 +268,7 @@ const ProductManager: React.FC = () => {
         if (dimensions) updatedEditing.packageDimensionsCm = dimensions;
       }
 
-      if (data.weightGrams != null && Number(data.weightGrams) > 0) {
+      if (enrichFields.weight && data.weightGrams != null && Number(data.weightGrams) > 0) {
         updatedEditing.weightGrams = Number(data.weightGrams);
       }
 
@@ -613,7 +613,7 @@ const ProductManager: React.FC = () => {
                   </button>
                 </div>
                 <p className="text-[11px] text-muted-foreground mt-1">
-                  ✨ <strong>Auto-preencher</strong>: busca descrição, preço, medidas da embalagem (quando o marketplace informa) e até 5 fotos automaticamente.
+                  ✨ <strong>Auto-preencher</strong>: busca descrição, preço, peso, medidas da embalagem e até 5 fotos automaticamente via Rakuten/Yahoo.
                 </p>
                 <div className="flex items-center gap-3 mt-1.5 flex-wrap">
                   <span className="text-[11px] text-muted-foreground font-medium">Buscar:</span>
@@ -621,6 +621,7 @@ const ProductManager: React.FC = () => {
                     { key: 'price', label: 'Valor' },
                     { key: 'images', label: 'Imagens' },
                     { key: 'description', label: 'Descrição' },
+                    { key: 'weight', label: 'Peso' },
                   ] as const).map(({ key, label }) => (
                     <label key={key} className="flex items-center gap-1 cursor-pointer select-none">
                       <input
