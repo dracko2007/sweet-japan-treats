@@ -67,9 +67,22 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
   const deliveryBlocked =
     (product.deliveryRestrict === 'exterior-only' && isJapanDest) ||
     (product.deliveryRestrict === 'japan-only' && !isJapanDest);
-  const deliveryBlockMsg = product.deliveryRestrict === 'exterior-only'
-    ? 'Vendas somente para fora do Japão'
-    : 'Disponível somente para entrega dentro do Japão';
+  const deliveryBlockMsgs: Record<string, Record<string, string>> = {
+    'exterior-only': { pt: 'Vendas somente para fora do Japão', en: 'Sales for overseas only', ja: '海外への販売のみ' },
+    'japan-only':    { pt: 'Disponível somente dentro do Japão', en: 'Available within Japan only', ja: '日本国内のみ対応' },
+  };
+  const lang = (language || 'pt') as string;
+  const deliveryBlockMsg = product.deliveryRestrict
+    ? (deliveryBlockMsgs[product.deliveryRestrict]?.[lang] || deliveryBlockMsgs[product.deliveryRestrict]?.pt)
+    : '';
+
+  const deliveryFaixaMsgs: Record<string, Record<string, string>> = {
+    'exterior-only': { pt: 'Vendas somente para fora do Japão', en: 'Overseas only', ja: '海外発送のみ' },
+    'japan-only':    { pt: 'Somente dentro do Japão', en: 'Japan only', ja: '日本国内のみ' },
+  };
+  const deliveryFaixaMsg = product.deliveryRestrict
+    ? (deliveryFaixaMsgs[product.deliveryRestrict]?.[lang] || deliveryFaixaMsgs[product.deliveryRestrict]?.pt)
+    : '';
 
   const handleAddToCart = () => {
     if (deliveryBlocked) {
@@ -227,7 +240,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
         {/* Aviso de restrição de destino */}
         {deliveryBlocked && (
           <div className="absolute bottom-0 left-0 right-0 z-20 bg-red-600/90 text-white text-[10px] font-bold text-center py-1 px-2">
-            🚫 {deliveryBlockMsg}
+            🚫 {deliveryFaixaMsg}
           </div>
         )}
 

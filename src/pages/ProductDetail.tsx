@@ -93,13 +93,28 @@ const ProductDetail: React.FC = () => {
   const deliveryBlocked =
     (product.deliveryRestrict === 'exterior-only' && isJapanDest) ||
     (product.deliveryRestrict === 'japan-only' && !isJapanDest);
-  const deliveryBlockMsg = product.deliveryRestrict === 'exterior-only'
-    ? 'Vendas somente para fora do Japão'
-    : 'Disponível somente para entrega dentro do Japão';
+
+  const i18nRestrict = {
+    'exterior-only': {
+      title: { pt: 'Vendas somente para fora do Japão', en: 'Sales for overseas only', ja: '海外への販売のみ' },
+      detail: { pt: 'Este produto japonês é exportado para o exterior. Altere o destino para continuar.', en: 'This Japanese product is exported overseas. Change your destination to continue.', ja: 'この商品は海外への輸出品です。お届け先を変更してください。' },
+      btn: { pt: '🚫 Indisponível neste destino', en: '🚫 Unavailable for this destination', ja: '🚫 このお届け先では購入不可' },
+    },
+    'japan-only': {
+      title: { pt: 'Disponível somente para entrega dentro do Japão', en: 'Available for delivery within Japan only', ja: '日本国内配送のみ対応' },
+      detail: { pt: 'Este produto importado está disponível apenas para entrega no Japão.', en: 'This imported product is only available for delivery within Japan.', ja: 'この輸入商品は日本国内へのお届けのみ対応しています。' },
+      btn: { pt: '🚫 Indisponível neste destino', en: '🚫 Unavailable for this destination', ja: '🚫 このお届け先では購入不可' },
+    },
+  };
+  const lang = (language || 'pt') as 'pt' | 'en' | 'ja';
+  const restrictKey = product.deliveryRestrict as 'exterior-only' | 'japan-only' | undefined;
+  const deliveryBlockTitle  = restrictKey ? (i18nRestrict[restrictKey].title[lang]  || i18nRestrict[restrictKey].title.pt)  : '';
+  const deliveryBlockDetail = restrictKey ? (i18nRestrict[restrictKey].detail[lang] || i18nRestrict[restrictKey].detail.pt) : '';
+  const deliveryBlockBtn    = restrictKey ? (i18nRestrict[restrictKey].btn[lang]    || i18nRestrict[restrictKey].btn.pt)    : '';
 
   const handleAddToCart = () => {
     if (deliveryBlocked) {
-      toast({ title: '🚫 ' + deliveryBlockMsg, variant: 'destructive' });
+      toast({ title: '🚫 ' + deliveryBlockTitle, variant: 'destructive' });
       return;
     }
     addToCart(product, selectedSize, quantity, selectedVariant?.label);
@@ -296,12 +311,8 @@ const ProductDetail: React.FC = () => {
                   <div className="flex items-center gap-2 bg-red-50 dark:bg-red-950/30 border border-red-300 dark:border-red-800 rounded-xl px-4 py-3 mb-4">
                     <span className="text-2xl">🚫</span>
                     <div>
-                      <p className="font-bold text-red-700 dark:text-red-400 text-sm">{deliveryBlockMsg}</p>
-                      <p className="text-xs text-red-600/80 dark:text-red-500/80">
-                        {product.deliveryRestrict === 'exterior-only'
-                          ? 'Este produto japonês é exportado para o exterior. Altere o destino para continuar.'
-                          : 'Este produto importado está disponível apenas para entrega no Japão.'}
-                      </p>
+                      <p className="font-bold text-red-700 dark:text-red-400 text-sm">{deliveryBlockTitle}</p>
+                      <p className="text-xs text-red-600/80 dark:text-red-500/80">{deliveryBlockDetail}</p>
                     </div>
                   </div>
                 )}
@@ -320,7 +331,7 @@ const ProductDetail: React.FC = () => {
                     className={`flex-1 gap-2 ${deliveryBlocked ? 'opacity-50 cursor-not-allowed' : ''}`}
                   >
                     <ShoppingCart className="w-5 h-5" />
-                    {deliveryBlocked ? '🚫 Indisponível neste destino' : t('productDetail.addToCart')}
+                    {deliveryBlocked ? deliveryBlockBtn : t('productDetail.addToCart')}
                   </Button>
                   <Button
                     variant="outline"
