@@ -88,7 +88,20 @@ const ProductDetail: React.FC = () => {
   const productRating = reviewService.getProductRating(product.id);
   const images = product.gallery && product.gallery.length > 0 ? product.gallery : [product.image];
 
+  // Restrição de destino
+  const isJapanDest = selectedCountry === 'Japão';
+  const deliveryBlocked =
+    (product.deliveryRestrict === 'exterior-only' && isJapanDest) ||
+    (product.deliveryRestrict === 'japan-only' && !isJapanDest);
+  const deliveryBlockMsg = product.deliveryRestrict === 'exterior-only'
+    ? 'Vendas somente para fora do Japão'
+    : 'Disponível somente para entrega dentro do Japão';
+
   const handleAddToCart = () => {
+    if (deliveryBlocked) {
+      toast({ title: '🚫 ' + deliveryBlockMsg, variant: 'destructive' });
+      return;
+    }
     addToCart(product, selectedSize, quantity, selectedVariant?.label);
     toast({
       title: t('productDetail.added'),
@@ -278,14 +291,36 @@ const ProductDetail: React.FC = () => {
                   </div>
                 </div>
 
+                {/* Aviso de restrição de destino */}
+                {deliveryBlocked && (
+                  <div className="flex items-center gap-2 bg-red-50 dark:bg-red-950/30 border border-red-300 dark:border-red-800 rounded-xl px-4 py-3 mb-4">
+                    <span className="text-2xl">🚫</span>
+                    <div>
+                      <p className="font-bold text-red-700 dark:text-red-400 text-sm">{deliveryBlockMsg}</p>
+                      <p className="text-xs text-red-600/80 dark:text-red-500/80">
+                        {product.deliveryRestrict === 'exterior-only'
+                          ? 'Este produto japonês é exportado para o exterior. Altere o destino para continuar.'
+                          : 'Este produto importado está disponível apenas para entrega no Japão.'}
+                      </p>
+                    </div>
+                  </div>
+                )}
+                {/* Badge importado */}
+                {product.origin === 'importado' && (
+                  <div className="inline-flex items-center gap-1.5 bg-green-100 dark:bg-green-950/30 text-green-700 dark:text-green-400 text-xs font-bold px-3 py-1.5 rounded-full mb-4">
+                    📦 Produto Importado
+                  </div>
+                )}
+
                 <div className="flex gap-3 mb-6">
                   <Button
                     onClick={handleAddToCart}
                     size="lg"
-                    className="flex-1 gap-2"
+                    disabled={deliveryBlocked}
+                    className={`flex-1 gap-2 ${deliveryBlocked ? 'opacity-50 cursor-not-allowed' : ''}`}
                   >
                     <ShoppingCart className="w-5 h-5" />
-                    {t('productDetail.addToCart')}
+                    {deliveryBlocked ? '🚫 Indisponível neste destino' : t('productDetail.addToCart')}
                   </Button>
                   <Button
                     variant="outline"

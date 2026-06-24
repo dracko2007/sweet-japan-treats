@@ -766,6 +766,31 @@ const ProductManager: React.FC = () => {
                   </button>
                   <p className="text-[11px] text-muted-foreground mt-1.5">Oculto = fica registrado, mas o cliente não vê.</p>
                 </div>
+
+                {/* Restrição de destino + Origem */}
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold block">Restrição de venda por destino</label>
+                  <select
+                    value={editing.deliveryRestrict || ''}
+                    onChange={e => setEditing({ ...editing, deliveryRestrict: (e.target.value as any) || undefined })}
+                    className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm"
+                  >
+                    <option value="">Sem restrição (vende em qualquer destino)</option>
+                    <option value="exterior-only">🌍 Somente exterior — produto japonês, não vende dentro do Japão</option>
+                    <option value="japan-only">🇯🇵 Somente Japão — produto importado, vende só dentro do Japão</option>
+                  </select>
+                  <div className="flex items-center gap-2 mt-1">
+                    <label className="flex items-center gap-2 cursor-pointer select-none text-sm">
+                      <input
+                        type="checkbox"
+                        checked={!!editing.origin}
+                        onChange={e => setEditing({ ...editing, origin: e.target.checked ? 'importado' : undefined })}
+                        className="w-4 h-4 rounded accent-primary"
+                      />
+                      <span>📦 Marcar como <strong>Importado</strong> (produto nacional vendido no Japão — exibe badge na loja)</span>
+                    </label>
+                  </div>
+                </div>
               </div>
 
               {/* Tags de tipo — usadas no filtro inteligente da loja */}

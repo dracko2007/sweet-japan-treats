@@ -62,7 +62,20 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
   const originalPrice = convertYen(baseYen(product, selectedSize));
   const isSoldOut = product.stock && !product.stock.unlimited && product.stock.quantity === 0;
 
+  // Verifica restrição de destino
+  const isJapanDest = selectedCountry === 'Japão';
+  const deliveryBlocked =
+    (product.deliveryRestrict === 'exterior-only' && isJapanDest) ||
+    (product.deliveryRestrict === 'japan-only' && !isJapanDest);
+  const deliveryBlockMsg = product.deliveryRestrict === 'exterior-only'
+    ? 'Vendas somente para fora do Japão'
+    : 'Disponível somente para entrega dentro do Japão';
+
   const handleAddToCart = () => {
+    if (deliveryBlocked) {
+      toast({ title: '🚫 ' + deliveryBlockMsg, variant: 'destructive' });
+      return;
+    }
     addToCart(product, selectedSize, quantity, firstVariant?.label);
     setAdded(true);
     setTimeout(() => setAdded(false), 2000);
@@ -200,11 +213,23 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
         )}
 
         {/* Category Badge */}
-        <div className={cn('absolute left-4 z-10', promoActive ? 'top-14' : 'top-4')}>
+        <div className={cn('absolute left-4 z-10 flex flex-col gap-1', promoActive ? 'top-14' : 'top-4')}>
           <span className="px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wide bg-primary text-primary-foreground shadow-sm">
             {t(`product.category.${['cosmeticos','acessorios','doces','papelaria','eletronicos','masculino','vestuario','higiene'].includes(product.category || '') ? product.category : 'importado'}`)}
           </span>
+          {product.origin === 'importado' && (
+            <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-green-600 text-white shadow-sm w-fit">
+              📦 Importado
+            </span>
+          )}
         </div>
+
+        {/* Aviso de restrição de destino */}
+        {deliveryBlocked && (
+          <div className="absolute bottom-0 left-0 right-0 z-20 bg-red-600/90 text-white text-[10px] font-bold text-center py-1 px-2">
+            🚫 {deliveryBlockMsg}
+          </div>
+        )}
 
         {/* Favorite & Share Buttons */}
         <div className="absolute top-4 right-4 z-10 flex gap-2">

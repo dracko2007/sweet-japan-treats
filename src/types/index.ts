@@ -30,7 +30,11 @@ export interface Product {
   gallery?: string[]; // Múltiplas imagens do produto
   video?: string; // Vídeo do produto (opcional)
   flavor: string;
-  deliveryRestrict?: 'Japão';
+  // 'exterior-only' = produto japonês, só vende fora do Japão
+  // 'japan-only'    = produto importado (ex: brasileiro), só vende dentro do Japão
+  // undefined       = sem restrição (vende em qualquer destino)
+  deliveryRestrict?: 'exterior-only' | 'japan-only';
+  origin?: 'importado'; // marca produtos importados (ex: brasileiros) dentro das categorias
   hidden?: boolean;          // Registrado mas não publicado na loja (oculto do cliente)
   discountPercent?: number;  // Desconto promocional em % (0–100). >0 ativa a promoção.
   // Traduções por idioma (geradas via IA no cadastro). Mostra automático conforme o idioma do cliente.
