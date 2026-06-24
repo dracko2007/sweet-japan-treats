@@ -69,13 +69,13 @@ const Header: React.FC = () => {
         </div>
       )}
       <div className="container mx-auto px-4">
-        <div className="flex items-center justify-between h-20 gap-4">
+        <div className="flex items-center justify-between h-16 gap-2">
           {/* Logo */}
-          <Link to="/" className="flex items-center gap-1.5 sm:gap-2.5 group shrink-0">
-            <JapanExpressLogo size={56} className="w-11 h-11 sm:w-14 sm:h-14 animate-float drop-shadow-lg group-hover:scale-105 transition-transform shrink-0" />
+          <Link to="/" className="flex items-center gap-1.5 group shrink-0">
+            <JapanExpressLogo size={44} className="w-9 h-9 sm:w-11 sm:h-11 animate-float drop-shadow-lg group-hover:scale-105 transition-transform shrink-0" />
             <div className="flex items-baseline gap-1">
-              <span className="font-display text-xl sm:text-2xl lg:text-3xl font-black text-foreground tracking-tight">Japan</span>
-              <span className="font-display text-base sm:text-lg lg:text-2xl font-extrabold text-white bg-gradient-to-r from-primary to-accent shadow-md px-1.5 sm:px-2 py-0.5 rounded-lg transform -rotate-6">Express</span>
+              <span className="font-display text-lg sm:text-xl lg:text-2xl font-black text-foreground tracking-tight">Japan</span>
+              <span className="font-display text-sm sm:text-base lg:text-xl font-extrabold text-white bg-gradient-to-r from-primary to-accent shadow-md px-1.5 py-0.5 rounded-lg transform -rotate-6">Express</span>
             </div>
           </Link>
 
@@ -148,10 +148,10 @@ const Header: React.FC = () => {
           </nav>
 
           {/* Cart, Language & Mobile Menu */}
-          <div className="flex items-center gap-1.5 sm:gap-3">
-            {/* País + Idioma — empilhados, cada um em linha única */}
+          <div className="flex items-center gap-1 sm:gap-2">
+            {/* País + Idioma — linha única lado a lado */}
             {!isAdminPage && (
-              <div className="flex flex-col gap-1 items-start">
+              <div className="flex items-center gap-1">
                 <div className="hidden md:block">
                   <CountrySwitcher />
                 </div>
@@ -159,8 +159,8 @@ const Header: React.FC = () => {
               </div>
             )}
 
-            {/* Admin + Perfil empilhados (desktop) — igual País/Idioma */}
-            <div className="hidden xl:flex flex-col gap-1">
+            {/* Admin + Perfil lado a lado (desktop) */}
+            <div className="hidden xl:flex flex-row items-center gap-1">
               {isAdmin && (
                 <Link
                   to={isAdminPage ? '/' : '/admin'}
