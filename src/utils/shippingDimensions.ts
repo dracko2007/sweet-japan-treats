@@ -90,17 +90,21 @@ export const calculateCartShippingBoxes = (
 ): CartShippingBoxes => {
   if (items.length === 0) return emptyBoxes();
 
-  // Weight estimation: 0.25 g/cm³ for items with dimensions, fallback by size
-  // +100g safety margin per item unit to account for real packaging variance
+  // Weight: usa weightGrams do produto se disponível; senão estima por dimensões ou fallback
   let totalWeightG = 200; // packaging overhead
   for (const item of items) {
-    const dim = sanitizePackageDimensions(item.product.packageDimensionsCm);
-    if (dim) {
-      totalWeightG += dim.widthCm * dim.lengthCm * dim.heightCm * 0.25 * item.quantity;
+    if (item.product.weightGrams && item.product.weightGrams > 0) {
+      // Peso real cadastrado — usa diretamente
+      totalWeightG += item.product.weightGrams * item.quantity;
     } else {
-      totalWeightG += (item.size === 'small' ? 300 : 600) * item.quantity;
+      const dim = sanitizePackageDimensions(item.product.packageDimensionsCm);
+      if (dim) {
+        totalWeightG += dim.widthCm * dim.lengthCm * dim.heightCm * 0.25 * item.quantity;
+      } else {
+        totalWeightG += (item.size === 'small' ? 300 : 600) * item.quantity;
+      }
+      totalWeightG += 100 * item.quantity; // 100g safety margin per item
     }
-    totalWeightG += 100 * item.quantity; // 100g safety margin per item
   }
   totalWeightG = Math.max(100, Math.round(totalWeightG));
 
