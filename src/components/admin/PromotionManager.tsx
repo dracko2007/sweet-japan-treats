@@ -115,7 +115,7 @@ const PromoForm: React.FC<PromoFormProps> = ({ label, products, value, onChange,
       </div>
 
       {/* Duração e limite */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 gap-3">
         {showDuration && (
           <div className="space-y-1">
             <label className="text-xs font-medium text-muted-foreground flex items-center gap-1"><Clock className="w-3 h-3" /> Duração (dias)</label>
