@@ -90,13 +90,15 @@ export const calculateCartShippingBoxes = (
 ): CartShippingBoxes => {
   if (items.length === 0) return emptyBoxes();
 
-  // Weight: usa weightGrams do produto se disponível; senão estima por dimensões ou fallback
-  let totalWeightG = 200; // packaging overhead
+  // Weight: usa weightGrams do produto se disponível (já inclui embalagem); senão estima
+  let totalWeightG = 0;
+  let hasAnyEstimated = false;
   for (const item of items) {
     if (item.product.weightGrams && item.product.weightGrams > 0) {
-      // Peso real cadastrado — usa diretamente
+      // Peso real cadastrado — já inclui frasco/embalagem, sem overhead
       totalWeightG += item.product.weightGrams * item.quantity;
     } else {
+      hasAnyEstimated = true;
       const dim = sanitizePackageDimensions(item.product.packageDimensionsCm);
       if (dim) {
         totalWeightG += dim.widthCm * dim.lengthCm * dim.heightCm * 0.25 * item.quantity;
@@ -106,6 +108,8 @@ export const calculateCartShippingBoxes = (
       totalWeightG += 100 * item.quantity; // 100g safety margin per item
     }
   }
+  // Overhead de embalagem só quando há itens sem peso cadastrado
+  if (hasAnyEstimated) totalWeightG += 200;
   totalWeightG = Math.max(100, Math.round(totalWeightG));
 
   let knownQuantity = 0;
