@@ -69,7 +69,7 @@ const Header: React.FC = () => {
         </div>
       )}
       <div className="container mx-auto px-4">
-        <div className="flex items-center justify-between h-16 gap-2">
+        <div className="flex items-center justify-between h-16 gap-2 overflow-hidden">
           {/* Logo */}
           <Link to="/" className="flex items-center gap-1.5 group shrink-0">
             <JapanExpressLogo size={44} className="w-9 h-9 sm:w-11 sm:h-11 animate-float drop-shadow-lg group-hover:scale-105 transition-transform shrink-0" />
@@ -80,7 +80,7 @@ const Header: React.FC = () => {
           </Link>
 
           {/* Desktop Navigation (escondida no painel admin) */}
-          <nav className={cn("items-center gap-1", isAdminPage ? "hidden" : "hidden xl:flex")}>
+          <nav className={cn("items-center gap-0.5 min-w-0 overflow-hidden", isAdminPage ? "hidden" : "hidden 2xl:flex")}>
             {navItems.map((item, index) => (
               <div key={item.label} className="relative group flex items-center">
                 {index > 0 && (
@@ -160,7 +160,7 @@ const Header: React.FC = () => {
             )}
 
             {/* Admin + Perfil lado a lado (desktop) */}
-            <div className="hidden xl:flex flex-row items-center gap-1">
+            <div className="hidden xl:flex flex-row items-center gap-1 shrink-0">
               {isAdmin && (
                 <Link
                   to={isAdminPage ? '/' : '/admin'}
@@ -184,7 +184,7 @@ const Header: React.FC = () => {
             {isAuthenticated && !isAdminPage && (
               <Link
                 to="/favoritos"
-                className="relative p-2 rounded-full hover:bg-secondary/50 transition-colors hidden xl:block"
+                className="relative p-2 rounded-full hover:bg-secondary/50 transition-colors hidden 2xl:block"
                 title={t('nav.favorites')}
               >
                 <Heart className="w-6 h-6 text-foreground" />
@@ -207,7 +207,7 @@ const Header: React.FC = () => {
             )}
 
             <button
-              className="xl:hidden p-2 rounded-full hover:bg-secondary/50 transition-colors"
+              className="2xl:hidden p-2 rounded-full hover:bg-secondary/50 transition-colors"
               onClick={() => setIsMenuOpen(!isMenuOpen)}
             >
               {isMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
@@ -217,7 +217,7 @@ const Header: React.FC = () => {
 
         {/* Mobile Navigation */}
         {isMenuOpen && (
-          <nav className="xl:hidden py-4 border-t border-border animate-fade-up">
+          <nav className="2xl:hidden py-4 border-t border-border animate-fade-up">
             {/* Switchers (escondidos no admin) */}
             {!isAdminPage && (
               <div className="flex flex-col items-center gap-3 pb-4 mb-4 border-b border-border">
