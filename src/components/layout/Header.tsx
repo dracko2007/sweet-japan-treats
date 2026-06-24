@@ -69,18 +69,18 @@ const Header: React.FC = () => {
         </div>
       )}
       <div className="container mx-auto px-4">
-        <div className="flex items-center justify-between h-16 gap-2 overflow-hidden">
+        <div className="flex items-center justify-between h-20 gap-4">
           {/* Logo */}
-          <Link to="/" className="flex items-center gap-1.5 group shrink-0">
-            <JapanExpressLogo size={44} className="w-9 h-9 sm:w-11 sm:h-11 animate-float drop-shadow-lg group-hover:scale-105 transition-transform shrink-0" />
+          <Link to="/" className="flex items-center gap-1.5 sm:gap-2.5 group shrink-0">
+            <JapanExpressLogo size={56} className="w-11 h-11 sm:w-14 sm:h-14 animate-float drop-shadow-lg group-hover:scale-105 transition-transform shrink-0" />
             <div className="flex items-baseline gap-1">
-              <span className="font-display text-lg sm:text-xl lg:text-2xl font-black text-foreground tracking-tight">Japan</span>
-              <span className="font-display text-sm sm:text-base lg:text-xl font-extrabold text-white bg-gradient-to-r from-primary to-accent shadow-md px-1.5 py-0.5 rounded-lg transform -rotate-6">Express</span>
+              <span className="font-display text-xl sm:text-2xl lg:text-3xl font-black text-foreground tracking-tight">Japan</span>
+              <span className="font-display text-base sm:text-lg lg:text-2xl font-extrabold text-white bg-gradient-to-r from-primary to-accent shadow-md px-1.5 sm:px-2 py-0.5 rounded-lg transform -rotate-6">Express</span>
             </div>
           </Link>
 
           {/* Desktop Navigation (escondida no painel admin) */}
-          <nav className={cn("items-center gap-0.5 min-w-0 overflow-hidden", isAdminPage ? "hidden" : "hidden 2xl:flex")}>
+          <nav className={cn("items-center gap-1", isAdminPage ? "hidden" : "hidden xl:flex")}>
             {navItems.map((item, index) => (
               <div key={item.label} className="relative group flex items-center">
                 {index > 0 && (
@@ -148,10 +148,10 @@ const Header: React.FC = () => {
           </nav>
 
           {/* Cart, Language & Mobile Menu */}
-          <div className="flex items-center gap-1 sm:gap-2">
-            {/* País + Idioma — linha única lado a lado */}
+          <div className="flex items-center gap-1.5 sm:gap-3">
+            {/* País (cima) + Idioma (baixo) — idioma sempre visível, país aparece a partir de md */}
             {!isAdminPage && (
-              <div className="flex items-center gap-1">
+              <div className="flex flex-col gap-1">
                 <div className="hidden md:block">
                   <CountrySwitcher />
                 </div>
@@ -159,16 +159,16 @@ const Header: React.FC = () => {
               </div>
             )}
 
-            {/* Admin + Perfil lado a lado (desktop) */}
-            <div className="hidden xl:flex flex-row items-center gap-1 shrink-0">
+            {/* Admin + Perfil empilhados (desktop) — igual País/Idioma */}
+            <div className="hidden xl:flex flex-col gap-1">
               {isAdmin && (
                 <Link
                   to={isAdminPage ? '/' : '/admin'}
                   className="flex items-center gap-1.5 px-2 py-1 bg-orange-500/10 border border-orange-300/60 rounded-full text-[11px] font-semibold text-orange-700 dark:text-orange-400 hover:bg-orange-500/20 transition-colors"
                 >
                   {isAdminPage
-                    ? <><ShoppingCart className="w-3.5 h-3.5" /><span className="hidden 2xl:inline"> Ver Loja</span></>
-                    : <><UserCircle className="w-3.5 h-3.5 animate-pulse" /><span className="hidden 2xl:inline"> Admin</span></>}
+                    ? <><ShoppingCart className="w-3.5 h-3.5" /> Ver Loja</>
+                    : <><UserCircle className="w-3.5 h-3.5 animate-pulse" /> Admin</>}
                 </Link>
               )}
               <Link
@@ -176,7 +176,7 @@ const Header: React.FC = () => {
                 className="flex items-center gap-1.5 px-2 py-1 bg-secondary/80 border border-border rounded-full text-[11px] font-semibold text-foreground hover:bg-secondary transition-colors"
               >
                 <UserCircle className="w-3.5 h-3.5" />
-                <span className="hidden 2xl:inline">{isAuthenticated ? (user?.name?.split(' ')[0] || t('nav.profile')) : t('nav.register')}</span>
+                {isAuthenticated ? (user?.name?.split(' ')[0] || t('nav.profile')) : t('nav.register')}
               </Link>
             </div>
 
@@ -184,7 +184,7 @@ const Header: React.FC = () => {
             {isAuthenticated && !isAdminPage && (
               <Link
                 to="/favoritos"
-                className="relative p-2 rounded-full hover:bg-secondary/50 transition-colors"
+                className="relative p-2 rounded-full hover:bg-secondary/50 transition-colors hidden xl:block"
                 title={t('nav.favorites')}
               >
                 <Heart className="w-6 h-6 text-foreground" />
@@ -207,7 +207,7 @@ const Header: React.FC = () => {
             )}
 
             <button
-              className="2xl:hidden p-2 rounded-full hover:bg-secondary/50 transition-colors"
+              className="xl:hidden p-2 rounded-full hover:bg-secondary/50 transition-colors"
               onClick={() => setIsMenuOpen(!isMenuOpen)}
             >
               {isMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
@@ -217,7 +217,7 @@ const Header: React.FC = () => {
 
         {/* Mobile Navigation */}
         {isMenuOpen && (
-          <nav className="2xl:hidden py-4 border-t border-border animate-fade-up">
+          <nav className="xl:hidden py-4 border-t border-border animate-fade-up">
             {/* Switchers (escondidos no admin) */}
             {!isAdminPage && (
               <div className="flex flex-col items-center gap-3 pb-4 mb-4 border-b border-border">

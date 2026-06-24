@@ -32,10 +32,10 @@ const LanguageSwitcher: React.FC = () => {
     <div className="relative inline-block text-left" ref={dropdownRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-1.5 px-2 sm:px-3 py-1.5 bg-secondary/80 border border-border rounded-full hover:bg-secondary transition-all text-xs font-semibold text-foreground shadow-sm focus:outline-none whitespace-nowrap"
+        className="flex items-center gap-1.5 px-2 sm:px-3 py-1.5 bg-secondary/80 border border-border rounded-full hover:bg-secondary transition-all text-xs font-semibold text-foreground shadow-sm focus:outline-none"
       >
         <FlagIcon code={current.flagCode} alt={current.label} size={20} />
-        <span className="hidden xl:inline">{current.label}</span>
+        <span className="hidden sm:inline">{current.label}</span>
         <ChevronDown className={cn("w-3 h-3 sm:w-3.5 sm:h-3.5 text-muted-foreground transition-transform duration-200", isOpen && "rotate-180")} />
       </button>
 
