@@ -3,7 +3,7 @@ import { Plus, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { getRates } from '@/services/fxService';
 import { formatPrice } from '@/utils/currency';
-import { getELightRate, getKozutsumiRate, type JapanPostZone } from '@/utils/japanPostRates';
+import { getELightRate, getAirParcelRate, getEmsRate, type JapanPostZone } from '@/utils/japanPostRates';
 
 interface ProductRow {
   id: number;
@@ -43,13 +43,15 @@ const AdminCalculator: React.FC = () => {
   const isLight = weightG > 0 && weightG <= 2000;
   const overLimit = weightG > 30000;
   const eRaitoYen = isLight ? getELightRate(weightG, zone) : null;
-  const kAirYen = !isLight && weightG > 2000 && !overLimit ? getKozutsumiRate(weightG, zone, 'air') : null;
+  const kAirYen = !isLight && weightG > 2000 && !overLimit ? getAirParcelRate(weightG, zone) : null;
+  const emsYen  = !overLimit ? getEmsRate(weightG, zone) : null;
 
   const yenFmt = (y: number) => `¥${Math.round(y).toLocaleString('ja-JP')}`;
 
   const shippingOptions: { label: string; yen: number }[] = [];
-  if (eRaitoYen != null) shippingOptions.push({ label: '📦 e-Raito Light', yen: eRaitoYen });
-  if (kAirYen != null) shippingOptions.push({ label: '✈️ Kozutsumi Aéreo', yen: kAirYen });
+  if (eRaitoYen != null) shippingOptions.push({ label: '✉️ e-Packet Light (≤2kg)', yen: eRaitoYen });
+  if (emsYen    != null) shippingOptions.push({ label: '🚀 EMS', yen: emsYen });
+  if (kAirYen   != null) shippingOptions.push({ label: '✈️ Air Parcel', yen: kAirYen });
 
   return (
     <div className="space-y-6 pb-8">
@@ -210,14 +212,21 @@ const AdminCalculator: React.FC = () => {
           {/* Destino */}
           <div>
             <label className="text-[11px] font-bold text-muted-foreground block mb-1 uppercase">Destino</label>
-            <div className="flex gap-2">
-              {([5, 3] as JapanPostZone[]).map(z => (
+            <div className="flex flex-wrap gap-2">
+              {([
+                { z: 1, label: '🇨🇳 Zona 1', desc: 'China/Coreia/Taiwan' },
+                { z: 2, label: '🌏 Zona 2', desc: 'Ásia' },
+                { z: 3, label: '🇪🇺 Zona 3', desc: 'Europa/Oceânia' },
+                { z: 4, label: '🇺🇸 Zona 4', desc: 'EUA/Guam' },
+                { z: 5, label: '🇧🇷 Zona 5', desc: 'Brasil/América do Sul' },
+              ] as { z: JapanPostZone; label: string; desc: string }[]).map(({ z, label, desc }) => (
                 <button
                   key={z}
                   onClick={() => setZone(z)}
+                  title={desc}
                   className={`px-3 py-2 rounded-lg text-xs font-bold border transition-colors ${zone === z ? 'bg-primary text-primary-foreground border-primary' : 'border-border text-muted-foreground hover:text-foreground'}`}
                 >
-                  {z === 5 ? '🇧🇷 Brasil' : '🇪🇺 Europa'}
+                  {label}
                 </button>
               ))}
             </div>

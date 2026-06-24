@@ -7,7 +7,7 @@ import { useLanguage } from '@/context/LanguageContext';
 import { cn } from '@/lib/utils';
 import { formatPrice } from '@/utils/currency';
 import { calculateCartShippingBoxes } from '@/utils/shippingDimensions';
-import { getELightRate, getKozutsumiRate, getEmsRate, MAX_WEIGHT_G, MAX_DIM_SUM_CM, type JapanPostZone } from '@/utils/japanPostRates';
+import { getELightRate, getAirParcelRate, getEmsRate, countryToZone, MAX_WEIGHT_G, MAX_DIM_SUM_CM, type JapanPostZone } from '@/utils/japanPostRates';
 import { effectiveYen } from '@/utils/pricing';
 
 interface ShippingCalculatorProps {
@@ -41,7 +41,7 @@ const ShippingCalculator: React.FC<ShippingCalculatorProps> = ({
 
   const isJapan = destinationCountry === 'Japão';
   const isEurope = ['Portugal', 'França', 'Itália', 'Espanha'].includes(destinationCountry || '');
-  const jpZone: JapanPostZone = isEurope ? 3 : 5;
+  const jpZone: JapanPostZone = countryToZone(destinationCountry || 'Brasil');
 
   const calculateBoxes = useMemo(
     () => calculateCartShippingBoxes(items, spaceInfo),
@@ -120,7 +120,7 @@ const ShippingCalculator: React.FC<ShippingCalculatorProps> = ({
         estimatedDays: isEurope ? '7-12' : '30-40',
       });
     } else {
-      const airYen = getKozutsumiRate(weightG, jpZone, 'air');
+      const airYen = getAirParcelRate(weightG, jpZone);
       if (airYen) options.push({
         carrier: 'kozutsumi-air',
         name: 'Japan Post Kozutsumi Air · 国際小包 航空便',

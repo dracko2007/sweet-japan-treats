@@ -7,7 +7,7 @@ import ShippingCalculator from '@/components/shipping/ShippingCalculator';
 import { Button } from '@/components/ui/button';
 import { useLanguage, CountryType } from '@/context/LanguageContext';
 import { formatPrice } from '@/utils/currency';
-import { getELightRate, getKozutsumiRate, getEmsRate, MAX_DIM_SUM_CM, MAX_WEIGHT_G, type JapanPostZone } from '@/utils/japanPostRates';
+import { getELightRate, getAirParcelRate, getEmsRate, countryToZone, MAX_DIM_SUM_CM, MAX_WEIGHT_G, type JapanPostZone } from '@/utils/japanPostRates';
 import { convertYen as fxConvert } from '@/services/fxService';
 
 const Shipping: React.FC = () => {
@@ -70,7 +70,7 @@ const Shipping: React.FC = () => {
     }
 
     const isEurope = ['Portugal', 'França', 'Itália', 'Espanha'].includes(country);
-    const zone: JapanPostZone = isEurope ? 3 : 5;
+    const zone: JapanPostZone = countryToZone(country);
     const cur = isEurope ? 'EUR' : 'BRL';
     const billableWeightG = Math.max(1, Math.round(billableWeight * 1000));
 
@@ -81,7 +81,7 @@ const Shipping: React.FC = () => {
       const yen = getELightRate(billableWeightG, zone);
       rates.push({ name: 'Japan Post E-Light ✉️', cost: yen ? fxConvert(yen, cur) : null, time: isEurope ? '7-12 days' : '10-15 days' });
     } else {
-      const airYen = getKozutsumiRate(billableWeightG, zone, 'air');
+      const airYen = getAirParcelRate(billableWeightG, zone);
       rates.push({ name: 'Japan Post Kozutsumi Air 📦', cost: airYen ? fxConvert(airYen, cur) : null, time: isEurope ? '7-10 days' : '10-15 days' });
     }
 
@@ -163,8 +163,8 @@ const Shipping: React.FC = () => {
       const eurELight2kg = fxConvert(getELightRate(2000, 3) ?? 4300, 'EUR');
       const eurEms1kg  = fxConvert(getEmsRate(1000, 3) ?? 4000, 'EUR');
       const eurEms3kg  = fxConvert(getEmsRate(3000, 3) ?? 6600, 'EUR');
-      const eurAir3kg  = fxConvert(getKozutsumiRate(3000, 3, 'air') ?? 8150, 'EUR');
-      const eurAir5kg  = fxConvert(getKozutsumiRate(5000, 3, 'air') ?? 12450, 'EUR');
+      const eurAir3kg  = fxConvert(getAirParcelRate(3000, 3) ?? 8150, 'EUR');
+      const eurAir5kg  = fxConvert(getAirParcelRate(5000, 3) ?? 12450, 'EUR');
       return [
         {
           name: 'Japan Post E-Light ✉️',
@@ -212,8 +212,8 @@ const Shipping: React.FC = () => {
     const brlELight2kg = fxConvert(getELightRate(2000, 5) ?? 5860, 'BRL');
     const brlEms1kg  = fxConvert(getEmsRate(1000, 5) ?? 4700, 'BRL');
     const brlEms3kg  = fxConvert(getEmsRate(3000, 5) ?? 7800, 'BRL');
-    const brlAir3kg  = fxConvert(getKozutsumiRate(3000, 5, 'air') ?? 9950, 'BRL');
-    const brlAir5kg  = fxConvert(getKozutsumiRate(5000, 5, 'air') ?? 15350, 'BRL');
+    const brlAir3kg  = fxConvert(getAirParcelRate(3000, 5) ?? 9950, 'BRL');
+    const brlAir5kg  = fxConvert(getAirParcelRate(5000, 5) ?? 15350, 'BRL');
     return [
       {
         name: 'Japan Post E-Light ✉️',
