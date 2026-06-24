@@ -167,8 +167,8 @@ const Header: React.FC = () => {
                   className="flex items-center gap-1.5 px-2 py-1 bg-orange-500/10 border border-orange-300/60 rounded-full text-[11px] font-semibold text-orange-700 dark:text-orange-400 hover:bg-orange-500/20 transition-colors"
                 >
                   {isAdminPage
-                    ? <><ShoppingCart className="w-3.5 h-3.5" /> Ver Loja</>
-                    : <><UserCircle className="w-3.5 h-3.5 animate-pulse" /> Admin</>}
+                    ? <><ShoppingCart className="w-3.5 h-3.5" /><span className="hidden 2xl:inline"> Ver Loja</span></>
+                    : <><UserCircle className="w-3.5 h-3.5 animate-pulse" /><span className="hidden 2xl:inline"> Admin</span></>}
                 </Link>
               )}
               <Link
@@ -176,7 +176,7 @@ const Header: React.FC = () => {
                 className="flex items-center gap-1.5 px-2 py-1 bg-secondary/80 border border-border rounded-full text-[11px] font-semibold text-foreground hover:bg-secondary transition-colors"
               >
                 <UserCircle className="w-3.5 h-3.5" />
-                {isAuthenticated ? (user?.name?.split(' ')[0] || t('nav.profile')) : t('nav.register')}
+                <span className="hidden 2xl:inline">{isAuthenticated ? (user?.name?.split(' ')[0] || t('nav.profile')) : t('nav.register')}</span>
               </Link>
             </div>
 
@@ -184,7 +184,7 @@ const Header: React.FC = () => {
             {isAuthenticated && !isAdminPage && (
               <Link
                 to="/favoritos"
-                className="relative p-2 rounded-full hover:bg-secondary/50 transition-colors hidden 2xl:block"
+                className="relative p-2 rounded-full hover:bg-secondary/50 transition-colors"
                 title={t('nav.favorites')}
               >
                 <Heart className="w-6 h-6 text-foreground" />
