@@ -44,14 +44,12 @@ const AdminCalculator: React.FC = () => {
   const overLimit = weightG > 30000;
   const eRaitoYen = isLight ? getELightRate(weightG, zone) : null;
   const kAirYen = !isLight && weightG > 2000 && !overLimit ? getKozutsumiRate(weightG, zone, 'air') : null;
-  const kSalYen = !isLight && weightG > 2000 && !overLimit ? getKozutsumiRate(weightG, zone, 'sal') : null;
 
   const yenFmt = (y: number) => `¥${Math.round(y).toLocaleString('ja-JP')}`;
 
   const shippingOptions: { label: string; yen: number }[] = [];
   if (eRaitoYen != null) shippingOptions.push({ label: '📦 e-Raito Light', yen: eRaitoYen });
   if (kAirYen != null) shippingOptions.push({ label: '✈️ Kozutsumi Aéreo', yen: kAirYen });
-  if (kSalYen != null) shippingOptions.push({ label: '🚢 Kozutsumi SAL', yen: kSalYen });
 
   return (
     <div className="space-y-6 pb-8">
@@ -259,17 +257,6 @@ const AdminCalculator: React.FC = () => {
                 <p className="text-2xl font-black text-blue-800 dark:text-blue-200">{yenFmt(kAirYen)}</p>
                 <p className="text-sm text-blue-600 dark:text-blue-400 mt-0.5">
                   ≈ {formatPrice(kAirYen * rates.BRL, 'BRL', true)} · {formatPrice(kAirYen * rates.EUR, 'EUR', true)}
-                </p>
-              </div>
-            )}
-            {kSalYen != null && (
-              <div className="bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-800 rounded-xl p-4">
-                <span className="inline-block text-[10px] font-black text-orange-700 bg-orange-100 dark:bg-orange-900 px-2 py-0.5 rounded-full mb-2">
-                  🚢 Kozutsumi SAL — econômico
-                </span>
-                <p className="text-2xl font-black text-orange-800 dark:text-orange-200">{yenFmt(kSalYen)}</p>
-                <p className="text-sm text-orange-600 dark:text-orange-400 mt-0.5">
-                  ≈ {formatPrice(kSalYen * rates.BRL, 'BRL', true)} · {formatPrice(kSalYen * rates.EUR, 'EUR', true)}
                 </p>
               </div>
             )}

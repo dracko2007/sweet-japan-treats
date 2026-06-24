@@ -120,17 +120,6 @@ const ShippingCalculator: React.FC<ShippingCalculatorProps> = ({
         estimatedDays: isEurope ? '7-12' : '30-40',
       });
     } else {
-      const salYen = getKozutsumiRate(weightG, jpZone, 'sal');
-      if (salYen) options.push({
-        carrier: 'kozutsumi-sal',
-        name: 'Japan Post SAL · 国際小包 エコノミー航空',
-        logo: '📦',
-        cost: fxConvert(salYen, currency),
-        costYen: salYen,
-        originalCost: undefined,
-        estimatedDays: isEurope ? '15-30' : '20-45',
-      });
-
       const airYen = getKozutsumiRate(weightG, jpZone, 'air');
       if (airYen) options.push({
         carrier: 'kozutsumi-air',

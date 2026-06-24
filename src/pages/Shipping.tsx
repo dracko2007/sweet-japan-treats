@@ -81,8 +81,6 @@ const Shipping: React.FC = () => {
       const yen = getELightRate(billableWeightG, zone);
       rates.push({ name: 'Japan Post E-Light ✉️', cost: yen ? fxConvert(yen, cur) : null, time: isEurope ? '7-12 days' : '10-15 days' });
     } else {
-      const salYen = getKozutsumiRate(billableWeightG, zone, 'sal');
-      rates.push({ name: 'Japan Post SAL 📦', cost: salYen ? fxConvert(salYen, cur) : null, time: isEurope ? '15-30 days' : '20-45 days' });
       const airYen = getKozutsumiRate(billableWeightG, zone, 'air');
       rates.push({ name: 'Japan Post Kozutsumi Air 📦', cost: airYen ? fxConvert(airYen, cur) : null, time: isEurope ? '7-10 days' : '10-15 days' });
     }
