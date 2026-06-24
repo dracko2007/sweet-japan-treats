@@ -546,16 +546,18 @@ const OrderReview: React.FC = () => {
         localStorage.setItem(key, JSON.stringify({ count: current + item.quantity, setAt: Date.now() }));
       } catch { /* localStorage indisponível */ }
     });
-    // Incrementa soldCount na promoção ativa no Firestore
+    // Incrementa soldCount na promoção ativa no Firestore (void — não bloqueia o fluxo)
     if (db && promoItems.length > 0) {
       const totalPromoQty = promoItems.reduce((s, i) => s + i.quantity, 0);
-      try {
-        const ref = doc(db, 'siteContent', 'homePromotion');
-        const snap = await getDoc(ref);
-        if (snap.exists()) {
-          await updateDoc(ref, { soldCount: increment(totalPromoQty) });
-        }
-      } catch { /* silencioso */ }
+      void (async () => {
+        try {
+          const ref = doc(db, 'siteContent', 'homePromotion');
+          const snap = await getDoc(ref);
+          if (snap.exists()) {
+            await updateDoc(ref, { soldCount: increment(totalPromoQty) });
+          }
+        } catch { /* silencioso */ }
+      })();
     }
 
     // Clear cart upon final purchase order creation
