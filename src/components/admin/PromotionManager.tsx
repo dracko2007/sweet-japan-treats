@@ -163,8 +163,9 @@ const PromotionManager: React.FC = () => {
     getDoc(doc(db, 'siteContent', 'homePromotion')).then(snap => {
       if (snap.exists()) {
         const data = snap.data() as ActivePromo;
-        // Auto-ativa próxima se expirada
-        if (data.expiresAt && data.expiresAt < Date.now()) {
+        const expiredByDate = data.expiresAt ? data.expiresAt < Date.now() : false;
+        const expiredByQty  = data.maxProducts != null && (data.soldCount ?? 0) >= data.maxProducts;
+        if (expiredByDate || expiredByQty) {
           if (data.nextPromo) activateNext(data.nextPromo);
           else removePromo(true);
         } else {
@@ -334,6 +335,17 @@ const PromotionManager: React.FC = () => {
               </Button>
             </div>
           </div>
+          {/* Resumo das condições de encerramento */}
+          {(active.expiresAt || active.maxProducts != null) && (
+            <div className="text-xs text-muted-foreground bg-secondary/40 rounded-lg px-3 py-2 flex flex-wrap gap-3">
+              <span className="font-semibold text-foreground">Encerra quando:</span>
+              {active.expiresAt && <span>⏱️ Data atingida</span>}
+              {active.expiresAt && active.maxProducts != null && <span className="text-muted-foreground/60">ou</span>}
+              {active.maxProducts != null && <span>📦 Estoque ({active.maxProducts} un.) esgotado</span>}
+              {active.expiresAt && active.maxProducts != null && <span className="font-semibold text-primary">— o que ocorrer primeiro</span>}
+            </div>
+          )}
+
           {active.expiresAt && (
             <div className={`flex items-center gap-2 text-sm font-medium ${timeLeft === 'Encerrada' ? 'text-red-600' : 'text-orange-600'}`}>
               <Clock className="w-4 h-4 shrink-0" />

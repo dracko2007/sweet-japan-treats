@@ -546,14 +546,29 @@ const OrderReview: React.FC = () => {
         localStorage.setItem(key, JSON.stringify({ count: current + item.quantity, setAt: Date.now() }));
       } catch { /* localStorage indisponível */ }
     });
-    // Incrementa soldCount na promoção ativa no Firestore (void — não bloqueia o fluxo)
+    // Incrementa soldCount; se atingir maxProducts ativa a próxima promoção
     if (db && promoItems.length > 0) {
       const totalPromoQty = promoItems.reduce((s, i) => s + i.quantity, 0);
       void (async () => {
         try {
           const ref = doc(db, 'siteContent', 'homePromotion');
           const snap = await getDoc(ref);
-          if (snap.exists()) {
+          if (!snap.exists()) return;
+          const promo = snap.data() as { soldCount?: number; maxProducts?: number | null; nextPromo?: any; expiresAt?: number | null };
+          const newSoldCount = (promo.soldCount ?? 0) + totalPromoQty;
+          const esgotou = promo.maxProducts != null && newSoldCount >= promo.maxProducts;
+
+          if (esgotou) {
+            // Quantidade esgotada — avança para a próxima promoção ou remove
+            if (promo.nextPromo) {
+              const next = promo.nextPromo;
+              const nextExpiresAt = next.durationDays ? Date.now() + next.durationDays * 86400000 : null;
+              await setDoc(ref, { ...next, expiresAt: nextExpiresAt, soldCount: 0, nextPromo: null });
+            } else {
+              await updateDoc(ref, { soldCount: newSoldCount });
+              // Marca esgotado — a UI já trata isSoldOut
+            }
+          } else {
             await updateDoc(ref, { soldCount: increment(totalPromoQty) });
           }
         } catch { /* silencioso */ }

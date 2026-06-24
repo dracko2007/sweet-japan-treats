@@ -79,8 +79,12 @@ const Promotion: React.FC = () => {
     getDoc(doc(db, 'siteContent', 'homePromotion')).then(snap => {
       if (!snap.exists()) { setPromo(null); return; }
       const data = snap.data() as ActivePromo;
-      // Verifica expiração
-      if (data.expiresAt && data.expiresAt < Date.now()) {
+      // Verifica expiração por data
+      const expiredByDate = data.expiresAt ? data.expiresAt < Date.now() : false;
+      // Verifica esgotamento por quantidade
+      const expiredByQty = data.maxProducts != null && (data.soldCount ?? 0) >= data.maxProducts;
+
+      if (expiredByDate || expiredByQty) {
         if (data.nextPromo) tryActivateNext(data.nextPromo).then(() => setPromo(null));
         else setPromo(null);
       } else {
