@@ -180,30 +180,30 @@ const Header: React.FC = () => {
               </Link>
             </div>
 
-            {/* Wishlist Button (escondido no admin) */}
-            {isAuthenticated && !isAdminPage && (
-              <Link
-                to="/favoritos"
-                className="relative p-2 rounded-full hover:bg-secondary/50 transition-colors hidden xl:block"
-                title={t('nav.favorites')}
-              >
-                <Heart className="w-6 h-6 text-foreground" />
-              </Link>
-            )}
-
-            {/* Carrinho (escondido no admin) */}
+            {/* Favoritos + Carrinho empilhados */}
             {!isAdminPage && (
-              <Link
-                to="/carrinho"
-                className="relative p-2 rounded-full hover:bg-secondary/50 transition-colors"
-              >
-                <ShoppingCart className="w-6 h-6 text-foreground" />
-                {totalItems > 0 && (
-                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-primary text-primary-foreground text-xs font-bold rounded-full flex items-center justify-center">
-                    {totalItems}
-                  </span>
+              <div className="flex flex-col gap-1">
+                {isAuthenticated && (
+                  <Link
+                    to="/favoritos"
+                    className="relative p-1.5 rounded-full hover:bg-secondary/50 transition-colors"
+                    title={t('nav.favorites')}
+                  >
+                    <Heart className="w-5 h-5 text-foreground" />
+                  </Link>
                 )}
-              </Link>
+                <Link
+                  to="/carrinho"
+                  className="relative p-1.5 rounded-full hover:bg-secondary/50 transition-colors"
+                >
+                  <ShoppingCart className="w-5 h-5 text-foreground" />
+                  {totalItems > 0 && (
+                    <span className="absolute -top-1 -right-1 w-4 h-4 bg-primary text-primary-foreground text-[10px] font-bold rounded-full flex items-center justify-center">
+                      {totalItems}
+                    </span>
+                  )}
+                </Link>
+              </div>
             )}
 
             <button
