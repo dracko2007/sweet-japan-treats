@@ -31,6 +31,8 @@ import { referralService } from '@/services/referralService';
 import { calcBrazilTax, calcEuVat, EU_VAT_RATES } from '@/utils/taxRules';
 import { cpfGuardService, normalizeCPF } from '@/services/cpfGuardService';
 import { thermalPrintService } from '@/services/thermalPrintService';
+import { db } from '@/config/firebase';
+import { doc, getDoc, updateDoc, increment } from 'firebase/firestore';
 
 const isDev = import.meta.env.DEV;
 const devLog = isDev ? console.log.bind(console) : () => {};
@@ -533,7 +535,8 @@ const OrderReview: React.FC = () => {
     }
 
     // Registra itens promocionais comprados (só agora, após pedido confirmado)
-    items.filter(i => !i.freeGift && i.product.id.endsWith('_promo')).forEach(item => {
+    const promoItems = items.filter(i => !i.freeGift && i.product.id.endsWith('_promo'));
+    promoItems.forEach(item => {
       const productId = item.product.id.replace(/_promo$/, '');
       const key = `promo_bought_${productId}`;
       try {
@@ -543,6 +546,17 @@ const OrderReview: React.FC = () => {
         localStorage.setItem(key, JSON.stringify({ count: current + item.quantity, setAt: Date.now() }));
       } catch { /* localStorage indisponível */ }
     });
+    // Incrementa soldCount na promoção ativa no Firestore
+    if (db && promoItems.length > 0) {
+      const totalPromoQty = promoItems.reduce((s, i) => s + i.quantity, 0);
+      try {
+        const ref = doc(db, 'siteContent', 'homePromotion');
+        const snap = await getDoc(ref);
+        if (snap.exists()) {
+          await updateDoc(ref, { soldCount: increment(totalPromoQty) });
+        }
+      } catch { /* silencioso */ }
+    }
 
     // Clear cart upon final purchase order creation
     clearCart();

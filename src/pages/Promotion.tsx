@@ -127,6 +127,8 @@ const Promotion: React.FC = () => {
   const gallery: string[] = product?.gallery?.length ? product.gallery : [promo.productImage].filter(Boolean);
 
   const isExpired = promo.expiresAt ? promo.expiresAt < Date.now() : false;
+  const isSoldOut = promo.maxProducts != null && (promo.soldCount ?? 0) >= promo.maxProducts;
+  const stockLeft = promo.maxProducts != null ? Math.max(0, promo.maxProducts - (promo.soldCount ?? 0)) : null;
 
   const promoQty = Math.min(qty, remaining);
   const overflowQty = Math.max(0, qty - remaining);
@@ -134,6 +136,7 @@ const Promotion: React.FC = () => {
 
   const handleAddToCart = () => {
     if (isExpired) { toast({ title: 'Promoção encerrada', variant: 'destructive' }); return; }
+    if (isSoldOut) { toast({ title: '😔 Estoque esgotado', description: 'Todas as unidades promocionais já foram vendidas.', variant: 'destructive' }); return; }
 
     // Se o limite já foi atingido entre pedidos anteriores + carrinho atual, tudo vai como regular
     if (remaining === 0 && inCartPromoQty > 0) {
@@ -243,6 +246,22 @@ const Promotion: React.FC = () => {
               </div>
             )}
 
+            {/* Estoque disponível */}
+            {promo.maxProducts != null && (
+              <div className={`rounded-xl p-3 border text-sm font-semibold flex flex-col gap-1 ${isSoldOut ? 'bg-red-50 border-red-300 text-red-700' : 'bg-amber-50 border-amber-200 text-amber-800'}`}>
+                <div className="flex items-center justify-between">
+                  <span>{isSoldOut ? '😔 Estoque esgotado — todas as unidades foram vendidas' : `📦 Restam apenas ${stockLeft} unidade(s) promocional(is)`}</span>
+                  <span className="text-xs font-normal opacity-70">{promo.soldCount ?? 0}/{promo.maxProducts} vendidos</span>
+                </div>
+                {!isSoldOut && (
+                  <div className="h-2 bg-amber-200 rounded-full overflow-hidden">
+                    <div className="h-full bg-amber-500 rounded-full transition-all"
+                      style={{ width: `${Math.min(100, ((promo.soldCount ?? 0) / promo.maxProducts) * 100)}%` }} />
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Preços */}
             <div className="space-y-1">
               {originalPriceLocal > 0 && (
@@ -302,11 +321,13 @@ const Promotion: React.FC = () => {
               </div>
             </div>
 
-            <Button size="lg" onClick={handleAddToCart} disabled={isExpired || countdown === 'Encerrada'} className="w-full gap-2 text-base font-bold">
+            <Button size="lg" onClick={handleAddToCart} disabled={isExpired || countdown === 'Encerrada' || isSoldOut} className="w-full gap-2 text-base font-bold">
               <ShoppingCart className="w-5 h-5" />
               {isExpired || countdown === 'Encerrada'
                 ? 'Promoção encerrada'
-                : `Adicionar ao carrinho — ${formatPrice(totalLocal, currency, true)}`}
+                : isSoldOut
+                  ? '😔 Estoque esgotado'
+                  : `Adicionar ao carrinho — ${formatPrice(totalLocal, currency, true)}`}
             </Button>
 
             <p className="text-xs text-muted-foreground text-center">

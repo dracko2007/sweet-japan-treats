@@ -115,7 +115,7 @@ const PromoForm: React.FC<PromoFormProps> = ({ label, products, value, onChange,
       </div>
 
       {/* Duração e limite */}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-3 gap-3">
         {showDuration && (
           <div className="space-y-1">
             <label className="text-xs font-medium text-muted-foreground flex items-center gap-1"><Clock className="w-3 h-3" /> Duração (dias)</label>
@@ -128,6 +128,12 @@ const PromoForm: React.FC<PromoFormProps> = ({ label, products, value, onChange,
           <input type="number" min="1" max="99" value={value.limitPerPerson ?? 1} onChange={e => onChange({ ...value, limitPerPerson: Number(e.target.value) })}
             className="w-full border border-border rounded-lg px-3 py-2 bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
         </div>
+        <div className="space-y-1">
+          <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">📦 Máx. produtos</label>
+          <input type="number" min="1" value={value.maxProducts ?? ''} onChange={e => onChange({ ...value, maxProducts: e.target.value ? Number(e.target.value) : null })}
+            className="w-full border border-border rounded-lg px-3 py-2 bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary" placeholder="Ilimitado" />
+          <div className="text-[10px] text-muted-foreground">Deixe vazio = ilimitado</div>
+        </div>
       </div>
     </div>
   );
@@ -137,7 +143,7 @@ const PromoForm: React.FC<PromoFormProps> = ({ label, products, value, onChange,
 const emptyForm = (): Partial<ActivePromo & ScheduledNextPromo> => ({
   type: 'abertura', productId: '', productName: '', productImage: '',
   originalPriceYen: 0, promoPriceYen: 0, discountPct: 0, limitPerPerson: 1,
-  durationDays: null,
+  maxProducts: null, durationDays: null,
 });
 
 const PromotionManager: React.FC = () => {
@@ -242,12 +248,14 @@ const PromotionManager: React.FC = () => {
       await ensureAdminAuth();
       const expiresAt = form.durationDays ? Date.now() + form.durationDays * 86400000 : null;
       const nextPromo: ScheduledNextPromo | null = (showNext && nextForm.productId)
-        ? { type: nextForm.type ?? 'abertura', productId: nextForm.productId!, productName: nextForm.productName!, productImage: nextForm.productImage ?? '', originalPriceYen: nextForm.originalPriceYen ?? 0, promoPriceYen: nextForm.promoPriceYen ?? 0, discountPct: nextForm.discountPct ?? 0, limitPerPerson: nextForm.limitPerPerson ?? 1, durationDays: nextForm.durationDays ?? null }
+        ? { type: nextForm.type ?? 'abertura', productId: nextForm.productId!, productName: nextForm.productName!, productImage: nextForm.productImage ?? '', originalPriceYen: nextForm.originalPriceYen ?? 0, promoPriceYen: nextForm.promoPriceYen ?? 0, discountPct: nextForm.discountPct ?? 0, limitPerPerson: nextForm.limitPerPerson ?? 1, maxProducts: nextForm.maxProducts ?? null, durationDays: nextForm.durationDays ?? null }
         : null;
       const promo: ActivePromo = {
         type: form.type!, productId: form.productId!, productName: form.productName!, productImage: form.productImage ?? '',
         originalPriceYen: form.originalPriceYen ?? 0, promoPriceYen: form.promoPriceYen!, discountPct: form.discountPct ?? 0,
-        limitPerPerson: form.limitPerPerson ?? 1, expiresAt, nextPromo,
+        limitPerPerson: form.limitPerPerson ?? 1, maxProducts: form.maxProducts ?? null,
+        soldCount: active?.productId === form.productId ? (active.soldCount ?? 0) : 0, // mantém contagem se for o mesmo produto
+        expiresAt, nextPromo,
       };
       await setDoc(doc(db, 'siteContent', 'homePromotion'), promo);
       setActive(promo);
@@ -301,7 +309,23 @@ const PromotionManager: React.FC = () => {
                 <span className="font-bold text-green-700">¥{active.promoPriceYen} · R${convertYen(active.promoPriceYen, 'BRL').toFixed(2)}</span>
                 {active.discountPct > 0 && <span className="bg-red-100 text-red-700 text-xs font-bold px-1.5 py-0.5 rounded-full">-{active.discountPct}%</span>}
               </div>
-              <div className="text-xs text-muted-foreground mt-0.5">Limite: {active.limitPerPerson}x/pessoa</div>
+              <div className="text-xs text-muted-foreground mt-0.5 flex items-center gap-3">
+                <span>Limite: {active.limitPerPerson}x/pessoa</span>
+                {active.maxProducts != null && (
+                  <span className={`font-semibold ${(active.soldCount ?? 0) >= active.maxProducts ? 'text-red-600' : 'text-amber-600'}`}>
+                    📦 {active.soldCount ?? 0}/{active.maxProducts} vendidos
+                    {(active.soldCount ?? 0) >= active.maxProducts && ' — ESGOTADO'}
+                  </span>
+                )}
+              </div>
+              {active.maxProducts != null && (active.soldCount ?? 0) < active.maxProducts && (
+                <div className="mt-1">
+                  <div className="h-1.5 bg-secondary rounded-full overflow-hidden w-full max-w-xs">
+                    <div className="h-full bg-amber-500 rounded-full transition-all"
+                      style={{ width: `${Math.min(100, ((active.soldCount ?? 0) / active.maxProducts) * 100)}%` }} />
+                  </div>
+                </div>
+              )}
             </div>
             <div className="flex flex-col gap-1 shrink-0">
               <Button variant="destructive" size="sm" onClick={() => removePromo()} disabled={saving}><Trash2 className="w-4 h-4" /></Button>

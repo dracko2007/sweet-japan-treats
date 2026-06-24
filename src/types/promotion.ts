@@ -18,6 +18,7 @@ export interface ScheduledNextPromo {
   promoPriceYen: number;
   discountPct: number;
   limitPerPerson: number;
+  maxProducts: number | null; // total de unidades disponíveis na promoção (null = ilimitado)
   durationDays: number | null;
 }
 
@@ -30,7 +31,9 @@ export interface ActivePromo {
   promoPriceYen: number;
   discountPct: number;
   limitPerPerson: number;
+  maxProducts: number | null;   // total de unidades disponíveis (null = ilimitado)
+  soldCount: number;            // quantas já foram vendidas nesta promoção
   expiresAt: number | null;
   nextPromo: ScheduledNextPromo | null;
-  limitResetAt?: number; // timestamp — invalida contadores locais anteriores a este valor
+  limitResetAt?: number;
 }
