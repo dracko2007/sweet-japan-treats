@@ -149,9 +149,9 @@ const Header: React.FC = () => {
 
           {/* Cart, Language & Mobile Menu */}
           <div className="flex items-center gap-1.5 sm:gap-3">
-            {/* País (cima) + Idioma (baixo) — idioma sempre visível, país aparece a partir de md */}
+            {/* País + Idioma — lado a lado em uma linha */}
             {!isAdminPage && (
-              <div className="flex flex-col gap-1">
+              <div className="flex flex-row items-center gap-1.5">
                 <div className="hidden md:block">
                   <CountrySwitcher />
                 </div>
