@@ -49,7 +49,7 @@ const CountrySwitcher: React.FC = () => {
       {/* Dropdown Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 px-3 py-1.5 bg-secondary/80 border border-border rounded-full hover:bg-secondary transition-all text-xs font-semibold text-foreground shadow-sm focus:outline-none"
+        className="flex items-center gap-2 px-3 py-1.5 bg-secondary/80 border border-border rounded-full hover:bg-secondary transition-all text-xs font-semibold text-foreground shadow-sm focus:outline-none whitespace-nowrap"
       >
         <FlagIcon code={currentCountry.flagCode} alt={currentCountry.label} size={20} />
         <span>{currentCountry.label}</span>
