@@ -123,9 +123,26 @@
     @apply border-border;
   }
 
-  body {
+  /* Trava a largura ao viewport: impede scroll horizontal e o zoom-out
+     forçado no PWA/mobile (o usuário não precisa mais "dar pinça"). */
+  html, body {
     @apply bg-background text-foreground antialiased;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+    -webkit-text-size-adjust: 100%; /* evita o iOS reescalar o texto */
+  }
+
+  body {
     font-family: 'Inter', sans-serif;
+    /* Respeita as áreas seguras (notch/barra) em telas com viewport-fit=cover */
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+
+  /* Nenhum elemento pode estourar a largura da tela */
+  img, video, canvas, svg, iframe, table {
+    max-width: 100%;
   }
 
   h1, h2, h3, h4, h5, h6 {

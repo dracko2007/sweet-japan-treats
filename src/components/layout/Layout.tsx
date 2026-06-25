@@ -15,10 +15,10 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const isAdminPage = useLocation().pathname.startsWith('/admin');
   useBirthdayBonus(); // concede 1000 pts no aniversário
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col w-full max-w-full overflow-x-hidden">
       <Header />
       {/* pt-20 = header (80px) + pt extra para a barra de confiança (~28px) nas páginas de cliente */}
-      <main className={`flex-1 ${isAdminPage ? 'pt-20' : 'pt-[108px]'}`}>
+      <main className={`flex-1 w-full max-w-full overflow-x-hidden ${isAdminPage ? 'pt-20' : 'pt-[108px]'}`}>
         {children}
       </main>
       <Footer />

@@ -838,7 +838,7 @@ const KimiClawAssistant: React.FC = () => {
 
       {/* CHAT WINDOW CONTAINER */}
       {isOpen && (
-        <div className="w-[360px] sm:w-[390px] h-[550px] max-h-[85vh] rounded-2xl border border-white/20 shadow-elevated bg-white/80 dark:bg-zinc-950/80 backdrop-blur-xl flex flex-col overflow-hidden animate-fade-up">
+        <div className="w-[calc(100vw-2rem)] sm:w-[390px] max-w-[390px] h-[550px] max-h-[85vh] rounded-2xl border border-white/20 shadow-elevated bg-white/80 dark:bg-zinc-950/80 backdrop-blur-xl flex flex-col overflow-hidden animate-fade-up">
           {/* HEADER */}
           <div className="p-4 bg-gradient-to-r from-primary/10 via-accent/5 to-transparent border-b border-border flex items-center justify-between">
             <div className="flex items-center gap-2.5">
