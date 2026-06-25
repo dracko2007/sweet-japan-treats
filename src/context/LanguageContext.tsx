@@ -3,7 +3,7 @@ import { translations, Language } from '@/data/translations';
 import { safeStorage } from '@/utils/storage';
 import { loadFxRates, getRates } from '@/services/fxService';
 
-export type CountryType = 'Brasil' | 'Japão' | 'Portugal' | 'França' | 'Itália' | 'Espanha';
+export type CountryType = 'Brasil' | 'Japão' | 'Portugal' | 'França' | 'Itália' | 'Espanha' | 'Estados Unidos';
 
 interface LanguageContextType {
   language: Language;
@@ -11,7 +11,7 @@ interface LanguageContextType {
   t: (key: string) => string;
   selectedCountry: CountryType;
   setSelectedCountry: (country: CountryType) => void;
-  fxRates: { BRL: number; EUR: number };
+  fxRates: { BRL: number; EUR: number; USD: number };
 }
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
@@ -31,12 +31,13 @@ const JA_COUNTRIES = new Set(['JP']);
 const COUNTRY_MAP: Record<string, CountryType> = {
   BR: 'Brasil', JP: 'Japão', PT: 'Portugal',
   FR: 'França', IT: 'Itália', ES: 'Espanha',
+  US: 'Estados Unidos',
 };
 
 function ipToLanguage(code: string): Language {
   if (PT_COUNTRIES.has(code)) return 'pt';
   if (JA_COUNTRIES.has(code)) return 'ja';
-  return 'en';
+  return 'en'; // EUA e demais → inglês
 }
 
 interface LanguageProviderProps { children: ReactNode; }
@@ -52,7 +53,7 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
     return (stored as CountryType) || 'Brasil';
   });
 
-  // Cotação cambial do dia (¥→R$/€)
+  // Cotação cambial do dia (¥→R$/€/$)
   const [fxRates, setFxRates] = useState(getRates());
   useEffect(() => { loadFxRates().then(setFxRates); }, []);
 

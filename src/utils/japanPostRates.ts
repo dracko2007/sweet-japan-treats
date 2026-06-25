@@ -129,12 +129,13 @@ export const getELightRate = (weightG: number, zone: JapanPostZone): number | nu
 // ── Mapeamento país → zona Japan Post ───────────────────────────────────────
 export const countryToZone = (country: string): JapanPostZone => {
   switch (country) {
-    case 'Brasil':   return 5;
+    case 'Brasil':         return 5;
+    case 'Estados Unidos': return 4;
     case 'Portugal':
     case 'França':
     case 'Itália':
-    case 'Espanha':  return 3;
-    default:         return 5;
+    case 'Espanha':        return 3;
+    default:               return 5;
   }
 };
 

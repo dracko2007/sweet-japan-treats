@@ -8,7 +8,7 @@ import { useCart } from '@/context/CartContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { useUser, Coupon } from '@/context/UserContext';
 import { useNavigate } from 'react-router-dom';
-import { formatPrice } from '@/utils/currency';
+import { formatPrice, getCurrencyByCountry } from '@/utils/currency';
 import { effectiveYen } from '@/utils/pricing';
 import { convertYen as fxConvert } from '@/services/fxService';
 import { POINTS } from '@/services/pointsService';
@@ -139,7 +139,7 @@ const Cart: React.FC = () => {
 
   // Calculations in correct currency
   const isEuro = ['Portugal', 'França', 'Itália', 'Espanha'].includes(selectedCountry);
-  const currency = selectedCountry === 'Japão' ? 'JPY' : (isEuro ? 'EUR' : 'BRL');
+  const currency = getCurrencyByCountry(selectedCountry);
 
   const isPromoItem = (item: (typeof items)[0]) => item.product.id.endsWith('_promo');
 

@@ -15,7 +15,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useToast } from '@/hooks/use-toast';
 import { useLanguage } from '@/context/LanguageContext';
 import { useProducts } from '@/context/ProductsContext';
-import { formatPrice } from '@/utils/currency';
+import { formatPrice, getCurrencyByCountry } from '@/utils/currency';
 import { effectiveYen, roundYen } from '@/utils/pricing';
 import { convertYen as fxConvert, yenFromConverted } from '@/services/fxService';
 import { negotiationService } from '@/services/negotiationService';
@@ -28,7 +28,7 @@ import { firebaseSyncService } from '@/services/firebaseSyncService';
 import { paymentSettingsService } from '@/services/paymentSettingsService';
 import { Wallet } from 'lucide-react';
 import { referralService } from '@/services/referralService';
-import { calcBrazilTax, calcEuVat, EU_VAT_RATES } from '@/utils/taxRules';
+import { calcBrazilTax, calcEuVat, calcUsSalesTax, EU_VAT_RATES, US_SALES_TAX } from '@/utils/taxRules';
 import { cpfGuardService, normalizeCPF } from '@/services/cpfGuardService';
 import { thermalPrintService } from '@/services/thermalPrintService';
 import { db } from '@/config/firebase';
@@ -101,7 +101,8 @@ const OrderReview: React.FC = () => {
 
   const isJapan = formData.country === 'Japão';
   const isEurope = ['Portugal', 'França', 'Itália', 'Espanha'].includes(formData.country);
-  const currency = isJapan ? 'JPY' : (isEurope ? 'EUR' : 'BRL');
+  const isUsa = formData.country === 'Estados Unidos';
+  const currency = getCurrencyByCountry(formData.country);
 
   const convertYen = (yen: number) => fxConvert(yen, currency);
   const convertYenExact = (yen: number) => fxConvert(yen, currency, true);
@@ -142,6 +143,12 @@ const OrderReview: React.FC = () => {
     icmsTax = br.icms;
     estimatedTax = br.total;
     taxLabel = 'Impostos Estimados (Brasil)';
+  } else if (isUsa) {
+    estimatedTax = calcUsSalesTax(priceAfterPix, formData.prefecture);
+    const stRate = US_SALES_TAX[(formData.prefecture || '').toUpperCase()];
+    taxLabel = stRate != null
+      ? `Sales Tax Est. (${formData.prefecture} ${(stRate * 100).toFixed(1)}%)`
+      : 'Sales Tax Estimado (US)';
   } else if (isEurope) {
     const rate = EU_VAT_RATES[formData.country] ?? 0.20;
     estimatedTax = calcEuVat(priceAfterPix, formData.country);

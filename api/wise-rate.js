@@ -1,7 +1,7 @@
 // Proxy serverless para taxa de câmbio da Wise em tempo real.
 // Tenta primeiro o endpoint público da Wise (sem auth).
 // Se WISE_API_TOKEN estiver configurado no Vercel, usa autenticado como fallback.
-// Retorna: { JPY_BRL: number, JPY_EUR: number, source: 'wise', ts: number }
+// Retorna: { JPY_BRL: number, JPY_EUR: number, JPY_USD: number, source: 'wise', ts: number }
 
 const WISE_API = 'https://api.wise.com/v1/rates';
 const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutos
@@ -34,12 +34,13 @@ export default async function handler(req, res) {
   const token = process.env.WISE_API_TOKEN || null; // opcional
 
   try {
-    const [brl, eur] = await Promise.all([
+    const [brl, eur, usd] = await Promise.all([
       fetchWiseRate('JPY', 'BRL', token),
       fetchWiseRate('JPY', 'EUR', token),
+      fetchWiseRate('JPY', 'USD', token),
     ]);
 
-    _cache = { JPY_BRL: brl, JPY_EUR: eur, source: 'wise', ts: Date.now() };
+    _cache = { JPY_BRL: brl, JPY_EUR: eur, JPY_USD: usd, source: 'wise', ts: Date.now() };
     return res.json(_cache);
   } catch (err) {
     console.error('[wise-rate] Error:', err.message);

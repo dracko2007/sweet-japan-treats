@@ -6,7 +6,7 @@ import { useProducts } from '@/context/ProductsContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { getTranslatedProductDesc } from '@/data/translations';
 import { i18nDesc } from '@/utils/productI18n';
-import { formatPrice } from '@/utils/currency';
+import { formatPrice, getCurrencyByCountry } from '@/utils/currency';
 import { effectiveYen, baseYen, hasDiscount } from '@/utils/pricing';
 import { convertYen as fxConvert } from '@/services/fxService';
 import { cn } from '@/lib/utils';
@@ -18,7 +18,7 @@ const FeaturedProducts: React.FC = () => {
   const featuredProducts = products.filter(p => !p.hidden).slice(0, 4);
 
   const isEuro = ['Portugal', 'França', 'Itália', 'Espanha'].includes(selectedCountry);
-  const currency = selectedCountry === 'Japão' ? 'JPY' : isEuro ? 'EUR' : 'BRL';
+  const currency = getCurrencyByCountry(selectedCountry);
   const getDisplayPrice = (val: number) => fxConvert(val, currency);
 
   return (

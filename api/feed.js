@@ -5,6 +5,7 @@
 // Uso:
 //   /api/feed              → XML Google Merchant, destino Brasil (BRL+¥)
 //   /api/feed?region=eu    → XML Google Merchant, destino Europa (EUR+¥)
+//   /api/feed?region=us    → XML Google Merchant, destino EUA (USD+¥)
 //   /api/feed?format=json  → JSON com os mesmos dados
 //
 // Produtos são públicos no Firestore (allow read: if true) — lê via REST sem auth.
@@ -13,26 +14,35 @@ const FIREBASE_PROJECT_ID = process.env.FIREBASE_PROJECT_ID || '';
 const SITE_URL = 'https://www.japanexpress-store.com';
 
 // Taxa fixa de fallback (mesma base do fxService) — feed precisa ser determinístico.
-// ¥→BRL ≈ 1/28, ¥→EUR ≈ 0.16/28. Cushion de 6% para cobrir variação cambial.
+// ¥→BRL ≈ 1/28, ¥→EUR ≈ 0.16/28, ¥→USD ≈ 1/150. Cushion de 6% para variação cambial.
 const FX = {
   BRL: { rate: 1 / 28, cushion: 0.06, symbol: 'BRL' },
   EUR: { rate: 0.16 / 28, cushion: 0.06, symbol: 'EUR' },
+  USD: { rate: 1 / 150, cushion: 0.06, symbol: 'USD' },
 };
 const BUFFER_YEN = 5;
 
+// region: 'br' | 'eu' | 'us'
+function fxForRegion(region) {
+  if (region === 'eu') return FX.EUR;
+  if (region === 'us') return FX.USD;
+  return FX.BRL;
+}
 function convertYen(yen, region) {
-  const fx = region === 'eu' ? FX.EUR : FX.BRL;
+  const fx = fxForRegion(region);
   return Math.round((yen + BUFFER_YEN) * fx.rate * (1 + fx.cushion) * 100) / 100;
 }
 
 // ── Tabelas Japan Post (mesmos dados de src/utils/japanPostRates.ts) ─────────
-// Zona 3 = Europa, Zona 5 = Brasil
+// Zona 3 = Europa, Zona 4 = EUA, Zona 5 = Brasil
 const E_LIGHT = {
   3: [880,1060,1240,1420,1600,1780,1960,2140,2320,2500,2680,2860,3040,3220,3400,3580,3760,3940,4120,4300],
+  4: [1200,1410,1620,1830,2040,2250,2460,2670,2880,3090,3300,3510,3720,3930,4140,4350,4560,4770,4980,5190],
   5: [920,1180,1440,1700,1960,2220,2480,2740,3000,3260,3520,3780,4040,4300,4560,4820,5080,5340,5600,5860],
 };
 const AIR_PARCEL = {
   3: [3850,6000,8150,10300,12450,14600,16750,18900,21050,23200,24800,26400,28000,29600,31200,32800,34400,36000,37600,39200,40800,42400,44000,45600,47200,48800,50400,52000,53600,55200],
+  4: [4200,6700,9200,11700,14200,16700,19200,21700,24200,26700,28700,30700,32700,34700,36700,38700,40700,42700,44700,46700,48700,50700,52700,54700,56700,58700,60700,62700,64700,66700],
   5: [4550,7250,9950,12650,15350,18050,20750,23450,26150,28850,30650,32450,34250,36050,37850,39650,41450,43250,45050,46850,48650,50450,52250,54050,55850,57650,59450,61250,63050,64850],
 };
 
@@ -118,8 +128,8 @@ function escapeXml(s) {
 
 // ── Monta os itens do catálogo ───────────────────────────────────────────────
 function buildCatalog(products, region) {
-  const zone = region === 'eu' ? 3 : 5;
-  const currency = region === 'eu' ? 'EUR' : 'BRL';
+  const zone = region === 'eu' ? 3 : region === 'us' ? 4 : 5;
+  const currency = region === 'eu' ? 'EUR' : region === 'us' ? 'USD' : 'BRL';
 
   return products
     .filter(p => {
@@ -173,8 +183,10 @@ function buildCatalog(products, region) {
 // google_product_category 469 = Health & Beauty; identifier_exists=no porque
 // produtos importados não têm GTIN/MPN cadastrado.
 function toXml(items, region) {
-  const title = region === 'eu' ? 'Japan Express — Catálogo (Europa)' : 'Japan Express — Catálogo (Brasil)';
-  const country = region === 'eu' ? 'PT' : 'BR';
+  const title = region === 'eu' ? 'Japan Express — Catálogo (Europa)'
+    : region === 'us' ? 'Japan Express — Catalog (USA)'
+    : 'Japan Express — Catálogo (Brasil)';
+  const country = region === 'eu' ? 'PT' : region === 'us' ? 'US' : 'BR';
   const entries = items.map(it => `
     <item>
       <g:id>${escapeXml(it.id)}</g:id>
@@ -215,7 +227,7 @@ export default async function handler(req, res) {
     return;
   }
 
-  const region = req.query.region === 'eu' ? 'eu' : 'br';
+  const region = ['eu', 'us'].includes(req.query.region) ? req.query.region : 'br';
   const format = req.query.format === 'json' ? 'json' : 'xml';
 
   try {

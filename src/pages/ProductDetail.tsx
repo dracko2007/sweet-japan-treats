@@ -16,7 +16,7 @@ import { cn } from '@/lib/utils';
 import { useLanguage } from '@/context/LanguageContext';
 import { getTranslatedProductDesc, getTranslatedProductFlavor } from '@/data/translations';
 import { i18nDesc } from '@/utils/productI18n';
-import { formatPrice } from '@/utils/currency';
+import { formatPrice, getCurrencyByCountry } from '@/utils/currency';
 import { effectiveYen, baseYen, hasDiscount, getVariants } from '@/utils/pricing';
 import { convertYen as fxConvert } from '@/services/fxService';
 import { productEnglishName } from '@/utils/productName';
@@ -78,7 +78,7 @@ const ProductDetail: React.FC = () => {
   const translatedFlavor = getTranslatedProductFlavor(product.id, t);
 
   const isEuro = ['Portugal', 'França', 'Itália', 'Espanha'].includes(selectedCountry);
-  const currency = selectedCountry === 'Japão' ? 'JPY' : (isEuro ? 'EUR' : 'BRL');
+  const currency = getCurrencyByCountry(selectedCountry);
   
   const convertYen = (yen: number) => fxConvert(yen, currency);
   const getDisplayPrice = (size: string) => convertYen(effectiveYen(product, size));

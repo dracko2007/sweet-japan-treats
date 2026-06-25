@@ -9,7 +9,7 @@ import { wishlistService, WishlistItem } from '@/services/wishlistService';
 import { useProducts } from '@/context/ProductsContext';
 import { useToast } from '@/hooks/use-toast';
 import { useLanguage } from '@/context/LanguageContext';
-import { formatPrice } from '@/utils/currency';
+import { formatPrice, getCurrencyByCountry } from '@/utils/currency';
 import { convertYen as fxConvert } from '@/services/fxService';
 import { productEnglishName } from '@/utils/productName';
 
@@ -158,8 +158,7 @@ const Wishlist: React.FC = () => {
                             </h3>
                             <p className="text-primary font-bold text-xl mb-2">
                               {(() => {
-                                const isEuro = ['Portugal', 'França', 'Itália', 'Espanha'].includes(selectedCountry);
-                                const cur = selectedCountry === 'Japão' ? 'JPY' : (isEuro ? 'EUR' : 'BRL');
+                                const cur = getCurrencyByCountry(selectedCountry);
                                 return formatPrice(fxConvert(item.productPrice, cur), cur);
                               })()}
                             </p>

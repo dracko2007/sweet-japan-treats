@@ -20,6 +20,7 @@ const CountrySwitcher: React.FC = () => {
     { code: 'França', flagCode: 'fr', label: 'França', details: 'Japan Express (Aéreo)' },
     { code: 'Itália', flagCode: 'it', label: 'Itália', details: 'Japan Express (Aéreo)' },
     { code: 'Espanha', flagCode: 'es', label: 'Espanha', details: 'Japan Express (Aéreo)' },
+    { code: 'Estados Unidos', flagCode: 'us', label: 'Estados Unidos', details: 'Japan Express (Aéreo)' },
   ];
 
   // Close dropdown on click outside

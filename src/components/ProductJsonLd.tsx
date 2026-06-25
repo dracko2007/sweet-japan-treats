@@ -21,8 +21,9 @@ const ProductJsonLd: React.FC<Props> = ({ product, country, rating }) => {
   useEffect(() => {
     const isEuro = ['Portugal', 'França', 'Itália', 'Espanha'].includes(country);
     const isJapan = country === 'Japão';
-    const currency = isJapan ? 'JPY' : isEuro ? 'EUR' : 'BRL';
-    const shippingCountry = isEuro ? 'PT' : isJapan ? 'JP' : 'BR';
+    const isUsa = country === 'Estados Unidos';
+    const currency = isJapan ? 'JPY' : isUsa ? 'USD' : isEuro ? 'EUR' : 'BRL';
+    const shippingCountry = isEuro ? 'PT' : isUsa ? 'US' : isJapan ? 'JP' : 'BR';
 
     const priceYen = minEffectiveYen(product);
     const shipYen = isJapan ? 0 : catalogShippingYen(product, country);

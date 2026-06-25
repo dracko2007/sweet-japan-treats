@@ -14,18 +14,19 @@ import CouponSelector, { computeCouponDiscount } from '@/components/checkout/Cou
 import { prefectures } from '@/data/prefectures';
 import { japanPrefectures } from '@/data/japanPrefectures';
 import { europePrefectures } from '@/data/europePrefectures';
+import { usStates } from '@/data/usStates';
 import { Coupon } from '@/context/UserContext';
 import { useToast } from '@/hooks/use-toast';
 import { usePostalCodeLookup } from '@/hooks/usePostalCodeLookup';
 import { useLanguage, CountryType } from '@/context/LanguageContext';
-import { formatPrice } from '@/utils/currency';
+import { formatPrice, getCurrencyByCountry } from '@/utils/currency';
 import { effectiveYen } from '@/utils/pricing';
 import { convertYen as fxConvert, getRates } from '@/services/fxService';
 import { POINTS } from '@/services/pointsService';
 import { safeStorage } from '@/utils/storage';
 import { productEnglishName } from '@/utils/productName';
 import { isValidEmail, isValidCPF, isValidPhone, isNonEmpty, maskPhone, runValidations, FieldErrors } from '@/utils/validation';
-import { calcBrazilTax, calcEuVat, EU_VAT_RATES } from '@/utils/taxRules';
+import { calcBrazilTax, calcEuVat, calcUsSalesTax, EU_VAT_RATES, US_SALES_TAX } from '@/utils/taxRules';
 
 const isDev = import.meta.env.DEV;
 const devLog = isDev ? console.log.bind(console) : () => {};
@@ -57,7 +58,8 @@ const Checkout: React.FC = () => {
 
   // Calculate base total price dynamically in correct currency
   const isEuro = ['Portugal', 'França', 'Itália', 'Espanha'].includes(formData.country);
-  const currency = formData.country === 'Japão' ? 'JPY' : (isEuro ? 'EUR' : 'BRL');
+  const isUsa = formData.country === 'Estados Unidos';
+  const currency = getCurrencyByCountry(formData.country);
 
   const baseTotalPrice = items.reduce(
     (sum, item) => item.freeGift ? sum : sum + fxConvert(effectiveYen(item.product, item.size), currency) * item.quantity, 0
@@ -87,9 +89,9 @@ const Checkout: React.FC = () => {
   const canRedeem = availablePoints >= POINTS.minRedeem;
   const [pointsToUse, setPointsToUse] = useState(0);
   const productSubtotalYen = items.reduce((s, i) => i.freeGift ? s : s + effectiveYen(i.product, i.size) * i.quantity, 0);
-  const convertYen = (yen: number) => fxConvert(yen, formData.country === 'Japão' ? 'JPY' : isEuro ? 'EUR' : 'BRL');
+  const convertYen = (yen: number) => fxConvert(yen, currency);
   // Sem buffer para taxas fixas em ¥ (ex.: taxa PS): evita exibir ¥2.050 em vez de ¥2.000
-  const convertYenExact = (yen: number) => fxConvert(yen, formData.country === 'Japão' ? 'JPY' : isEuro ? 'EUR' : 'BRL', true);
+  const convertYenExact = (yen: number) => fxConvert(yen, currency, true);
   const maxRedeemable = canRedeem ? Math.min(availablePoints, Math.floor(productSubtotalYen / POINTS.yenPerPoint)) : 0;
   const redeemPoints = Math.max(0, Math.min(pointsToUse, maxRedeemable));
   const pointsDiscount = convertYen(redeemPoints * POINTS.yenPerPoint);
@@ -333,14 +335,14 @@ const Checkout: React.FC = () => {
           }
         }
       }
-    } else if (['Portugal', 'França', 'Itália', 'Espanha'].includes(currentCountry)) {
+    } else if (['Portugal', 'França', 'Itália', 'Espanha', 'Estados Unidos'].includes(currentCountry)) {
       // Formata e busca via zippopotam.us (gratuito, sem key)
       const countryCode: Record<string, string> = {
-        'Portugal': 'PT', 'França': 'FR', 'Itália': 'IT', 'Espanha': 'ES',
+        'Portugal': 'PT', 'França': 'FR', 'Itália': 'IT', 'Espanha': 'ES', 'Estados Unidos': 'US',
       };
       const cc = countryCode[currentCountry];
 
-      // Formatação automática: Portugal XXXX-XXX, demais XXXXX
+      // Formatação automática: Portugal XXXX-XXX, demais XXXXX (incl. ZIP dos EUA)
       let formatted = val;
       if (currentCountry === 'Portugal') {
         const digits = val.replace(/\D/g, '').slice(0, 7);
@@ -366,10 +368,14 @@ const Checkout: React.FC = () => {
             const data = await res.json();
             const place = data.places?.[0];
             if (place) {
+              // Nos EUA, guardamos a SIGLA do estado (state abbreviation) p/ calcular sales tax
+              const stateValue = currentCountry === 'Estados Unidos'
+                ? (place['state abbreviation'] || place['state'] || '')
+                : (place['state'] || '');
               setFormData(prev => ({
                 ...prev,
                 city: place['place name'] || '',
-                prefecture: place['state'] || '',
+                prefecture: stateValue,
               }));
               toast({
                 title: 'Código Postal Encontrado!',
@@ -384,7 +390,7 @@ const Checkout: React.FC = () => {
         } catch (error) {
           clearTimeout(timeoutId);
           if (error instanceof Error && error.name !== 'AbortError') {
-            devError('Erro ao buscar código postal europeu:', error);
+            devError('Erro ao buscar código postal:', error);
           }
         }
       }
@@ -431,7 +437,7 @@ const Checkout: React.FC = () => {
       const autoApprove = negModalType === 'ps_fee' && requestedYen <= 300 * totalQty;
       // Freeze the exchange rate at this exact moment so approved ¥ → R$ never drifts
       const rates = getRates();
-      const frozenRate = currency === 'EUR' ? rates.EUR : currency === 'JPY' ? 1 : rates.BRL;
+      const frozenRate = currency === 'EUR' ? rates.EUR : currency === 'USD' ? rates.USD : currency === 'JPY' ? 1 : rates.BRL;
 
       const neg = await negotiationService.create({
         userId: user.id || user.email || '',
@@ -582,6 +588,12 @@ const Checkout: React.FC = () => {
   if (formData.country === 'Brasil') {
     estimatedTax = calcBrazilTax(subtotalWithCoupon).total;
     taxLabel = 'Impostos Estimados (Brasil)';
+  } else if (formData.country === 'Estados Unidos') {
+    estimatedTax = calcUsSalesTax(subtotalWithCoupon, formData.prefecture);
+    const stRate = US_SALES_TAX[(formData.prefecture || '').toUpperCase()];
+    taxLabel = stRate != null
+      ? `Sales Tax Est. (${formData.prefecture} ${(stRate * 100).toFixed(1)}%)`
+      : 'Sales Tax Estimado (US)';
   } else if (isEuro) {
     const rate = EU_VAT_RATES[formData.country] ?? 0.20;
     estimatedTax = calcEuVat(subtotalWithCoupon, formData.country);
@@ -862,13 +874,13 @@ const Checkout: React.FC = () => {
 
                       <div className="space-y-2">
                         <Label htmlFor="postalCode" className="font-semibold">
-                          {formData.country === 'Japão' ? 'Código Postal (ZIP) *' : ['Portugal', 'França', 'Itália', 'Espanha'].includes(formData.country) ? 'Código Postal *' : 'CEP *'}
+                          {formData.country === 'Japão' ? 'Código Postal (ZIP) *' : formData.country === 'Estados Unidos' ? 'ZIP Code *' : ['Portugal', 'França', 'Itália', 'Espanha'].includes(formData.country) ? 'Código Postal *' : 'CEP *'}
                         </Label>
                         <Input
                           id="postalCode"
                           name="postalCode"
                           type="text"
-                          placeholder={formData.country === 'Japão' ? '123-4567' : formData.country === 'Portugal' ? '0000-000' : ['França', 'Itália', 'Espanha'].includes(formData.country) ? '00000' : '00000-000'}
+                          placeholder={formData.country === 'Japão' ? '123-4567' : formData.country === 'Portugal' ? '0000-000' : ['França', 'Itália', 'Espanha', 'Estados Unidos'].includes(formData.country) ? '00000' : '00000-000'}
                           value={formData.postalCode}
                           onChange={handlePostalCodeChange}
                           required
@@ -878,6 +890,8 @@ const Checkout: React.FC = () => {
                             ? 'Preenche o endereço japonês automaticamente (7 dígitos).'
                             : formData.country === 'Portugal'
                             ? 'Formato XXXX-XXX (ex: 2910-112) — preenche cidade automaticamente.'
+                            : formData.country === 'Estados Unidos'
+                            ? 'Enter ZIP code (5 digits) — city and state auto-filled.'
                             : ['França', 'Itália', 'Espanha'].includes(formData.country)
                             ? 'Formato XXXXX (5 dígitos) — preenche cidade automaticamente.'
                             : 'Preenche o endereço brasileiro automaticamente (8 dígitos).'}
@@ -888,7 +902,7 @@ const Checkout: React.FC = () => {
                     <div className="grid md:grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="prefecture" className="font-semibold">
-                          {formData.country === 'Japão' ? 'Província *' : ['Portugal', 'França', 'Itália', 'Espanha'].includes(formData.country) ? 'Região / Distrito *' : 'Estado (UF) *'}
+                          {formData.country === 'Japão' ? 'Província *' : formData.country === 'Estados Unidos' ? 'State *' : ['Portugal', 'França', 'Itália', 'Espanha'].includes(formData.country) ? 'Região / Distrito *' : 'Estado (UF) *'}
                         </Label>
                         <select
                           id="prefecture"
@@ -899,14 +913,18 @@ const Checkout: React.FC = () => {
                           className="w-full p-2.5 rounded-lg border border-border bg-background text-foreground focus:ring-2 focus:ring-primary focus:border-primary transition-all font-medium text-sm"
                         >
                           <option value="">
-                            {formData.country === 'Japão' 
-                              ? 'Escolha a Província...' 
-                              : ['Portugal', 'França', 'Itália', 'Espanha'].includes(formData.country) 
-                              ? 'Escolha a Região/Distrito...' 
+                            {formData.country === 'Japão'
+                              ? 'Escolha a Província...'
+                              : formData.country === 'Estados Unidos'
+                              ? 'Select your State...'
+                              : ['Portugal', 'França', 'Itália', 'Espanha'].includes(formData.country)
+                              ? 'Escolha a Região/Distrito...'
                               : 'Escolha seu Estado...'}
                           </option>
-                          {(formData.country === 'Japão' 
-                            ? japanPrefectures 
+                          {(formData.country === 'Japão'
+                            ? japanPrefectures
+                            : formData.country === 'Estados Unidos'
+                            ? usStates
                             : ['Portugal', 'França', 'Itália', 'Espanha'].includes(formData.country)
                             ? europePrefectures[formData.country] || []
                             : prefectures

@@ -5,7 +5,7 @@ import { CartItem as CartItemType } from '@/types';
 import { useCart } from '@/context/CartContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { getTranslatedProductFlavor } from '@/data/translations';
-import { formatPrice } from '@/utils/currency';
+import { formatPrice, getCurrencyByCountry } from '@/utils/currency';
 import { effectiveYen } from '@/utils/pricing';
 import { convertYen as fxConvert } from '@/services/fxService';
 import { productEnglishName } from '@/utils/productName';
@@ -27,7 +27,7 @@ const CartItemComponent: React.FC<CartItemProps> = ({ item, couponDiscount = 0 }
 
   // Determine display price and currency
   const isEuro = ['Portugal', 'França', 'Itália', 'Espanha'].includes(selectedCountry);
-  const currency = selectedCountry === 'Japão' ? 'JPY' : (isEuro ? 'EUR' : 'BRL');
+  const currency = getCurrencyByCountry(selectedCountry);
   const unitPrice = fxConvert(basePrice, currency);
 
   const finalPrice = unitPrice * item.quantity;

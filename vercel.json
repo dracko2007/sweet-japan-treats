@@ -26,6 +26,7 @@
     { "source": "/feed.xml", "destination": "/api/feed?region=br&format=xml" },
     { "source": "/feed-br.xml", "destination": "/api/feed?region=br&format=xml" },
     { "source": "/feed-eu.xml", "destination": "/api/feed?region=eu&format=xml" },
+    { "source": "/feed-us.xml", "destination": "/api/feed?region=us&format=xml" },
     { "source": "/feed.json", "destination": "/api/feed?region=br&format=json" },
     {
       "source": "/((?!api/).*)",
