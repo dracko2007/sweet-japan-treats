@@ -13,7 +13,7 @@ const CookieBanner: React.FC = () => {
     <div
       role="dialog"
       aria-label="Aviso de cookies"
-      className="fixed bottom-0 left-0 right-0 z-[9999] p-4 sm:p-6 animate-in slide-in-from-bottom duration-300"
+      className="fixed bottom-0 left-0 right-0 z-50 p-4 pb-20 sm:p-6 sm:pb-6 animate-in slide-in-from-bottom duration-300"
     >
       <div className="max-w-3xl mx-auto bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden">
         <div className="h-1 bg-gradient-to-r from-orange-400 to-pink-400" />
