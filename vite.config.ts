@@ -16,6 +16,7 @@ export default defineConfig(({ mode }) => ({
     mode === "development" && componentTagger(),
     VitePWA({
       registerType: "autoUpdate",
+      injectRegister: null, // registro feito manualmente em main.tsx (controle do reload)
       workbox: {
         skipWaiting: true,
         clientsClaim: true,
