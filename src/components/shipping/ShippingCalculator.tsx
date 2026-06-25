@@ -393,8 +393,8 @@ const ShippingCalculator: React.FC<ShippingCalculatorProps> = ({
                     : "border-border"
                 )}
               >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
                     {onShippingSelect && !isConsultar && (
                       <div className={cn(
                         "w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all shrink-0",
@@ -403,9 +403,9 @@ const ShippingCalculator: React.FC<ShippingCalculatorProps> = ({
                         {selectedCarrier === option.carrier && <div className="w-2 h-2 rounded-full bg-white" />}
                       </div>
                     )}
-                    <span className="text-2xl">{option.logo}</span>
-                    <div>
-                      <p className="font-bold text-sm text-foreground">{option.name}</p>
+                    <span className="text-2xl shrink-0">{option.logo}</span>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-bold text-sm text-foreground break-words">{option.name}</p>
                       <p className="text-xs text-muted-foreground">
                         {option.costYen ? `¥${option.costYen.toLocaleString()} · ` : ''}
                         {isConsultar ? t('calc.variableDeadline') : t('calc.deliveryDays').replace('{days}', option.estimatedDays)}

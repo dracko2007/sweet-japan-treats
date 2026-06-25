@@ -333,10 +333,10 @@ const Shipping: React.FC = () => {
             </div>
           </div>
 
-          <div className="grid lg:grid-cols-5 gap-8 items-start">
-            
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 items-start min-w-0">
+
             {/* Left Column: Interactive Shipping Calculator & Advanced Simulator */}
-            <div className="lg:col-span-3 space-y-8">
+            <div className="lg:col-span-3 space-y-8 min-w-0">
               
               {/* Box Shipping Calculator */}
               <ShippingCalculator destinationCountry={country} />
@@ -554,8 +554,8 @@ const Shipping: React.FC = () => {
             </div>
 
             {/* Right Column: Dynamic Rates & Taxes */}
-            <div className="lg:col-span-2 space-y-6">
-              
+            <div className="lg:col-span-2 space-y-6 min-w-0">
+
               {/* Dynamic Impostos (Taxes) Card */}
               <div className="p-6 rounded-2xl bg-primary/5 border border-primary/20 space-y-4">
                 <h3 className="font-display text-lg font-bold text-foreground flex items-center gap-2 border-b border-primary/10 pb-3">
