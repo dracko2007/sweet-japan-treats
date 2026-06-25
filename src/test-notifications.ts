@@ -36,7 +36,7 @@ async function testEmail() {
       </head>
       <body style="font-family: Arial, sans-serif; padding: 20px;">
         <h1 style="color: #22c55e;">🧪 Test Email</h1>
-        <p>This is a test email from Sabor do Campo!</p>
+        <p>This is a test email from Japan Express!</p>
         <p>If you received this, your email configuration is working correctly! ✅</p>
         <p>Time: ${new Date().toLocaleString('pt-BR')}</p>
       </body>
@@ -46,7 +46,7 @@ async function testEmail() {
   try {
     const result = await emailService.sendOrderConfirmation({
       to: TEST_EMAIL,
-      subject: '🧪 Test Email - Sabor do Campo',
+      subject: '🧪 Test Email - Japan Express',
       html: testEmailHTML,
       orderNumber: 'TEST-001',
       customerName: 'Test Customer'
@@ -70,7 +70,7 @@ async function testWhatsApp() {
   const testMessage = `
 🧪 *Test Message*
 
-This is a test message from Sabor do Campo!
+This is a test message from Japan Express!
 
 If you received this, your WhatsApp configuration is working correctly! ✅
 

@@ -133,12 +133,14 @@ function buildCatalog(products, region) {
       const productYen = minEffectiveYen(p);
       if (!productYen) return null;
 
-      // Imagem: Google Merchant prefere JPG/PNG, não WebP. Converte URL Cloudinary.
-      let image = p.image || p.thumbnail || (p.gallery && p.gallery[0]) || '';
+      // Imagem: só URLs http(s) válidas. Google rejeita base64/data-URI e WebP.
+      // Procura a primeira imagem que seja URL http (ignora base64 salvo no Firestore).
+      const candidates = [p.image, p.thumbnail, ...(p.gallery || [])].filter(Boolean);
+      let image = candidates.find(u => typeof u === 'string' && /^https?:\/\//.test(u)) || '';
       if (image.includes('res.cloudinary.com')) {
         image = image.replace(/\/upload\/[^/]*\//, '/upload/f_jpg,q_auto/');
       }
-      if (!image) return null; // Google rejeita produto sem imagem
+      if (!image) return null; // sem URL http válida → fora do feed
 
       const weightG = productWeightG(p);
       const shipYen = cheapestShippingYen(weightG, zone) || 0;

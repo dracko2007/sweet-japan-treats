@@ -256,7 +256,7 @@ const Admin: React.FC = () => {
             </head>
             <body style="font-family: Arial, sans-serif; padding: 20px;">
               <h1 style="color: #22c55e;">🧪 Test Email (Resend)</h1>
-              <p>This is a test email from Sabor do Campo!</p>
+              <p>This is a test email from Japan Express!</p>
               <p>If you received this, your email configuration is working correctly! ✅</p>
               <p>Time: ${new Date().toLocaleString('pt-BR')}</p>
             </body>
@@ -265,7 +265,7 @@ const Admin: React.FC = () => {
         
         emailResult = await emailService.sendOrderConfirmation({
           to: ADMIN_EMAIL,
-          subject: '🧪 Test Email (Resend) - Sabor do Campo',
+          subject: '🧪 Test Email (Resend) - Japan Express',
           html: testEmailHTML,
           orderNumber: 'TEST-' + Date.now(),
           customerName: 'Test User'
@@ -301,7 +301,7 @@ const Admin: React.FC = () => {
       const testMessage = `
 🧪 *Test Message*
 
-This is a test message from Sabor do Campo!
+This is a test message from Japan Express!
 
 If you received this, your WhatsApp configuration is working correctly! ✅
 
