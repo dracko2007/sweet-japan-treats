@@ -132,16 +132,24 @@ function buildCatalog(products, region) {
     .map(p => {
       const productYen = minEffectiveYen(p);
       if (!productYen) return null;
+
+      // Imagem: Google Merchant prefere JPG/PNG, não WebP. Converte URL Cloudinary.
+      let image = p.image || p.thumbnail || (p.gallery && p.gallery[0]) || '';
+      if (image.includes('res.cloudinary.com')) {
+        image = image.replace(/\/upload\/[^/]*\//, '/upload/f_jpg,q_auto/');
+      }
+      if (!image) return null; // Google rejeita produto sem imagem
+
       const weightG = productWeightG(p);
       const shipYen = cheapestShippingYen(weightG, zone) || 0;
       const totalYen = productYen + shipYen;
 
       return {
         id: p.id,
-        title: p.name,
+        title: p.name.slice(0, 150),
         description: (p.description || p.name).slice(0, 5000),
         link: `${SITE_URL}/produto/${p.id}`,
-        image: p.image || p.thumbnail || (p.gallery && p.gallery[0]) || '',
+        image,
         availability: (p.stock && !p.stock.unlimited && p.stock.quantity === 0) ? 'out_of_stock' : 'in_stock',
         condition: 'new',
         brand: 'Japan Express',
@@ -159,27 +167,32 @@ function buildCatalog(products, region) {
 }
 
 // ── Saída XML (Google Merchant RSS 2.0 + namespace g:) ───────────────────────
+// title/description/link usam RSS padrão; campos próprios do Google usam g:
+// google_product_category 469 = Health & Beauty; identifier_exists=no porque
+// produtos importados não têm GTIN/MPN cadastrado.
 function toXml(items, region) {
   const title = region === 'eu' ? 'Japan Express — Catálogo (Europa)' : 'Japan Express — Catálogo (Brasil)';
+  const country = region === 'eu' ? 'PT' : 'BR';
   const entries = items.map(it => `
     <item>
       <g:id>${escapeXml(it.id)}</g:id>
-      <g:title>${escapeXml(it.title)}</g:title>
-      <g:description>${escapeXml(it.description)}</g:description>
-      <g:link>${escapeXml(it.link)}</g:link>
+      <title>${escapeXml(it.title)}</title>
+      <description>${escapeXml(it.description)}</description>
+      <link>${escapeXml(it.link)}</link>
       <g:image_link>${escapeXml(it.image)}</g:image_link>
       <g:availability>${it.availability}</g:availability>
-      <g:condition>${it.condition}</g:condition>
-      <g:brand>${escapeXml(it.brand)}</g:brand>
+      <g:condition>new</g:condition>
       <g:price>${it.priceLocal.toFixed(2)} ${it.currency}</g:price>
+      <g:brand>${escapeXml(it.brand)}</g:brand>
+      <g:identifier_exists>no</g:identifier_exists>
+      <g:google_product_category>469</g:google_product_category>
       <g:shipping>
-        <g:country>${region === 'eu' ? 'PT' : 'BR'}</g:country>
+        <g:country>${country}</g:country>
         <g:service>Japan Post</g:service>
         <g:price>${it.shippingLocal.toFixed(2)} ${it.currency}</g:price>
       </g:shipping>
-      <g:shipping_weight>${it.weightG} g</g:shipping_weight>
-      <g:custom_label_0>Total c/ frete: ${it.totalLocal.toFixed(2)} ${it.currency}</g:custom_label_0>
-      <g:custom_label_1>¥${it.priceYen.toLocaleString('ja-JP')} + frete ¥${it.shippingYen.toLocaleString('ja-JP')}</g:custom_label_1>
+      <g:shipping_weight>${(it.weightG / 1000).toFixed(2)} kg</g:shipping_weight>
+      <g:custom_label_0>${it.totalLocal.toFixed(2)} ${it.currency}</g:custom_label_0>
     </item>`).join('');
 
   return `<?xml version="1.0" encoding="UTF-8"?>
