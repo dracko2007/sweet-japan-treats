@@ -699,9 +699,9 @@ const Checkout: React.FC = () => {
 
       <section className="py-12 bg-background">
         <div className="container mx-auto px-4">
-          <div className="grid lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 max-w-6xl mx-auto min-w-0">
             {/* Checkout Form */}
-            <div className="lg:col-span-2">
+            <div className="lg:col-span-2 min-w-0">
               <div className="bg-card rounded-2xl border border-border p-6 lg:p-8">
                 <div className="flex items-center gap-3 mb-6">
                   <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
@@ -1054,8 +1054,8 @@ const Checkout: React.FC = () => {
             </div>
 
             {/* Order Summary Sidebar */}
-            <div className="lg:col-span-1">
-              <div className="sticky top-24 bg-card rounded-2xl border border-border p-6 space-y-6 shadow-sm">
+            <div className="lg:col-span-1 min-w-0">
+              <div className="sticky top-24 bg-card rounded-2xl border border-border p-6 space-y-6 shadow-sm min-w-0">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
                     <Package className="w-5 h-5 text-primary" />
@@ -1142,9 +1142,9 @@ const Checkout: React.FC = () => {
 
                   {/* Calculations breakdown */}
                   <div className="space-y-2 pt-2 text-xs">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Subtotal dos itens</span>
-                      <span className="font-semibold text-gray-800">{formatPrice(baseTotalPrice, currency)}</span>
+                    <div className="flex justify-between gap-2">
+                      <span className="text-muted-foreground min-w-0 truncate">Subtotal dos itens</span>
+                      <span className="font-semibold text-gray-800 shrink-0 whitespace-nowrap">{formatPrice(baseTotalPrice, currency)}</span>
                     </div>
 
                     {appliedCoupon && couponDiscount > 0 && (
