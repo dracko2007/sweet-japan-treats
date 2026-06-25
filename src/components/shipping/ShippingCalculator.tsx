@@ -405,8 +405,8 @@ const ShippingCalculator: React.FC<ShippingCalculatorProps> = ({
                     )}
                     <span className="text-2xl shrink-0">{option.logo}</span>
                     <div className="min-w-0 flex-1">
-                      <p className="font-bold text-sm text-foreground break-words">{option.name}</p>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="font-bold text-sm text-foreground truncate">{option.name}</p>
+                      <p className="text-xs text-muted-foreground truncate">
                         {option.costYen ? `¥${option.costYen.toLocaleString()} · ` : ''}
                         {isConsultar ? t('calc.variableDeadline') : t('calc.deliveryDays').replace('{days}', option.estimatedDays)}
                       </p>
@@ -417,14 +417,14 @@ const ShippingCalculator: React.FC<ShippingCalculatorProps> = ({
                       <p className="font-sans text-sm font-black text-muted-foreground">{t('calc.consultar')}</p>
                     ) : (
                       <p className={cn(
-                        "font-sans text-lg font-black",
+                        "font-sans text-lg font-black whitespace-nowrap",
                         option.cost === 0 ? "text-green-600" : "text-primary"
                       )}>
-                        {option.cost === 0 ? t('calc.gratis') : formatPrice(option.cost, currency)}
+                        {option.cost === 0 ? t('calc.gratis') : formatPrice(option.cost, currency, true)}
                       </p>
                     )}
                     {option.originalCost && option.originalCost > 0 && (
-                      <p className="text-xs text-muted-foreground line-through">{formatPrice(option.originalCost, currency)}</p>
+                      <p className="text-xs text-muted-foreground line-through whitespace-nowrap">{formatPrice(option.originalCost, currency, true)}</p>
                     )}
                     {!onShippingSelect && !isConsultar && index === 0 && (
                       <span className="text-xs text-primary font-bold">{t('calc.bestOption')}</span>
