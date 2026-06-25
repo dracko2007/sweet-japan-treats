@@ -80,19 +80,28 @@ const NegotiationRow: React.FC<{ neg: Negotiation }> = ({ neg }) => {
 
   const adminEmail = user?.email || 'admin';
 
-  const handleApprove = async () => {
-    const discount = parseInt(approveInput, 10) || 0;
+  const handleApprove = async (overrideDiscount?: number) => {
+    const discount = overrideDiscount ?? (parseInt(approveInput, 10) || 0);
     if (discount <= 0) { toast({ title: 'Informe o desconto a aprovar', variant: 'destructive' }); return; }
-    if (discount >= neg.originalAmountYen) { toast({ title: 'Desconto não pode ser igual ou maior que o valor', variant: 'destructive' }); return; }
+    // Frete não pode zerar (mín. 1¥); taxa PS PODE ser zerada (desconto = valor total).
+    const maxDiscount = neg.type === 'ps_fee' ? neg.originalAmountYen : neg.originalAmountYen - 1;
+    if (discount > maxDiscount) {
+      toast({ title: neg.type === 'ps_fee' ? 'Desconto não pode passar do valor da taxa' : 'Desconto não pode zerar o frete', variant: 'destructive' });
+      return;
+    }
     setSaving(true);
     try {
       await negotiationService.approve(neg.id, discount, adminNote, adminEmail);
-      toast({ title: '✅ Negociação aprovada!', description: `Desconto de ${fmt(discount)} aplicado.` });
+      const isZero = discount >= neg.originalAmountYen;
+      toast({ title: isZero ? '✅ Taxa PS zerada!' : '✅ Negociação aprovada!', description: `Desconto de ${fmt(discount)} aplicado.` });
     } catch {
       toast({ title: 'Erro ao aprovar', variant: 'destructive' });
     }
     setSaving(false);
   };
+
+  // Zera completamente a taxa de PS (desconto = valor total)
+  const handleZeroPsFee = () => handleApprove(neg.originalAmountYen);
 
   const handleReject = async () => {
     if (!adminNote.trim()) {
@@ -285,7 +294,7 @@ const NegotiationRow: React.FC<{ neg: Negotiation }> = ({ neg }) => {
                 </div>
               </div>
               <div className="flex gap-3">
-                <Button onClick={handleApprove} disabled={saving} className="flex-1 bg-green-600 hover:bg-green-700 text-white">
+                <Button onClick={() => handleApprove()} disabled={saving} className="flex-1 bg-green-600 hover:bg-green-700 text-white">
                   <CheckCircle2 className="w-4 h-4 mr-1.5" />
                   {saving ? 'Salvando...' : 'Aprovar'}
                 </Button>
@@ -294,6 +303,11 @@ const NegotiationRow: React.FC<{ neg: Negotiation }> = ({ neg }) => {
                   Recusar
                 </Button>
               </div>
+              {neg.type === 'ps_fee' && (
+                <Button onClick={handleZeroPsFee} disabled={saving} variant="outline" className="w-full border-purple-400 text-purple-700 hover:bg-purple-50 dark:hover:bg-purple-950 mt-1">
+                  💸 Zerar Taxa PS completamente ({fmt(neg.originalAmountYen)} → ¥0)
+                </Button>
+              )}
             </div>
           )}
         </div>

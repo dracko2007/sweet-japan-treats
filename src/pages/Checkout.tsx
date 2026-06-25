@@ -100,9 +100,10 @@ const Checkout: React.FC = () => {
   // Erros de validação do formulário
   const [errors, setErrors] = useState<FieldErrors>({});
 
-  // PS fee — ¥1000 por unidade comprada
+  // PS fee — ¥1000 por unidade comprada (exceto produtos isentos: noPsFee)
   const totalQty = items.reduce((s, i) => i.freeGift ? s : s + i.quantity, 0);
-  const psFeeYen = totalQty * 1000;
+  const psFeeQty = items.reduce((s, i) => (i.freeGift || i.product.noPsFee) ? s : s + i.quantity, 0);
+  const psFeeYen = psFeeQty * 1000;
 
   const isGuest = !!location.state?.isGuest;
 
@@ -430,7 +431,7 @@ const Checkout: React.FC = () => {
     }
     setNegSubmitting(true);
     try {
-      const autoApprove = negModalType === 'ps_fee' && requestedYen <= 300 * totalQty;
+      const autoApprove = negModalType === 'ps_fee' && requestedYen <= 300 * psFeeQty;
       // Freeze the exchange rate at this exact moment so approved ¥ → R$ never drifts
       const rates = getRates();
       const frozenRate = currency === 'EUR' ? rates.EUR : currency === 'USD' ? rates.USD : currency === 'JPY' ? 1 : rates.BRL;
@@ -566,7 +567,7 @@ const Checkout: React.FC = () => {
 
   // PS fee final — para auto-aprovação, cap em 300×qty impede manipulação de carrinho.
   // Para aprovação manual pelo admin, respeita o valor aprovado (apenas cap no valor real da taxa).
-  const maxAutoApprovable = 300 * totalQty;
+  const maxAutoApprovable = 300 * psFeeQty;
   const isManualApproval = activeNeg?.status === 'approved';
   const effectivePsFeeDiscountYen = isManualApproval
     ? Math.min(psFeeDiscountYen, psFeeYen)
@@ -619,7 +620,7 @@ const Checkout: React.FC = () => {
             <div className="bg-secondary/40 rounded-xl p-4 mb-4 text-sm space-y-1">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">
-                  {negModalType === 'ps_fee' ? `Taxa PS (${totalQty} itens × ¥1.000)` : 'Frete selecionado'}
+                  {negModalType === 'ps_fee' ? `Taxa PS (${psFeeQty} itens × ¥1.000)` : 'Frete selecionado'}
                 </span>
                 <span className="font-semibold">
                   ¥{(negModalType === 'ps_fee' ? psFeeYen : (selectedShipping?.costYen || 0)).toLocaleString()}
@@ -627,7 +628,7 @@ const Checkout: React.FC = () => {
               </div>
               {negModalType === 'ps_fee' && (
                 <p className="text-xs text-primary font-medium">
-                  Desconto até ¥{(300 * totalQty).toLocaleString()} é aprovado automaticamente.
+                  Desconto até ¥{(300 * psFeeQty).toLocaleString()} é aprovado automaticamente.
                 </p>
               )}
               {negModalType === 'shipping' && (

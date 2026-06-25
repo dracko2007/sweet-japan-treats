@@ -796,6 +796,17 @@ const ProductManager: React.FC = () => {
                       <span>📦 Marcar como <strong>Importado</strong> (produto nacional vendido no Japão — exibe badge na loja)</span>
                     </label>
                   </div>
+                  <div className="flex items-center gap-2 mt-2">
+                    <label className="flex items-center gap-2 cursor-pointer select-none text-sm">
+                      <input
+                        type="checkbox"
+                        checked={!!editing.noPsFee}
+                        onChange={e => setEditing({ ...editing, noPsFee: e.target.checked || undefined })}
+                        className="w-4 h-4 rounded accent-primary"
+                      />
+                      <span>💸 <strong>Isentar taxa de Personal Shopper</strong> (¥1.000/un — não cobra essa taxa neste produto)</span>
+                    </label>
+                  </div>
                 </div>
               </div>
 
