@@ -182,6 +182,9 @@ const Footer: React.FC = () => {
             <Link to="/cookies" className="text-xs text-accent-foreground/50 hover:text-accent-foreground/80 transition-colors">
               {t('footer.cookies')}
             </Link>
+            <Link to="/devolucao" className="text-xs text-accent-foreground/50 hover:text-accent-foreground/80 transition-colors">
+              {t('footer.returns') || 'Devolução'}
+            </Link>
           </div>
         </div>
       </div>

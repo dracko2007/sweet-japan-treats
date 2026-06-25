@@ -46,6 +46,7 @@ const NotFound         = lazy(() => import("./pages/NotFound"));
 const PrivacyPolicy    = lazy(() => import("./pages/PrivacyPolicy"));
 const TermsOfService   = lazy(() => import("./pages/TermsOfService"));
 const CookiePolicy     = lazy(() => import("./pages/CookiePolicy"));
+const ReturnPolicy     = lazy(() => import("./pages/ReturnPolicy"));
 const FirebaseSync     = lazy(() => import("./pages/FirebaseSync"));
 const SyncData         = lazy(() => import("./pages/SyncData"));
 const Promotion        = lazy(() => import("./pages/Promotion"));
@@ -134,6 +135,8 @@ const FullApp: React.FC = () => (
                 <Route path="/privacidade" element={<PrivacyPolicy />} />
                 <Route path="/termos" element={<TermsOfService />} />
                 <Route path="/cookies" element={<CookiePolicy />} />
+                <Route path="/return-policy" element={<ReturnPolicy />} />
+                <Route path="/devolucao" element={<ReturnPolicy />} />
                 <Route path="/promocao" element={<Promotion />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
