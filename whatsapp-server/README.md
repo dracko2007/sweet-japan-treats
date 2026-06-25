@@ -33,15 +33,24 @@ Também pode abrir `http://localhost:3220/qr` no navegador para ver o QR.
 Depois de conectar, aparece `✅ Pronto!` e a sessão fica salva. Pode fechar o
 terminal e reabrir com `npm start` — não pede QR de novo.
 
-## Manter rodando sempre (opcional)
+## Instalar como serviço (inicia no boot automaticamente)
 
-Com [pm2](https://pm2.keymetrics.io/):
+Execute o script de instalação **uma única vez**:
 
 ```bash
-npm install -g pm2
-pm2 start server.js --name japan-whatsapp
-pm2 save
-pm2 startup   # segue as instruções para iniciar no boot
+bash install-service.sh
+```
+
+Ele instala o pm2, inicia o servidor e configura o startup. No final imprime
+um comando para rodar com `sudo` — copie e execute para finalizar.
+
+### Comandos úteis
+
+```bash
+pm2 status                  # ver se está rodando
+pm2 logs japan-whatsapp     # logs em tempo real
+pm2 restart japan-whatsapp  # reiniciar
+pm2 stop japan-whatsapp     # parar
 ```
 
 ## Configurar no painel admin
