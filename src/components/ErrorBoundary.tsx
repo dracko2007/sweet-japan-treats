@@ -1,5 +1,6 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { AlertTriangle, RefreshCw, Home } from 'lucide-react';
+import { isChunkLoadError, recoverFromChunkError } from '@/utils/recoverFromChunkError';
 
 interface Props {
   children: ReactNode;
@@ -23,10 +24,7 @@ class ErrorBoundary extends Component<Props, State> {
   state: State = { hasError: false, error: null, isChunkError: false };
 
   static isChunk(error: Error) {
-    return (
-      error.name === 'ChunkLoadError' ||
-      /Failed to fetch dynamically imported module|Loading chunk \d+ failed|dynamically imported module/i.test(error.message)
-    );
+    return error.name === 'ChunkLoadError' || isChunkLoadError(error.message);
   }
 
   static getDerivedStateFromError(error: Error): State {
@@ -35,15 +33,16 @@ class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, info: ErrorInfo) {
     console.error(`❌ [ErrorBoundary${this.props.area ? ` · ${this.props.area}` : ''}]`, error, info.componentStack);
-    // PWA deploy: old SW serves stale HTML with old chunk hashes → 404 on import
+    // PWA deploy: old SW serves stale HTML with old chunk hashes → 404 on import.
+    // Limpa o cache do SW e recarrega de forma limpa (com proteção contra loop).
     if (ErrorBoundary.isChunk(error)) {
-      setTimeout(() => window.location.reload(), 800);
+      void recoverFromChunkError();
     }
   }
 
   handleReset = () => {
     if (this.state.isChunkError) {
-      window.location.reload();
+      void recoverFromChunkError();
     } else {
       this.setState({ hasError: false, error: null, isChunkError: false });
     }

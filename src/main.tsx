@@ -3,6 +3,7 @@ import { registerSW } from "virtual:pwa-register";
 import App from "./App.tsx";
 import "./index.css";
 import { migrateLocalStorage } from "./utils/migrate";
+import { isChunkLoadError, recoverFromChunkError } from "./utils/recoverFromChunkError";
 
 migrateLocalStorage();
 
@@ -23,14 +24,21 @@ const updateSW = registerSW({
 });
 
 // Quando o SW carrega um chunk antigo que já não existe no novo deploy,
-// o browser lança "Failed to fetch dynamically imported module".
-// Detectamos e recarregamos para pegar os assets novos.
+// o browser lança erro de "dynamically imported module". Limpamos o cache do
+// SW e recarregamos de forma limpa (com proteção contra loop infinito).
 window.addEventListener("unhandledrejection", (event) => {
   const msg = event.reason?.message || String(event.reason || "");
-  if (msg.includes("Failed to fetch dynamically imported module") ||
-      msg.includes("Importing a module script failed")) {
+  if (isChunkLoadError(msg)) {
     event.preventDefault();
-    window.location.reload();
+    void recoverFromChunkError();
+  }
+});
+
+// Mesmo erro pode chegar como erro de import de <script> (não rejection).
+window.addEventListener("error", (event) => {
+  const msg = event.message || String((event as ErrorEvent).error || "");
+  if (isChunkLoadError(msg)) {
+    void recoverFromChunkError();
   }
 });
 
