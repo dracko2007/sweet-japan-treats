@@ -65,6 +65,10 @@ const AnalyticsLoader: React.FC = () => {
     import('firebase/analytics').then(({ getAnalytics }) => {
       try { getAnalytics(app!); } catch { /* já inicializado */ }
     });
+    // Rastreia visita única por sessão (país + cidade para o painel admin)
+    import('@/services/visitorService').then(({ visitorService }) => {
+      visitorService.trackVisit().catch(() => {});
+    });
   }, [consent]);
   return null;
 };

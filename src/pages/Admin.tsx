@@ -33,6 +33,7 @@ import CouponUsageReport from '@/components/admin/CouponUsageReport';
 import FraudDashboard from '@/components/admin/FraudDashboard';
 import ThermalPrinterSettings from '@/components/admin/ThermalPrinterSettings';
 import WhatsAppSettings from '@/components/admin/WhatsAppSettings';
+import VisitorStats from '@/components/admin/VisitorStats';
 import ReviewModeration from '@/components/admin/ReviewModeration';
 import MarginAudit from '@/components/admin/MarginAudit';
 import CN23Modal from '@/components/admin/CN23Modal';
@@ -55,7 +56,7 @@ type AdminTab =
   | 'orders' | 'coupons' | 'dashboard' | 'customers' | 'products'
   | 'home' | 'vlog' | 'affiliates' | 'requests' | 'b2b' | 'admins' | 'videos'
   | 'calculator' | 'migration' | 'promotion' | 'negotiations' | 'marketing' | 'employees' | 'coupon-usage' | 'fraud'
-  | 'thermal-printer' | 'whatsapp' | 'review-moderation' | 'margin-audit';
+  | 'thermal-printer' | 'whatsapp' | 'review-moderation' | 'margin-audit' | 'visitors';
 
 interface AdminTabItem {
   id: AdminTab;
@@ -659,6 +660,7 @@ _This is an automated test message_
       { id: 'negotiations', label: 'Negociações', icon: Handshake, badge: pendingNegotiationsCount || 0 },
       { id: 'customers', label: 'Clientes', icon: Users, badge: newCustomers },
       { id: 'affiliates', label: 'Afiliados', icon: Megaphone },
+      { id: 'visitors', label: 'Visitantes', icon: BarChart3 },
     ] },
     { title: 'Catálogo', items: [
       { id: 'products', label: 'Produtos', icon: PackagePlus },
@@ -1183,6 +1185,8 @@ _This is an automated test message_
               <ThermalPrinterSettings />
             ) : activeTab === 'whatsapp' ? (
               <WhatsAppSettings />
+            ) : activeTab === 'visitors' ? (
+              <VisitorStats />
             ) : activeTab === 'review-moderation' ? (
               <ReviewModeration />
             ) : activeTab === 'margin-audit' ? (
