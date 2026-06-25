@@ -835,8 +835,13 @@ const Profile: React.FC = () => {
 
               {orders.length > 0 ? (
                 <div className="space-y-4">
-                  {orders.map((order) => (
-                    <div 
+                  {orders.map((order) => {
+                    // Pago = admin confirmou (paymentConfirmed) OU status já avançou além de pending.
+                    // Se o pedido está em confirmed/packing/shipped/delivered, o pagamento já foi recebido.
+                    const advancedStatuses = ['confirmed', 'processing', 'packing', 'shipped', 'delivered'];
+                    const isPaid = !!(order as any).paymentConfirmed || advancedStatuses.includes(order.status as string);
+                    return (
+                    <div
                       key={order.id}
                       className="p-4 rounded-xl border border-border hover:bg-secondary/50 transition-colors"
                     >
@@ -1113,9 +1118,9 @@ const Profile: React.FC = () => {
                                 : order.paymentMethod === 'bank' ? t('profile.orders.payment.bank')
                                 : order.paymentMethod || 'N/A'}
                             </span>
-                            {(order as any).paymentConfirmed ? (
+                            {isPaid ? (
                               <span className="text-xs font-bold text-green-600 flex items-center gap-1">
-                                ✅ Confirmado
+                                ✅ Pago
                               </span>
                             ) : (
                               <span className="text-xs font-bold text-orange-600 flex items-center gap-1">
@@ -1136,7 +1141,7 @@ const Profile: React.FC = () => {
                                   <p><strong>Número:</strong> ${order.orderNumber}</p>
                                   <p><strong>Data:</strong> ${new Date(order.date).toLocaleDateString('pt-BR')}</p>
                                   <p><strong>Total:</strong> ${formatPrice(order.totalAmount, (order as any).currency || 'JPY')}</p>
-                                  <p><strong>Status do Pagamento:</strong> ${(order as any).paymentConfirmed ? '✅ Confirmado' : '⏳ Pendente'}</p>
+                                  <p><strong>Status do Pagamento:</strong> ${isPaid ? '✅ Pago' : '⏳ Pendente'}</p>
                                   <button onclick="window.print()">Imprimir</button>
                                   </body></html>
                                 `);
@@ -1162,7 +1167,8 @@ const Profile: React.FC = () => {
                         </div>
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="text-center py-12">
