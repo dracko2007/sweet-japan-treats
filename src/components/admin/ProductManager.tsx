@@ -206,18 +206,24 @@ const ProductManager: React.FC = () => {
     setEditing({ ...editing, tags: (editing.tags || []).filter(t => t !== tag) });
   };
 
-  const updatePackageDimension = (field: 'widthCm' | 'lengthCm' | 'heightCm', value: string) => {
+  // O admin digita em MILÍMETROS (mm), mas o armazenamento é em centímetros (cm).
+  // Converte mm → cm (÷10) ao salvar no estado.
+  const updatePackageDimension = (field: 'widthCm' | 'lengthCm' | 'heightCm', valueMm: string) => {
     if (!editing) return;
     const current = editing.packageDimensionsCm || { widthCm: 0, lengthCm: 0, heightCm: 0, source: 'manual' };
+    const cm = (Number(valueMm) || 0) / 10; // mm → cm
     setEditing({
       ...editing,
       packageDimensionsCm: {
         ...current,
-        [field]: Number(value) || 0,
+        [field]: cm,
         source: current.source || 'manual',
       },
     });
   };
+
+  // Converte cm armazenado → mm para exibir no input. Vazio se 0.
+  const dimMm = (cm?: number) => (cm && cm > 0 ? Math.round(cm * 10) : '');
 
   // Chama /api/product-enrich para preencher automaticamente descrição, preços e fotos.
   const handleEnrich = async () => {
@@ -1032,48 +1038,48 @@ const ProductManager: React.FC = () => {
 
               <div className="bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-900 rounded-lg p-3">
                 <label className="text-sm font-semibold block mb-2">
-                  Medidas da embalagem para frete (cm)
+                  Medidas da embalagem para frete (mm)
                 </label>
                 <div className="grid grid-cols-3 gap-2">
                   <div>
-                    <span className="text-[11px] text-muted-foreground">Largura</span>
+                    <span className="text-[11px] text-muted-foreground">Largura (mm)</span>
                     <input
                       type="number"
                       min={0}
-                      step="0.1"
-                      value={editing.packageDimensionsCm?.widthCm || ''}
+                      step="1"
+                      value={dimMm(editing.packageDimensionsCm?.widthCm)}
                       onChange={(e) => updatePackageDimension('widthCm', e.target.value)}
-                      placeholder="L"
+                      placeholder="ex: 54"
                       className="w-full px-3 py-2 rounded-lg border border-orange-200 bg-background text-sm"
                     />
                   </div>
                   <div>
-                    <span className="text-[11px] text-muted-foreground">Comprimento</span>
+                    <span className="text-[11px] text-muted-foreground">Comprimento (mm)</span>
                     <input
                       type="number"
                       min={0}
-                      step="0.1"
-                      value={editing.packageDimensionsCm?.lengthCm || ''}
+                      step="1"
+                      value={dimMm(editing.packageDimensionsCm?.lengthCm)}
                       onChange={(e) => updatePackageDimension('lengthCm', e.target.value)}
-                      placeholder="C"
+                      placeholder="ex: 84"
                       className="w-full px-3 py-2 rounded-lg border border-orange-200 bg-background text-sm"
                     />
                   </div>
                   <div>
-                    <span className="text-[11px] text-muted-foreground">Altura</span>
+                    <span className="text-[11px] text-muted-foreground">Altura (mm)</span>
                     <input
                       type="number"
                       min={0}
-                      step="0.1"
-                      value={editing.packageDimensionsCm?.heightCm || ''}
+                      step="1"
+                      value={dimMm(editing.packageDimensionsCm?.heightCm)}
                       onChange={(e) => updatePackageDimension('heightCm', e.target.value)}
-                      placeholder="A"
+                      placeholder="ex: 192"
                       className="w-full px-3 py-2 rounded-lg border border-orange-200 bg-background text-sm"
                     />
                   </div>
                 </div>
                 <p className="text-[11px] text-orange-700 dark:text-orange-300 mt-2 leading-relaxed">
-                  O frete soma automaticamente +{PACKAGE_SAFETY_MARGIN_CM}cm em largura, comprimento e altura. Fonte: {editing.packageDimensionsCm?.source || 'manual/nao informado'}.
+                  Digite em <strong>milímetros</strong> (ex: 54 × 84 × 192 mm). O frete soma +{PACKAGE_SAFETY_MARGIN_CM}cm de margem. Fonte: {editing.packageDimensionsCm?.source || 'manual/nao informado'}.
                 </p>
                 <div className="mt-3">
                   <span className="text-[11px] text-muted-foreground">Peso da embalagem (g)</span>
