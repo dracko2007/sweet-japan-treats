@@ -24,9 +24,9 @@
   ],
   "screenshots": [
     {
-      "src": "/logo/logo.jpeg",
+      "src": "/icons/icon-512x512.png?v=2",
       "sizes": "512x512",
-      "type": "image/jpeg",
+      "type": "image/png",
       "form_factor": "narrow",
       "label": "Japan Express — Importados do Japão"
     }

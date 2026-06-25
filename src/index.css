@@ -146,6 +146,16 @@
     max-width: 100%;
   }
 
+  /* O .container nunca pode exceder a viewport (reforço além do config) */
+  .container {
+    max-width: 100%;
+  }
+
+  /* Palavras/URLs muito longas quebram em vez de empurrar o layout */
+  p, span, h1, h2, h3, h4, h5, h6, a, li, td {
+    overflow-wrap: break-word;
+  }
+
   h1, h2, h3, h4, h5, h6 {
     font-family: 'Outfit', sans-serif;
   }
