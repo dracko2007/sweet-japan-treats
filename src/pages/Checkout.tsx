@@ -15,7 +15,7 @@ import { prefectures } from '@/data/prefectures';
 import { japanPrefectures } from '@/data/japanPrefectures';
 import { europePrefectures } from '@/data/europePrefectures';
 import { usStates } from '@/data/usStates';
-import { getCountryConfig } from '@/data/worldCountries';
+import { getCountryConfig, WORLD_COUNTRIES } from '@/data/worldCountries';
 import { Coupon } from '@/context/UserContext';
 import { useToast } from '@/hooks/use-toast';
 import { usePostalCodeLookup } from '@/hooks/usePostalCodeLookup';
@@ -850,12 +850,11 @@ const Checkout: React.FC = () => {
                           required
                           className="w-full p-2.5 rounded-lg border border-border bg-background text-foreground focus:ring-2 focus:ring-primary focus:border-primary transition-all font-medium text-sm"
                         >
-                          <option value="Brasil">Brasil 🇧🇷 (Envio Internacional)</option>
-                          <option value="Portugal">Portugal 🇵🇹 (Envio Internacional)</option>
-                          <option value="França">França 🇫🇷 (Envio Internacional)</option>
-                          <option value="Itália">Itália 🇮🇹 (Envio Internacional)</option>
-                          <option value="Espanha">Espanha 🇪🇸 (Envio Internacional)</option>
-                          <option value="Japão">Japão 🇯🇵 (Envio Local)</option>
+                          {WORLD_COUNTRIES.map((c) => (
+                            <option key={c.name} value={c.name}>
+                              {c.name}{c.name === 'Japão' ? ' (Envio Local)' : ' (Envio Internacional)'}
+                            </option>
+                          ))}
                         </select>
                       </div>
 

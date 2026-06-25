@@ -6,7 +6,8 @@ import { useLanguage } from '@/context/LanguageContext';
 import { useToast } from '@/hooks/use-toast';
 import { customRequestService } from '@/services/customRequestService';
 
-const COUNTRIES = ['Japão', 'Brasil', 'Portugal', 'França', 'Itália', 'Espanha'];
+import { WORLD_COUNTRIES } from '@/data/worldCountries';
+const COUNTRIES = WORLD_COUNTRIES.map(c => c.name);
 
 const CustomRequest: React.FC = () => {
   const { selectedCountry, t } = useLanguage();

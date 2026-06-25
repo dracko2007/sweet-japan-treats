@@ -6,8 +6,9 @@ import { useToast } from '@/hooks/use-toast';
 import { useLanguage } from '@/context/LanguageContext';
 import { isValidCNPJ, maskCNPJ, isValidEmail } from '@/utils/validation';
 import { b2bRequestService, B2BShipping } from '@/services/b2bRequestService';
+import { WORLD_COUNTRIES } from '@/data/worldCountries';
 
-const COUNTRIES = ['Brasil', 'Portugal', 'França', 'Itália', 'Espanha', 'Japão'];
+const COUNTRIES = WORLD_COUNTRIES.map(c => c.name);
 
 const Business: React.FC = () => {
   const { toast } = useToast();
