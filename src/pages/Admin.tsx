@@ -1,7 +1,7 @@
 import { safeStorage } from '@/utils/storage';
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Package, Printer, ShoppingBag, User, MapPin, Phone, Mail, Calendar, TestTube, Tag, Truck, CheckCircle, XCircle, Trash2, BarChart3, Users, PackagePlus, Video, Megaphone, Clapperboard, Building2, Sparkles, ShieldCheck, Calculator, CloudUpload, FileText, Handshake, Flag, TrendingDown } from 'lucide-react';
+import { Package, Printer, ShoppingBag, User, MapPin, Phone, Mail, Calendar, TestTube, Tag, Truck, CheckCircle, XCircle, Trash2, BarChart3, Users, PackagePlus, Video, Megaphone, Clapperboard, Building2, Sparkles, ShieldCheck, Calculator, CloudUpload, FileText, Handshake, Flag, TrendingDown, MessageCircle } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { useUser } from '@/context/UserContext';
@@ -9,6 +9,7 @@ import { emailService } from '@/services/emailService';
 import { emailServiceSimple } from '@/services/emailServiceSimple';
 import { whatsappService } from '@/services/whatsappService';
 import { whatsappServiceSimple } from '@/services/whatsappServiceSimple';
+import { waServer } from '@/services/waServerService';
 import { useToast } from '@/hooks/use-toast';
 import CouponManager from '@/components/admin/CouponManager';
 import AffiliateManager from '@/components/admin/AffiliateManager';
@@ -31,6 +32,7 @@ import EmployeeManager from '@/components/admin/EmployeeManager';
 import CouponUsageReport from '@/components/admin/CouponUsageReport';
 import FraudDashboard from '@/components/admin/FraudDashboard';
 import ThermalPrinterSettings from '@/components/admin/ThermalPrinterSettings';
+import WhatsAppSettings from '@/components/admin/WhatsAppSettings';
 import ReviewModeration from '@/components/admin/ReviewModeration';
 import MarginAudit from '@/components/admin/MarginAudit';
 import CN23Modal from '@/components/admin/CN23Modal';
@@ -53,7 +55,7 @@ type AdminTab =
   | 'orders' | 'coupons' | 'dashboard' | 'customers' | 'products'
   | 'home' | 'vlog' | 'affiliates' | 'requests' | 'b2b' | 'admins' | 'videos'
   | 'calculator' | 'migration' | 'promotion' | 'negotiations' | 'marketing' | 'employees' | 'coupon-usage' | 'fraud'
-  | 'thermal-printer' | 'review-moderation' | 'margin-audit';
+  | 'thermal-printer' | 'whatsapp' | 'review-moderation' | 'margin-audit';
 
 interface AdminTabItem {
   id: AdminTab;
@@ -179,6 +181,9 @@ const Admin: React.FC = () => {
         title: "✅ Pagamento confirmado!",
         description: `Pedido ${orderNumber} marcado como pago e pronto para processar.`,
       });
+      // Avisa o cliente que o pagamento foi confirmado (preparo em 2-3 dias)
+      const order = allOrders.find(o => o.orderNumber === orderNumber);
+      if (order) void notifyWhatsApp(order, 'paymentConfirmed');
       loadOrders();
     } else {
       toast({
@@ -197,6 +202,11 @@ const Admin: React.FC = () => {
         title: "Status atualizado!",
         description: `Pedido ${orderNumber} marcado como ${getStatusLabel(newStatus)}`,
       });
+      // Notifica o cliente por WhatsApp ao iniciar o preparo do pacote.
+      if (newStatus === 'packing') {
+        const order = allOrders.find(o => o.orderNumber === orderNumber);
+        if (order) void notifyWhatsApp(order, 'preparing');
+      }
       loadOrders();
     } else {
       toast({
@@ -204,6 +214,24 @@ const Admin: React.FC = () => {
         description: "Não foi possível atualizar o status",
         variant: "destructive",
       });
+    }
+  };
+
+  // Envia notificação WhatsApp ao cliente (silencioso; mostra toast com o resultado).
+  const notifyWhatsApp = async (
+    order: any,
+    type: 'paymentConfirmed' | 'preparing' | 'shipped',
+    extra?: { trackingNumber: string; trackingUrl: string; carrier: string }
+  ) => {
+    if (!waServer.getConfig().enabled) return;
+    const result =
+      type === 'paymentConfirmed' ? await waServer.notifyPaymentConfirmed(order)
+      : type === 'preparing' ? await waServer.notifyPreparing(order)
+      : await waServer.notifyShipped(order, extra!.trackingNumber, extra!.trackingUrl, extra!.carrier);
+    if (result.ok) {
+      toast({ title: '📱 WhatsApp enviado!', description: `Cliente notificado (${type}).` });
+    } else {
+      toast({ title: '⚠️ WhatsApp não enviado', description: result.error || 'Erro desconhecido', variant: 'destructive' });
     }
   };
 
@@ -658,6 +686,7 @@ _This is an automated test message_
       { id: 'calculator', label: 'Calculadora', icon: Calculator },
       { id: 'migration', label: 'Migrar Imagens', icon: CloudUpload },
       { id: 'thermal-printer', label: 'Impressora Térmica', icon: Printer },
+      { id: 'whatsapp', label: 'WhatsApp', icon: MessageCircle },
     ] },
     // Só nível 3 vê o gerenciamento de administradores
     ...(permissions.canManageAdmins
@@ -1152,6 +1181,8 @@ _This is an automated test message_
               <FraudDashboard />
             ) : activeTab === 'thermal-printer' ? (
               <ThermalPrinterSettings />
+            ) : activeTab === 'whatsapp' ? (
+              <WhatsAppSettings />
             ) : activeTab === 'review-moderation' ? (
               <ReviewModeration />
             ) : activeTab === 'margin-audit' ? (
@@ -1195,16 +1226,19 @@ _This is an automated test message_
               return '';
             };
             const trackingUrl = getTrackingUrl(carrier, trackingNumber);
-            
+
             // Save tracking info to order (Firestore + safeStorage)
             await orderService.updateOrderTracking(selectedOrder.orderNumber, trackingNumber, trackingUrl, carrier);
-            
-            // Also update status
-            await handleUpdateStatus(selectedOrder.orderNumber, 'shipped');
+
+            // Update status to shipped (sem disparar o WhatsApp de 'packing' aqui)
+            await orderService.updateOrderStatus(selectedOrder.orderNumber, 'shipped');
+            loadOrders();
             toast({
               title: "Pedido marcado como enviado!",
               description: `Tracking: ${trackingNumber}`,
             });
+            // Notifica o cliente com itens + código de rastreio
+            void notifyWhatsApp(selectedOrder, 'shipped', { trackingNumber, trackingUrl, carrier });
           }}
         />
       )}
