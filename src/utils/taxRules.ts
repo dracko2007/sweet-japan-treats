@@ -1,3 +1,5 @@
+import { getCountryConfig } from '@/data/worldCountries';
+
 // Brazilian import tax rules (Remessa Conforme program)
 // Source: Receita Federal / Portaria MF nº 612/2023
 export const BRAZIL_TAX = {
@@ -26,6 +28,24 @@ export function calcBrazilTax(price: number): { federal: number; icms: number; t
 
 export function calcEuVat(price: number, country: string): number {
   return price * (EU_VAT_RATES[country] ?? 0.20);
+}
+
+// IVA/VAT/GST universal — consulta a taxa do país na tabela central.
+// Para EUA usa sales tax por estado (calcUsSalesTax); demais usam a taxa do país.
+export function calcImportTax(price: number, country: string, stateCode?: string): { tax: number; label: string } {
+  if (country === 'Brasil') {
+    const br = calcBrazilTax(price);
+    return { tax: br.total, label: 'Impostos Estimados (Brasil)' };
+  }
+  if (country === 'Estados Unidos') {
+    const tax = calcUsSalesTax(price, stateCode);
+    const stRate = US_SALES_TAX[(stateCode || '').toUpperCase()];
+    return { tax, label: stRate != null ? `Sales Tax Est. (${stateCode} ${(stRate * 100).toFixed(1)}%)` : 'Sales Tax Estimado (US)' };
+  }
+  const cfg = getCountryConfig(country);
+  const rate = cfg ? cfg.vat : 0.10;
+  if (rate <= 0) return { tax: 0, label: '' };
+  return { tax: price * rate, label: `IVA / VAT Estimado (${Math.round(rate * 100)}%)` };
 }
 
 // ── USA Sales Tax por estado ─────────────────────────────────────────────────

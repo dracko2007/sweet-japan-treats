@@ -1,7 +1,7 @@
 import { safeStorage } from '@/utils/storage';
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Package, Printer, ShoppingBag, User, MapPin, Phone, Mail, Calendar, TestTube, Tag, Truck, CheckCircle, XCircle, Trash2, BarChart3, Users, PackagePlus, Video, Megaphone, Clapperboard, Building2, Sparkles, ShieldCheck, Calculator, CloudUpload, FileText, Handshake, Flag } from 'lucide-react';
+import { Package, Printer, ShoppingBag, User, MapPin, Phone, Mail, Calendar, TestTube, Tag, Truck, CheckCircle, XCircle, Trash2, BarChart3, Users, PackagePlus, Video, Megaphone, Clapperboard, Building2, Sparkles, ShieldCheck, Calculator, CloudUpload, FileText, Handshake, Flag, TrendingDown } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { useUser } from '@/context/UserContext';
@@ -32,6 +32,7 @@ import CouponUsageReport from '@/components/admin/CouponUsageReport';
 import FraudDashboard from '@/components/admin/FraudDashboard';
 import ThermalPrinterSettings from '@/components/admin/ThermalPrinterSettings';
 import ReviewModeration from '@/components/admin/ReviewModeration';
+import MarginAudit from '@/components/admin/MarginAudit';
 import CN23Modal from '@/components/admin/CN23Modal';
 import PromoNotificationModal from '@/components/admin/PromoNotificationModal';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
@@ -52,7 +53,7 @@ type AdminTab =
   | 'orders' | 'coupons' | 'dashboard' | 'customers' | 'products'
   | 'home' | 'vlog' | 'affiliates' | 'requests' | 'b2b' | 'admins' | 'videos'
   | 'calculator' | 'migration' | 'promotion' | 'negotiations' | 'marketing' | 'employees' | 'coupon-usage' | 'fraud'
-  | 'thermal-printer' | 'review-moderation';
+  | 'thermal-printer' | 'review-moderation' | 'margin-audit';
 
 interface AdminTabItem {
   id: AdminTab;
@@ -627,6 +628,7 @@ _This is an automated test message_
       { id: 'employees', label: 'Funcionários', icon: Users },
       { id: 'coupon-usage', label: 'Gastos c/ Cupons', icon: Tag },
       { id: 'fraud', label: 'Anti-Fraude', icon: ShieldCheck },
+      { id: 'margin-audit', label: 'Auditoria de Margem', icon: TrendingDown },
     ] },
     { title: 'Ferramentas', items: [
       { id: 'promotion', label: 'Promoção Início', icon: Sparkles },
@@ -1110,6 +1112,8 @@ _This is an automated test message_
               <ThermalPrinterSettings />
             ) : activeTab === 'review-moderation' ? (
               <ReviewModeration />
+            ) : activeTab === 'margin-audit' ? (
+              <MarginAudit />
             ) : (
               <CustomerList />
             )}

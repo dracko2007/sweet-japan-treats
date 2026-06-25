@@ -5,6 +5,8 @@
 // Zone 4: USA, Guam
 // Zone 5: Central/South America (incl. Brazil), Africa
 
+import { getCountryConfig } from '@/data/worldCountries';
+
 export type JapanPostZone = 1 | 2 | 3 | 4 | 5;
 
 // ── e-Packet Light (国際eパケットライト) ≤2kg ────────────────────────────────
@@ -128,6 +130,9 @@ export const getELightRate = (weightG: number, zone: JapanPostZone): number | nu
 
 // ── Mapeamento país → zona Japan Post ───────────────────────────────────────
 export const countryToZone = (country: string): JapanPostZone => {
+  const cfg = getCountryConfig(country);
+  if (cfg) return cfg.zone;
+  // Retrocompat
   switch (country) {
     case 'Brasil':         return 5;
     case 'Estados Unidos': return 4;

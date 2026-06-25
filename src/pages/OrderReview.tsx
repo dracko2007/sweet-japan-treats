@@ -28,11 +28,11 @@ import { firebaseSyncService } from '@/services/firebaseSyncService';
 import { paymentSettingsService } from '@/services/paymentSettingsService';
 import { Wallet } from 'lucide-react';
 import { referralService } from '@/services/referralService';
-import { calcBrazilTax, calcEuVat, calcUsSalesTax, EU_VAT_RATES, US_SALES_TAX } from '@/utils/taxRules';
+import { calcBrazilTax, calcImportTax } from '@/utils/taxRules';
 import { cpfGuardService, normalizeCPF } from '@/services/cpfGuardService';
 import { thermalPrintService } from '@/services/thermalPrintService';
 import { db } from '@/config/firebase';
-import { doc, getDoc, updateDoc, increment } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, increment } from 'firebase/firestore';
 
 const isDev = import.meta.env.DEV;
 const devLog = isDev ? console.log.bind(console) : () => {};
@@ -143,16 +143,10 @@ const OrderReview: React.FC = () => {
     icmsTax = br.icms;
     estimatedTax = br.total;
     taxLabel = 'Impostos Estimados (Brasil)';
-  } else if (isUsa) {
-    estimatedTax = calcUsSalesTax(priceAfterPix, formData.prefecture);
-    const stRate = US_SALES_TAX[(formData.prefecture || '').toUpperCase()];
-    taxLabel = stRate != null
-      ? `Sales Tax Est. (${formData.prefecture} ${(stRate * 100).toFixed(1)}%)`
-      : 'Sales Tax Estimado (US)';
-  } else if (isEurope) {
-    const rate = EU_VAT_RATES[formData.country] ?? 0.20;
-    estimatedTax = calcEuVat(priceAfterPix, formData.country);
-    taxLabel = `IVA / VAT Estimado (${Math.round(rate * 100)}%)`;
+  } else {
+    const r = calcImportTax(priceAfterPix, formData.country, formData.prefecture);
+    estimatedTax = r.tax;
+    taxLabel = r.label;
   }
   
   const taxAmount = estimatedTax; // Saved in mockOrder for administrative visibility

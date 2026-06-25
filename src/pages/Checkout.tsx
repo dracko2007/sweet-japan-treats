@@ -15,6 +15,7 @@ import { prefectures } from '@/data/prefectures';
 import { japanPrefectures } from '@/data/japanPrefectures';
 import { europePrefectures } from '@/data/europePrefectures';
 import { usStates } from '@/data/usStates';
+import { getCountryConfig } from '@/data/worldCountries';
 import { Coupon } from '@/context/UserContext';
 import { useToast } from '@/hooks/use-toast';
 import { usePostalCodeLookup } from '@/hooks/usePostalCodeLookup';
@@ -26,7 +27,7 @@ import { POINTS } from '@/services/pointsService';
 import { safeStorage } from '@/utils/storage';
 import { productEnglishName } from '@/utils/productName';
 import { isValidEmail, isValidCPF, isValidPhone, isNonEmpty, maskPhone, runValidations, FieldErrors } from '@/utils/validation';
-import { calcBrazilTax, calcEuVat, calcUsSalesTax, EU_VAT_RATES, US_SALES_TAX } from '@/utils/taxRules';
+import { calcImportTax } from '@/utils/taxRules';
 
 const isDev = import.meta.env.DEV;
 const devLog = isDev ? console.log.bind(console) : () => {};
@@ -335,32 +336,32 @@ const Checkout: React.FC = () => {
           }
         }
       }
-    } else if (['Portugal', 'França', 'Itália', 'Espanha', 'Estados Unidos'].includes(currentCountry)) {
-      // Formata e busca via zippopotam.us (gratuito, sem key)
-      const countryCode: Record<string, string> = {
-        'Portugal': 'PT', 'França': 'FR', 'Itália': 'IT', 'Espanha': 'ES', 'Estados Unidos': 'US',
-      };
-      const cc = countryCode[currentCountry];
+    } else if (getCountryConfig(currentCountry)?.zipLookup) {
+      // Busca via zippopotam.us (gratuito) — todos os países da tabela com zipLookup
+      const cfg = getCountryConfig(currentCountry)!;
+      const cc = cfg.iso.toUpperCase();
+      const isUsState = currentCountry === 'Estados Unidos';
 
-      // Formatação automática: Portugal XXXX-XXX, demais XXXXX (incl. ZIP dos EUA)
+      // Formatação: Portugal XXXX-XXX; demais mantém o que o usuário digitou (formatos variam por país)
       let formatted = val;
       if (currentCountry === 'Portugal') {
         const digits = val.replace(/\D/g, '').slice(0, 7);
         formatted = digits.length > 4 ? `${digits.slice(0, 4)}-${digits.slice(4)}` : digits;
-      } else {
+      } else if (['Estados Unidos', 'França', 'Itália', 'Espanha', 'Alemanha'].includes(currentCountry)) {
         formatted = val.replace(/\D/g, '').slice(0, 5);
+      } else {
+        formatted = val.trim().slice(0, 12); // outros países: CEP alfanumérico (UK, CA, etc.)
       }
       setFormData(prev => ({ ...prev, postalCode: formatted }));
 
-      // Busca quando completo: PT = 7 dígitos, demais = 5 dígitos
-      const cleanVal = formatted.replace(/\D/g, '');
-      const expectedLen = currentCountry === 'Portugal' ? 7 : 5;
-      if (cc && cleanVal.length === expectedLen) {
+      // Dispara a busca quando o CEP parece completo (>= 3 chars). Trata erro silencioso.
+      const probe = formatted.replace(/\s/g, '');
+      if (probe.length >= 3) {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 6000);
         try {
           const res = await fetch(
-            `https://api.zippopotam.us/${cc}/${formatted}`,
+            `https://api.zippopotam.us/${cc}/${encodeURIComponent(formatted)}`,
             { signal: controller.signal }
           );
           clearTimeout(timeoutId);
@@ -368,24 +369,19 @@ const Checkout: React.FC = () => {
             const data = await res.json();
             const place = data.places?.[0];
             if (place) {
-              // Nos EUA, guardamos a SIGLA do estado (state abbreviation) p/ calcular sales tax
-              const stateValue = currentCountry === 'Estados Unidos'
+              const stateValue = isUsState
                 ? (place['state abbreviation'] || place['state'] || '')
                 : (place['state'] || '');
               setFormData(prev => ({
                 ...prev,
-                city: place['place name'] || '',
-                prefecture: stateValue,
+                city: place['place name'] || prev.city,
+                prefecture: stateValue || prev.prefecture,
               }));
               toast({
                 title: 'Código Postal Encontrado!',
                 description: `${place['place name']} — ${place['state']}`,
               });
-            } else {
-              toast({ title: 'Código postal não encontrado', description: 'Preencha o endereço manualmente.', variant: 'destructive' });
             }
-          } else {
-            toast({ title: 'Código postal não encontrado', description: 'Preencha o endereço manualmente.', variant: 'destructive' });
           }
         } catch (error) {
           clearTimeout(timeoutId);
@@ -585,19 +581,10 @@ const Checkout: React.FC = () => {
   let estimatedTax = 0;
   let taxLabel = '';
 
-  if (formData.country === 'Brasil') {
-    estimatedTax = calcBrazilTax(subtotalWithCoupon).total;
-    taxLabel = 'Impostos Estimados (Brasil)';
-  } else if (formData.country === 'Estados Unidos') {
-    estimatedTax = calcUsSalesTax(subtotalWithCoupon, formData.prefecture);
-    const stRate = US_SALES_TAX[(formData.prefecture || '').toUpperCase()];
-    taxLabel = stRate != null
-      ? `Sales Tax Est. (${formData.prefecture} ${(stRate * 100).toFixed(1)}%)`
-      : 'Sales Tax Estimado (US)';
-  } else if (isEuro) {
-    const rate = EU_VAT_RATES[formData.country] ?? 0.20;
-    estimatedTax = calcEuVat(subtotalWithCoupon, formData.country);
-    taxLabel = `IVA / VAT Estimado (${Math.round(rate * 100)}%)`;
+  {
+    const r = calcImportTax(subtotalWithCoupon, formData.country, formData.prefecture);
+    estimatedTax = r.tax;
+    taxLabel = r.label;
   }
     
   // Taxes are completely omitted from checkout final price!
@@ -902,38 +889,54 @@ const Checkout: React.FC = () => {
                     <div className="grid md:grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="prefecture" className="font-semibold">
-                          {formData.country === 'Japão' ? 'Província *' : formData.country === 'Estados Unidos' ? 'State *' : ['Portugal', 'França', 'Itália', 'Espanha'].includes(formData.country) ? 'Região / Distrito *' : 'Estado (UF) *'}
+                          {formData.country === 'Japão' ? 'Província *' : formData.country === 'Estados Unidos' ? 'State *' : ['Portugal', 'França', 'Itália', 'Espanha'].includes(formData.country) ? 'Região / Distrito *' : formData.country === 'Brasil' ? 'Estado (UF) *' : 'State / Region *'}
                         </Label>
-                        <select
-                          id="prefecture"
-                          name="prefecture"
-                          value={formData.prefecture}
-                          onChange={handleInputChange}
-                          required
-                          className="w-full p-2.5 rounded-lg border border-border bg-background text-foreground focus:ring-2 focus:ring-primary focus:border-primary transition-all font-medium text-sm"
-                        >
-                          <option value="">
-                            {formData.country === 'Japão'
-                              ? 'Escolha a Província...'
-                              : formData.country === 'Estados Unidos'
-                              ? 'Select your State...'
-                              : ['Portugal', 'França', 'Itália', 'Espanha'].includes(formData.country)
-                              ? 'Escolha a Região/Distrito...'
-                              : 'Escolha seu Estado...'}
-                          </option>
-                          {(formData.country === 'Japão'
-                            ? japanPrefectures
-                            : formData.country === 'Estados Unidos'
-                            ? usStates
+                        {(() => {
+                          // Países com lista pronta usam select; os demais usam texto livre
+                          const stateList =
+                            formData.country === 'Japão' ? japanPrefectures
+                            : formData.country === 'Estados Unidos' ? usStates
+                            : formData.country === 'Brasil' ? prefectures
                             : ['Portugal', 'França', 'Itália', 'Espanha'].includes(formData.country)
-                            ? europePrefectures[formData.country] || []
-                            : prefectures
-                          ).map((pref) => (
-                            <option key={pref.name} value={pref.name}>
-                              {pref.nameJa || pref.name} ({pref.name})
-                            </option>
-                          ))}
-                        </select>
+                              ? (europePrefectures[formData.country] || [])
+                              : null;
+                          if (!stateList) {
+                            // Texto livre (preenchido automaticamente pelo CEP quando disponível)
+                            return (
+                              <Input
+                                id="prefecture"
+                                name="prefecture"
+                                type="text"
+                                placeholder="State / Region"
+                                value={formData.prefecture}
+                                onChange={handleInputChange}
+                                required
+                              />
+                            );
+                          }
+                          return (
+                            <select
+                              id="prefecture"
+                              name="prefecture"
+                              value={formData.prefecture}
+                              onChange={handleInputChange}
+                              required
+                              className="w-full p-2.5 rounded-lg border border-border bg-background text-foreground focus:ring-2 focus:ring-primary focus:border-primary transition-all font-medium text-sm"
+                            >
+                              <option value="">
+                                {formData.country === 'Japão' ? 'Escolha a Província...'
+                                  : formData.country === 'Estados Unidos' ? 'Select your State...'
+                                  : ['Portugal', 'França', 'Itália', 'Espanha'].includes(formData.country) ? 'Escolha a Região/Distrito...'
+                                  : 'Escolha seu Estado...'}
+                              </option>
+                              {stateList.map((pref) => (
+                                <option key={pref.name} value={pref.name}>
+                                  {pref.nameJa || pref.name} ({pref.name})
+                                </option>
+                              ))}
+                            </select>
+                          );
+                        })()}
                       </div>
 
                       <div className="space-y-2">
@@ -1065,7 +1068,6 @@ const Checkout: React.FC = () => {
 
                 <div className="space-y-4">
                   {items.map((item) => {
-                    const currency = formData.country === 'Japão' ? 'JPY' : (isEuro ? 'EUR' : 'BRL');
                     const displayItemPrice = item.freeGift ? 0 : fxConvert(effectiveYen(item.product, item.size), currency) * item.quantity;
                     const productName = productEnglishName(item.product);
                     return (

@@ -1,5 +1,6 @@
 import { yenFromConverted } from '@/services/fxService';
 import { roundYen } from '@/utils/pricing';
+import { getCountryConfig } from '@/data/worldCountries';
 
 export const BRL_TO_JPY_RATE = 28;
 export const BRL_TO_EUR_RATE = 0.16;
@@ -51,6 +52,9 @@ export const formatPrice = (price: number, currency: 'BRL' | 'JPY' | 'EUR' | 'US
  * Gets the currency code based on country name.
  */
 export const getCurrencyByCountry = (country: string): 'BRL' | 'JPY' | 'EUR' | 'USD' => {
+  const cfg = getCountryConfig(country);
+  if (cfg) return cfg.currency;
+  // Retrocompat para nomes antigos
   if (country === 'Japão') return 'JPY';
   if (country === 'Estados Unidos') return 'USD';
   if (['Portugal', 'França', 'Itália', 'Espanha'].includes(country)) return 'EUR';

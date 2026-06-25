@@ -13,7 +13,7 @@ import { effectiveYen } from '@/utils/pricing';
 interface ShippingCalculatorProps {
   selectedPrefecture?: string;
   onShippingSelect?: (shipping: { carrier: string; cost: number; costYen: number; estimatedDays: string } | null) => void;
-  destinationCountry?: 'Brasil' | 'Japão' | 'Portugal' | 'França' | 'Itália' | 'Espanha' | 'Estados Unidos';
+  destinationCountry?: string;
   couponDiscount?: number;
 }
 

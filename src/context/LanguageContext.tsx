@@ -2,8 +2,11 @@ import React, { createContext, useContext, useState, useCallback, useEffect, Rea
 import { translations, Language } from '@/data/translations';
 import { safeStorage } from '@/utils/storage';
 import { loadFxRates, getRates } from '@/services/fxService';
+import { WORLD_COUNTRIES } from '@/data/worldCountries';
 
-export type CountryType = 'Brasil' | 'Japão' | 'Portugal' | 'França' | 'Itália' | 'Espanha' | 'Estados Unidos';
+// Nome do país (ver lista completa em src/data/worldCountries.ts).
+// String aberta porque agora há 40+ países — a config vem da tabela central.
+export type CountryType = string;
 
 interface LanguageContextType {
   language: Language;
@@ -22,22 +25,12 @@ export const useLanguage = () => {
   return context;
 };
 
-// Países cujo IP mapeia para português
-const PT_COUNTRIES = new Set(['BR', 'PT', 'AO', 'MZ', 'CV', 'ST', 'GW', 'GQ', 'TL']);
-// Países cujo IP mapeia para japonês
-const JA_COUNTRIES = new Set(['JP']);
-
-// ISO code → CountryType da loja
-const COUNTRY_MAP: Record<string, CountryType> = {
-  BR: 'Brasil', JP: 'Japão', PT: 'Portugal',
-  FR: 'França', IT: 'Itália', ES: 'Espanha',
-  US: 'Estados Unidos',
-};
+// ISO code (upper) → config do país. Construído a partir da tabela central.
+const ISO_TO_CONFIG: Record<string, import('@/data/worldCountries').CountryConfig> =
+  Object.fromEntries(WORLD_COUNTRIES.map(c => [c.iso.toUpperCase(), c]));
 
 function ipToLanguage(code: string): Language {
-  if (PT_COUNTRIES.has(code)) return 'pt';
-  if (JA_COUNTRIES.has(code)) return 'ja';
-  return 'en'; // EUA e demais → inglês
+  return ISO_TO_CONFIG[code]?.language ?? 'en';
 }
 
 interface LanguageProviderProps { children: ReactNode; }
@@ -79,7 +72,7 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
           safeStorage.setItem('preferred-language', lang);
         }
         if (!hasCountry) {
-          const country = COUNTRY_MAP[code];
+          const country = ISO_TO_CONFIG[code]?.name;
           if (country) {
             setSelectedCountryState(country);
             safeStorage.setItem('sakura_selected_country', country);

@@ -8,11 +8,12 @@ import { cn } from '@/lib/utils';
 import { useLanguage } from '@/context/LanguageContext';
 import { usePagination } from '@/hooks/usePagination';
 import Pagination from '@/components/Pagination';
+import { minEffectiveYen } from '@/utils/pricing';
 
 const normalize = (s: string) =>
   (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 
-type SortKey = 'az' | 'za' | 'vendidos' | 'lancamento';
+type SortKey = 'az' | 'za' | 'vendidos' | 'lancamento' | 'preco-menor' | 'preco-maior';
 
 const SORT_KEYS: SortKey[] = ['az', 'za', 'vendidos', 'lancamento'];
 
@@ -26,6 +27,8 @@ const Products: React.FC = () => {
   const { t, language } = useLanguage();
 
   const SORT_OPTIONS = [
+    { key: 'preco-menor' as SortKey, label: t('productsPage.sortPriceAsc') || 'Menor preço' },
+    { key: 'preco-maior' as SortKey, label: t('productsPage.sortPriceDesc') || 'Maior preço' },
     { key: 'az' as SortKey,         label: t('productsPage.sortAZ') },
     { key: 'za' as SortKey,         label: t('productsPage.sortZA') },
     { key: 'vendidos' as SortKey,   label: t('productsPage.sortBestseller') },
@@ -119,6 +122,8 @@ const Products: React.FC = () => {
     if (sort === 'za') arr.sort((a, b) => b.name.localeCompare(a.name, 'pt'));
     if (sort === 'vendidos') arr.sort((a, b) => (b.salesCount || 0) - (a.salesCount || 0));
     if (sort === 'lancamento') arr.sort((a, b) => (b.isNew ? 1 : 0) - (a.isNew ? 1 : 0));
+    if (sort === 'preco-menor') arr.sort((a, b) => minEffectiveYen(a) - minEffectiveYen(b));
+    if (sort === 'preco-maior') arr.sort((a, b) => minEffectiveYen(b) - minEffectiveYen(a));
     return arr;
   }, [bySearch, sort]);
 
