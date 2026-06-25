@@ -642,17 +642,13 @@ export const firebaseSyncService = {
   },
 
   async resetAllUsersData(): Promise<{ success: boolean; users: number; error?: unknown }> {
-    try {
-      ensureFirebaseReady();
-      const snap = await getDocs(collection(db, 'users'));
-      await Promise.all(snap.docs.map((d) =>
-        updateDoc(doc(db, 'users', d.id), { orders: [], points: 0, coupons: [] })
-      ));
-      return { success: true, users: snap.size };
-    } catch (error) {
-      devError('❌ [FIREBASE] resetAllUsersData error:', error);
-      return { success: false, users: 0, error };
-    }
+    ensureFirebaseReady();
+    const snap = await getDocs(collection(db, 'users'));
+    await Promise.all(snap.docs.map((d) =>
+      updateDoc(doc(db, 'users', d.id), { orders: [], points: 0, coupons: [] })
+    ));
+    devLog('✅ [FIREBASE] resetAllUsersData: zeroed', snap.size, 'users');
+    return { success: true, users: snap.size };
   },
 
   // Apaga toda a coleção coupon_usage (histórico de uso de cupons).

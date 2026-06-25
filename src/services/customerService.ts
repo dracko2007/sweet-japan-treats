@@ -360,6 +360,7 @@ export const customerService = {
 
   // Delete todo o histórico (pedidos de todos os clientes, localStorage + Firestore)
   async deleteAllOrderHistory(): Promise<boolean> {
+    // 1. Limpa orders no japan-express-users
     try {
       const usersData = safeStorage.getItem('japan-express-users');
       if (usersData) {
@@ -372,9 +373,23 @@ export const customerService = {
     } catch (error) {
       devError('❌ Erro ao deletar histórico (local):', error);
     }
+    // 2. Remove chaves orders_${userId} (storage por userId)
+    try {
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith('orders_')) keysToRemove.push(k);
+      }
+      keysToRemove.forEach(k => safeStorage.removeItem(k));
+    } catch { /* ignora */ }
+    // 3. Limpa sakura_orders
+    safeStorage.removeItem('sakura_orders');
+    // 4. Firestore
     try {
       await ensureAdminAuth();
       await firebaseSyncService.deleteAllOrdersFromFirestore();
+      // Zera orders nos documentos de usuário no Firestore
+      await firebaseSyncService.resetAllUsersData();
     } catch (error) {
       devError('❌ Erro ao deletar histórico (Firestore):', error);
     }

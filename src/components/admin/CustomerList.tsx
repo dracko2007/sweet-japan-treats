@@ -11,6 +11,7 @@ import { firebaseSyncService } from '@/services/firebaseSyncService';
 import { negotiationService } from '@/services/negotiationService';
 import { ensureAdminAuth } from '@/utils/adminAuth';
 import { requireAdminPassword } from '@/utils/adminGuard';
+import { safeStorage } from '@/utils/storage';
 import { useUser } from '@/context/UserContext';
 import type { Coupon } from '@/context/UserContext';
 
@@ -312,15 +313,41 @@ const CustomerList: React.FC = () => {
         firebaseSyncService.deleteAllCouponUsage(),
         firebaseSyncService.resetAllUsersData(),
       ]);
-      // Limpa também o localStorage relevante
+
+      // Limpa localStorage: sakura_orders, carrinho, negociação ativa
       safeStorage.removeItem('sakura_orders');
       safeStorage.removeItem('redeem_points');
       safeStorage.removeItem('sakura_cart');
       safeStorage.removeItem('activeNegId');
+
+      // Limpa orders de todos os usuários em japan-express-users (localStorage legado)
+      try {
+        const raw = safeStorage.getItem('japan-express-users');
+        if (raw) {
+          const users = JSON.parse(raw) as Record<string, { orders?: unknown[]; points?: number }>;
+          Object.keys(users).forEach(email => {
+            users[email].orders = [];
+            users[email].points = 0;
+          });
+          safeStorage.setItem('japan-express-users', JSON.stringify(users));
+        }
+      } catch { /* ignora se localStorage não disponível */ }
+
+      // Limpa chaves orders_${userId} de todos os usuários (varre o localStorage)
+      try {
+        const keysToRemove: string[] = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k && k.startsWith('orders_')) keysToRemove.push(k);
+        }
+        keysToRemove.forEach(k => safeStorage.removeItem(k));
+      } catch { /* ignora */ }
+
       toast({ title: '✅ Reset completo realizado!', description: 'Pedidos, negociações, pontos e cupons foram zerados.' });
       loadCustomers();
       setSelectedCustomer(null);
-    } catch {
+    } catch (err) {
+      console.error('❌ Erro no reset completo:', err);
       toast({ title: '❌ Erro durante o reset', description: 'Alguns dados podem não ter sido apagados.', variant: 'destructive' });
     }
   };
