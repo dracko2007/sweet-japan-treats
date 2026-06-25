@@ -43,7 +43,14 @@ export const sanitizePackageDimensions = (
   const lengthCm = Number(dimensions.lengthCm);
   const heightCm = Number(dimensions.heightCm);
 
-  if (![widthCm, lengthCm, heightCm].every((value) => Number.isFinite(value) && value > 0 && value <= 200)) {
+  // Cada lado deve ser plausível (0 < x <= 80cm). Acima disso é quase sempre
+  // erro de cadastro (ex: mm digitado como cm) → descarta e usa o peso.
+  if (![widthCm, lengthCm, heightCm].every((value) => Number.isFinite(value) && value > 0 && value <= 80)) {
+    return null;
+  }
+  // Soma (com margem) não pode ultrapassar o limite do Japan Post (150cm),
+  // senão o produto fica "oversize" e some o frete. Descarta se já estourar.
+  if (widthCm + lengthCm + heightCm + 3 * PACKAGE_SAFETY_MARGIN_CM > 145) {
     return null;
   }
 
