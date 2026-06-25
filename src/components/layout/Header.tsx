@@ -52,16 +52,26 @@ const Header: React.FC = () => {
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-md border-b border-border">
-      {/* Barra de confiança — esconde no painel admin */}
+      {/* Barra de confiança — esconde no painel admin.
+          Mobile: marquee contínuo (não corta as pontas). Desktop: centralizado. */}
       {!isAdminPage && (
         <div className="bg-primary text-primary-foreground text-[11px] font-semibold overflow-hidden">
-          <div className="flex items-center justify-center gap-0 animate-none">
-            <div className="flex items-center gap-6 px-4 py-1.5 overflow-x-auto scrollbar-none whitespace-nowrap w-full justify-center">
-              {trustItems.map(({ icon: Icon, text }) => (
-                <span key={text} className="flex items-center gap-1.5 shrink-0">
+          {/* Desktop (lg+): centralizado, cabe inteiro */}
+          <div className="hidden lg:flex items-center justify-center gap-6 px-4 py-1.5 whitespace-nowrap">
+            {trustItems.map(({ icon: Icon, text }) => (
+              <span key={text} className="flex items-center gap-1.5">
+                <Icon className="w-3 h-3 opacity-90" />
+                {text}
+              </span>
+            ))}
+          </div>
+          {/* Mobile: marquee rolando da direita para a esquerda (sem corte) */}
+          <div className="lg:hidden py-1.5 overflow-hidden">
+            <div className="flex items-center gap-8 whitespace-nowrap animate-marquee">
+              {[...trustItems, ...trustItems].map(({ icon: Icon, text }, i) => (
+                <span key={i} className="flex items-center gap-1.5 shrink-0">
                   <Icon className="w-3 h-3 opacity-90" />
                   {text}
-                  <span className="text-primary-foreground/40 mx-1 hidden sm:inline">|</span>
                 </span>
               ))}
             </div>
