@@ -171,11 +171,13 @@ const Admin: React.FC = () => {
       toast({ title: "Erro", description: "Email do admin não encontrado", variant: "destructive" });
       return;
     }
+    // Confirma pagamento E muda status para 'confirmed' (etapa 1)
     const success = await orderService.confirmPayment(orderNumber, user.email);
     if (success) {
+      await orderService.updateOrderStatus(orderNumber, 'confirmed');
       toast({
         title: "✅ Pagamento confirmado!",
-        description: `Pedido ${orderNumber} marcado como pago.`,
+        description: `Pedido ${orderNumber} marcado como pago e pronto para processar.`,
       });
       loadOrders();
     } else {
@@ -1030,7 +1032,7 @@ _This is an automated test message_
                           </Button>
                         </>
                       )}
-                      {order.status === 'processing' && (
+                      {(order.status === 'processing' || order.status === 'confirmed') && (
                         <Button
                           onClick={() => handleUpdateStatus(order.orderNumber, 'packing')}
                           size="sm"
@@ -1055,15 +1057,24 @@ _This is an automated test message_
                         </Button>
                       )}
                       {order.status === 'shipped' && (
-                        <Button
-                          onClick={() => handleUpdateStatus(order.orderNumber, 'delivered')}
-                          variant="outline"
-                          size="sm"
-                          className="gap-2"
-                        >
-                          <CheckCircle className="w-4 h-4" />
-                          Marcar como Entregue
-                        </Button>
+                        <>
+                          <Button
+                            onClick={() => handleUpdateStatus(order.orderNumber, 'delivered')}
+                            size="sm"
+                            className="gap-2 bg-green-600 hover:bg-green-700 text-white"
+                          >
+                            <CheckCircle className="w-4 h-4" />
+                            ✅ Pacote Recebido pelo Admin
+                          </Button>
+                          <Button
+                            onClick={() => handleUpdateStatus(order.orderNumber, 'cancelled')}
+                            variant="outline"
+                            size="sm"
+                            className="gap-2 text-orange-600 hover:text-orange-700"
+                          >
+                            Cancelar
+                          </Button>
+                        </>
                       )}
                       {order.status !== 'cancelled' && order.status !== 'delivered' && (
                         <Button

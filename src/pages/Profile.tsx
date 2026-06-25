@@ -882,6 +882,8 @@ const Profile: React.FC = () => {
                       {(() => {
                         const hasTracking = !!(order as any).trackingNumber;
                         const st = order.status as string;
+                        // Mapa de status para passo no fluxo:
+                        // 0=Pagamento (pending) | 1=Preparando (processing/packing) | 2=Enviado (shipped) | 3=Entregue (delivered)
                         const statusStep =
                           st === 'delivered' ? 3
                           : st === 'shipped' ? 2
