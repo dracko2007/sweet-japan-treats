@@ -6,7 +6,7 @@ import Layout from '@/components/layout/Layout';
 import ShippingCalculator from '@/components/shipping/ShippingCalculator';
 import { Button } from '@/components/ui/button';
 import { useLanguage, CountryType } from '@/context/LanguageContext';
-import { formatPrice } from '@/utils/currency';
+import { formatPrice, getCurrencyByCountry } from '@/utils/currency';
 import { getELightRate, getAirParcelRate, getEmsRate, countryToZone, MAX_DIM_SUM_CM, MAX_WEIGHT_G, type JapanPostZone } from '@/utils/japanPostRates';
 import { convertYen as fxConvert } from '@/services/fxService';
 
@@ -69,24 +69,33 @@ const Shipping: React.FC = () => {
       ];
     }
 
-    const isEurope = ['Portugal', 'França', 'Itália', 'Espanha'].includes(country);
     const zone: JapanPostZone = countryToZone(country);
-    const cur = isEurope ? 'EUR' : 'BRL';
+    const cur = getCurrencyByCountry(country);
     const billableWeightG = Math.max(1, Math.round(billableWeight * 1000));
+
+    // Prazo estimado por zona Japan Post
+    const daysByZone: Record<number, { light: string; air: string; ems: string }> = {
+      1: { light: '6-10 days',  air: '4-7 days',   ems: '2-4 days'  },
+      2: { light: '7-12 days',  air: '5-9 days',   ems: '3-5 days'  },
+      3: { light: '7-14 days',  air: '6-10 days',  ems: '4-7 days'  },
+      4: { light: '7-14 days',  air: '6-10 days',  ems: '3-6 days'  },
+      5: { light: '20-40 days', air: '10-15 days', ems: '7-12 days' },
+    };
+    const zd = daysByZone[zone] || daysByZone[5];
 
     type SimRate = { name: string; cost: number | null; time: string; consultar?: boolean };
     const rates: SimRate[] = [];
 
     if (billableWeightG <= 2000) {
       const yen = getELightRate(billableWeightG, zone);
-      rates.push({ name: 'Japan Post E-Light ✉️', cost: yen ? fxConvert(yen, cur) : null, time: isEurope ? '7-12 days' : '10-15 days' });
+      rates.push({ name: 'Japan Post E-Light ✉️', cost: yen ? fxConvert(yen, cur) : null, time: zd.light });
     } else {
       const airYen = getAirParcelRate(billableWeightG, zone);
-      rates.push({ name: 'Japan Post Kozutsumi Air 📦', cost: airYen ? fxConvert(airYen, cur) : null, time: isEurope ? '7-10 days' : '10-15 days' });
+      rates.push({ name: 'Japan Post Kozutsumi Air 📦', cost: airYen ? fxConvert(airYen, cur) : null, time: zd.air });
     }
 
     const emsYen = getEmsRate(billableWeightG, zone);
-    rates.push({ name: 'Japan Post EMS / DHL ✈️', cost: emsYen ? fxConvert(emsYen, cur) : null, time: isEurope ? '5-8 days' : '7-12 days' });
+    rates.push({ name: 'Japan Post EMS / DHL ✈️', cost: emsYen ? fxConvert(emsYen, cur) : null, time: zd.ems });
     rates.push({ name: 'Sea Freight 🚢', cost: null, time: '60-90 days', consultar: true });
 
     return rates;
@@ -256,7 +265,7 @@ const Shipping: React.FC = () => {
   };
 
   const sampleRates = getSampleRates();
-  const currency = country === 'Japão' ? 'JPY' : (['Portugal', 'França', 'Itália', 'Espanha'].includes(country) ? 'EUR' : 'BRL');
+  const currency = getCurrencyByCountry(country);
 
   return (
     <Layout>

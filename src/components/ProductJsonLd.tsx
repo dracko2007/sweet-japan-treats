@@ -3,6 +3,8 @@ import type { Product } from '@/types';
 import { minEffectiveYen } from '@/utils/pricing';
 import { convertYen } from '@/services/fxService';
 import { catalogShippingYen } from '@/utils/catalogShipping';
+import { getCurrencyByCountry } from '@/utils/currency';
+import { getCountryConfig } from '@/data/worldCountries';
 
 interface Props {
   product: Product;
@@ -19,11 +21,10 @@ const SITE_URL = 'https://www.japanexpress-store.com';
  */
 const ProductJsonLd: React.FC<Props> = ({ product, country, rating }) => {
   useEffect(() => {
-    const isEuro = ['Portugal', 'França', 'Itália', 'Espanha'].includes(country);
     const isJapan = country === 'Japão';
-    const isUsa = country === 'Estados Unidos';
-    const currency = isJapan ? 'JPY' : isUsa ? 'USD' : isEuro ? 'EUR' : 'BRL';
-    const shippingCountry = isEuro ? 'PT' : isUsa ? 'US' : isJapan ? 'JP' : 'BR';
+    const currency = getCurrencyByCountry(country);
+    const cfg = getCountryConfig(country);
+    const shippingCountry = (cfg?.iso || 'br').toUpperCase();
 
     const priceYen = minEffectiveYen(product);
     const shipYen = isJapan ? 0 : catalogShippingYen(product, country);

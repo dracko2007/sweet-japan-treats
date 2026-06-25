@@ -5,7 +5,7 @@ import { useCart } from '@/context/CartContext';
 import { convertYen as fxConvert } from '@/services/fxService';
 import { useLanguage } from '@/context/LanguageContext';
 import { cn } from '@/lib/utils';
-import { formatPrice } from '@/utils/currency';
+import { formatPrice, getCurrencyByCountry } from '@/utils/currency';
 import { calculateCartShippingBoxes } from '@/utils/shippingDimensions';
 import { getELightRate, getAirParcelRate, getEmsRate, countryToZone, MAX_WEIGHT_G, MAX_DIM_SUM_CM, type JapanPostZone } from '@/utils/japanPostRates';
 import { effectiveYen } from '@/utils/pricing';
@@ -42,6 +42,8 @@ const ShippingCalculator: React.FC<ShippingCalculatorProps> = ({
   const isJapan = destinationCountry === 'Japão';
   const isEurope = ['Portugal', 'França', 'Itália', 'Espanha'].includes(destinationCountry || '');
   const jpZone: JapanPostZone = countryToZone(destinationCountry || 'Brasil');
+  // Moeda de exibição do frete conforme o país (BRL/EUR/USD/JPY)
+  const destCurrency = getCurrencyByCountry(destinationCountry || 'Brasil');
 
   const calculateBoxes = useMemo(
     () => calculateCartShippingBoxes(items, spaceInfo),
@@ -54,11 +56,10 @@ const ShippingCalculator: React.FC<ShippingCalculatorProps> = ({
 
   const displaySubtotal = useMemo(() => {
     return items.reduce((sum, item) => {
-      const cur = isJapan ? 'JPY' : isEurope ? 'EUR' : 'BRL';
-      const unitPrice = fxConvert(effectiveYen(item.product, item.size), cur);
+      const unitPrice = fxConvert(effectiveYen(item.product, item.size), destCurrency);
       return sum + unitPrice * item.quantity;
     }, 0);
-  }, [items, isJapan, isEurope]);
+  }, [items, destCurrency]);
 
   const finalAmountForFreeShipping = displaySubtotal - couponDiscount;
   const isFreeShipping = isJapan && items.length > 0 && finalAmountForFreeShipping >= 6000;
@@ -97,9 +98,19 @@ const ShippingCalculator: React.FC<ShippingCalculatorProps> = ({
     // International — Japan Post weight-based
     const weightG = calculateBoxes.totalWeightG;
     if (weightG <= 0) return [];
-    const currency = isEurope ? 'EUR' : 'BRL';
+    const currency = destCurrency;
 
     if (weightG > MAX_WEIGHT_G) return []; // overweight — handled in JSX
+
+    // Prazo estimado por zona Japan Post (e-Light / Air / EMS)
+    const daysByZone: Record<number, { light: string; air: string; ems: string }> = {
+      1: { light: '6-10',  air: '4-7',   ems: '2-4'  }, // China/Coreia/Taiwan
+      2: { light: '7-12',  air: '5-9',   ems: '3-5'  }, // Ásia
+      3: { light: '7-14',  air: '6-10',  ems: '4-7'  }, // Europa/Oceania
+      4: { light: '7-14',  air: '6-10',  ems: '3-6'  }, // EUA
+      5: { light: '20-40', air: '10-15', ems: '7-12' }, // Brasil/Am.Sul/África
+    };
+    const zd = daysByZone[jpZone] || daysByZone[5];
 
     const options: Array<{
       carrier: string; name: string; logo: string;
@@ -117,7 +128,7 @@ const ShippingCalculator: React.FC<ShippingCalculatorProps> = ({
         cost: fxConvert(eLightYen, currency),
         costYen: eLightYen,
         originalCost: undefined,
-        estimatedDays: isEurope ? '7-12' : '30-40',
+        estimatedDays: zd.light,
       });
     } else {
       const airYen = getAirParcelRate(weightG, jpZone);
@@ -128,7 +139,7 @@ const ShippingCalculator: React.FC<ShippingCalculatorProps> = ({
         cost: fxConvert(airYen, currency),
         costYen: airYen,
         originalCost: undefined,
-        estimatedDays: isEurope ? '7-10' : '10-15',
+        estimatedDays: zd.air,
       });
     }
 
@@ -141,7 +152,7 @@ const ShippingCalculator: React.FC<ShippingCalculatorProps> = ({
       cost: fxConvert(emsYen, currency),
       costYen: emsYen,
       originalCost: undefined,
-      estimatedDays: isEurope ? '5-8' : '20-25',
+      estimatedDays: zd.ems,
     });
 
     // Maritime — always show as "Consultar"
@@ -161,7 +172,7 @@ const ShippingCalculator: React.FC<ShippingCalculatorProps> = ({
       if (b.isConsultar) return -1;
       return a.cost - b.cost;
     });
-  }, [selectedPref, items, calculateBoxes, isJapan, isEurope, jpZone, isFreeShipping]);
+  }, [selectedPref, items, calculateBoxes, isJapan, jpZone, destCurrency, isFreeShipping]);
 
   useEffect(() => {
     if (onShippingSelect && selectedCarrier && shippingOptions.length > 0) {
@@ -174,7 +185,7 @@ const ShippingCalculator: React.FC<ShippingCalculatorProps> = ({
     }
   }, [selectedCarrier, shippingOptions, onShippingSelect]);
 
-  const currency = isJapan ? 'JPY' : (isEurope ? 'EUR' : 'BRL');
+  const currency = destCurrency;
 
   const weightG = calculateBoxes.totalWeightG;
   const weightLabel = weightG >= 1000
@@ -232,7 +243,7 @@ const ShippingCalculator: React.FC<ShippingCalculatorProps> = ({
           <p className="text-sm font-semibold text-blue-800 dark:text-blue-200 flex items-center gap-2">
             🗾 Japan Post Internacional · Zona {jpZone}
             <span className="text-xs font-normal text-blue-600 dark:text-blue-400">
-              — {isEurope ? `${destinationCountry} (Europe)` : t('calc.southAmerica')}
+              — {destinationCountry}
             </span>
           </p>
           <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
