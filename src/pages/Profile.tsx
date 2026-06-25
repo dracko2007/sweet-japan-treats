@@ -1,7 +1,7 @@
 import { safeStorage } from '@/utils/storage';
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { User, Mail, Phone, MapPin, Calendar, Gift, ShoppingBag, Edit2, LogOut, Package, RotateCcw, Cloud, Truck, Tag, Megaphone, ArrowRight, Handshake, CheckCircle2, XCircle, Hourglass } from 'lucide-react';
+import { User, Mail, Phone, MapPin, Calendar, Gift, ShoppingBag, Edit2, LogOut, Package, RotateCcw, Cloud, Truck, Tag, Megaphone, ArrowRight, Handshake, CheckCircle2, XCircle, Hourglass, FileText } from 'lucide-react';
 import { negotiationService } from '@/services/negotiationService';
 import type { Negotiation } from '@/types/negotiation';
 import Layout from '@/components/layout/Layout';
@@ -1096,19 +1096,58 @@ const Profile: React.FC = () => {
                         );
                       })()}
 
-                      <div className="mt-3 pt-3 border-t border-border">
+                      <div className="mt-3 pt-3 border-t border-border space-y-2">
+                        {/* Payment Status */}
                         <div className="flex items-center justify-between">
-                          <p className="text-xs text-muted-foreground">
-                            <Package className="w-3 h-3 inline mr-1" />
-                            {t('profile.orders.payment')}{' '}
-                            {order.paymentMethod === 'pix' ? 'PIX'
-                              : order.paymentMethod === 'wise' ? 'Wise'
-                              : order.paymentMethod === 'paypay' ? 'PayPay'
-                              : order.paymentMethod === 'yucho' ? 'Yucho'
-                              : order.paymentMethod === 'card' ? 'Cartão de Crédito'
-                              : order.paymentMethod === 'bank' ? t('profile.orders.payment.bank')
-                              : order.paymentMethod || 'N/A'}
-                          </p>
+                          <div className="flex items-center gap-2">
+                            <Package className="w-3 h-3 text-muted-foreground" />
+                            <span className="text-xs text-muted-foreground">
+                              {t('profile.orders.payment')}{' '}
+                              {order.paymentMethod === 'pix' ? 'PIX'
+                                : order.paymentMethod === 'wise' ? 'Wise'
+                                : order.paymentMethod === 'paypay' ? 'PayPay'
+                                : order.paymentMethod === 'yucho' ? 'Yucho'
+                                : order.paymentMethod === 'card' ? 'Cartão de Crédito'
+                                : order.paymentMethod === 'bank' ? t('profile.orders.payment.bank')
+                                : order.paymentMethod || 'N/A'}
+                            </span>
+                            {(order as any).paymentConfirmed ? (
+                              <span className="text-xs font-bold text-green-600 flex items-center gap-1">
+                                ✅ Confirmado
+                              </span>
+                            ) : (
+                              <span className="text-xs font-bold text-orange-600 flex items-center gap-1">
+                                ⏳ Pendente
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        {/* Action Buttons */}
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            onClick={() => {
+                              const printWindow = window.open('', '', 'width=800,height=600');
+                              if (printWindow) {
+                                printWindow.document.write(`
+                                  <html><head><title>Comprovante ${order.orderNumber}</title></head><body>
+                                  <h1>Comprovante de Pedido</h1>
+                                  <p><strong>Número:</strong> ${order.orderNumber}</p>
+                                  <p><strong>Data:</strong> ${new Date(order.date).toLocaleDateString('pt-BR')}</p>
+                                  <p><strong>Total:</strong> ${formatPrice(order.totalAmount, (order as any).currency || 'JPY')}</p>
+                                  <p><strong>Status do Pagamento:</strong> ${(order as any).paymentConfirmed ? '✅ Confirmado' : '⏳ Pendente'}</p>
+                                  <button onclick="window.print()">Imprimir</button>
+                                  </body></html>
+                                `);
+                                printWindow.document.close();
+                              }
+                            }}
+                            variant="outline"
+                            size="sm"
+                            className="gap-2 text-primary hover:bg-primary/10"
+                          >
+                            <FileText className="w-3 h-3" />
+                            Comprovante
+                          </Button>
                           <Button
                             onClick={() => handleReorder(order)}
                             variant="outline"

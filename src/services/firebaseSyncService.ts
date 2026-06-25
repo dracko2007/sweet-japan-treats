@@ -256,11 +256,30 @@ export const firebaseSyncService = {
         status,
         updatedAt: new Date().toISOString()
       });
-      
+
       devLog('✅ [FIREBASE] Order status updated:', orderNumber, status);
       return true;
     } catch (error) {
       devError('❌ [FIREBASE] Error updating order:', error);
+      return false;
+    }
+  },
+
+  async confirmPayment(orderNumber: string, adminEmail: string, confirmedAt: string) {
+    try {
+      ensureFirebaseReady();
+      const orderRef = doc(db, 'orders', orderNumber);
+      await updateDoc(orderRef, {
+        paymentConfirmed: true,
+        paymentConfirmedAt: confirmedAt,
+        paymentConfirmedBy: adminEmail,
+        updatedAt: confirmedAt
+      });
+
+      devLog('✅ [FIREBASE] Payment confirmed:', orderNumber, 'by', adminEmail);
+      return true;
+    } catch (error) {
+      devError('❌ [FIREBASE] Error confirming payment:', error);
       return false;
     }
   },

@@ -98,6 +98,9 @@ export interface Order {
   date?: string;
   status?: OrderStatusValue | string;
   paymentMethod?: string;
+  paymentConfirmed?: boolean;            // true = admin confirmou pagamento recebido
+  paymentConfirmedAt?: string;           // ISO timestamp da confirmação
+  paymentConfirmedBy?: string;           // email do admin que confirmou
   items: OrderItem[];
   totalPrice?: number;
   totalAmount?: number;

@@ -112,6 +112,41 @@ export const orderService = {
     return updated;
   },
 
+  // Confirma pagamento do pedido (marca como recebido pelo admin)
+  confirmPayment: async (orderNumber: string, adminEmail: string): Promise<boolean> => {
+    let updated = false;
+    const now = new Date().toISOString();
+
+    // Update in Firestore
+    try {
+      await ensureAdminAuth();
+      await firebaseSyncService.confirmPayment(orderNumber, adminEmail, now);
+      updated = true;
+    } catch (err) {
+      devError('❌ [ORDER] Firestore payment confirmation failed:', err);
+    }
+
+    // Also update in safeStorage
+    const users = JSON.parse(safeStorage.getItem('japan-express-users') || '{}');
+    Object.keys(users).forEach((email) => {
+      const user = users[email];
+      if (user.orders && user.orders.length > 0) {
+        const order = user.orders.find((o: any) => o.orderNumber === orderNumber);
+        if (order) {
+          order.paymentConfirmed = true;
+          order.paymentConfirmedAt = now;
+          order.paymentConfirmedBy = adminEmail;
+          updated = true;
+        }
+      }
+    });
+    if (updated) {
+      safeStorage.setItem('japan-express-users', JSON.stringify(users));
+    }
+
+    return updated;
+  },
+
   // Exclui o pedido de verdade (localStorage + Firestore)
   deleteOrder: async (orderNumber: string): Promise<boolean> => {
     let deletedLocal = false;

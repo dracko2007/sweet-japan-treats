@@ -166,9 +166,30 @@ const Admin: React.FC = () => {
     }
   }, [activeTab, customerCount]);
 
+  const handleConfirmPayment = async (orderNumber: string) => {
+    if (!user?.email) {
+      toast({ title: "Erro", description: "Email do admin não encontrado", variant: "destructive" });
+      return;
+    }
+    const success = await orderService.confirmPayment(orderNumber, user.email);
+    if (success) {
+      toast({
+        title: "✅ Pagamento confirmado!",
+        description: `Pedido ${orderNumber} marcado como pago.`,
+      });
+      loadOrders();
+    } else {
+      toast({
+        title: "Erro",
+        description: "Não foi possível confirmar o pagamento",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleUpdateStatus = async (orderNumber: string, newStatus: 'pending' | 'processing' | 'packing' | 'shipped' | 'delivered' | 'cancelled') => {
     const success = await orderService.updateOrderStatus(orderNumber, newStatus);
-    
+
     if (success) {
       toast({
         title: "Status atualizado!",
@@ -990,14 +1011,24 @@ _This is an automated test message_
                     {/* Action Buttons */}
                     <div className="mt-6 pt-4 border-t border-border flex flex-wrap gap-2">
                       {order.status === 'pending' && (
-                        <Button
-                          onClick={() => handleUpdateStatus(order.orderNumber, 'processing')}
-                          size="sm"
-                          className="gap-2 bg-green-600 hover:bg-green-700 text-white"
-                        >
-                          <CheckCircle className="w-4 h-4" />
-                          Confirmar Pagamento
-                        </Button>
+                        <>
+                          <Button
+                            onClick={() => handleConfirmPayment(order.orderNumber)}
+                            size="sm"
+                            className="gap-2 bg-green-600 hover:bg-green-700 text-white"
+                          >
+                            <CheckCircle className="w-4 h-4" />
+                            ✅ Confirmar Pagamento Recebido
+                          </Button>
+                          <Button
+                            onClick={() => handleUpdateStatus(order.orderNumber, 'processing')}
+                            size="sm"
+                            variant="outline"
+                          >
+                            <Package className="w-4 h-4 mr-2" />
+                            Já Processando
+                          </Button>
+                        </>
                       )}
                       {order.status === 'processing' && (
                         <Button
