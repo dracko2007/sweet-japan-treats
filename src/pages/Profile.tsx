@@ -339,7 +339,7 @@ const Profile: React.FC = () => {
           <div className="max-w-6xl mx-auto space-y-6">
 
             {/* Pontos de Fidelidade */}
-            <div className="bg-gradient-to-r from-amber-400 to-orange-500 rounded-2xl p-6 lg:p-8 text-white shadow-elevated flex items-center justify-between">
+            <div className="bg-gradient-to-r from-amber-400 to-pink-500 rounded-2xl p-6 lg:p-8 text-white shadow-elevated flex items-center justify-between">
               <div>
                 <p className="text-sm font-semibold uppercase tracking-wide text-white/90">{t('profile.points.title')}</p>
                 <p className="font-display text-5xl font-extrabold mt-1">{user?.points || 0} <span className="text-2xl font-bold">pts</span></p>
@@ -867,8 +867,8 @@ const Profile: React.FC = () => {
                           <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${
                             order.status === 'delivered' ? 'bg-green-100 text-green-800' :
                             order.status === 'shipped' ? 'bg-blue-100 text-blue-800' :
-                            (order.status as string) === 'packing' ? 'bg-orange-100 text-orange-800' :
-                            (order.status as string) === 'processing' ? 'bg-orange-100 text-orange-800' :
+                            (order.status as string) === 'packing' ? 'bg-pink-100 text-orange-800' :
+                            (order.status as string) === 'processing' ? 'bg-pink-100 text-orange-800' :
                             order.status === 'confirmed' ? 'bg-yellow-100 text-yellow-800' :
                             order.status === 'cancelled' ? 'bg-red-100 text-red-800' :
                             'bg-gray-100 text-gray-800'
@@ -1135,7 +1135,7 @@ const Profile: React.FC = () => {
                                 ✅ Pago
                               </span>
                             ) : (
-                              <span className="text-xs font-bold text-orange-600 flex items-center gap-1">
+                              <span className="text-xs font-bold text-pink-600 flex items-center gap-1">
                                 ⏳ Pendente
                               </span>
                             )}
@@ -1227,7 +1227,7 @@ const Profile: React.FC = () => {
                     const isRejected = neg.status === 'rejected';
                     const isExpired = neg.status === 'expired' || isExpiredClient;
                     const borderClass = isPending
-                      ? 'border-orange-200 bg-orange-50/30 dark:bg-orange-950/10'
+                      ? 'border-pink-200 bg-pink-50/30 dark:bg-pink-950/10'
                       : isApproved
                       ? 'border-green-200 bg-green-50/30 dark:bg-green-950/10'
                       : isUsed
@@ -1244,7 +1244,7 @@ const Profile: React.FC = () => {
                                 {neg.type === 'ps_fee' ? '🤝 Taxa Personal Shopper' : '🚚 Frete'}
                               </span>
                               <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold border ${
-                                isPending ? 'bg-orange-100 text-orange-700 border-orange-300'
+                                isPending ? 'bg-pink-100 text-pink-700 border-pink-300'
                                 : isApproved ? 'bg-green-100 text-green-700 border-green-300'
                                 : isUsed ? 'bg-blue-100 text-blue-700 border-blue-300'
                                 : 'bg-red-100 text-red-700 border-red-300'

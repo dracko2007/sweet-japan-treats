@@ -174,7 +174,7 @@ const Header: React.FC = () => {
               {isAdmin && (
                 <Link
                   to={isAdminPage ? '/' : '/admin'}
-                  className="flex items-center gap-1.5 px-2 py-1 bg-orange-500/10 border border-orange-300/60 rounded-full text-[11px] font-semibold text-orange-700 dark:text-orange-400 hover:bg-orange-500/20 transition-colors"
+                  className="flex items-center gap-1.5 px-2 py-1 bg-pink-500/10 border border-pink-300/60 rounded-full text-[11px] font-semibold text-pink-700 dark:text-pink-400 hover:bg-pink-500/20 transition-colors"
                 >
                   {isAdminPage
                     ? <><ShoppingCart className="w-3.5 h-3.5" /> Ver Loja</>
@@ -292,7 +292,7 @@ const Header: React.FC = () => {
               <Button
                 asChild
                 variant="ghost"
-                className="w-full justify-start text-base font-medium text-orange-600 hover:text-orange-700"
+                className="w-full justify-start text-base font-medium text-pink-600 hover:text-pink-700"
               >
                 {isAdminPage ? (
                   <Link to="/" onClick={() => setIsMenuOpen(false)}>

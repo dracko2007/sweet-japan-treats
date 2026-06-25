@@ -138,7 +138,7 @@ const CartItemComponent: React.FC<CartItemProps> = ({ item, couponDiscount = 0 }
               </button>
             </div>
             {atPromoLimit && (
-              <p className="text-[10px] text-orange-600 font-semibold leading-tight">
+              <p className="text-[10px] text-pink-600 font-semibold leading-tight">
                 Limite promocional atingido ({promoMax}x/pessoa)
               </p>
             )}

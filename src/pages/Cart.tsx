@@ -293,13 +293,13 @@ const Cart: React.FC = () => {
 
                 {/* Remessa Conforme Trust Badge Info Banner for Brazil */}
                 {selectedCountry === 'Brasil' && (
-                  <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 flex items-start gap-3 mt-6">
-                    <ShieldCheck className="w-6 h-6 text-orange-600 shrink-0 mt-0.5" />
+                  <div className="bg-pink-50 border border-pink-200 rounded-xl p-4 flex items-start gap-3 mt-6">
+                    <ShieldCheck className="w-6 h-6 text-pink-600 shrink-0 mt-0.5" />
                     <div>
                       <h4 className="font-sans font-bold text-sm text-orange-800 flex items-center gap-1.5">
                         Alíquota do Remessa Conforme Atualizada (2026)
                       </h4>
-                      <p className="text-xs text-orange-700 mt-1 leading-relaxed">
+                      <p className="text-xs text-pink-700 mt-1 leading-relaxed">
                         {subtotalWithDiscount < 250 ? (
                           <span>
                             <strong>Taxação de 20% + ICMS inclusa:</strong> Conforme a nova legislação brasileira, compras internacionais de até <strong>R$ 250,00</strong> pagam 20% de Imposto de Importação Federal + 17% de ICMS Estadual. Todos os impostos já estão calculados no carrinho para evitar surpresas na alfândega dos Correios.
@@ -435,7 +435,7 @@ const Cart: React.FC = () => {
                           </span>
                         </div>
                         {hasPromoItems && regularSubtotal === 0 && (
-                          <p className="text-[11px] text-orange-600 font-semibold bg-orange-50 border border-orange-200 rounded-lg px-2 py-1.5 leading-snug">
+                          <p className="text-[11px] text-pink-600 font-semibold bg-pink-50 border border-pink-200 rounded-lg px-2 py-1.5 leading-snug">
                             ⚠️ Todos os itens já têm desconto promocional. O cupom não foi aplicado.
                           </p>
                         )}
@@ -449,12 +449,12 @@ const Cart: React.FC = () => {
 
                     {/* Tax displays only as estimated warnings for international destinations */}
                     {selectedCountry !== 'Japão' && estimatedTax > 0 && (
-                      <div className="bg-orange-50/50 dark:bg-orange-950/10 border border-orange-200/60 rounded-xl p-3 space-y-2 mt-2">
-                        <div className="flex justify-between text-xs font-bold text-orange-850 dark:text-orange-300">
+                      <div className="bg-pink-50/50 dark:bg-pink-950/10 border border-pink-200/60 rounded-xl p-3 space-y-2 mt-2">
+                        <div className="flex justify-between text-xs font-bold text-orange-850 dark:text-pink-300">
                           <span>{taxLabel}</span>
                           <span>{formatPrice(estimatedTax, currency)}</span>
                         </div>
-                        <p className="text-[10px] text-orange-700 dark:text-orange-400 leading-relaxed font-semibold">
+                        <p className="text-[10px] text-pink-700 dark:text-pink-400 leading-relaxed font-semibold">
                           ⚠️ <strong>Lembrete:</strong> Este imposto é apenas uma estimativa aproximada. Ele <strong>NÃO</strong> foi somado ao total geral do seu carrinho e poderá ser cobrado pela alfândega local na chegada do pacote ao país de destino.
                         </p>
                       </div>
@@ -473,7 +473,7 @@ const Cart: React.FC = () => {
                             {formatPrice(baseTotalPrice, currency)}
                           </p>
                         )}
-                        <span className="font-black text-2xl text-orange-600">
+                        <span className="font-black text-2xl text-pink-600">
                           {formatPrice(grandTotal, currency)}
                         </span>
                         {discountAmount > 0 && (

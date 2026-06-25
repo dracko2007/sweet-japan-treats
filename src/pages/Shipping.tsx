@@ -522,15 +522,15 @@ const Shipping: React.FC = () => {
 
                 {/* Simulated Tax Result */}
                 {country !== 'Japão' && simTax.total > 0 && (
-                  <div className="bg-orange-50/50 dark:bg-orange-950/20 border border-orange-200 rounded-xl p-4 space-y-2">
-                    <div className="flex justify-between items-center text-sm font-bold text-orange-850 dark:text-orange-300">
+                  <div className="bg-pink-50/50 dark:bg-pink-950/20 border border-pink-200 rounded-xl p-4 space-y-2">
+                    <div className="flex justify-between items-center text-sm font-bold text-orange-850 dark:text-pink-300">
                       <span className="flex items-center gap-1.5">
                         <Percent className="w-4 h-4" />
                         {t('shippingPage.customsEst')} ({simTax.label})
                       </span>
                       <span>{formatPrice(simTax.total, currency)}</span>
                     </div>
-                    <p className="text-[10px] text-orange-700 dark:text-orange-400 leading-relaxed font-semibold">
+                    <p className="text-[10px] text-pink-700 dark:text-pink-400 leading-relaxed font-semibold">
                       ⚠️ {t('shippingPage.notaFiscal')}
                     </p>
                   </div>
@@ -565,7 +565,7 @@ const Shipping: React.FC = () => {
                 
                 {country === 'Brasil' && (
                   <div className="space-y-3 text-xs leading-relaxed text-muted-foreground">
-                    <div className="bg-orange-50 dark:bg-orange-950/20 border border-orange-200 rounded-lg p-3 text-orange-850 dark:text-orange-200 font-medium">
+                    <div className="bg-pink-50 dark:bg-pink-950/20 border border-pink-200 rounded-lg p-3 text-orange-850 dark:text-pink-200 font-medium">
                       ⚠️ <strong>{t('shippingPage.customsEst')}</strong>
                     </div>
                     <p>
@@ -573,13 +573,13 @@ const Shipping: React.FC = () => {
                         ? 'International purchases from Japan are subject to customs fees at the Curitiba clearance center. We show estimates in your cart for full transparency.'
                         : 'As compras internacionais do Japão sofrem taxação na alfândega. Apresentamos as estimativas no carrinho para sua transparência.'}
                     </p>
-                    <p className="text-orange-700 dark:text-orange-400 font-semibold bg-orange-50/50 p-2 rounded">
+                    <p className="text-pink-700 dark:text-pink-400 font-semibold bg-pink-50/50 p-2 rounded">
                       * {t('shippingPage.notaFiscal')}
                     </p>
                     <div className="border-t border-primary/10 pt-2.5 space-y-2">
                       <div className="flex justify-between font-bold text-foreground">
                         <span>{t('shippingPage.customs.below')}:</span>
-                        <span className="text-orange-600">20% Federal + 17% ICMS</span>
+                        <span className="text-pink-600">20% Federal + 17% ICMS</span>
                       </div>
                       <p className="text-[10px] pl-2 border-l-2 border-border">
                         20% simplified federal tax on customs value + 17% ICMS state tax.
@@ -587,7 +587,7 @@ const Shipping: React.FC = () => {
 
                       <div className="flex justify-between font-bold text-foreground">
                         <span>{t('shippingPage.customs.above')}:</span>
-                        <span className="text-orange-600">60% Federal + 17% ICMS</span>
+                        <span className="text-pink-600">60% Federal + 17% ICMS</span>
                       </div>
                       <p className="text-[10px] pl-2 border-l-2 border-border">
                         60% federal import tax (with R$ 62.50 fixed deduction) + 17% ICMS state tax.
@@ -696,7 +696,7 @@ const Shipping: React.FC = () => {
                       </div>
 
                       <div className="text-[10px] text-muted-foreground flex items-center gap-1">
-                        <Clock className="w-3.5 h-3.5 text-orange-500 shrink-0" />
+                        <Clock className="w-3.5 h-3.5 text-pink-500 shrink-0" />
                         {t('shippingPage.estDeadline')} <span className="font-semibold text-foreground">{carrier.time}</span>
                       </div>
                     </div>

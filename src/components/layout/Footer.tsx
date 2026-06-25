@@ -122,7 +122,7 @@ const Footer: React.FC = () => {
                 <li className="pt-1">
                   <button
                     onClick={handleInstallClick}
-                    className="flex items-center gap-1.5 text-sm text-orange-300 hover:text-orange-200 font-semibold transition-colors"
+                    className="flex items-center gap-1.5 text-sm text-pink-300 hover:text-pink-200 font-semibold transition-colors"
                   >
                     <Smartphone className="w-3.5 h-3.5" />
                     {platform === 'ios' ? t('footer.appInstallIOS') : t('footer.appInstall')}

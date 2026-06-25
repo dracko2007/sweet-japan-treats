@@ -15,106 +15,106 @@
 
 @layer base {
   :root {
-    /* Japan Express Theme - High conversion Orange & Red */
+    /* Japan Express Theme - Pink */
     --background: 0 0% 100%;
-    --foreground: 20 20% 10%;
+    --foreground: 330 15% 10%;
 
     --card: 0 0% 98%;
-    --card-foreground: 20 20% 10%;
+    --card-foreground: 330 15% 10%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 20 20% 10%;
+    --popover-foreground: 330 15% 10%;
 
-    /* Primary - Japan Express Orange */
-    --primary: 14 100% 57%;
+    /* Primary - Japan Express Pink */
+    --primary: 330 85% 55%;
     --primary-foreground: 0 0% 100%;
 
-    /* Secondary - Light Grey with hint of orange */
-    --secondary: 14 20% 96%;
-    --secondary-foreground: 14 80% 30%;
+    /* Secondary - Light rose tint */
+    --secondary: 330 40% 96%;
+    --secondary-foreground: 330 60% 35%;
 
-    --muted: 0 0% 95%;
-    --muted-foreground: 0 0% 45%;
+    --muted: 330 20% 95%;
+    --muted-foreground: 330 10% 45%;
 
-    /* Accent - Pink/Red Discount Highlight */
-    --accent: 340 82% 52%;
+    /* Accent - Deep rose/magenta */
+    --accent: 315 80% 48%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 0 0% 90%;
-    --input: 0 0% 90%;
-    --ring: 14 100% 57%;
+    --border: 330 20% 88%;
+    --input: 330 20% 88%;
+    --ring: 330 85% 55%;
 
     --radius: 0.5rem;
 
-    /* Mapped custom colors from old theme to prevent styling breakage */
-    --caramel: 14 100% 57%;
-    --caramel-light: 14 100% 90%;
-    --caramel-dark: 14 100% 35%;
+    /* Mapped custom colors */
+    --caramel: 330 85% 55%;
+    --caramel-light: 330 85% 92%;
+    --caramel-dark: 330 85% 38%;
     --cream: 0 0% 98%;
-    --chocolate: 340 82% 52%;
-    --coffee: 20 20% 20%;
+    --chocolate: 315 80% 48%;
+    --coffee: 330 15% 20%;
     --gold: 45 100% 50%;
 
     /* Gradients */
-    --gradient-caramel: linear-gradient(135deg, hsl(14 100% 57%) 0%, hsl(340 82% 52%) 100%);
-    --gradient-cream: linear-gradient(180deg, hsl(0 0% 100%) 0%, hsl(0 0% 95%) 100%);
-    --gradient-hero: linear-gradient(180deg, hsl(330 85% 93%) 0%, hsl(335 80% 97%) 45%, hsl(0 0% 100%) 100%);
+    --gradient-caramel: linear-gradient(135deg, hsl(330 85% 55%) 0%, hsl(315 80% 48%) 100%);
+    --gradient-cream: linear-gradient(180deg, hsl(0 0% 100%) 0%, hsl(330 30% 97%) 100%);
+    --gradient-hero: linear-gradient(180deg, hsl(330 85% 94%) 0%, hsl(330 60% 97%) 45%, hsl(0 0% 100%) 100%);
 
     /* Shadows */
-    --shadow-soft: 0 2px 10px -2px hsl(20 20% 10% / 0.05);
-    --shadow-card: 0 4px 20px -6px hsl(20 20% 10% / 0.1);
-    --shadow-elevated: 0 15px 35px -10px hsl(20 20% 10% / 0.15);
+    --shadow-soft: 0 2px 10px -2px hsl(330 50% 20% / 0.06);
+    --shadow-card: 0 4px 20px -6px hsl(330 50% 20% / 0.12);
+    --shadow-elevated: 0 15px 35px -10px hsl(330 50% 20% / 0.18);
 
     --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 14 100% 57%;
+    --sidebar-primary: 330 85% 55%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 4.8% 95.9%;
-    --sidebar-accent-foreground: 240 5.9% 10%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 14 100% 57%;
+    --sidebar-accent: 330 30% 95%;
+    --sidebar-accent-foreground: 330 60% 25%;
+    --sidebar-border: 330 20% 88%;
+    --sidebar-ring: 330 85% 55%;
   }
 
   .dark {
-    --background: 20 20% 8%;
+    --background: 330 15% 8%;
     --foreground: 0 0% 95%;
 
-    --card: 20 15% 12%;
+    --card: 330 12% 12%;
     --card-foreground: 0 0% 95%;
 
-    --popover: 20 20% 10%;
+    --popover: 330 15% 10%;
     --popover-foreground: 0 0% 95%;
 
-    --primary: 14 100% 57%;
+    --primary: 330 85% 60%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 20 15% 18%;
+    --secondary: 330 15% 18%;
     --secondary-foreground: 0 0% 90%;
 
-    --muted: 20 10% 20%;
+    --muted: 330 10% 20%;
     --muted-foreground: 0 0% 60%;
 
-    --accent: 340 82% 52%;
+    --accent: 315 75% 55%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 20 10% 20%;
-    --input: 20 10% 20%;
-    --ring: 14 100% 57%;
+    --border: 330 10% 22%;
+    --input: 330 10% 22%;
+    --ring: 330 85% 60%;
 
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 14 100% 57%;
+    --sidebar-background: 330 15% 8%;
+    --sidebar-foreground: 330 20% 85%;
+    --sidebar-primary: 330 85% 60%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 14 100% 57%;
+    --sidebar-accent: 330 12% 15%;
+    --sidebar-accent-foreground: 330 20% 85%;
+    --sidebar-border: 330 10% 20%;
+    --sidebar-ring: 330 85% 60%;
   }
 }
 

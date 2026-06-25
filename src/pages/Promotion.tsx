@@ -244,7 +244,7 @@ const Promotion: React.FC = () => {
 
             {/* Countdown */}
             {promo.expiresAt && countdown && (
-              <div className={`flex items-center gap-2 text-sm font-semibold ${isExpired || countdown === 'Encerrada' ? 'text-red-600' : 'text-orange-600'}`}>
+              <div className={`flex items-center gap-2 text-sm font-semibold ${isExpired || countdown === 'Encerrada' ? 'text-red-600' : 'text-pink-600'}`}>
                 <Clock className="w-4 h-4 shrink-0" />
                 {countdown === 'Encerrada' ? 'Promoção encerrada' : `Encerra em: ${countdown}`}
               </div>
@@ -307,11 +307,11 @@ const Promotion: React.FC = () => {
 
             {/* Preview do pedido quando excede limite */}
             {overflowQty > 0 && !isExpired && (
-              <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 text-sm space-y-1">
-                <div className="flex items-center gap-1.5 font-semibold text-orange-700"><Info className="w-4 h-4" /> Resumo do pedido</div>
-                {promoQty > 0 && <div className="text-orange-700">{promoQty}x a {formatPrice(promoPriceLocal, currency, true)} <span className="text-xs">(preço promo)</span></div>}
-                <div className="text-orange-700">{overflowQty}x a {formatPrice(originalPriceLocal, currency, true)} <span className="text-xs">(preço original)</span></div>
-                <div className="font-bold text-orange-800 border-t border-orange-200 pt-1">Total: {formatPrice(totalLocal, currency, true)}</div>
+              <div className="bg-pink-50 border border-pink-200 rounded-lg p-3 text-sm space-y-1">
+                <div className="flex items-center gap-1.5 font-semibold text-pink-700"><Info className="w-4 h-4" /> Resumo do pedido</div>
+                {promoQty > 0 && <div className="text-pink-700">{promoQty}x a {formatPrice(promoPriceLocal, currency, true)} <span className="text-xs">(preço promo)</span></div>}
+                <div className="text-pink-700">{overflowQty}x a {formatPrice(originalPriceLocal, currency, true)} <span className="text-xs">(preço original)</span></div>
+                <div className="font-bold text-orange-800 border-t border-pink-200 pt-1">Total: {formatPrice(totalLocal, currency, true)}</div>
               </div>
             )}
 
