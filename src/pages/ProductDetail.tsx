@@ -20,6 +20,7 @@ import { formatPrice } from '@/utils/currency';
 import { effectiveYen, baseYen, hasDiscount, getVariants } from '@/utils/pricing';
 import { convertYen as fxConvert } from '@/services/fxService';
 import { productEnglishName } from '@/utils/productName';
+import ProductJsonLd from '@/components/ProductJsonLd';
 
 const ProductDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -173,6 +174,7 @@ const ProductDetail: React.FC = () => {
 
   return (
     <Layout>
+      <ProductJsonLd product={product} country={selectedCountry} rating={productRating} />
       <div className="gradient-hero py-8">
         <div className="container mx-auto px-4">
           <Button

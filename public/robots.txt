@@ -47,3 +47,7 @@ Disallow: /firebase-sync.html
 Disallow: /clear-storage.html
 
 Sitemap: https://japanexpress-store.com/sitemap.xml
+
+# Feeds de catálogo (preço + frete por peso) para Google Merchant / Shopping
+# Brasil (BRL): https://japanexpress-store.com/feed.xml
+# Europa (EUR): https://japanexpress-store.com/feed-eu.xml
