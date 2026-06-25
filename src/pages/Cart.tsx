@@ -219,9 +219,9 @@ const Cart: React.FC = () => {
       <section className="py-12 bg-background">
         <div className="container mx-auto px-4">
           {items.length > 0 ? (
-            <div className="max-w-6xl mx-auto grid lg:grid-cols-3 gap-8">
+            <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8 min-w-0">
               {/* Cart Items List */}
-              <div className="lg:col-span-2 space-y-4">
+              <div className="lg:col-span-2 space-y-4 min-w-0">
                 <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
                   <h2 className="font-sans text-xl font-bold text-foreground">
                     {t('cart.yourProducts')}
@@ -331,8 +331,8 @@ const Cart: React.FC = () => {
               </div>
 
               {/* Order Summary Card */}
-              <div className="lg:col-span-1">
-                <div className="bg-card rounded-2xl border border-border p-6 sticky top-24 space-y-6 shadow-sm">
+              <div className="lg:col-span-1 min-w-0">
+                <div className="bg-card rounded-2xl border border-border p-6 sticky top-24 space-y-6 shadow-sm min-w-0">
                   <h3 className="font-sans text-lg font-bold text-foreground">{t('cart.summary')}</h3>
 
                   {/* Coupon Application Input + lista de cupons disponíveis */}
