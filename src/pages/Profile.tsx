@@ -887,14 +887,18 @@ const Profile: React.FC = () => {
                       {(() => {
                         const hasTracking = !!(order as any).trackingNumber;
                         const st = order.status as string;
-                        // Mapa de status para passo no fluxo:
-                        // 0=Pagamento (pending) | 1=Preparando (processing/packing) | 2=Enviado (shipped) | 3=Entregue (delivered)
-                        const statusStep =
-                          st === 'delivered' ? 3
-                          : st === 'shipped' ? 2
-                          : (st === 'processing' || st === 'confirmed' || st === 'packing') ? 1
-                          : 0;
                         const steps = ['Pagamento', 'Preparando', 'Enviado', 'Entregue'];
+                        // Estado de cada etapa: 'done' (✓) | 'active' (atual) | 'pending' (futura).
+                        // IMPORTANTE: 'Pagamento confirmado' NÃO significa 'Preparando'. No Personal
+                        // Shopper, o preparo só começa quando o admin clica 'Preparando' (pode levar
+                        // 2-3 dias após o pagamento). Por isso 'confirmed' deixa Preparando como pending.
+                        type StepState = 'done' | 'active' | 'pending';
+                        const stepStates: StepState[] =
+                          st === 'delivered' ? ['done', 'done', 'done', 'done']
+                          : st === 'shipped'  ? ['done', 'done', 'done', 'pending']
+                          : (st === 'processing' || st === 'packing') ? ['done', 'active', 'pending', 'pending']
+                          : st === 'confirmed' ? ['done', 'pending', 'pending', 'pending']  // pago, ainda não preparando
+                          : ['active', 'pending', 'pending', 'pending'];  // pending — aguardando pagamento
                         return (
                           <div className="mt-2 p-3 rounded-xl bg-muted/40 border border-border">
                             <p className="text-xs font-semibold text-foreground mb-2 flex items-center gap-1">
@@ -902,23 +906,31 @@ const Profile: React.FC = () => {
                               Acompanhamento do Pedido
                             </p>
                             <div className="flex items-center gap-1 mb-2">
-                              {steps.map((label, i) => (
-                                <React.Fragment key={i}>
-                                  <div className={`flex flex-col items-center ${i === 0 ? 'flex-shrink-0' : 'flex-1'}`}>
-                                    <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${i <= statusStep ? 'bg-primary text-white' : 'bg-muted-foreground/20 text-muted-foreground'}`}>
-                                      {i < statusStep ? '✓' : i + 1}
+                              {steps.map((label, i) => {
+                                const state = stepStates[i];
+                                const highlighted = state === 'done' || state === 'active';
+                                // Conector preenchido se a PRÓXIMA etapa já começou (done/active)
+                                const nextStarted = i < steps.length - 1 && stepStates[i + 1] !== 'pending';
+                                return (
+                                  <React.Fragment key={i}>
+                                    <div className={`flex flex-col items-center ${i === 0 ? 'flex-shrink-0' : 'flex-1'}`}>
+                                      <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${highlighted ? 'bg-primary text-white' : 'bg-muted-foreground/20 text-muted-foreground'}`}>
+                                        {state === 'done' ? '✓' : i + 1}
+                                      </div>
+                                      <span className={`text-[9px] mt-0.5 text-center leading-tight ${highlighted ? 'text-primary font-semibold' : 'text-muted-foreground'}`}>{label}</span>
                                     </div>
-                                    <span className={`text-[9px] mt-0.5 text-center leading-tight ${i <= statusStep ? 'text-primary font-semibold' : 'text-muted-foreground'}`}>{label}</span>
-                                  </div>
-                                  {i < steps.length - 1 && (
-                                    <div className={`flex-1 h-0.5 mb-3.5 ${i < statusStep ? 'bg-primary' : 'bg-muted-foreground/20'}`} />
-                                  )}
-                                </React.Fragment>
-                              ))}
+                                    {i < steps.length - 1 && (
+                                      <div className={`flex-1 h-0.5 mb-3.5 ${nextStarted ? 'bg-primary' : 'bg-muted-foreground/20'}`} />
+                                    )}
+                                  </React.Fragment>
+                                );
+                              })}
                             </div>
                             {!hasTracking && (
                               <p className="text-[11px] text-muted-foreground">
-                                {statusStep === 0 ? 'Aguardando confirmação do pagamento.' : 'Seu pedido está sendo preparado. O código de rastreio aparecerá aqui após o envio.'}
+                                {st === 'pending' ? 'Aguardando confirmação do pagamento.'
+                                  : st === 'confirmed' ? '✅ Pagamento confirmado! O preparo do seu pedido começa em até 2-3 dias úteis (serviço Personal Shopper).'
+                                  : 'Seu pedido está sendo preparado. O código de rastreio aparecerá aqui após o envio.'}
                               </p>
                             )}
                           </div>
