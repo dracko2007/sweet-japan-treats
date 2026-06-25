@@ -7,7 +7,10 @@ export default {
   theme: {
     container: {
       center: true,
-      padding: "2rem",
+      // Padding ZERADO: as páginas já aplicam px-4 manualmente. O padding 2rem
+      // fixo do config somava com o px-4 → padding duplo (até 48px) cortava
+      // conteúdo no mobile. Agora só o px-4 das páginas vale.
+      padding: "0",
       screens: {
         "2xl": "1400px",
       },
