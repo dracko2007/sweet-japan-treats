@@ -67,6 +67,24 @@ export const categoryService = {
     }
   },
 
+  /** Edita label/emoji de uma categoria personalizada (mantém o mesmo id). */
+  async update(id: string, label: string, icon: string): Promise<boolean> {
+    if (!db || !label.trim()) return false;
+    if (DEFAULT_CATEGORIES.some(c => c.id === id)) return false; // padrão não edita
+    try {
+      const ref = doc(db, 'settings', SETTINGS_DOC);
+      const snap = await getDoc(ref);
+      const custom: ProductCategory[] = snap.exists() ? (snap.data().list || []) : [];
+      const updated = custom.map(c =>
+        c.id === id ? { ...c, label: label.trim(), icon: icon.trim() || c.icon } : c
+      );
+      await setDoc(ref, { list: updated }, { merge: true });
+      return true;
+    } catch {
+      return false;
+    }
+  },
+
   /** Remove uma categoria personalizada (não remove as padrão). */
   async remove(id: string): Promise<boolean> {
     if (!db || DEFAULT_CATEGORIES.some(c => c.id === id)) return false;
@@ -79,5 +97,10 @@ export const categoryService = {
     } catch {
       return false;
     }
+  },
+
+  /** true se a categoria é padrão (não pode editar/deletar). */
+  isDefault(id: string): boolean {
+    return DEFAULT_CATEGORIES.some(c => c.id === id);
   },
 };

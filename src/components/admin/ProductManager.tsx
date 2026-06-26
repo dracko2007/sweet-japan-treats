@@ -160,6 +160,52 @@ const ProductManager: React.FC = () => {
     }
   };
 
+  // Editar categoria personalizada (nome + emoji)
+  const handleEditCategory = async () => {
+    if (!editing) return;
+    const id = editing.category;
+    const current = CATEGORIES.find(c => c.id === id);
+    if (!current || categoryService.isDefault(id)) {
+      toast({ title: 'Categoria padrão não pode ser editada', variant: 'destructive' });
+      return;
+    }
+    const label = window.prompt('Novo nome da categoria:', current.label);
+    if (!label || !label.trim()) return;
+    const icon = window.prompt('Novo emoji/ícone:', current.icon) || current.icon;
+    const ok = await categoryService.update(id, label.trim(), icon.trim());
+    if (ok) {
+      setCategories(await categoryService.getAll());
+      toast({ title: '✅ Categoria atualizada', description: `${icon} ${label}` });
+    } else {
+      toast({ title: 'Erro ao editar categoria', variant: 'destructive' });
+    }
+  };
+
+  // Deletar categoria personalizada
+  const handleDeleteCategory = async () => {
+    if (!editing) return;
+    const id = editing.category;
+    const current = CATEGORIES.find(c => c.id === id);
+    if (!current || categoryService.isDefault(id)) {
+      toast({ title: 'Categoria padrão não pode ser deletada', variant: 'destructive' });
+      return;
+    }
+    const inUse = products.filter(p => p.category === id).length;
+    const msg = inUse > 0
+      ? `Deletar "${current.label}"?\n\n⚠️ ${inUse} produto(s) usam essa categoria — eles ficarão sem categoria válida.`
+      : `Deletar a categoria "${current.label}"?`;
+    if (!window.confirm(msg)) return;
+    const ok = await categoryService.remove(id);
+    if (ok) {
+      const updated = await categoryService.getAll();
+      setCategories(updated);
+      setEditing({ ...editing, category: updated[0]?.id || 'cosmeticos' });
+      toast({ title: '🗑️ Categoria removida', description: current.label });
+    } else {
+      toast({ title: 'Erro ao remover categoria', variant: 'destructive' });
+    }
+  };
+
   const filteredProducts = products.filter((p) => {
     const matchCat = filterCat === 'all' || p.category === filterCat;
     const q = searchQuery.trim().toLowerCase();
@@ -688,6 +734,25 @@ const ProductManager: React.FC = () => {
                       <Plus className="w-4 h-4" /> Nova
                     </button>
                   </div>
+                  {/* Editar/Deletar — só para categorias personalizadas */}
+                  {!categoryService.isDefault(editing.category) && (
+                    <div className="flex gap-2 mt-1.5">
+                      <button
+                        type="button"
+                        onClick={handleEditCategory}
+                        className="flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-700 transition-colors"
+                      >
+                        <Pencil className="w-3 h-3" /> Editar categoria
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleDeleteCategory}
+                        className="flex items-center gap-1 text-xs font-semibold text-red-600 hover:text-red-700 transition-colors"
+                      >
+                        <Trash2 className="w-3 h-3" /> Deletar categoria
+                      </button>
+                    </div>
+                  )}
                 </div>
                 <div>
                   <label className="text-sm font-semibold block mb-1">Tag / Sabor</label>
