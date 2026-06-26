@@ -47,6 +47,66 @@ export const orderService = {
     return getLocalOrders();
   },
 
+  /**
+   * Registra uma VENDA POSTERIOR (manual) — produtos cobrados fora do fluxo
+   * normal do site (Wise/PIX direto), mas que devem entrar como receita.
+   * Cria um pedido já confirmado/pago no Firestore.
+   */
+  createManualSale: async (sale: {
+    customerName: string;
+    customerEmail: string;
+    customerPhone?: string;
+    items: { productName: string; priceYen: number }[];
+    paymentMethod: string;        // 'wise' | 'pix' | ...
+    currency?: string;            // moeda exibida (default JPY)
+    linkedRequestId?: string;     // pedido personalizado de origem
+    note?: string;
+    createdBy?: string;
+  }): Promise<{ ok: boolean; orderNumber?: string; error?: string }> => {
+    try {
+      await ensureAdminAuth();
+      const totalYen = sale.items.reduce((s, it) => s + (it.priceYen || 0), 0);
+      const now = new Date().toISOString();
+      const orderNumber = `VP-${Date.now().toString(36).toUpperCase()}`;
+
+      const order = {
+        orderNumber,
+        orderDate: now,
+        date: now,
+        status: 'confirmed',
+        paymentMethod: sale.paymentMethod,
+        paymentConfirmed: true,
+        paymentConfirmedAt: now,
+        items: sale.items.map((it) => ({
+          productName: it.productName,
+          name: it.productName,
+          price: it.priceYen,
+          priceYen: it.priceYen,
+          quantity: 1,
+          size: 'small',
+        })),
+        totalAmount: totalYen,
+        totalPrice: totalYen,
+        grandTotalYen: totalYen,
+        currency: sale.currency || 'JPY',
+        customerName: sale.customerName,
+        customerEmail: (sale.customerEmail || '').toLowerCase(),
+        customerPhone: sale.customerPhone || '',
+        customerType: 'manual',
+        source: 'venda_posterior',
+        linkedRequestId: sale.linkedRequestId || '',
+        adminNote: sale.note || '',
+        createdBy: sale.createdBy || '',
+      };
+
+      await firebaseSyncService.syncOrderToFirestore('manual-sale', order);
+      return { ok: true, orderNumber };
+    } catch (e: any) {
+      devError('❌ [ORDER] createManualSale falhou:', e);
+      return { ok: false, error: e?.message || 'Erro ao registrar venda' };
+    }
+  },
+
   // Async version that fetches from Firestore + merges with safeStorage
   getAllOrdersAsync: async (): Promise<Order[]> => {
     try {

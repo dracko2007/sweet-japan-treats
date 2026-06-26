@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { PackagePlus, Loader2, Trash2, ExternalLink, Phone, Check, RotateCcw } from 'lucide-react';
+import { PackagePlus, Loader2, Trash2, ExternalLink, Phone, Check, RotateCcw, DollarSign } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { customRequestService, CustomRequest } from '@/services/customRequestService';
 import { useToast } from '@/hooks/use-toast';
 import { requireAdminPassword } from '@/utils/adminGuard';
+import { useUser } from '@/context/UserContext';
+import RegisterSaleModal from '@/components/admin/RegisterSaleModal';
 
 const STATUS_LABEL: Record<CustomRequest['status'], string> = {
   new: '🆕 Novo', quoted: '💬 Cotado', closed: '✅ Fechado',
@@ -16,8 +18,10 @@ const STATUS_COLOR: Record<CustomRequest['status'], string> = {
 
 const CustomRequestManager: React.FC = () => {
   const { toast } = useToast();
+  const { user } = useUser();
   const [list, setList] = useState<CustomRequest[]>([]);
   const [loading, setLoading] = useState(true);
+  const [saleRequest, setSaleRequest] = useState<CustomRequest | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -97,6 +101,9 @@ const CustomRequestManager: React.FC = () => {
                 </div>
 
                 <div className="flex flex-wrap gap-2 mt-4 pt-3 border-t border-border">
+                  <Button onClick={() => setSaleRequest(r)} size="sm" className="gap-1.5 bg-green-600 hover:bg-green-700 text-white">
+                    <DollarSign className="w-4 h-4" /> Registrar Venda
+                  </Button>
                   {r.status !== 'quoted' && (
                     <Button onClick={() => setStatus(r.id, 'quoted')} variant="outline" size="sm" className="gap-1.5">
                       💬 Marcar como cotado
@@ -120,6 +127,15 @@ const CustomRequestManager: React.FC = () => {
             );
           })}
         </div>
+      )}
+
+      {saleRequest && (
+        <RegisterSaleModal
+          request={saleRequest}
+          adminName={user?.name}
+          onClose={() => setSaleRequest(null)}
+          onRegistered={load}
+        />
       )}
     </div>
   );
