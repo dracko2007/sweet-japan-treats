@@ -79,7 +79,7 @@ const Shipping: React.FC = () => {
       2: { light: '7-12 days',  air: '5-9 days',   ems: '3-5 days'  },
       3: { light: '7-14 days',  air: '6-10 days',  ems: '4-7 days'  },
       4: { light: '7-14 days',  air: '6-10 days',  ems: '3-6 days'  },
-      5: { light: '20-40 days', air: '10-15 days', ems: '7-12 days' },
+      5: { light: '20-40 days', air: '10-15 days', ems: '18 days' },
     };
     const zd = daysByZone[zone] || daysByZone[5];
 

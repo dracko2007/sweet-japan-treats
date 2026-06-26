@@ -108,7 +108,7 @@ const ShippingCalculator: React.FC<ShippingCalculatorProps> = ({
       2: { light: '7-12',  air: '5-9',   ems: '3-5'  }, // Ásia
       3: { light: '7-14',  air: '6-10',  ems: '4-7'  }, // Europa/Oceania
       4: { light: '7-14',  air: '6-10',  ems: '3-6'  }, // EUA
-      5: { light: '20-40', air: '10-15', ems: '7-12' }, // Brasil/Am.Sul/África
+      5: { light: '20-40', air: '10-15', ems: '18' }, // Brasil/Am.Sul/África
     };
     const zd = daysByZone[jpZone] || daysByZone[5];
 
