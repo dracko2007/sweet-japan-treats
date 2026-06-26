@@ -1,5 +1,6 @@
 // Tenta Cloudinary primeiro. Se falhar por limite de banda/quota (4xx),
-// faz fallback automático para Firebase Storage.
+// faz fallback para Firebase Storage. Se AMBOS falharem, salva a imagem
+// comprimida em base64 (último recurso) para o produto nunca deixar de salvar.
 import { storage } from '@/config/firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
@@ -14,6 +15,27 @@ async function uploadToFirebase(blob: Blob, folder: string): Promise<string> {
   const storageRef = ref(storage, path);
   await uploadBytes(storageRef, blob, { contentType: blob.type });
   return getDownloadURL(storageRef);
+}
+
+// Último recurso: comprime a imagem para um data URL pequeno guardado no Firestore.
+function compressToDataUrl(dataUrl: string, maxPx = 900, quality = 0.82): Promise<string> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, maxPx / Math.max(img.width, img.height));
+      const w = Math.round(img.width * scale);
+      const h = Math.round(img.height * scale);
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return resolve(dataUrl);
+      ctx.drawImage(img, 0, 0, w, h);
+      resolve(canvas.toDataURL('image/jpeg', quality));
+    };
+    img.onerror = () => resolve(dataUrl);
+    img.src = dataUrl;
+  });
 }
 
 export const cloudinaryService = {
@@ -36,31 +58,39 @@ export const cloudinaryService = {
     typeof s === 'string' && s.startsWith('data:'),
 
   async uploadDataUrl(dataUrl: string, folder: string): Promise<string> {
-    const res = await fetch(dataUrl);
-    const blob = await res.blob();
-
-    // Tenta Cloudinary
+    let blob: Blob | null = null;
     try {
-      const form = new FormData();
-      form.append('file', blob);
-      form.append('upload_preset', UPLOAD_PRESET);
-      form.append('folder', folder);
+      const res = await fetch(dataUrl);
+      blob = await res.blob();
+    } catch { /* segue para o fallback base64 */ }
 
-      const response = await fetch(UPLOAD_URL, { method: 'POST', body: form });
-
-      if (response.ok) {
-        const data = await response.json();
-        return data.secure_url.replace('/upload/', '/upload/f_webp,q_auto/');
+    // 1) Tenta Cloudinary
+    if (blob) {
+      try {
+        const form = new FormData();
+        form.append('file', blob);
+        form.append('upload_preset', UPLOAD_PRESET);
+        form.append('folder', folder);
+        const response = await fetch(UPLOAD_URL, { method: 'POST', body: form });
+        if (response.ok) {
+          const data = await response.json();
+          return data.secure_url.replace('/upload/', '/upload/f_webp,q_auto/');
+        }
+        const err = await response.json().catch(() => ({}));
+        console.warn(`Cloudinary indisponível (${response.status}): ${err?.error?.message}. Tentando Firebase Storage.`);
+      } catch (e) {
+        console.warn('Cloudinary offline, tentando Firebase Storage:', e);
       }
 
-      // 429 = quota/bandwidth, 401/403 = conta bloqueada → fallback
-      const err = await response.json().catch(() => ({}));
-      console.warn(`Cloudinary indisponível (${response.status}): ${err?.error?.message}. Usando Firebase Storage.`);
-    } catch (e) {
-      console.warn('Cloudinary offline, usando Firebase Storage:', e);
+      // 2) Fallback: Firebase Storage
+      try {
+        return await uploadToFirebase(blob, folder);
+      } catch (e) {
+        console.warn('Firebase Storage falhou, salvando imagem comprimida no Firestore:', e);
+      }
     }
 
-    // Fallback: Firebase Storage
-    return uploadToFirebase(blob, folder);
+    // 3) Último recurso: imagem comprimida em base64 (sem rede — sempre funciona)
+    return compressToDataUrl(dataUrl, 900, 0.82);
   },
 };
