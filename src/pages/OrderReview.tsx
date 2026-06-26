@@ -67,8 +67,9 @@ const OrderReview: React.FC = () => {
   const [couponLoading, setCouponLoading] = useState(false);
 
   const [paymentMethod, setPaymentMethod] = useState(() => {
-    return formData?.country === 'Japão' ? 'paypay' : 'pix';
+    return formData?.country === 'Japão' ? 'paypay' : 'wise';
   });
+  const WISE_INVITE_LINK = 'https://wise.com/invite/ahpc/juniorcelsotadaos';
   const [paySettings, setPaySettings] = useState<import('@/services/paymentSettingsService').PaymentSettings>({
     wiseLink: '', wiseEnabled: false,
     pixKey: '', pixReceiverName: 'Japan Express', pixCity: 'Sao Paulo',
@@ -998,30 +999,62 @@ const OrderReview: React.FC = () => {
                     </>
                   ) : (
                     <>
-                      {/* PIX Option */}
+                      {/* Wise Option (transferência internacional) — principal */}
                       <div className={cn(
                         "flex items-start space-x-3 p-4 rounded-xl border-2 transition-all cursor-pointer",
-                        isPix ? "border-pink-500 bg-pink-50/50" : "border-border hover:border-gray-300"
+                        paymentMethod === 'wise' ? "border-emerald-500 bg-emerald-50/50" : "border-border hover:border-gray-300"
                       )}>
-                        <RadioGroupItem value="pix" id="pix" className="mt-1" />
-                        <Label htmlFor="pix" className="flex-1 cursor-pointer">
+                        <RadioGroupItem value="wise" id="wise" className="mt-1" />
+                        <Label htmlFor="wise" className="flex-1 cursor-pointer">
                           <div className="flex items-center gap-2 mb-1">
-                            <Smartphone className="w-5 h-5 text-pink-500" />
-                            <span className="font-bold text-base text-gray-800">PIX</span>
+                            <Wallet className="w-5 h-5 text-emerald-600" />
+                            <span className="font-bold text-base text-gray-800">Wise (Transferência Internacional)</span>
                           </div>
                           <p className="text-xs text-muted-foreground leading-relaxed">
-                            Mostraremos o QR Code e a chave Copia e Cola na próxima página. Após pagar, envie o comprovante para confirmarmos.
+                            Pague em qualquer moeda com câmbio justo. Mostraremos o link de pagamento Wise na próxima tela.
                           </p>
                           <div className="mt-2 flex flex-col gap-1">
-                            <div className="flex items-center gap-1.5 text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-2 py-1 w-fit">
-                              <span>⏱</span>
-                              <span>Remessa internacional em até <strong>3 dias úteis</strong> após confirmação</span>
+                            <div className="flex items-start gap-1.5 text-[11px] text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-md px-2 py-1.5">
+                              <span className="mt-0.5">💱</span>
+                              <span>
+                                No campo <strong>Valor</strong> do Wise, insira{' '}
+                                <strong className="text-emerald-900">¥ {grandTotalYen.toLocaleString()}</strong>{' '}
+                                (ienes). A Wise converte automaticamente para a sua moeda.
+                              </span>
                             </div>
-                            <div className="flex items-center gap-1.5 text-[11px] text-blue-700 bg-blue-50 border border-blue-200 rounded-md px-2 py-1 w-fit">
+                            <div className="flex items-center gap-1.5 text-[11px] text-gray-500 bg-gray-50 border border-gray-200 rounded-md px-2 py-1 w-fit">
                               <span>ℹ️</span>
-                              <span>Taxas <strong>só nesta opção</strong>: IOF 3,5% + R$ 32 banco — <strong>Wise não cobra IOF</strong></span>
+                              <span>Taxa Wise variável (~4%) — <strong>sem IOF</strong></span>
                             </div>
                           </div>
+                          {/* Aviso: não tem Wise? Cadastre-se */}
+                          {paymentMethod === 'wise' && (
+                            <a
+                              href={WISE_INVITE_LINK}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className="mt-2 flex items-center justify-between gap-2 text-xs font-semibold text-emerald-700 bg-emerald-100 hover:bg-emerald-200 border border-emerald-300 rounded-lg px-3 py-2 transition-colors"
+                            >
+                              <span>🌍 Não tem Wise? Cadastre-se aqui — é <strong>rápido e fácil</strong>!</span>
+                              <span className="shrink-0">↗</span>
+                            </a>
+                          )}
+                        </Label>
+                      </div>
+
+                      {/* PIX Option — desativado, em breve */}
+                      <div className="flex items-start space-x-3 p-4 rounded-xl border-2 border-border opacity-60 cursor-not-allowed">
+                        <RadioGroupItem value="pix" id="pix" className="mt-1" disabled />
+                        <Label htmlFor="pix" className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <Smartphone className="w-5 h-5 text-gray-400" />
+                            <span className="font-bold text-base text-gray-600">PIX</span>
+                            <span className="text-[10px] bg-gray-400 text-white font-extrabold px-2 py-0.5 rounded-full uppercase">Em breve</span>
+                          </div>
+                          <p className="text-xs text-muted-foreground leading-relaxed">
+                            Pagamento via PIX estará disponível em breve. Por enquanto, use o Wise.
+                          </p>
                         </Label>
                       </div>
 
@@ -1035,43 +1068,10 @@ const OrderReview: React.FC = () => {
                             <span className="text-[10px] bg-gray-400 text-white font-extrabold px-2 py-0.5 rounded-full uppercase">Em breve</span>
                           </div>
                           <p className="text-xs text-muted-foreground leading-relaxed">
-                            Pagamento com cartão estará disponível em breve. Por enquanto, use o PIX.
+                            Pagamento com cartão estará disponível em breve. Por enquanto, use o Wise.
                           </p>
                         </Label>
                       </div>
-
-                      {/* Wise Option (transferência internacional) */}
-                      {(paySettings.wiseEnabled && !!paySettings.wiseLink) && (
-                        <div className={cn(
-                          "flex items-start space-x-3 p-4 rounded-xl border-2 transition-all cursor-pointer",
-                          paymentMethod === 'wise' ? "border-emerald-500 bg-emerald-50/50" : "border-border hover:border-gray-300"
-                        )}>
-                          <RadioGroupItem value="wise" id="wise" className="mt-1" />
-                          <Label htmlFor="wise" className="flex-1 cursor-pointer">
-                            <div className="flex items-center gap-2 mb-1">
-                              <Wallet className="w-5 h-5 text-emerald-600" />
-                              <span className="font-bold text-base text-gray-800">Wise (Transferência Internacional)</span>
-                            </div>
-                            <p className="text-xs text-muted-foreground leading-relaxed">
-                              Pague em qualquer moeda com câmbio justo. Mostraremos o link de pagamento Wise na próxima tela.
-                            </p>
-                            <div className="mt-2 flex flex-col gap-1">
-                              <div className="flex items-start gap-1.5 text-[11px] text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-md px-2 py-1.5">
-                                <span className="mt-0.5">💱</span>
-                                <span>
-                                  No campo <strong>Valor</strong> do Wise, insira{' '}
-                                  <strong className="text-emerald-900">¥ {grandTotalYen.toLocaleString()}</strong>{' '}
-                                  (ienes). A Wise converte automaticamente para a sua moeda.
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-1.5 text-[11px] text-gray-500 bg-gray-50 border border-gray-200 rounded-md px-2 py-1 w-fit">
-                                <span>ℹ️</span>
-                                <span>Taxa Wise variável (~4%) — <strong>sem IOF</strong></span>
-                              </div>
-                            </div>
-                          </Label>
-                        </div>
-                      )}
                     </>
                   )}
                 </div>
@@ -1366,6 +1366,10 @@ const OrderReview: React.FC = () => {
                         <ExternalLink className="w-4 h-4" /> Pagar pelo Wise
                       </a>
                     )}
+                    <a href={WISE_INVITE_LINK} target="_blank" rel="noopener noreferrer"
+                      className="block text-xs font-semibold text-emerald-700 hover:underline mt-1">
+                      🌍 Não tem Wise? Cadastre-se aqui — é rápido e fácil ↗
+                    </a>
                   </div>
                 )}
 
