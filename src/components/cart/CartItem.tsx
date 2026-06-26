@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { Trash2, Plus, Minus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { CartItem as CartItemType } from '@/types';
@@ -70,24 +71,28 @@ const CartItemComponent: React.FC<CartItemProps> = ({ item, couponDiscount = 0 }
     );
   }
 
+  const productUrl = `/produto/${item.product.id}`;
+
   return (
     <div className="flex gap-4 p-4 bg-card rounded-xl border border-border">
-      {/* Image */}
-      <div className="w-24 h-24 rounded-lg overflow-hidden bg-secondary/50 flex-shrink-0">
+      {/* Image — clicável para ir à página do produto */}
+      <Link to={productUrl} className="w-24 h-24 rounded-lg overflow-hidden bg-secondary/50 flex-shrink-0 hover:opacity-90 transition-opacity">
         {item.product.image ? (
           <img src={item.product.image} alt={productName} loading="lazy" className="w-full h-full object-cover" />
         ) : (
           <span className="text-4xl">🌸</span>
         )}
-      </div>
+      </Link>
 
       {/* Info */}
       <div className="flex-1 min-w-0">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0 flex-1">
-            <h3 className="font-display font-semibold text-foreground truncate">
-              {productName}
-            </h3>
+            <Link to={productUrl} className="hover:underline hover:text-pink-600 transition-colors">
+              <h3 className="font-display font-semibold text-foreground truncate">
+                {productName}
+              </h3>
+            </Link>
             <p className="text-sm text-muted-foreground">
               {productFlavor}
             </p>

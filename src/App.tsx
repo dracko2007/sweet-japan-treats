@@ -60,6 +60,8 @@ const queryClient = new QueryClient({
 // Analytics só carrega após consentimento
 const AnalyticsLoader: React.FC = () => {
   const { consent } = useCookieConsent();
+  const location = useLocation();
+
   useEffect(() => {
     if (consent !== 'accepted' || !app) return;
     import('firebase/analytics').then(({ getAnalytics }) => {
@@ -70,6 +72,14 @@ const AnalyticsLoader: React.FC = () => {
       visitorService.trackVisit().catch(() => {});
     });
   }, [consent]);
+
+  // Rastreia visualização de página a cada mudança de rota
+  useEffect(() => {
+    import('@/services/visitorService').then(({ visitorService }) => {
+      visitorService.trackPage(location.pathname).catch(() => {});
+    });
+  }, [location.pathname]);
+
   return null;
 };
 

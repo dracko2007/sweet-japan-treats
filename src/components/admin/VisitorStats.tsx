@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Globe, MapPin, TrendingUp, ExternalLink, RefreshCw } from 'lucide-react';
+import { Users, Globe, MapPin, TrendingUp, ExternalLink, RefreshCw, FileText, ShoppingBag } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { visitorService, type DailyStats } from '@/services/visitorService';
+import { visitorService } from '@/services/visitorService';
 
 const FLAG: Record<string, string> = {
   BR: '🇧🇷', PT: '🇵🇹', US: '🇺🇸', JP: '🇯🇵', FR: '🇫🇷', IT: '🇮🇹',
@@ -18,21 +18,28 @@ const COUNTRY_NAME: Record<string, string> = {
   EC: 'Equador', AO: 'Angola', MZ: 'Moçambique', CV: 'Cabo Verde',
 };
 
-const GA4_LINK = 'https://analytics.google.com/analytics/web/#/p' +
-  (typeof window !== 'undefined' && '') + // placeholder, admin usa measurementId
-  '/reports/explorer';
-
 const GA4_URL = 'https://analytics.google.com/analytics/web/';
+
+type TabId = 'overview' | 'pages' | 'products';
 
 export default function VisitorStats() {
   const [period, setPeriod] = useState<7 | 30 | 90>(30);
+  const [tab, setTab] = useState<TabId>('overview');
   const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState<Awaited<ReturnType<typeof visitorService['getSummary']>> | null>(null);
+  const [topPages, setTopPages] = useState<Array<{ slug: string; label: string; views: number }>>([]);
+  const [topProducts, setTopProducts] = useState<Array<{ productId: string; productName: string; views: number }>>([]);
 
   async function load() {
     setLoading(true);
-    const s = await visitorService.getSummary(period);
+    const [s, pages, products] = await Promise.all([
+      visitorService.getSummary(period),
+      visitorService.getTopPages(15),
+      visitorService.getTopProducts(15),
+    ]);
     setSummary(s);
+    setTopPages(pages);
+    setTopProducts(products);
     setLoading(false);
   }
 
@@ -56,15 +63,10 @@ export default function VisitorStats() {
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           {([7, 30, 90] as const).map(d => (
-            <button
-              key={d}
-              onClick={() => setPeriod(d)}
+            <button key={d} onClick={() => setPeriod(d)}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
                 period === d ? 'bg-pink-500 text-white' : 'bg-secondary text-muted-foreground hover:bg-secondary/80'
-              }`}
-            >
-              {d} dias
-            </button>
+              }`}>{d} dias</button>
           ))}
           <Button variant="outline" size="sm" onClick={load} disabled={loading} className="gap-1.5">
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
@@ -73,13 +75,29 @@ export default function VisitorStats() {
         </div>
       </div>
 
+      {/* Tabs */}
+      <div className="flex gap-1 bg-secondary/50 rounded-xl p-1 w-fit">
+        {([
+          { id: 'overview', label: 'Visão Geral', icon: Users },
+          { id: 'pages', label: 'Páginas', icon: FileText },
+          { id: 'products', label: 'Produtos', icon: ShoppingBag },
+        ] as { id: TabId; label: string; icon: React.ElementType }[]).map(({ id, label, icon: Icon }) => (
+          <button key={id} onClick={() => setTab(id)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+              tab === id ? 'bg-pink-500 text-white shadow-sm' : 'text-muted-foreground hover:text-foreground'
+            }`}>
+            <Icon className="w-3.5 h-3.5" />{label}
+          </button>
+        ))}
+      </div>
+
       {loading ? (
         <div className="flex items-center justify-center py-16">
           <div className="w-8 h-8 border-4 border-pink-200 border-t-pink-500 rounded-full animate-spin" />
         </div>
       ) : summary ? (
         <>
-          {/* KPIs */}
+          {/* KPIs — sempre visíveis */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="bg-card rounded-2xl border border-border p-4">
               <p className="text-xs text-muted-foreground mb-1">Hoje</p>
@@ -103,8 +121,8 @@ export default function VisitorStats() {
             </div>
           </div>
 
-          {/* Gráfico de barras — últimos 14 dias */}
-          {chartDays.length > 0 && (
+          {/* Visão geral: gráfico + países + cidades */}
+          {tab === 'overview' && chartDays.length > 0 && (
             <div className="bg-card rounded-2xl border border-border p-5">
               <div className="flex items-center gap-2 mb-4">
                 <TrendingUp className="w-4 h-4 text-pink-500" />
@@ -134,7 +152,7 @@ export default function VisitorStats() {
             </div>
           )}
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {tab === 'overview' && <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {/* Top Países */}
             <div className="bg-card rounded-2xl border border-border p-5">
               <div className="flex items-center gap-2 mb-4">
@@ -202,7 +220,93 @@ export default function VisitorStats() {
                 </div>
               )}
             </div>
-          </div>
+          </div>}
+
+          {/* Tab: Páginas */}
+          {tab === 'pages' && (
+            <div className="bg-card rounded-2xl border border-border p-5">
+              <div className="flex items-center gap-2 mb-4">
+                <FileText className="w-4 h-4 text-pink-500" />
+                <h3 className="font-semibold text-sm">Páginas mais visitadas</h3>
+              </div>
+              {topPages.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Ainda sem dados de páginas. Os dados aparecem conforme os visitantes navegam.</p>
+              ) : (
+                <div className="space-y-2">
+                  {topPages.map((p, i) => {
+                    const maxViews = topPages[0]?.views || 1;
+                    const pct = Math.round((p.views / maxViews) * 100);
+                    return (
+                      <div key={p.slug}>
+                        <div className="flex items-center justify-between text-sm mb-1">
+                          <span className="flex items-center gap-2 min-w-0">
+                            <span className="text-xs text-muted-foreground w-4 shrink-0">#{i + 1}</span>
+                            <span className="truncate font-medium">{p.label}</span>
+                            <span className="text-[10px] text-muted-foreground font-mono shrink-0 hidden sm:inline">{p.slug}</span>
+                          </span>
+                          <span className="font-mono text-xs text-pink-600 font-semibold shrink-0 ml-2">{p.views.toLocaleString()}</span>
+                        </div>
+                        <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
+                          <div className="h-full bg-pink-400 rounded-full" style={{ width: `${pct}%` }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Tab: Produtos */}
+          {tab === 'products' && (
+            <div className="bg-card rounded-2xl border border-border p-5">
+              <div className="flex items-center gap-2 mb-4">
+                <ShoppingBag className="w-4 h-4 text-pink-500" />
+                <h3 className="font-semibold text-sm">Produtos mais visualizados</h3>
+              </div>
+              {topProducts.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Ainda sem dados de produtos. Os dados aparecem quando visitantes abrem a página de um produto.</p>
+              ) : (
+                <div className="space-y-2">
+                  {topProducts.map((p, i) => {
+                    const maxViews = topProducts[0]?.views || 1;
+                    const pct = Math.round((p.views / maxViews) * 100);
+                    return (
+                      <div key={p.productId}>
+                        <div className="flex items-center justify-between text-sm mb-1">
+                          <span className="flex items-center gap-2 min-w-0">
+                            <span className="text-xs text-muted-foreground w-4 shrink-0">#{i + 1}</span>
+                            <a
+                              href={`/produto/${p.productId}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="truncate font-medium hover:text-pink-500 hover:underline transition-colors"
+                            >
+                              {p.productName}
+                            </a>
+                          </span>
+                          <span className="font-mono text-xs text-pink-600 font-semibold shrink-0 ml-2">
+                            {p.views.toLocaleString()} views
+                          </span>
+                        </div>
+                        <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
+                          <div className="h-full bg-pink-500 rounded-full" style={{ width: `${pct}%` }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              {topProducts.length > 0 && (
+                <div className="mt-4 p-3 bg-pink-50 dark:bg-pink-950/20 rounded-xl border border-pink-100 dark:border-pink-900">
+                  <p className="text-xs font-semibold text-pink-700 dark:text-pink-300 mb-1">📸 Dica para o Instagram</p>
+                  <p className="text-xs text-pink-600 dark:text-pink-400 leading-relaxed">
+                    <strong>{topProducts[0]?.productName}</strong> é o produto mais procurado. Publique stories e reels sobre ele para converter mais visitantes!
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Link GA4 */}
           <div className="bg-secondary/40 rounded-2xl border border-border p-5 flex items-center justify-between gap-4 flex-wrap">
@@ -212,12 +316,8 @@ export default function VisitorStats() {
                 Bounce rate, tempo de sessão, canais de aquisição, funil de conversão e muito mais.
               </p>
             </div>
-            <a
-              href={GA4_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-pink-500 text-white text-sm font-semibold hover:bg-pink-600 transition-colors shrink-0"
-            >
+            <a href={GA4_URL} target="_blank" rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-pink-500 text-white text-sm font-semibold hover:bg-pink-600 transition-colors shrink-0">
               <ExternalLink className="w-4 h-4" />
               Abrir GA4
             </a>

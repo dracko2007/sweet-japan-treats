@@ -47,6 +47,10 @@ const ProductDetail: React.FC = () => {
       registrarEvento('viu_produto', product.id, product.category);
       const vs = getVariants(product);
       if (vs.length && !vs.some((v) => v.id === selectedSize)) setSelectedSize(vs[0].id);
+      // Rastreia visualização no painel de visitantes
+      import('@/services/visitorService').then(({ visitorService }) => {
+        visitorService.trackProduct(product.id, product.name).catch(() => {});
+      });
     }
   }, [product?.id]);
 

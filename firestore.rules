@@ -160,9 +160,17 @@ service cloud.firestore {
     }
 
     // ---------- Analytics de visitantes ----------
-    // Qualquer visitante (sem auth) pode criar/incrementar o contador do dia.
+    // Qualquer visitante (sem auth) pode criar/incrementar os contadores.
     // Leitura e deleção apenas pelo admin.
     match /analytics_daily/{dateKey} {
+      allow create, update: if true;
+      allow read, delete: if isAdmin();
+    }
+    match /analytics_pages/{pageId} {
+      allow create, update: if true;
+      allow read, delete: if isAdmin();
+    }
+    match /analytics_products/{productId} {
       allow create, update: if true;
       allow read, delete: if isAdmin();
     }
