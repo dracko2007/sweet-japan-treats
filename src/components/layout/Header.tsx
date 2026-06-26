@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { ShoppingCart, Menu, X, ChevronDown, UserCircle, Heart, Lock, Package, ShieldCheck as ShieldCheckIcon, Plane } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
 import { useUser } from '@/context/UserContext';
 import { useLanguage } from '@/context/LanguageContext';
+import { useProducts } from '@/context/ProductsContext';
+import { categoryService, DEFAULT_CATEGORIES, type ProductCategory } from '@/services/categoryService';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import LanguageSwitcher from '@/components/LanguageSwitcher';
@@ -18,17 +20,27 @@ const Header: React.FC = () => {
   const { totalItems } = useCart();
   const { isAuthenticated, user, isAdmin } = useUser();
   const { t, selectedCountry } = useLanguage();
+  const { products } = useProducts();
   const location = useLocation();
   const { settings } = useSiteSettings();
 
+  // Categorias para o submenu — só as que têm produto visível cadastrado
+  const [allCategories, setAllCategories] = useState<ProductCategory[]>(DEFAULT_CATEGORIES);
+  useEffect(() => {
+    categoryService.getAll().then(setAllCategories).catch(() => {});
+  }, []);
+  const categoriesWithProducts = allCategories.filter(
+    (c) => products.some((p) => !p.hidden && p.category === c.id)
+  );
+
   const navItems = [
-    { 
-      label: t('nav.products'), 
+    {
+      label: t('nav.products'),
       href: '/produtos',
-      submenu: [
-        { label: t('nav.products.cosmeticos'), href: '/produtos/cosmeticos' },
-        { label: t('nav.products.doces'), href: '/produtos/doces' },
-      ]
+      submenu: categoriesWithProducts.map((c) => ({
+        label: `${c.icon} ${c.label}`,
+        href: `/produtos/${c.id}`,
+      })),
     },
     { label: t('nav.offers'), href: '/ofertas' },
     ...(settings.vlogEnabled ? [{ label: t('nav.vlog'), href: '/vlog' }] : []),
