@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Plus, Pencil, Trash2, X, Image as ImageIcon, Loader2, PackageOpen, Sparkles, GripVertical, Save, Gift, Infinity, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -17,19 +17,7 @@ import { PACKAGE_SAFETY_MARGIN_CM, sanitizePackageDimensions } from '@/utils/shi
 import { convertYen as fxConvertYen } from '@/services/fxService';
 import { formatPrice } from '@/utils/currency';
 
-const CATEGORIES = [
-  { id: 'cosmeticos', label: 'Cosméticos', icon: '🧴' },
-  { id: 'doces', label: 'Doces & Chás', icon: '🍵' },
-  { id: 'acessorios', label: 'Acessórios', icon: '🎮' },
-  { id: 'papelaria', label: 'Papelaria', icon: '✏️' },
-  { id: 'eletronicos', label: 'Eletrônicos', icon: '📱' },
-  { id: 'masculino', label: 'Masculino', icon: '👔' },
-  { id: 'vestuario', label: 'Vestuário', icon: '👕' },
-  { id: 'higiene', label: 'Higiene & Saúde', icon: '🧼' },
-];
-
-const categoryLabel = (id: string) => CATEGORIES.find((c) => c.id === id)?.label || id;
-const categoryIcon = (id: string) => CATEGORIES.find((c) => c.id === id)?.icon || '🌸';
+import { categoryService, DEFAULT_CATEGORIES, type ProductCategory } from '@/services/categoryService';
 
 const slugify = (s: string) =>
   s
@@ -147,6 +135,30 @@ const ProductManager: React.FC = () => {
   const fileRef = useRef<HTMLInputElement>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterCat, setFilterCat] = useState<string>('all');
+
+  // Categorias dinâmicas (padrão + personalizadas do Firestore)
+  const [CATEGORIES, setCategories] = useState<ProductCategory[]>(DEFAULT_CATEGORIES);
+  useEffect(() => {
+    categoryService.getAll().then(setCategories).catch(() => {});
+  }, []);
+  const categoryLabel = (id: string) => CATEGORIES.find((c) => c.id === id)?.label || id;
+  const categoryIcon = (id: string) => CATEGORIES.find((c) => c.id === id)?.icon || '🌸';
+
+  // Adicionar nova categoria
+  const handleAddCategory = async () => {
+    const label = window.prompt('Nome da nova categoria:');
+    if (!label || !label.trim()) return;
+    const icon = window.prompt('Emoji/ícone (opcional):', '🏷️') || '🏷️';
+    const cat = await categoryService.add(label.trim(), icon.trim());
+    if (cat) {
+      const updated = await categoryService.getAll();
+      setCategories(updated);
+      if (editing) setEditing({ ...editing, category: cat.id });
+      toast({ title: '✅ Categoria adicionada', description: `${cat.icon} ${cat.label}` });
+    } else {
+      toast({ title: 'Erro ao adicionar categoria', variant: 'destructive' });
+    }
+  };
 
   const filteredProducts = products.filter((p) => {
     const matchCat = filterCat === 'all' || p.category === filterCat;
@@ -657,15 +669,25 @@ const ProductManager: React.FC = () => {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-sm font-semibold block mb-1">Categoria</label>
-                  <select
-                    value={editing.category}
-                    onChange={(e) => setEditing({ ...editing, category: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg border border-border bg-background"
-                  >
-                    {CATEGORIES.map((c) => (
-                      <option key={c.id} value={c.id}>{c.icon} {c.label}</option>
-                    ))}
-                  </select>
+                  <div className="flex gap-2">
+                    <select
+                      value={editing.category}
+                      onChange={(e) => setEditing({ ...editing, category: e.target.value })}
+                      className="flex-1 px-3 py-2 rounded-lg border border-border bg-background min-w-0"
+                    >
+                      {CATEGORIES.map((c) => (
+                        <option key={c.id} value={c.id}>{c.icon} {c.label}</option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={handleAddCategory}
+                      title="Adicionar nova categoria"
+                      className="shrink-0 px-3 py-2 rounded-lg border border-primary/40 bg-primary/10 text-primary hover:bg-primary/20 transition-colors flex items-center gap-1 text-sm font-semibold"
+                    >
+                      <Plus className="w-4 h-4" /> Nova
+                    </button>
+                  </div>
                 </div>
                 <div>
                   <label className="text-sm font-semibold block mb-1">Tag / Sabor</label>
