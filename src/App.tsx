@@ -57,21 +57,27 @@ const queryClient = new QueryClient({
   },
 });
 
-// Analytics só carrega após consentimento
+// Analytics do Google só carrega após consentimento.
+// A contagem de visitas (anônima, agregada, sem dados pessoais) roda para
+// TODOS os visitantes — não depende do banner de cookies.
 const AnalyticsLoader: React.FC = () => {
   const { consent } = useCookieConsent();
   const location = useLocation();
 
+  // Google Analytics — só com consentimento explícito
   useEffect(() => {
     if (consent !== 'accepted' || !app) return;
     import('firebase/analytics').then(({ getAnalytics }) => {
       try { getAnalytics(app!); } catch { /* já inicializado */ }
     });
-    // Rastreia visita única por sessão (país + cidade para o painel admin)
+  }, [consent]);
+
+  // Contagem de visitas + país/cidade — para todos (estatística agregada anônima)
+  useEffect(() => {
     import('@/services/visitorService').then(({ visitorService }) => {
       visitorService.trackVisit().catch(() => {});
     });
-  }, [consent]);
+  }, []);
 
   // Rastreia visualização de página a cada mudança de rota
   useEffect(() => {

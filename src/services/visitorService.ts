@@ -12,7 +12,7 @@
 
 import { db } from '@/config/firebase';
 import {
-  doc, getDoc, setDoc, updateDoc, increment,
+  doc, setDoc, increment,
   collection, query, orderBy, limit, getDocs,
 } from 'firebase/firestore';
 
@@ -50,13 +50,17 @@ export interface GeoInfo {
 
 async function getGeoInfo(): Promise<GeoInfo | null> {
   try {
-    const res = await fetch('https://ip-api.com/json/?fields=country,countryCode,city,regionName', {
-      signal: AbortSignal.timeout(4000),
-    });
+    // /api/geo usa os headers de geolocalização do Vercel (mesma origem, HTTPS)
+    const res = await fetch('/api/geo', { signal: AbortSignal.timeout(4000) });
     if (!res.ok) return null;
     const data = await res.json();
-    if (data.status === 'fail') return null;
-    return data as GeoInfo;
+    if (!data.countryCode) return null;
+    return {
+      country: data.countryCode,
+      countryCode: data.countryCode,
+      city: data.city || '',
+      regionName: data.regionName || '',
+    };
   } catch {
     return null;
   }
@@ -82,26 +86,17 @@ export const visitorService = {
     const ref = doc(db, 'analytics_daily', dateKey);
 
     try {
-      const snap = await getDoc(ref);
-      if (!snap.exists()) {
-        // Primeiro acesso do dia
-        await setDoc(ref, {
-          date: dateKey,
-          total: 1,
-          countries: geo ? { [geo.countryCode]: 1 } : {},
-          cities: geo ? { [geo.city]: 1 } : {},
-        });
-      } else {
-        // Incrementa total + país + cidade
-        const updates: Record<string, unknown> = { total: increment(1) };
-        if (geo) {
-          updates[`countries.${geo.countryCode}`] = increment(1);
-          if (geo.city) updates[`cities.${geo.city}`] = increment(1);
-        }
-        await updateDoc(ref, updates);
-      }
-    } catch {
-      // silencioso — não interrompe a navegação
+      // setDoc com merge + increment cria o doc/campo se não existir, SEM precisar
+      // de getDoc (visitante comum não tem permissão de leitura na regra do Firestore).
+      // Objetos aninhados com merge:true fazem incremento parcial em countries/cities.
+      await setDoc(ref, {
+        date: dateKey,
+        total: increment(1),
+        ...(geo ? { countries: { [geo.countryCode]: increment(1) } } : {}),
+        ...(geo && geo.city ? { cities: { [geo.city]: increment(1) } } : {}),
+      }, { merge: true });
+    } catch (e) {
+      console.warn('[visitor] trackVisit falhou:', e);
     }
   },
 
@@ -133,12 +128,8 @@ export const visitorService = {
       const slug = pathname.startsWith('/produto/') ? '/produto/:id' : pathname;
       const label = PAGE_LABELS[slug] || slug;
       const ref = doc(db, 'analytics_pages', slug.replace(/\//g, '_').replace(/^_/, '') || 'home');
-      const snap = await getDoc(ref);
-      if (!snap.exists()) {
-        await setDoc(ref, { slug, label, views: 1, updatedAt: new Date().toISOString() });
-      } else {
-        await updateDoc(ref, { views: increment(1), updatedAt: new Date().toISOString() });
-      }
+      // setDoc+merge+increment cria se não existir, sem precisar de getDoc (sem permissão de leitura)
+      await setDoc(ref, { slug, label, views: increment(1), updatedAt: new Date().toISOString() }, { merge: true });
     } catch { /* silencioso */ }
   },
 
@@ -150,16 +141,12 @@ export const visitorService = {
     if (!db) return;
     try {
       const ref = doc(db, 'analytics_products', productId);
-      const snap = await getDoc(ref);
-      if (!snap.exists()) {
-        await setDoc(ref, { productId, productName, views: 1, updatedAt: new Date().toISOString() });
-      } else {
-        await updateDoc(ref, {
-          views: increment(1),
-          productName, // atualiza o nome caso tenha mudado
-          updatedAt: new Date().toISOString(),
-        });
-      }
+      await setDoc(ref, {
+        productId,
+        productName,
+        views: increment(1),
+        updatedAt: new Date().toISOString(),
+      }, { merge: true });
     } catch { /* silencioso */ }
   },
 
