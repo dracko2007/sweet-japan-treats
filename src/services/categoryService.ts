@@ -19,6 +19,7 @@ export const DEFAULT_CATEGORIES: ProductCategory[] = [
   { id: 'masculino', label: 'Masculino', icon: '👔' },
   { id: 'vestuario', label: 'Vestuário', icon: '👕' },
   { id: 'higiene', label: 'Higiene & Saúde', icon: '🧼' },
+  { id: 'pet', label: 'Pet', icon: '🐕' },
 ];
 
 const SETTINGS_DOC = 'product_categories';
@@ -35,8 +36,9 @@ export const categoryService = {
       const snap = await getDoc(doc(db, 'settings', SETTINGS_DOC));
       const custom: ProductCategory[] = snap.exists() ? (snap.data().list || []) : [];
       const map = new Map<string, ProductCategory>();
-      for (const c of DEFAULT_CATEGORIES) map.set(c.id, c);
+      // Custom primeiro; padrão sobrescreve (emoji/label das padrão sempre prevalecem)
       for (const c of custom) if (c?.id) map.set(c.id, c);
+      for (const c of DEFAULT_CATEGORIES) map.set(c.id, c);
       return Array.from(map.values());
     } catch {
       return DEFAULT_CATEGORIES;
