@@ -15,7 +15,25 @@ import { productEnglishName } from '@/utils/productName';
 const FeaturedProducts: React.FC = () => {
   const { t, language, selectedCountry } = useLanguage();
   const { products, loading } = useProducts();
-  const featuredProducts = products.filter(p => !p.hidden).slice(0, 4);
+
+  // Produtos marcados como destaque pelo admin. Mostra no máx. 4 por vez;
+  // se houver mais de 4, a janela alterna a cada semana (rotação automática).
+  const featuredProducts = (() => {
+    const flagged = products
+      .filter(p => !p.hidden && p.featured)
+      .sort((a, b) => (a.featuredAt || '').localeCompare(b.featuredAt || ''));
+
+    // Fallback: se ninguém foi marcado, usa os 4 primeiros visíveis (comportamento antigo)
+    if (flagged.length === 0) return products.filter(p => !p.hidden).slice(0, 4);
+    if (flagged.length <= 4) return flagged;
+
+    // Rotação semanal: a janela de 4 avança 4 posições por semana, com wrap-around
+    const weeksSinceEpoch = Math.floor(Date.now() / (7 * 24 * 60 * 60 * 1000));
+    const offset = (weeksSinceEpoch * 4) % flagged.length;
+    const result = [];
+    for (let i = 0; i < 4; i++) result.push(flagged[(offset + i) % flagged.length]);
+    return result;
+  })();
 
   const isEuro = ['Portugal', 'França', 'Itália', 'Espanha'].includes(selectedCountry);
   const currency = getCurrencyByCountry(selectedCountry);

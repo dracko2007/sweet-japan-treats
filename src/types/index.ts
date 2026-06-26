@@ -43,6 +43,8 @@ export interface Product {
   packageDimensionsCm?: ProductPackageDimensionsCm; // Medidas da embalagem/produto em cm, sem margem de seguranca.
   tags?: string[];           // Tipos/subcategorias para filtro inteligente (ex: 'shampoo', 'filtro solar')
   noPsFee?: boolean;         // true = isenta a taxa de Personal Shopper (¥1000/un) deste produto
+  featured?: boolean;        // true = aparece na seção "Em Destaque" da home (máx 4 por vez, rotação semanal)
+  featuredAt?: string;       // ISO timestamp de quando foi marcado como destaque (ordena a rotação)
   isNew?: boolean;           // Marca como lançamento (aparece em destaque no filtro "Lançamento")
   salesCount?: number;       // Quantidade vendida (usado no filtro "Mais Vendidos"); atualizado manualmente pelo admin
   stock?: { unlimited: boolean; quantity: number }; // undefined = ilimitado (retrocompat)

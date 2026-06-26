@@ -773,6 +773,47 @@ const ProductManager: React.FC = () => {
                   <p className="text-[11px] text-muted-foreground mt-1.5">Oculto = fica registrado, mas o cliente não vê.</p>
                 </div>
 
+                {/* Em Destaque na home */}
+                <div className="bg-secondary/40 border border-border rounded-lg p-3 flex flex-col justify-center col-span-2">
+                  <label className="text-sm font-semibold block mb-2 flex items-center gap-1.5">⭐ Em Destaque na Página Inicial</label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const turningOn = !editing.featured;
+                      setEditing({
+                        ...editing,
+                        featured: turningOn,
+                        featuredAt: turningOn ? (editing.featuredAt || new Date().toISOString()) : undefined,
+                      });
+                    }}
+                    className={`flex items-center justify-between gap-2 px-3 py-2 rounded-lg border text-sm font-semibold transition-colors ${
+                      editing.featured
+                        ? 'bg-amber-100 dark:bg-amber-950/30 text-amber-700 dark:text-amber-300 border-amber-300'
+                        : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 border-gray-300'
+                    }`}
+                  >
+                    <span>{editing.featured ? '⭐ Em destaque' : '☆ Sem destaque'}</span>
+                    <span className={`w-9 h-5 rounded-full relative transition-colors ${editing.featured ? 'bg-amber-500' : 'bg-gray-400'}`}>
+                      <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-all ${editing.featured ? 'left-4' : 'left-0.5'}`} />
+                    </span>
+                  </button>
+                  {(() => {
+                    const featuredCount = products.filter(p => p.featured && p.id !== editing.id).length + (editing.featured ? 1 : 0);
+                    if (featuredCount > 4) {
+                      return (
+                        <p className="text-[11px] text-amber-700 dark:text-amber-300 mt-1.5 leading-snug">
+                          ⚠️ {featuredCount} produtos em destaque. A home mostra <strong>4 por vez</strong> e alterna automaticamente <strong>a cada semana</strong>, dando vez aos próximos.
+                        </p>
+                      );
+                    }
+                    return (
+                      <p className="text-[11px] text-muted-foreground mt-1.5 leading-snug">
+                        {featuredCount}/4 em destaque. Aparece na seção "Em Destaque" da home. Acima de 4, alternam semanalmente.
+                      </p>
+                    );
+                  })()}
+                </div>
+
                 {/* Restrição de destino + Origem */}
                 <div className="space-y-2">
                   <label className="text-sm font-semibold block">Restrição de venda por destino</label>
