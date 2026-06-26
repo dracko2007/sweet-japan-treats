@@ -392,26 +392,30 @@ const ShippingCalculator: React.FC<ShippingCalculatorProps> = ({
           {shippingOptions.map((option, index) => {
             const isConsultar = (option as any).isConsultar;
             const isCombinar = (option as any).isCombinar;
+            // 'A Combinar' é selecionável (tem radio), apesar de não ter preço fixo
+            const selectable = !isConsultar || isCombinar;
             return (
               <div
                 key={option.carrier}
-                onClick={() => onShippingSelect && !isConsultar && setSelectedCarrier(option.carrier)}
+                onClick={() => onShippingSelect && selectable && setSelectedCarrier(option.carrier)}
                 className={cn(
                   "rounded-xl p-4 border transition-all",
-                  onShippingSelect && !isConsultar ? "cursor-pointer" : "",
-                  isConsultar ? "border-dashed border-border opacity-70" :
+                  onShippingSelect && selectable ? "cursor-pointer" : "",
+                  (isConsultar && !isCombinar) ? "border-dashed border-border opacity-70" :
                   selectedCarrier === option.carrier
                     ? "border-primary bg-primary/10 ring-2 ring-primary/20"
                     : onShippingSelect
                     ? "border-border hover:border-primary/50"
-                    : index === 0
+                    : index === 0 && !isCombinar
                     ? "border-primary bg-primary/5"
+                    : isCombinar
+                    ? "border-dashed border-amber-300"
                     : "border-border"
                 )}
               >
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-3 min-w-0 flex-1">
-                    {onShippingSelect && !isConsultar && (
+                    {onShippingSelect && selectable && (
                       <div className={cn(
                         "w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all shrink-0",
                         selectedCarrier === option.carrier ? "border-primary bg-primary" : "border-border"
