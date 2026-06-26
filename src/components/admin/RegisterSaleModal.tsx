@@ -13,7 +13,7 @@ interface ItemRow {
 }
 
 interface Props {
-  request: CustomRequest;
+  request?: CustomRequest;   // opcional — se ausente, venda avulsa
   adminName?: string;
   onClose: () => void;
   onRegistered: () => void;
@@ -32,6 +32,9 @@ const RegisterSaleModal: React.FC<Props> = ({ request, adminName, onClose, onReg
   const [paymentMethod, setPaymentMethod] = useState<'wise' | 'pix'>('wise');
   const [currency, setCurrency] = useState<'JPY' | 'BRL' | 'EUR' | 'USD'>('JPY');
   const [saving, setSaving] = useState(false);
+  // Cliente: vem do pedido ou é digitado (venda avulsa)
+  const [custName, setCustName] = useState(request?.name || '');
+  const [custContact, setCustContact] = useState(request?.contact || '');
 
   const totalYen = useMemo(
     () => rows.reduce((s, r) => s + (parseFloat(r.valueYen) || 0), 0),
@@ -47,26 +50,30 @@ const RegisterSaleModal: React.FC<Props> = ({ request, adminName, onClose, onReg
   const validItems = rows.filter((r) => r.name.trim() && (parseFloat(r.valueYen) || 0) > 0);
 
   const handleRegister = async () => {
+    if (!custName.trim()) {
+      toast({ title: 'Informe o nome do cliente', variant: 'destructive' });
+      return;
+    }
     if (validItems.length === 0) {
       toast({ title: 'Adicione ao menos 1 produto com nome e valor', variant: 'destructive' });
       return;
     }
     // E-mail do cliente: usa o contato se for e-mail, senão um placeholder a partir do nome
-    const contact = request.contact?.trim() || '';
+    const contact = custContact.trim();
     const email = contact.includes('@')
       ? contact
-      : `${request.name.trim().toLowerCase().replace(/\s+/g, '.')}@manual.local`;
+      : `${custName.trim().toLowerCase().replace(/\s+/g, '.')}@manual.local`;
 
     setSaving(true);
     const res = await orderService.createManualSale({
-      customerName: request.name,
+      customerName: custName.trim(),
       customerEmail: email,
       customerPhone: contact.includes('@') ? '' : contact,
       items: validItems.map((r) => ({ productName: r.name.trim(), priceYen: parseFloat(r.valueYen) || 0 })),
       paymentMethod,
       currency,
-      linkedRequestId: request.id,
-      note: `Venda posterior — ${request.productDesc?.slice(0, 80) || ''}`,
+      linkedRequestId: request?.id,
+      note: `Venda posterior${request?.productDesc ? ' — ' + request.productDesc.slice(0, 80) : ''}`,
       createdBy: adminName || '',
     });
     setSaving(false);
@@ -100,7 +107,7 @@ const RegisterSaleModal: React.FC<Props> = ({ request, adminName, onClose, onReg
               <DollarSign className="w-5 h-5 text-green-600" /> Registrar Venda
             </h3>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Cliente: <strong>{request.name}</strong> · {request.contact}
+              {request ? 'Vinculada ao pedido personalizado' : 'Venda avulsa (Wise/PIX direto)'}
             </p>
           </div>
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
@@ -113,6 +120,28 @@ const RegisterSaleModal: React.FC<Props> = ({ request, adminName, onClose, onReg
           <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900 rounded-lg p-3 text-xs text-amber-700 dark:text-amber-300">
             💡 Produtos cobrados fora do site (Wise/PIX direto). Ao registrar, esta venda entra como
             <strong> receita no Dashboard</strong> (pagamento confirmado).
+          </div>
+
+          {/* Cliente */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-sm font-semibold block mb-1">Nome do cliente *</label>
+              <input
+                value={custName}
+                onChange={(e) => setCustName(e.target.value)}
+                placeholder="Ex: Maria Silva"
+                className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-semibold block mb-1">Contato (e-mail/WhatsApp)</label>
+              <input
+                value={custContact}
+                onChange={(e) => setCustContact(e.target.value)}
+                placeholder="email@exemplo.com ou +55..."
+                className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm"
+              />
+            </div>
           </div>
 
           {/* Produtos (calculadora) */}

@@ -22,6 +22,7 @@ const CustomRequestManager: React.FC = () => {
   const [list, setList] = useState<CustomRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [saleRequest, setSaleRequest] = useState<CustomRequest | null>(null);
+  const [avulsaOpen, setAvulsaOpen] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -60,9 +61,14 @@ const CustomRequestManager: React.FC = () => {
           </h2>
           <p className="text-sm text-muted-foreground">{list.length} pedido(s) de "Faça seu Pedido"</p>
         </div>
-        <Button variant="outline" onClick={load} className="rounded-xl gap-2 h-9">
-          <RotateCcw className="w-4 h-4" /> Atualizar
-        </Button>
+        <div className="flex gap-2">
+          <Button onClick={() => setAvulsaOpen(true)} className="rounded-xl gap-2 h-9 bg-green-600 hover:bg-green-700 text-white">
+            <DollarSign className="w-4 h-4" /> Registrar Venda
+          </Button>
+          <Button variant="outline" onClick={load} className="rounded-xl gap-2 h-9">
+            <RotateCcw className="w-4 h-4" /> Atualizar
+          </Button>
+        </div>
       </div>
 
       {list.length === 0 ? (
@@ -134,6 +140,14 @@ const CustomRequestManager: React.FC = () => {
           request={saleRequest}
           adminName={user?.name}
           onClose={() => setSaleRequest(null)}
+          onRegistered={load}
+        />
+      )}
+
+      {avulsaOpen && (
+        <RegisterSaleModal
+          adminName={user?.name}
+          onClose={() => setAvulsaOpen(false)}
           onRegistered={load}
         />
       )}
