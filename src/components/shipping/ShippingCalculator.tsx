@@ -167,7 +167,22 @@ const ShippingCalculator: React.FC<ShippingCalculatorProps> = ({
       isConsultar: true,
     });
 
+    // A combinar — frete calculado após pesagem real
+    options.push({
+      carrier: 'a-combinar',
+      name: 'A Combinar · 要相談',
+      logo: '⚖️',
+      cost: 0,
+      costYen: null,
+      originalCost: undefined,
+      estimatedDays: 'A definir',
+      isConsultar: true,
+      isCombinar: true,
+    } as any);
+
     return options.sort((a, b) => {
+      if ((a as any).isCombinar) return 1;
+      if ((b as any).isCombinar) return -1;
       if (a.isConsultar) return 1;
       if (b.isConsultar) return -1;
       return a.cost - b.cost;
@@ -376,6 +391,7 @@ const ShippingCalculator: React.FC<ShippingCalculatorProps> = ({
 
           {shippingOptions.map((option, index) => {
             const isConsultar = (option as any).isConsultar;
+            const isCombinar = (option as any).isCombinar;
             return (
               <div
                 key={option.carrier}
@@ -408,12 +424,23 @@ const ShippingCalculator: React.FC<ShippingCalculatorProps> = ({
                       <p className="font-bold text-sm text-foreground truncate">{option.name}</p>
                       <p className="text-xs text-muted-foreground truncate">
                         {option.costYen ? `¥${option.costYen.toLocaleString()} · ` : ''}
-                        {isConsultar ? t('calc.variableDeadline') : t('calc.deliveryDays').replace('{days}', option.estimatedDays)}
+                        {isCombinar
+                          ? 'Frete calculado após pesagem real do pacote'
+                          : isConsultar
+                          ? t('calc.variableDeadline')
+                          : t('calc.deliveryDays').replace('{days}', option.estimatedDays)}
                       </p>
+                      {isCombinar && (
+                        <p className="text-xs text-amber-600 dark:text-amber-400 mt-0.5 leading-tight">
+                          ⚖️ O valor será informado após a pesagem e cobrado separadamente.
+                        </p>
+                      )}
                     </div>
                   </div>
                   <div className="text-right shrink-0">
-                    {isConsultar ? (
+                    {isCombinar ? (
+                      <p className="font-sans text-sm font-black text-amber-600 dark:text-amber-400">A combinar</p>
+                    ) : isConsultar ? (
                       <p className="font-sans text-sm font-black text-muted-foreground">{t('calc.consultar')}</p>
                     ) : (
                       <p className={cn(
