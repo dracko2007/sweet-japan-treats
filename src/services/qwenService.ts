@@ -4,7 +4,7 @@
 import { auth } from '@/config/firebase';
 
 export interface QwenMsg { role: 'user' | 'assistant'; content: string; }
-export interface CatalogItem { name: string; category: string; priceYen: number; discount?: number; }
+export interface CatalogItem { name: string; category: string; priceYen: number; discount?: number; approxWeightGrams?: number; }
 
 // Catálogo estendido enviado APENAS em sessões admin (inclui dados sensíveis de negócio).
 export interface AdminCatalogItem extends CatalogItem {

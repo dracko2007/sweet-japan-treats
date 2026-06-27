@@ -11,6 +11,7 @@ import { formatPrice, getCurrencyByCountry } from '@/utils/currency';
 import { askQwen, qwenEnabled, QwenMsg, AdminCatalogItem } from '@/services/qwenService';
 import { productEnglishName } from '@/utils/productName';
 import { effectiveYen } from '@/utils/pricing';
+import { convertYen as fxConvert } from '@/services/fxService';
 import { orderService } from '@/services/orderService';
 import { toast } from 'sonner';
 
@@ -347,10 +348,14 @@ const KimiClawAssistant: React.FC = () => {
     const symbol = code === 'JPY' ? '¥' : code === 'EUR' ? '€' : 'R$';
     const locale = { country: selectedCountry, currencyCode: code, currencySymbol: symbol };
 
-    // Catálogo público (produtos visíveis) — enviado sempre
+    // Catálogo público (produtos visíveis) — enviado sempre.
+    // Inclui peso estimado (g) para a IA poder calcular frete e filtrar por orçamento.
     const catalog = products
       .filter((p) => !p.hidden)
-      .map((p) => ({ name: productEnglishName(p), category: p.category, priceYen: p.prices?.small || 0, discount: p.discountPercent || 0 }));
+      .map((p) => {
+        const wt = p.weightGrams || (WEIGHT_BY_CATEGORY[p.category] || DEFAULT_WEIGHT).small;
+        return { name: productEnglishName(p), category: p.category, priceYen: p.prices?.small || 0, discount: p.discountPercent || 0, approxWeightGrams: wt };
+      });
 
     if (isAdmin) {
       // Admin recebe TODOS os produtos (incluindo ocultos), com custo e peso estimado
@@ -439,6 +444,23 @@ const KimiClawAssistant: React.FC = () => {
       return;
     }
 
+    // 0.PS PEDIDO DE ORÇAMENTO COM RESTRIÇÃO (produto + frete + limite de valor)
+    // Ex.: "quero shampoo + frete até 550 reais". Exige raciocínio (filtrar por preço+frete)
+    // → encaminha para a IA GLM-5.2, NÃO para a busca burra por palavra-chave.
+    const qHasValue = /\d/.test(query) && /reais?|real|r\$|yen|ienes?|¥|euros?|€|dol[áa]r|\$/.test(query);
+    const qHasLimit = /m[áa]ximo|at[ée]\s+\d|limite|n[ãa]o\s+passar|abaixo\s+de|menos\s+de|passa\s+de|no\s+m[áa]ximo|\bm[áa]x\b/.test(query);
+    const qHasShipping = /frete|envio|entrega|shipping/.test(query);
+    if (/or[çc]amento/.test(query) || (qHasValue && qHasLimit) || (qHasShipping && qHasValue)) {
+      setIsTyping(true);
+      const ai = await aiAnswer(text);
+      setIsTyping(false);
+      await addKimiMessageWithTyping(
+        ai ||
+        'Para um orçamento preciso (produto + frete) dentro de um valor, fale com um vendedor no WhatsApp **+81 70-1367-1679** (wa.me/817013671679) ou e-mail **contato@japanexpress-store.com** — eles calculam na hora pra você! 📦'
+      );
+      return;
+    }
+
     // 0. SEARCH PRODUCTS SKILL
     if (query.includes('buscar') || query.includes('procurar') || query.includes('pesquisar') || query.includes('search') || query.includes('find') || query.includes('tem ') || query.includes('quero ') || query.includes('mostrar') || query.includes('achar') || query.includes('encontrar')) {
       // Busca exige match FORTE (nome/categoria/marca) — evita resultados aleatórios
@@ -485,7 +507,7 @@ const KimiClawAssistant: React.FC = () => {
       );
 
       const responseText = language === 'pt'
-        ? `Feito! Adicionei o **${targetProduct.name}** (Tamanho Pequeno) ao seu carrinho. O preço exibido é de **${formatPrice(effectiveYen(targetProduct, 'small'), selectedCountry === 'Japão' ? 'JPY' : 'BRL')}**.`
+        ? `Feito! Adicionei o **${targetProduct.name}** (Tamanho Pequeno) ao seu carrinho. O preço exibido é de **${formatPrice(fxConvert(effectiveYen(targetProduct, 'small'), selectedCountry === 'Japão' ? 'JPY' : 'BRL'), selectedCountry === 'Japão' ? 'JPY' : 'BRL')}**.`
         : `Success! Added **${targetProduct.name}** (Small Size) to your cart.`;
 
       await addKimiMessageWithTyping(responseText, steps);
@@ -929,7 +951,7 @@ const KimiClawAssistant: React.FC = () => {
                               <p className="text-[11px] font-semibold text-foreground truncate">{productEnglishName(product)}</p>
                               <p className="text-[10px] text-muted-foreground">{product.category}</p>
                               <p className="text-[11px] font-bold text-primary mt-1">
-                                {formatPrice(effectiveYen(product, 'small'), getCurrencyByCountry(selectedCountry))}
+                                {formatPrice(fxConvert(effectiveYen(product, 'small'), getCurrencyByCountry(selectedCountry)), getCurrencyByCountry(selectedCountry))}
                               </p>
                             </div>
                             <button
