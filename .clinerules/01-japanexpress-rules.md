@@ -15,3 +15,9 @@
 - **Site-alvo:** japanexpress-store.com (e-commerce de produtos japoneses importados para o Brasil, sob regras de Remessa Conforme).
 - **Integridade do código:** Todo HTML, CSS e JS deve permanecer leve, de carregamento rápido e moderno.
 - **Verificação:** Sempre explicar o que foi alterado em português claro e não-técnico após uma edição bem-sucedida, para que o usuário teste facilmente no ambiente ao vivo.
+
+## FLUXO DE VERSIONAMENTO (GIT) — OBRIGATÓRIO
+- **Sempre commitar e dar push:** Toda vez que concluir qualquer alteração nos arquivos do projeto (código, config ou conteúdo), execute imediatamente `git add` + `git commit` + `git push`, sem exceção e sem deixar para depois.
+- **Um commit por alteração concluída:** Nunca acumule mudanças pendentes. Assim que uma edição estiver pronta e validada, commit e push na hora.
+- **Mensagens de commit:** Curtas e em português, descrevendo o que mudou (ex.: "ajusta espaçamento do header", "adiciona banner de promoção", "corrige link do rodapé").
+- **Ordem correta:** adicionar (`git add`) → commitar (`git commit -m "..."`) → enviar (`git push`). Confirmar que o push foi concluído antes de considerar a tarefa finalizada.
