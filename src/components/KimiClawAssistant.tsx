@@ -466,8 +466,59 @@ const KimiClawAssistant: React.FC = () => {
       return;
     }
 
+    // 0.S SELEÇÃO / FECHAMENTO DE PEDIDO — quando o cliente ESCOLHE um produto que o
+    // bot acabou de recomendar (ex.: "quero esse X", "vamos nesse", "pode ser esse",
+    // "gostei desse", "comprar o primeiro"). NÃO é busca burra — é intenção de COMPRA.
+    // Discriminador: verbo de escolha + pronome demonstrativo (esse/este/aquele/primeiro...).
+    // Assim "quero ver shampoos" continua sendo busca, mas "quero ESSE shampoo" vira seleção.
+    const qNorm = normalizeText(query);
+    const selVerb = /(quero|queria|vamos|bora|pode ser|fech[aou]?|comprar|compra|lev[ao]|levar|gostei|gosto|escolh[oi]|prefiro|adicion[ae]|coloc[ao]|ped[i]?r|encomendar|finalizar|concluir|confirmo|topo|bora)/.test(qNorm);
+    const selTarget = /(ess[ea]|est[ea]|aquele|aquela|aquel[ea]s?|primeir[oa]|segund[oa]|terceir[oa]|quart[oa]|ultim[oa]|mesm[oa]|desse|dessa|deste|desta|mostrad|indicad|recomendad|apresentad)/.test(qNorm);
+    if (selVerb && selTarget) {
+      const results = searchProducts(query, { requireStrong: true });
+
+      // (a) Catálogo não tem o item exato → encaminha para encomenda (não busca burra)
+      if (results.length === 0) {
+        await addKimiMessageWithTyping(
+          `Perfeito! Vou te levar para o **"Faça seu Pedido"** pra finalizar a compra de **${text.trim()}** com a equipe — eles calculam o frete certinho e fecham com você. 📝`,
+          ['🛒 Preparando seu pedido...']
+        );
+        setTimeout(() => navigate('/faca-seu-pedido'), 700);
+        return;
+      }
+
+      // (b) Match único → adiciona ao carrinho e orienta o checkout
+      if (results.length === 1) {
+        const targetProduct = results[0];
+        addToCart(targetProduct, 'small', 1);
+        toast.success(`Adicionado: 1x ${targetProduct.name}`);
+        await addKimiMessageWithTyping(
+          `Boa escolha! ✅ Adicionei o **${targetProduct.name}** ao seu carrinho. Pra finalizar com o frete pra Brasil, vá em **Carrinho → Finalizar** ou confirme direto com um vendedor no WhatsApp **+81 70-1367-1679** (wa.me/817013671679). 📦`,
+          ['🛒 Adicionando ao carrinho...']
+        );
+        return;
+      }
+
+      // (c) Várias variantes (refil, kit, pack...) → mostra como SELEÇÃO, não como busca.
+      // Enquadra como fechamento de pedido: o cliente escolhe qual variante quer.
+      await addKimiMessageWithTyping(
+        `Ótima escolha! 🎯 Encontrei estas versões — toque na que você quer que eu adicione ao carrinho, ou me diga qual (ex.: "quero o kit completo"). Também posso fechar direto pelo **Faça seu Pedido** ou pelo WhatsApp **+81 70-1367-1679**. 📦`
+      );
+      setMessages(prev => [
+        ...prev,
+        {
+          id: Math.random().toString(36).substring(7),
+          sender: 'kimi',
+          text: '',
+          timestamp: new Date(),
+          products: results
+        }
+      ]);
+      return;
+    }
+
     // 0. SEARCH PRODUCTS SKILL
-    if (query.includes('buscar') || query.includes('procurar') || query.includes('pesquisar') || query.includes('search') || query.includes('find') || query.includes('tem ') || query.includes('quero ') || query.includes('mostrar') || query.includes('achar') || query.includes('encontrar')) {
+    if (query.includes('buscar') || query.includes('procurar') || query.includes('pesquisar') || query.includes('search') || query.includes('find') || query.includes('tem ') || query.includes('mostrar') || query.includes('achar') || query.includes('encontrar')) {
       // Busca exige match FORTE (nome/categoria/marca) — evita resultados aleatórios
       const results = searchProducts(query, { requireStrong: true });
 
