@@ -9,6 +9,7 @@ import { useLanguage } from '@/context/LanguageContext';
 import { usePagination } from '@/hooks/usePagination';
 import Pagination from '@/components/Pagination';
 import { minEffectiveYen } from '@/utils/pricing';
+import { categoryService, DEFAULT_CATEGORIES, type ProductCategory } from '@/services/categoryService';
 
 const normalize = (s: string) =>
   (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
@@ -35,7 +36,13 @@ const Products: React.FC = () => {
     { key: 'lancamento' as SortKey, label: t('productsPage.sortNew') },
   ];
 
-  const getCategoryLabel = (id: string) => t(`product.category.${id}`) || id;
+  // Categorias dinâmicas (padrão + personalizadas do Firestore) — igual ao Header
+  const [allCategories, setAllCategories] = useState<ProductCategory[]>(DEFAULT_CATEGORIES);
+  useEffect(() => { categoryService.getAll().then(setAllCategories).catch(() => {}); }, []);
+
+  const getCatIcon = (id: string) => allCategories.find(c => c.id === id)?.icon || CATEGORY_ICONS[id] || '🛍️';
+  const getCategoryLabel = (id: string) =>
+    allCategories.find(c => c.id === id)?.label || t(`product.category.${id}`) || id;
   const getCategoryDesc = (id: string) => {
     const descs: Record<string, Record<string, string>> = {
       pt: {
@@ -132,9 +139,8 @@ const Products: React.FC = () => {
 
   const availableCats = useMemo(() =>
     Array.from(new Set(visible.map(p => p.category)))
-      .filter(id => CATEGORY_ICONS[id])
       .sort((a, b) => getCategoryLabel(a).localeCompare(getCategoryLabel(b))),
-    [visible, language]);
+    [visible, language, allCategories]);
 
   // Tipos disponíveis (tags) — mostra sempre que existam tags na lista atual
   const availableTypes = useMemo(() => {
@@ -168,7 +174,7 @@ const Products: React.FC = () => {
     return () => document.removeEventListener('mousedown', onClick);
   }, [filtersOpen]);
 
-  const catMeta = effectiveCat ? { icon: CATEGORY_ICONS[effectiveCat] || '🛍️', label: getCategoryLabel(effectiveCat), desc: getCategoryDesc(effectiveCat) } : null;
+  const catMeta = effectiveCat ? { icon: getCatIcon(effectiveCat), label: getCategoryLabel(effectiveCat), desc: getCategoryDesc(effectiveCat) } : null;
 
   return (
     <Layout>
@@ -264,7 +270,7 @@ const Products: React.FC = () => {
                             <button key={id} onClick={() => { setCatFilter(catFilter === id ? null : id); setPage(1); }}
                               className={cn("px-3 py-1 rounded-full text-xs font-semibold border transition-all",
                                 catFilter === id ? "bg-primary text-primary-foreground border-primary" : "bg-card text-muted-foreground border-border hover:text-foreground")}>
-                              {CATEGORY_ICONS[id]} {getCategoryLabel(id)}
+                              {getCatIcon(id)} {getCategoryLabel(id)}
                             </button>
                           ))}
                         </div>
