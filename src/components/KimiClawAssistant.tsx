@@ -95,19 +95,33 @@ const KimiClawAssistant: React.FC = () => {
     scrollToBottom();
   }, [messages, isTyping, currentSteps]);
 
-  // Initial welcome message
+  // Persistência da conversa no navegador — sobrevive à troca de página (igual ao carrinho),
+  // evitando que o chat "reinicie" toda vez que o cliente navega entre seções da loja.
+  const KIMICLAW_STORAGE_KEY = 'kimiclaw_messages_v1';
   useEffect(() => {
-    if (messages.length === 0) {
-      setMessages([
-        {
-          id: 'welcome',
-          sender: 'kimi',
-          text: t('kimiclaw.welcome'),
-          timestamp: new Date(),
-        },
-      ]);
-    }
+    setMessages((prev) => {
+      if (prev.length > 0) return prev; // já há mensagens (ex.: fluxo de pedido confirmado)
+      try {
+        const saved = safeStorage.getItem(KIMICLAW_STORAGE_KEY);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            return parsed.map((m: any) => ({ ...m, timestamp: new Date(m.timestamp) }));
+          }
+        }
+      } catch { /* storage corrompido — ignora */ }
+      return [{ id: 'welcome', sender: 'kimi', text: t('kimiclaw.welcome'), timestamp: new Date() }];
+    });
   }, [language, t]);
+
+  // Salva a conversa sempre que muda (mantém só as últimas 50 mensagens p/ não inchar o storage)
+  useEffect(() => {
+    if (messages.length > 0) {
+      try {
+        safeStorage.setItem(KIMICLAW_STORAGE_KEY, JSON.stringify(messages.slice(-50)));
+      } catch { /* storage cheio/indisponível — ignora */ }
+    }
+  }, [messages]);
 
   // Hide attention badge when chat is opened
   useEffect(() => {
@@ -354,7 +368,7 @@ const KimiClawAssistant: React.FC = () => {
       .filter((p) => !p.hidden)
       .map((p) => {
         const wt = p.weightGrams || (WEIGHT_BY_CATEGORY[p.category] || DEFAULT_WEIGHT).small;
-        return { name: productEnglishName(p), category: p.category, priceYen: p.prices?.small || 0, discount: p.discountPercent || 0, approxWeightGrams: wt };
+        return { id: p.id, name: productEnglishName(p), category: p.category, priceYen: p.prices?.small || 0, discount: p.discountPercent || 0, approxWeightGrams: wt };
       });
 
     if (isAdmin) {
@@ -751,25 +765,6 @@ const KimiClawAssistant: React.FC = () => {
       return;
     }
 
-    // 8.5 BUSCA AUTOMÁTICA — só se houver match FORTE (nome/categoria/marca).
-    // Frases conversacionais ("qual a diferença entre pix e wise") não casam → vão pra IA.
-    if (!query.includes('oi') && !query.includes('ola') && !query.includes('hello')) {
-      const autoResults = searchProducts(query, { requireStrong: true });
-      if (autoResults.length > 0) {
-        setMessages(prev => [
-          ...prev,
-          {
-            id: Math.random().toString(36).substring(7),
-            sender: 'kimi',
-            text: t('kimiclaw.search.found').replace('{count}', autoResults.length.toString()),
-            timestamp: new Date(),
-            products: autoResults,
-          }
-        ]);
-        return;
-      }
-    }
-
     // 9. GENERAL RESPONSE
     let responseText = '';
     if (query.includes('oi') || query.includes('ola') || query.includes('hello')) {
@@ -793,13 +788,56 @@ const KimiClawAssistant: React.FC = () => {
       return;
     }
 
-    // 9.5 IA — responde de forma conversacional (com o catálogo em contexto)
+    // 9.5 IA resolve TUDO (busca de produtos, orçamentos, perguntas) — tem o catálogo
+    // completo no contexto e decide SOZINHA quais produtos recomendar. Isso elimina o bug
+    // da busca por palavra-chave (ex.: "kit" casando com KitKat em vez do kit de shampoo).
     if (qwenEnabled()) {
       setIsTyping(true);
       const ai = await aiAnswer(text);
       setIsTyping(false);
       if (ai) {
-        await addKimiMessageWithTyping(ai);
+        // Extrai os IDs dos produtos recomendados pela tag |||PRODUCT_IDS: id1,id2 → mostra cards
+        let responseText = ai;
+        let recommendedProducts: Product[] | undefined;
+        const marker = '|||PRODUCT_IDS:';
+        const idx = responseText.indexOf(marker);
+        if (idx !== -1) {
+          const idsPart = responseText.slice(idx + marker.length).trim();
+          responseText = responseText.slice(0, idx).trim();
+          const ids = idsPart.split(',').map((s) => s.trim()).filter(Boolean).slice(0, 5);
+          recommendedProducts = products.filter((p) => ids.includes(p.id));
+        }
+        setIsTyping(true);
+        await new Promise((resolve) => setTimeout(resolve, 1200));
+        setIsTyping(false);
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: Math.random().toString(36).substring(7),
+            sender: 'kimi',
+            text: responseText,
+            timestamp: new Date(),
+            ...(recommendedProducts && recommendedProducts.length > 0 ? { products: recommendedProducts } : {}),
+          },
+        ]);
+        return;
+      }
+    }
+
+    // Fallback (só se a IA estiver fora do ar): busca por palavra-chave no catálogo
+    if (!query.includes('oi') && !query.includes('ola') && !query.includes('hello')) {
+      const autoResults = searchProducts(query, { requireStrong: true });
+      if (autoResults.length > 0) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: Math.random().toString(36).substring(7),
+            sender: 'kimi',
+            text: t('kimiclaw.search.found').replace('{count}', autoResults.length.toString()),
+            timestamp: new Date(),
+            products: autoResults,
+          },
+        ]);
         return;
       }
     }

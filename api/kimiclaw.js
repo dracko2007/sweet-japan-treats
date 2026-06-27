@@ -119,6 +119,7 @@ confirmados com um vendedor ou administrador. Nunca apresente um número calcula
 
 Fatos da loja:
 - Envio do Japão (Hiroshima) por Correios/EMS; impostos de importação são cobrados pela Receita Federal e pagos online antes da liberação (nunca ao carteiro).
+- PRAZOS DE ENTREGA (envio internacional Japão → Brasil): EMS = a partir de 15 dias úteis; PAC = a partir de 18 dias úteis. São prazos MÍNIMOS — a alfândega pode atrasar mais. É PROIBIDO citar prazos como "2-4 dias" ou "5-7 dias" (esses são prazos domésticos e estão ERRADOS para envio internacional). Para Europa: EMS a partir de 12 dias úteis, PAC a partir de 20 dias úteis. Sempre diga "a partir de X dias úteis" e lembre que pode variar conforme a alfândega.
 - Pagamento: PIX e Wise (Brasil), PayPay (Japão).
 - Pontos: 1 por avaliação, 5 pts por minuto de vídeo de review (após validação), 1 ponto a cada ¥100 em produtos, 1000 no aniversário; 1 ponto = ¥1 de desconto.
 - Páginas: Produtos, Frete, Como Funciona, Faça seu Pedido, Empresas.
@@ -141,18 +142,18 @@ Você está conversando com um ADMINISTRADOR da loja. Pode fornecer informaçõe
 
 CÁLCULO DE FRETE — TARIFAS ATUAIS (origem Japão/Hiroshima):
 
-BRASIL:
-  PAC (Correios econômico):  base R$ 120 + R$ 35 por kg | prazo ~5-7 dias úteis
-  EMS (Correios prioritário): base R$ 220 + R$ 60 por kg | prazo ~2-4 dias úteis
-  Expresso (courier):         base R$ 350 + R$ 85 por kg | prazo ~1-3 dias úteis
+BRASIL (envio internacional):
+  PAC (Correios econômico):  base R$ 120 + R$ 35 por kg | prazo a partir de 18 dias úteis
+  EMS (Correios prioritário): base R$ 220 + R$ 60 por kg | prazo a partir de 15 dias úteis
+  Expresso (courier DHL/FedEx): base R$ 350 + R$ 85 por kg | prazo a partir de 7 dias úteis
 
 JAPÃO (entrega doméstica):
   Japan Post ゆうパック:  base ¥ 700 + ¥ 150 por kg | prazo 1-2 dias
   Yamato ヤマト宅急便:   base ¥ 800 + ¥ 180 por kg | prazo 1-3 dias
 
 EUROPA (Portugal, França, Itália, Espanha):
-  Correio local EMS:  base € 20 + € 6 por kg  | prazo ~5-7 dias
-  DHL/FedEx Express:  base € 35 + € 10 por kg | prazo ~2-4 dias
+  Correio local EMS:  base € 20 + € 6 por kg  | prazo a partir de 12 dias úteis
+  DHL/FedEx Express:  base € 35 + € 10 por kg | prazo a partir de 5 dias úteis
 
 COMO CALCULAR:
   1. Identifique o produto no catálogo admin (campo "Peso" indica gramas por variante)
@@ -306,10 +307,10 @@ Mantenha o aviso de que é estimativa e que o valor real deve ser confirmado com
         .map((p) => {
           const promo = p.discount ? ` (-${p.discount}%)` : '';
           const wt = p.approxWeightGrams ? ` | ~${p.approxWeightGrams}g` : '';
-          return `- ${p.name} [${p.category}] ¥${p.priceYen}${promo}${wt}`;
+          return `- [${p.id}] ${p.name} [${p.category}] ¥${p.priceYen}${promo}${wt}`;
         })
         .join('\n');
-      systemContent += `\n\nCATÁLOGO ATUAL DA LOJA (${catalog.length} itens — use SOMENTE isto para dizer o que existe):\n${lines}`;
+      systemContent += `\n\nCATÁLOGO ATUAL DA LOJA (${catalog.length} itens — use SOMENTE isto para dizer o que existe). O código entre colchetes no início de cada linha é o ID único do produto:\n${lines}\n\nRECOMENDAR PRODUTOS: sempre que citar/recomendar um ou mais produtos do catálogo, adicione AO FINAL da sua resposta (em uma única linha) a tag |||PRODUCT_IDS: seguida dos IDs exatos (os que estão entre colchetes) separados por vírgula, sem espaços, máximo 5. Ex.: "Encontrei o Shampoo X e o Condicionador Y! |||PRODUCT_IDS: shampoo-x,cond-y". A parte depois de ||| será ocultada do cliente e usada para mostrar os cards dos produtos. Se você não recomendar nenhum produto específico do catálogo, NÃO inclua a tag.`;
     }
 
     const baseMessages = [{ role: 'system', content: systemContent }, ...safeHistory];
