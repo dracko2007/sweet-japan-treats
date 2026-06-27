@@ -1,6 +1,7 @@
-// Função serverless (Vercel) — "cérebro" do KimiClaw via Groq (tier grátis, rápido).
-// A chave fica SÓ no servidor (process.env.GROQ_API_KEY) e nunca vai pro navegador.
-// Sem a chave, retorna 503 e o KimiClaw responde pelas regras (fallback).
+// Função serverless (Vercel) — "cérebro" do KimiClaw via GLM-5.2 (Z.ai).
+// Prioriza ZAI_API_KEY (GLM-5.2); se ausente, cai no Groq (GROQ_API_KEY) — retrocompat.
+// A chave fica SÓ no servidor e nunca vai pro navegador.
+// Sem nenhuma chave configurada, retorna 503 e o KimiClaw responde pelas regras (fallback).
 import { cert, getApps, initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 
@@ -13,13 +14,23 @@ function firebaseAdminAuth() {
   return getAuth();
 }
 
+// ---------- Provedores de IA ----------
+// GLM-5.2 via Z.ai é o provedor PRINCIPAL (mesma família do agente core da loja).
+// Groq permanece como fallback opcional — mantém o assistente no ar se faltar a chave da Z.ai.
+const ZAI_API_URL = 'https://api.z.ai/api/paas/v4/chat/completions';
+const DEFAULT_ZAI_MODELS = [
+  'glm-5.2',   // principal — GLM-5.2 (janela de contexto de 1M), raciocínio avançado
+  'glm-4.6',   // fallback estável
+  'glm-4.5',   // fallback adicional
+];
+const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const DEFAULT_GROQ_MODELS = [
   'llama-3.3-70b-versatile',        // principal — 70B, rápido
   'llama-3.3-70b-specdec',          // variante especulativa do 70B (alta disponibilidade)
   'deepseek-r1-distill-llama-70b',  // fallback 70B com raciocínio
   'llama-3.1-8b-instant',           // último recurso leve
 ];
-const DISABLED_GROQ_MODELS = new Set(['moonshotai/kimi-k2-instruct', 'openai/gpt-oss-120b']);
+const DISABLED_MODELS = new Set(['moonshotai/kimi-k2-instruct', 'openai/gpt-oss-120b']);
 const uniqueNonEmpty = (values) => {
   const seen = new Set();
   const out = [];
@@ -31,10 +42,14 @@ const uniqueNonEmpty = (values) => {
   }
   return out;
 };
+const ZAI_MODELS = uniqueNonEmpty([
+  ...(process.env.ZAI_MODEL || '').split(','),
+  ...DEFAULT_ZAI_MODELS,
+]).filter((model) => !DISABLED_MODELS.has(model));
 const GROQ_MODELS = uniqueNonEmpty([
   ...(process.env.GROQ_MODEL || '').split(','),
   ...DEFAULT_GROQ_MODELS,
-]).filter((model) => !DISABLED_GROQ_MODELS.has(model));
+]).filter((model) => !DISABLED_MODELS.has(model));
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -180,12 +195,17 @@ export default async function handler(req, res) {
     return;
   }
 
-  // ---------- Chave Groq ----------
-  const key = process.env.GROQ_API_KEY;
-  if (!key) {
+  // ---------- Chaves de IA (prioriza GLM-5.2 via Z.ai; Groq como fallback) ----------
+  const zaiKey = process.env.ZAI_API_KEY;
+  const groqKey = process.env.GROQ_API_KEY;
+  if (!zaiKey && !groqKey) {
     res.status(503).json({ error: 'AI not configured' });
     return;
   }
+  // Ordem de prioridade: GLM-5.2 primeiro (mais inteligente), Groq como reserva.
+  const providers = [];
+  if (zaiKey) providers.push({ name: 'glm', url: ZAI_API_URL, key: zaiKey, models: ZAI_MODELS });
+  if (groqKey) providers.push({ name: 'groq', url: GROQ_API_URL, key: groqKey, models: GROQ_MODELS });
 
   try {
     const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
@@ -278,25 +298,28 @@ pode ser pedido pelo "Faça seu Pedido". Nunca apresente o número como preço f
     let lastStatus = 0;
     let lastDetail = '';
 
-    for (const model of GROQ_MODELS) {
-      let r;
-      for (let attempt = 0; attempt < 2; attempt++) {
-        r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
-          body: JSON.stringify({ model, max_tokens: isAdmin ? 2048 : 600, temperature: 0.5, messages: baseMessages }),
-        });
-        if (r.ok) break;
-        lastStatus = r.status;
-        lastDetail = await r.text().catch(() => '');
-        if (r.status === 429 && attempt === 0) { await sleep(300); continue; }
-        break;
+    for (const provider of providers) {
+      for (const model of provider.models) {
+        let r;
+        for (let attempt = 0; attempt < 2; attempt++) {
+          r = await fetch(provider.url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${provider.key}` },
+            body: JSON.stringify({ model, max_tokens: isAdmin ? 2048 : 600, temperature: 0.5, messages: baseMessages }),
+          });
+          if (r.ok) break;
+          lastStatus = r.status;
+          lastDetail = await r.text().catch(() => '');
+          if (r.status === 429 && attempt === 0) { await sleep(300); continue; }
+          break;
+        }
+        if (r && r.ok) {
+          const data = await r.json().catch(() => null);
+          const t = data?.choices?.[0]?.message?.content?.trim();
+          if (t) { text = t; usedModel = `${provider.name}/${model}`; break; }
+        }
       }
-      if (r && r.ok) {
-        const data = await r.json().catch(() => null);
-        const t = data?.choices?.[0]?.message?.content?.trim();
-        if (t) { text = t; usedModel = model; break; }
-      }
+      if (text) break;
     }
 
     if (!text) {
