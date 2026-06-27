@@ -94,4 +94,18 @@ export default defineConfig(({ mode }) => ({
   resolve: {
     alias: { "@": path.resolve(__dirname, "./src") },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        // Divide bibliotecas pesadas em chunks separados (melhor cache entre
+        // deploys e download paralelo). As páginas já são lazy via React.lazy.
+        manualChunks: {
+          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+          firebase: ['firebase/app', 'firebase/firestore', 'firebase/auth', 'firebase/analytics', 'firebase/storage'],
+          recharts: ['recharts'],
+          query: ['@tanstack/react-query'],
+        },
+      },
+    },
+  },
 }));

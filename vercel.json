@@ -23,6 +23,7 @@
     { "source": "/clear-storage.html", "destination": "/", "permanent": false }
   ],
   "rewrites": [
+    { "source": "/sitemap.xml", "destination": "/api/sitemap" },
     { "source": "/feed.xml", "destination": "/api/feed?region=br&format=xml" },
     { "source": "/feed-br.xml", "destination": "/api/feed?region=br&format=xml" },
     { "source": "/feed-eu.xml", "destination": "/api/feed?region=eu&format=xml" },

@@ -21,6 +21,7 @@ import { effectiveYen, baseYen, hasDiscount, getVariants } from '@/utils/pricing
 import { convertYen as fxConvert } from '@/services/fxService';
 import { productEnglishName } from '@/utils/productName';
 import ProductJsonLd from '@/components/ProductJsonLd';
+import { useSeo } from '@/hooks/useSeo';
 
 const ProductDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -39,6 +40,16 @@ const ProductDetail: React.FC = () => {
   const [isFavorite, setIsFavorite] = useState(
     user?.email ? wishlistService.isInWishlist(user.email, id || '') : false
   );
+
+  // SEO: cada produto ganha título/descrição/imagem/canonical próprios.
+  // Antes TODAS as páginas de produto exibiam o mesmo título — péssimo p/ Google.
+  useSeo(product ? {
+    title: `${productEnglishName(product)} | Japan Express`,
+    description: (i18nDesc(product, language) || product.description || '').slice(0, 160) || undefined,
+    image: product.gallery?.[0] || product.image || product.thumbnail,
+    canonicalPath: `/produto/${product.id}`,
+    type: 'product',
+  } : {});
 
   // Registra que o usuário abriu este produto (coleta para futuras recomendações).
   // Só dispara quando o ID do produto muda — não a cada re-render da tela.

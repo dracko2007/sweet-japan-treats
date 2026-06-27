@@ -15,6 +15,7 @@ import { ADMIN_EMAIL, ADMIN_USER_ID } from "@/config/admin";
 import ScrollToTop from "./components/ScrollToTop";
 import { referralService } from "@/services/referralService";
 import ErrorBoundary from "./components/ErrorBoundary";
+import { useSeo } from "@/hooks/useSeo";
 import RequireAdmin from "./components/RequireAdmin";
 import CookieBanner from "./components/CookieBanner";
 import InstallPrompt from "./components/InstallPrompt";
@@ -89,6 +90,36 @@ const AnalyticsLoader: React.FC = () => {
   return null;
 };
 
+// SEO centralizado: título/descrição/OG por rota estática.
+// Páginas de produto (/produto/:id) são tratadas pelo próprio ProductDetail (useSeo).
+const STATIC_ROUTE_META: Array<{ match: string; title: string; description: string }> = [
+  { match: '/produtos', title: 'Produtos Importados do Japão | Japan Express', description: 'Cosméticos, doces, papelaria e acessórios originais do Japão. Envio direto com frete calculado por peso real.' },
+  { match: '/ofertas', title: 'Ofertas e Promoções | Japan Express', description: 'Promoções relâmpago e descontos em produtos japoneses importados. Aproveite enquanto durarem os estoques.' },
+  { match: '/frete', title: 'Frete e Prazos de Envio | Japan Express', description: 'Simule o frete e o prazo de envio do Japão para o seu país. Cálculo por peso real, conforme Japan Post.' },
+  { match: '/como-funciona', title: 'Como Funciona | Japan Express', description: 'Passo a passo de como comprar produtos originais do Japão com segurança e Remessa Conforme.' },
+  { match: '/sobre', title: 'Sobre a Japan Express', description: 'Conheça a Japan Express: importação direta do Japão, produtos originais e atendimento cuidadoso.' },
+  { match: '/favoritos', title: 'Meus Favoritos | Japan Express', description: 'Sua lista de produtos japoneses favoritos, salva para comprar depois.' },
+  { match: '/empresas', title: 'Vendas para Empresas | Japan Express', description: 'Importação de produtos japoneses para empresas, lojas e revenda.' },
+  { match: '/faca-seu-pedido', title: 'Faça Seu Pedido | Japan Express', description: 'Não encontrou o produto japonês que procura? Peça sob encomenda.' },
+  { match: '/afiliado', title: 'Programa de Afiliados | Japan Express', description: 'Ganhe comissões indicando produtos japoneses importados para seus seguidores.' },
+  { match: '/rastrear', title: 'Rastrear Pedido | Japan Express', description: 'Acompanhe o status e o rastreio do seu pedido enviado do Japão.' },
+  { match: '/promocao', title: 'Promoção em Destaque | Japan Express', description: 'Oferta especial em produtos japoneses selecionados. Tempo limitado.' },
+  { match: '/vlog', title: 'Vlog do Japão | Japan Express', description: 'Vídeos e bastidores direto do Japão: cultura, produtos e novidades.' },
+  { match: '/privacidade', title: 'Política de Privacidade | Japan Express', description: 'Como coletamos e tratamos os seus dados pessoais na Japan Express.' },
+  { match: '/termos', title: 'Termos de Serviço | Japan Express', description: 'Termos e condições de uso e compra na loja Japan Express.' },
+  { match: '/cookies', title: 'Política de Cookies | Japan Express', description: 'Saiba como usamos cookies na Japan Express e como gerenciar seu consentimento.' },
+  { match: '/devolucao', title: 'Política de Devolução e Troca | Japan Express', description: 'Regras de devolução, troca e reembolso de produtos importados.' },
+];
+
+const RouteMeta: React.FC = () => {
+  const location = useLocation();
+  const p = location.pathname;
+  // /produto/* → o ProductDetail define título/imagem do produto. Aqui não mexemos.
+  const meta = STATIC_ROUTE_META.find(r => p === r.match || p.startsWith(r.match + '/'));
+  useSeo(meta ? { title: meta.title, description: meta.description, canonicalPath: p } : {});
+  return null;
+};
+
 // Rotas sempre acessíveis mesmo em manutenção
 const OPEN_PATHS = ['/admin', '/login', '/firebase-sync', '/sync-data'];
 
@@ -121,6 +152,7 @@ const FullApp: React.FC = () => (
             </div>
           )}
           <AnalyticsLoader />
+          <RouteMeta />
           <ReferralCapture />
           <Toaster />
           <Sonner />

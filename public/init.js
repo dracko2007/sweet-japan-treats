@@ -23,12 +23,17 @@
     if (document.body) insert(); else document.addEventListener('DOMContentLoaded', insert);
   }
 
-  window.onerror = function (message, source, lineno, colno, error) {
-    showFatalError(message + '\nFonte: ' + source + ' (Linha ' + lineno + ', Col ' + colno + ')', error && error.stack);
-    return false;
-  };
-  window.onunhandledrejection = function (event) {
-    var r = event.reason;
-    showFatalError('Promessa rejeitada não tratada: ' + (r && r.message || String(r)), r && r.stack);
-  };
+  // Banner de erro vermelho: SÓ em desenvolvimento (localhost).
+  // Em produção, um erro pontual qualquer apareceria para clientes reais — péssimo.
+  var isDev = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+  if (isDev) {
+    window.onerror = function (message, source, lineno, colno, error) {
+      showFatalError(message + '\nFonte: ' + source + ' (Linha ' + lineno + ', Col ' + colno + ')', error && error.stack);
+      return false;
+    };
+    window.onunhandledrejection = function (event) {
+      var r = event.reason;
+      showFatalError('Promessa rejeitada não tratada: ' + (r && r.message || String(r)), r && r.stack);
+    };
+  }
 })();
