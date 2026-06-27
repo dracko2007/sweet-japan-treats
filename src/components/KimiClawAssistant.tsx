@@ -447,10 +447,15 @@ const KimiClawAssistant: React.FC = () => {
     // 0.PS PEDIDO DE ORÇAMENTO COM RESTRIÇÃO (produto + frete + limite de valor)
     // Ex.: "quero shampoo + frete até 550 reais". Exige raciocínio (filtrar por preço+frete)
     // → encaminha para a IA GLM-5.2, NÃO para a busca burra por palavra-chave.
-    const qHasValue = /\d/.test(query) && /reais?|real|r\$|yen|ienes?|¥|euros?|€|dol[áa]r|\$/.test(query);
-    const qHasLimit = /m[áa]ximo|at[ée]\s+\d|limite|n[ãa]o\s+passar|abaixo\s+de|menos\s+de|passa\s+de|no\s+m[áa]ximo|\bm[áa]x\b/.test(query);
+    const qHasNumber = /\d/.test(query);
+    // Moeda: aceita variações/erros de digitação de "reais" (reia, reis, real...) + estrangeiras
+    const qHasCurrency = /reais?|real|reis?|reia|r\$|yen|ienes?|¥|euros?|€|dol[áa]r|\$/.test(query);
+    const qHasValue = qHasNumber && qHasCurrency;
+    const qHasLimit = /m[áa]ximo|at[ée]\s+\d|limite|n[ãa]o\s+passar|abaixo\s+de|menos\s+de|passa\s+de|no\s+m[áa]ximo|\bm[áa]x\b|inclus[oa]s?|gr[áa]tis/.test(query);
     const qHasShipping = /frete|envio|entrega|shipping/.test(query);
-    if (/or[çc]amento/.test(query) || (qHasValue && qHasLimit) || (qHasShipping && qHasValue)) {
+    // Orçamento explícito; OU (valor + limite); OU (frete + valor);
+    // OU (frete + número + limite) — pega "frete incluso até 550" mesmo sem a moeda escrita.
+    if (/or[çc]amento/.test(query) || (qHasValue && qHasLimit) || (qHasShipping && qHasValue) || (qHasShipping && qHasNumber && qHasLimit)) {
       setIsTyping(true);
       const ai = await aiAnswer(text);
       setIsTyping(false);
