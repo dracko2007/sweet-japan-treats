@@ -9,6 +9,7 @@ import { useLanguage, CountryType } from '@/context/LanguageContext';
 import { formatPrice, getCurrencyByCountry } from '@/utils/currency';
 import { getELightRate, getAirParcelRate, getEmsRate, countryToZone, MAX_DIM_SUM_CM, MAX_WEIGHT_G, type JapanPostZone } from '@/utils/japanPostRates';
 import { convertYen as fxConvert } from '@/services/fxService';
+import { cn } from '@/lib/utils';
 
 const Shipping: React.FC = () => {
   const { t, selectedCountry, language } = useLanguage();
