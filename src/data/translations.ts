@@ -129,7 +129,7 @@ export const translations: Record<Language, Record<string, string>> = {
     "hero.title.1": "Sua conexão direta com o",
     "hero.title.highlight": "mercado japonês",
     "hero.title.2": "em casa",
-    "hero.description": "Os melhores cosméticos, papelaria, acessórios e doces direto do Japão para você. Compre com facilidade e frete 100% seguro.",
+    "hero.description": "Os melhores cosméticos, papelaria, acessórios e doces direto do Japão para a sua casa até você, com frete seguro. Veja a aba \"Como Funciona\" e entenda todo o processo, do pedido à entrega.",
     "hero.cta.products": "Ver Produtos",
     "hero.cta.story": "Saiba Mais",
     "hero.stat.artesanal": "Curadoria",

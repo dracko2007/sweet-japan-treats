@@ -16,6 +16,7 @@ export interface ProductPackageDimensionsCm {
 
 export interface Product {
   id: string;
+  sku?: string; // Código único do produto (ex.: JE-COS-0001) — gerado automaticamente se ausente
   name: string;
   description: string;
   category: string;

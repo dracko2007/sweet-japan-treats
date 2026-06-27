@@ -4,6 +4,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Product, ProductVariant } from '@/types';
 import { getVariants, roundYen } from '@/utils/pricing';
+import { generateUniqueSku } from '@/utils/sku';
 import { useLanguage } from '@/context/LanguageContext';
 
 const VARIANT_PRESETS = ['Pequeno', 'Médio', 'Grande', 'Kit'];
@@ -480,9 +481,13 @@ const ProductManager: React.FC = () => {
       const large = roundYen(priceVals.length ? Math.max(...priceVals) : Number(editing.prices?.large) || small);
       const packageDimensionsCm = sanitizePackageDimensions(editing.packageDimensionsCm);
 
+      // SKU único por categoria — gerado automaticamente na criação (ou se faltar ao editar)
+      const sku = editing.sku?.trim() || generateUniqueSku(editing.category, products);
+
       const product: Product = {
         ...editing,
         id,
+        sku,
         image: coverUrl || editing.image || '',
         thumbnail: thumbnailUrl || undefined,
         gallery: galleryUrls.filter(Boolean),
@@ -626,6 +631,9 @@ const ProductManager: React.FC = () => {
                         )}
                         {p.name}
                       </p>
+                      {p.sku && (
+                        <p className="text-[10px] font-mono text-muted-foreground/80 tracking-wide">SKU: {p.sku}</p>
+                      )}
                       {p.discountPercent ? (
                         <p className="text-xs mt-1">
                           <s className="text-gray-400">¥{p.prices.small.toLocaleString()}</s>{' '}
@@ -709,6 +717,14 @@ const ProductManager: React.FC = () => {
                     </label>
                   ))}
                 </div>
+              </div>
+
+              {/* SKU (código do produto) */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-sm font-semibold shrink-0">SKU</span>
+                <span className="text-xs font-mono px-2 py-1 rounded bg-secondary text-secondary-foreground break-all">
+                  {editing.sku || (isNew ? 'Gerado automaticamente ao salvar' : '—')}
+                </span>
               </div>
 
               {/* Categoria + Sabor/tag */}

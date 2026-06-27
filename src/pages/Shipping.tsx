@@ -73,30 +73,35 @@ const Shipping: React.FC = () => {
     const cur = getCurrencyByCountry(country);
     const billableWeightG = Math.max(1, Math.round(billableWeight * 1000));
 
-    // Prazo estimado por zona Japan Post
+    // Unidade de prazo conforme idioma
+    const du = language === 'ja' ? '営業日' : language === 'en' ? 'business days' : 'dias úteis';
+    // Prazo estimado por zona Japan Post (só números; unidade adicionada abaixo)
     const daysByZone: Record<number, { light: string; air: string; ems: string }> = {
-      1: { light: '6-10 days',  air: '4-7 days',   ems: '2-4 days'  },
-      2: { light: '7-12 days',  air: '5-9 days',   ems: '3-5 days'  },
-      3: { light: '7-14 days',  air: '6-10 days',  ems: '4-7 days'  },
-      4: { light: '7-14 days',  air: '6-10 days',  ems: '3-6 days'  },
-      5: { light: '20-40 days', air: '10-15 days', ems: '18 days' },
+      1: { light: '6-10',  air: '4-7',   ems: '2-4'  },
+      2: { light: '7-12',  air: '5-9',   ems: '3-5'  },
+      3: { light: '7-14',  air: '6-10',  ems: '4-7'  },
+      4: { light: '7-14',  air: '6-10',  ems: '3-6'  },
+      5: { light: '20-40', air: '10-15', ems: '18'   },
     };
     const zd = daysByZone[zone] || daysByZone[5];
 
-    type SimRate = { name: string; cost: number | null; time: string; consultar?: boolean };
+    type SimRate = { name: string; cost: number | null; time: string; consultar?: boolean; combinar?: boolean };
     const rates: SimRate[] = [];
 
     if (billableWeightG <= 2000) {
       const yen = getELightRate(billableWeightG, zone);
-      rates.push({ name: 'Japan Post E-Light ✉️', cost: yen ? fxConvert(yen, cur) : null, time: zd.light });
+      rates.push({ name: 'Japan Post E-Light ✉️', cost: yen ? fxConvert(yen, cur) : null, time: `${zd.light} ${du}` });
     } else {
       const airYen = getAirParcelRate(billableWeightG, zone);
-      rates.push({ name: 'Japan Post Kozutsumi Air 📦', cost: airYen ? fxConvert(airYen, cur) : null, time: zd.air });
+      rates.push({ name: 'Japan Post Kozutsumi Air 📦', cost: airYen ? fxConvert(airYen, cur) : null, time: `${zd.air} ${du}` });
     }
 
     const emsYen = getEmsRate(billableWeightG, zone);
-    rates.push({ name: 'Japan Post EMS / DHL ✈️', cost: emsYen ? fxConvert(emsYen, cur) : null, time: zd.ems });
-    rates.push({ name: 'Sea Freight 🚢', cost: null, time: '60-90 days', consultar: true });
+    rates.push({ name: 'Japan Post EMS / DHL ✈️', cost: emsYen ? fxConvert(emsYen, cur) : null, time: `${zd.ems} ${du}` });
+    const seaTime = language === 'ja' ? '60-90日' : language === 'en' ? '60-90 days' : '60-90 dias';
+    const tbdTime = language === 'ja' ? '要相談' : language === 'en' ? 'TBD' : 'A definir';
+    rates.push({ name: 'Sea Freight 🚢', cost: null, time: seaTime, consultar: true });
+    rates.push({ name: 'A Combinar ⚖️', cost: null, time: tbdTime, consultar: true, combinar: true });
 
     return rates;
   };
@@ -223,6 +228,9 @@ const Shipping: React.FC = () => {
     const brlEms3kg  = fxConvert(getEmsRate(3000, 5) ?? 7800, 'BRL');
     const brlAir3kg  = fxConvert(getAirParcelRate(3000, 5) ?? 9950, 'BRL');
     const brlAir5kg  = fxConvert(getAirParcelRate(5000, 5) ?? 15350, 'BRL');
+    const du = language === 'ja' ? '営業日' : language === 'en' ? 'business days' : 'dias úteis';
+    const seaTime = language === 'ja' ? '60-90日' : language === 'en' ? '60-90 days' : '60-90 dias';
+    const tbdTime = language === 'ja' ? '要相談' : language === 'en' ? 'TBD' : 'A definir';
     return [
       {
         name: 'Japan Post E-Light ✉️',
@@ -230,7 +238,7 @@ const Shipping: React.FC = () => {
         desc: t('shippingPage.carrier.elight.desc'),
         rate60: brlELight1kg,
         rate80: brlELight2kg,
-        time: '10-15 days',
+        time: `20-40 ${du}`,
         features: ['Até 2 kg', 'Rastreio básico', 'Mais acessível']
       },
       {
@@ -239,7 +247,7 @@ const Shipping: React.FC = () => {
         desc: t('shippingPage.carrier.ems.desc'),
         rate60: brlEms1kg,
         rate80: brlEms3kg,
-        time: '7-12 days',
+        time: `18 ${du}`,
         features: ['Prioridade na aduana', 'Rastreio em tempo real', 'Despacho rápido']
       },
       {
@@ -248,7 +256,7 @@ const Shipping: React.FC = () => {
         desc: t('shippingPage.carrier.kozutsumi.desc'),
         rate60: brlAir3kg,
         rate80: brlAir5kg,
-        time: '10-15 days',
+        time: `10-15 ${du}`,
         features: ['Até 30 kg', 'Rastreio completo', 'Ótimo custo-benefício']
       },
       {
@@ -257,9 +265,20 @@ const Shipping: React.FC = () => {
         desc: t('shippingPage.carrier.sea.desc'),
         rate60: null as unknown as number,
         rate80: null as unknown as number,
-        time: '60-90 days',
+        time: seaTime,
         features: ['Custo baixo', 'Ideal para volumes grandes', 'Consultar disponibilidade'],
         consultar: true
+      },
+      {
+        name: 'A Combinar ⚖️',
+        logo: '⚖️',
+        desc: 'Frete calculado após pesagem real do pacote — valor cobrado separadamente.',
+        rate60: null as unknown as number,
+        rate80: null as unknown as number,
+        time: tbdTime,
+        features: ['Produtos acrescentados depois', 'Pesagem na finalização', 'Cobrado à parte'],
+        consultar: true,
+        combinar: true,
       }
     ];
   };
@@ -508,7 +527,9 @@ const Shipping: React.FC = () => {
                       {simRates.map((rate) => (
                         <div key={rate.name} className="p-3 bg-secondary/20 rounded-xl border border-border text-center flex flex-col justify-between">
                           <span className="text-[10px] text-muted-foreground block truncate font-bold">{rate.name}</span>
-                          {(rate as any).consultar || rate.cost === null ? (
+                          {(rate as any).combinar ? (
+                            <span className="text-sm font-black text-amber-600 dark:text-amber-400 block mt-1">A combinar</span>
+                          ) : (rate as any).consultar || rate.cost === null ? (
                             <span className="text-sm font-black text-muted-foreground block mt-1">{t('shippingPage.consultar')}</span>
                           ) : (
                             <span className="text-base font-black text-primary block mt-1">{formatPrice(rate.cost as number, currency)}</span>
@@ -683,14 +704,14 @@ const Shipping: React.FC = () => {
                       <div className="grid grid-cols-2 gap-3 pt-2.5 border-t border-border/80 text-xs">
                         <div className="bg-secondary/40 p-2 rounded-lg text-center">
                           <span className="text-muted-foreground block text-[10px]">{(carrier as any).consultar ? t('shippingPage.box60only') : t('shippingPage.avgBox60')}</span>
-                          <span className="font-sans font-black text-sm text-primary">
-                            {(carrier as any).consultar ? t('shippingPage.consultar') : formatPrice(carrier.rate60, currency)}
+                          <span className={cn("font-sans font-black text-sm", (carrier as any).combinar ? "text-amber-600 dark:text-amber-400" : "text-primary")}>
+                            {(carrier as any).combinar ? 'A combinar' : (carrier as any).consultar ? t('shippingPage.consultar') : formatPrice(carrier.rate60, currency)}
                           </span>
                         </div>
                         <div className="bg-secondary/40 p-2 rounded-lg text-center">
                           <span className="text-muted-foreground block text-[10px]">{(carrier as any).consultar ? t('shippingPage.box80only') : t('shippingPage.avgBox80')}</span>
-                          <span className="font-sans font-black text-sm text-primary">
-                            {(carrier as any).consultar ? t('shippingPage.consultar') : formatPrice(carrier.rate80, currency)}
+                          <span className={cn("font-sans font-black text-sm", (carrier as any).combinar ? "text-amber-600 dark:text-amber-400" : "text-primary")}>
+                            {(carrier as any).combinar ? 'A combinar' : (carrier as any).consultar ? t('shippingPage.consultar') : formatPrice(carrier.rate80, currency)}
                           </span>
                         </div>
                       </div>
