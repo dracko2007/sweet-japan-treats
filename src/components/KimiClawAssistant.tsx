@@ -124,6 +124,37 @@ const KimiClawAssistant: React.FC = () => {
     }
   }, [messages]);
 
+  // ── AUTO-LIMPEZA POR INATIVIDADE (10 minutos) ───────────────────────────
+  // Conversas longas acumulam tokens na API (todo o histórico é reenviado a cada msg).
+  // Para evitar isso, se não houver interação por 10 min o chat é zerado (memória + storage),
+  // voltando à mensagem de boas-vindas. Qualquer atividade reinicia a contagem.
+  const INACTIVITY_MS = 10 * 60 * 1000; // 10 minutos
+  const inactivityTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Zera a conversa por completo (estado + persistência)
+  const clearConversation = React.useCallback(() => {
+    setMessages([{ id: 'welcome', sender: 'kimi', text: t('kimiclaw.welcome'), timestamp: new Date() }]);
+    setRespondedOrders([]);
+    setShippingFlow('idle');
+    try {
+      safeStorage.removeItem(KIMICLAW_STORAGE_KEY);
+    } catch { /* ignora */ }
+    if (isOpen) {
+      toast.info(language === 'ja' ? 'しばらく操作がなかったため、会話をリセットしました 💬' : 'Conversa reiniciada por inatividade 💬');
+    }
+  }, [t, language, isOpen]);
+
+  // Reinicia o timer a cada atividade: novas mensagens, IA digitando, abrir/fechar, digitar no input
+  useEffect(() => {
+    if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
+    // Só ativa o timer se já existir conversa além da boas-vindas
+    if (messages.length <= 1) return;
+    inactivityTimerRef.current = setTimeout(clearConversation, INACTIVITY_MS);
+    return () => {
+      if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
+    };
+  }, [messages, isTyping, isOpen, inputValue, clearConversation]);
+
   // Hide attention badge when chat is opened
   useEffect(() => {
     if (isOpen) {

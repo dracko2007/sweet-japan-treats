@@ -8,6 +8,9 @@ import { generateUniqueSku } from '@/utils/sku';
 import { useLanguage } from '@/context/LanguageContext';
 
 const VARIANT_PRESETS = ['Pequeno', 'Médio', 'Grande', 'Kit'];
+// Opções de venda por unidade — ex: "1 unidade", "2 unidades"
+const UNIT_PRESETS = ['1 unidade', '2 unidades', '3 unidades', '4 unidades', '5 unidades', '6 unidades', '10 unidades'];
+const ALL_PRESETS = [...VARIANT_PRESETS, ...UNIT_PRESETS];
 const MAX_PHOTOS = 9; // capa + até 8 fotos extras
 import { useProducts } from '@/context/ProductsContext';
 import { productService } from '@/services/productService';
@@ -783,20 +786,25 @@ const ProductManager: React.FC = () => {
 
               {/* Variantes de preço (Pequeno/Médio/Grande/Kit) */}
               <div>
-                <label className="text-sm font-semibold block mb-2">Tamanhos & preços (¥)</label>
+                <label className="text-sm font-semibold block mb-2">Tamanhos / unidades & preços (¥)</label>
                 <div className="space-y-2">
                   {variants().map((v) => (
                     <div key={v.id} className="flex items-center gap-2">
                       <select
-                        value={VARIANT_PRESETS.includes(v.label) ? v.label : 'custom'}
+                        value={ALL_PRESETS.includes(v.label) ? v.label : 'custom'}
                         onChange={(e) => updateVariant(v.id, { label: e.target.value === 'custom' ? '' : e.target.value })}
                         disabled={!canPrice}
                         className="px-2 py-2 rounded-lg border border-border bg-background text-sm disabled:opacity-60"
                       >
-                        {VARIANT_PRESETS.map((p) => <option key={p} value={p}>{p}</option>)}
+                        <optgroup label="Tamanhos">
+                          {VARIANT_PRESETS.map((p) => <option key={p} value={p}>{p}</option>)}
+                        </optgroup>
+                        <optgroup label="Unidades">
+                          {UNIT_PRESETS.map((p) => <option key={p} value={p}>{p}</option>)}
+                        </optgroup>
                         <option value="custom">Outro…</option>
                       </select>
-                      {!VARIANT_PRESETS.includes(v.label) && (
+                      {!ALL_PRESETS.includes(v.label) && (
                         <input
                           value={v.label}
                           onChange={(e) => updateVariant(v.id, { label: e.target.value })}
@@ -823,7 +831,7 @@ const ProductManager: React.FC = () => {
                 </div>
                 {canPrice && (
                   <button onClick={addVariant} className="mt-2 inline-flex items-center gap-1.5 text-sm font-semibold text-primary hover:underline">
-                    <Plus className="w-4 h-4" /> Adicionar tamanho/kit
+                    <Plus className="w-4 h-4" /> Adicionar opção
                   </button>
                 )}
                 <p className="text-xs text-muted-foreground mt-2">
