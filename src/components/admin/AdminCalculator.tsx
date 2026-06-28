@@ -152,6 +152,29 @@ const AdminCalculator: React.FC = () => {
         </div>
       </div>
 
+      {/* ── Detalhamento (transparência da soma) ── */}
+      {totalYen > 0 && (
+        <div className="bg-card rounded-2xl border border-border p-4">
+          <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wide mb-2">🧮 Detalhamento da soma</p>
+          <div className="space-y-1.5 text-sm">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Produtos (preço de venda × qtd de linhas)</span>
+              <span className="font-bold text-foreground">{yenFmt(totalYen)}</span>
+            </div>
+            {psFeeYen > 0 && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Taxa Personal Shopper ({parseInt(psQty) || 0} × ¥1.000)</span>
+                <span className="font-bold text-orange-600 dark:text-orange-400">{yenFmt(psFeeYen)}</span>
+              </div>
+            )}
+            <div className="flex justify-between border-t border-border pt-1.5 mt-1.5">
+              <span className="font-semibold">Subtotal (produtos + PS)</span>
+              <span className="font-black text-primary text-base">{yenFmt(grandTotalYen)}</span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── Totais (produtos + PS fee) ── */}
       <div className="grid grid-cols-3 gap-4">
         <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-2xl p-4 text-center">
