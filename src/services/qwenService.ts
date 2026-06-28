@@ -16,9 +16,10 @@ export interface AdminCatalogItem extends CatalogItem {
 
 export interface Locale { country: string; currencyCode: string; currencySymbol: string; }
 
-// Tentamos sempre; se o endpoint não existir (dev local) ou a chave não estiver
-// configurada, a chamada falha de leve e caímos no fallback por regras.
-export const qwenEnabled = (): boolean => true;
+// KimiClaw agora é 100% determinístico (regras + catálogo real + tabela de frete real).
+// A IA foi DESLIGADA: qwenEnabled() retorna false → askQwen() nunca é chamado, o
+// endpoint /api/kimiclaw fica sem uso e o chat responde só pelas regras no frontend.
+export const qwenEnabled = (): boolean => false;
 
 export interface AskQwenOptions {
   isAdmin?: boolean;

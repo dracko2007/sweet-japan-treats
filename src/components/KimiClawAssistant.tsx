@@ -11,6 +11,7 @@ import { formatPrice, getCurrencyByCountry } from '@/utils/currency';
 import { askQwen, qwenEnabled, QwenMsg, AdminCatalogItem } from '@/services/qwenService';
 import { productEnglishName } from '@/utils/productName';
 import { effectiveYen } from '@/utils/pricing';
+import { catalogShippingYen } from '@/utils/catalogShipping';
 import { convertYen as fxConvert } from '@/services/fxService';
 import { orderService } from '@/services/orderService';
 import { toast } from 'sonner';
@@ -458,9 +459,9 @@ const KimiClawAssistant: React.FC = () => {
       return;
     }
 
-    // 0.PS PEDIDO DE ORÇAMENTO COM RESTRIÇÃO (produto + frete + limite de valor)
-    // Ex.: "quero shampoo + frete até 550 reais". Exige raciocínio (filtrar por preço+frete)
-    // → encaminha para a IA GLM-5.2, NÃO para a busca burra por palavra-chave.
+    // 0.PS ORÇAMENTO DETERMINÍSTICO (produto + frete real ≤ valor). 100% por regras —
+    // usa preço real do catálogo (effectiveYen) + tabela de frete real do Japan Post
+    // (catalogShippingYen). Não há IA: é impossível inventar preço ou frete.
     const qHasNumber = /\d/.test(query);
     // Moeda: aceita variações/erros de digitação de "reais" (reia, reis, real...) + estrangeiras
     const qHasCurrency = /reais?|real|reis?|reia|r\$|yen|ienes?|¥|euros?|€|dol[áa]r|\$/.test(query);
@@ -470,13 +471,62 @@ const KimiClawAssistant: React.FC = () => {
     // Orçamento explícito; OU (valor + limite); OU (frete + valor);
     // OU (frete + número + limite) — pega "frete incluso até 550" mesmo sem a moeda escrita.
     if (/or[çc]amento/.test(query) || (qHasValue && qHasLimit) || (qHasShipping && qHasValue) || (qHasShipping && qHasNumber && qHasLimit)) {
-      setIsTyping(true);
-      const ai = await aiAnswer(text);
-      setIsTyping(false);
+      const numMatch = query.match(/(\d+(?:[.,]\d{1,2})?)/);
+      const budgetValue = numMatch ? parseFloat(numMatch[1].replace(',', '.')) : 0;
+      const isYen = /yen|ienes?|¥/.test(query);
+      const isEur = /euros?|€/.test(query);
+      const isUsd = /dol[áa]r|dolar|usd|\$/.test(query);
+      const budgetCurrency: 'BRL' | 'JPY' | 'EUR' | 'USD' = isYen ? 'JPY' : isEur ? 'EUR' : isUsd ? 'USD' : getCurrencyByCountry(selectedCountry);
+      const country = selectedCountry || 'Brasil';
+      const curSymbol = budgetCurrency === 'JPY' ? '¥' : budgetCurrency === 'EUR' ? '€' : budgetCurrency === 'USD' ? '$' : 'R$';
+      const fmtBudget = (v: number): string => {
+        if (budgetCurrency === 'BRL' || budgetCurrency === 'EUR') return `${curSymbol} ${Math.round(v).toLocaleString('pt-BR')}`;
+        if (budgetCurrency === 'USD') return `$ ${v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        return `¥ ${Math.round(v).toLocaleString()}`;
+      };
+
       await addKimiMessageWithTyping(
-        ai ||
-        'Para um orçamento preciso (produto + frete) dentro de um valor, fale com um vendedor no WhatsApp **+81 70-1367-1679** (wa.me/817013671679) ou e-mail **contato@japanexpress-store.com** — eles calculam na hora pra você! 📦'
+        '📊 Calculando com **preços e fretes reais** da loja (sem chute!)...',
+        ['📊 Filtrando o catálogo pelo seu orçamento...']
       );
+
+      if (!budgetValue) {
+        await addKimiMessageWithTyping('Quanto você quer gastar? Me diga o valor e a moeda, por exemplo: **"produtos até 550 reais com frete"**. 📦');
+        return;
+      }
+
+      const candidates = products
+        .filter((p) => !p.hidden)
+        .map((p) => {
+          const priceYen = effectiveYen(p, 'small');
+          const shipYen = catalogShippingYen(p, country);
+          const totalYen = priceYen + shipYen;
+          return {
+            p,
+            totalLocal: fxConvert(totalYen, budgetCurrency),
+            priceLocal: fxConvert(priceYen, budgetCurrency),
+            shipLocal: fxConvert(shipYen, budgetCurrency),
+          };
+        })
+        .filter((x) => x.totalLocal > 0 && x.totalLocal <= budgetValue)
+        .sort((a, b) => a.totalLocal - b.totalLocal)
+        .slice(0, 5);
+
+      if (candidates.length === 0) {
+        await addKimiMessageWithTyping(`Não encontrei nenhum produto (com frete pra **${country}**) que caiba em **${fmtBudget(budgetValue)}**. 😕 Tente um valor um pouco maior, ou fale com um vendedor no WhatsApp **+81 70-1367-1679** (wa.me/817013671679) pra uma cotação sob medida! 📦`);
+        return;
+      }
+
+      const cards = candidates.map((c) => c.p);
+      const summary = candidates
+        .map((c) => `• **${c.p.name}** — ${fmtBudget(c.totalLocal)} (produto ${fmtBudget(c.priceLocal)} + frete ${fmtBudget(c.shipLocal)})`)
+        .join('\n');
+      const headerText = `Encontrei **${candidates.length}** ${candidates.length === 1 ? 'produto que cabe' : 'produtos que cabem'} em ${fmtBudget(budgetValue)} (frete pra ${country} já incluso):\n\n${summary}\n\nToque num card e depois em **Adicionar** pra colocar no carrinho. 🛒`;
+
+      setMessages((prev) => [
+        ...prev,
+        { id: Math.random().toString(36).substring(7), sender: 'kimi', text: headerText, timestamp: new Date(), products: cards },
+      ]);
       return;
     }
 
@@ -562,25 +612,48 @@ const KimiClawAssistant: React.FC = () => {
       return;
     }
 
-    // 1. ADD PRODUCT SKILL — só com intenção explícita de adicionar ao carrinho
+    // 1. ADD PRODUCT SKILL — adiciona ao carrinho SÓ com match determinístico.
+    // Extrai o nome do produto e busca no catálogo: 1 match → adiciona; vários → mostra
+    // as opções; nenhum → orienta. NUNCA chuta (antes usava products[0] e errava o item).
     if ((query.includes('adicionar') || query.includes('add') || query.includes('coloca')) && query.includes('carrinho')) {
-      const targetProduct = products[0];
-      const steps = [
-        language === 'pt' ? '🔍 Buscando produto no banco de dados...' : '🔍 Searching database...',
-        language === 'pt' ? `📦 Selecionando "${targetProduct.name}" (Tamanho: Pequeno)...` : `📦 Selecting "${targetProduct.name}"...`,
-        language === 'pt' ? '⚡ Executando comando addToCart na aplicação...' : '⚡ Executing addToCart...',
-      ];
-      
-      addToCart(targetProduct, 'small', 1);
-      toast.success(
-        language === 'pt' ? `Adicionado: 1x ${targetProduct.name}` : `Added: 1x ${targetProduct.name}`
-      );
+      const productName = query
+        .replace(/no carrinho|ao carrinho|para o carrinho|pra o carrinho|pra carrinho|carrinho/g, ' ')
+        .replace(/adicion[ae]r?|add|coloc[ao]r?|quero|pode|por favor|favor/g, ' ')
+        .replace(/\b(o|a|os|as|um|uma|no|ao|de|e|meu|pra|para)\b/g, ' ')
+        .trim();
 
-      const responseText = language === 'pt'
-        ? `Feito! Adicionei o **${targetProduct.name}** (Tamanho Pequeno) ao seu carrinho. O preço exibido é de **${formatPrice(fxConvert(effectiveYen(targetProduct, 'small'), selectedCountry === 'Japão' ? 'JPY' : 'BRL'), selectedCountry === 'Japão' ? 'JPY' : 'BRL')}**.`
-        : `Success! Added **${targetProduct.name}** (Small Size) to your cart.`;
+      if (!productName) {
+        await addKimiMessageWithTyping('Qual produto você quer adicionar ao carrinho? Me diga o nome, por exemplo: **"adicionar kit fino no carrinho"**. 🛒');
+        return;
+      }
 
-      await addKimiMessageWithTyping(responseText, steps);
+      const results = searchProducts(productName, { requireStrong: true });
+
+      if (results.length === 0) {
+        await addKimiMessageWithTyping(`Não encontrei **"${productName}"** no catálogo. 😕 Posso buscar por outro nome, ou você pode encomendar pelo **"Faça seu Pedido"** no menu do topo! 📝`);
+        return;
+      }
+
+      if (results.length === 1) {
+        const targetProduct = results[0];
+        addToCart(targetProduct, 'small', 1);
+        toast.success(language === 'pt' ? `Adicionado: 1x ${targetProduct.name}` : `Added: 1x ${targetProduct.name}`);
+        const cur = selectedCountry === 'Japão' ? 'JPY' : getCurrencyByCountry(selectedCountry);
+        await addKimiMessageWithTyping(
+          language === 'pt'
+            ? `Feito! ✅ Adicionei **1x ${targetProduct.name}** ao seu carrinho por **${formatPrice(fxConvert(effectiveYen(targetProduct, 'small'), cur), cur)}**. Vá em **Carrinho → Finalizar** pra calcular o frete e fechar o pedido. 🛒`
+            : `Done! ✅ Added **1x ${targetProduct.name}** to your cart. Go to **Cart → Checkout** to finish. 🛒`,
+          [language === 'pt' ? '🛒 Adicionando ao carrinho...' : '🛒 Adding to cart...']
+        );
+        return;
+      }
+
+      // Vários produtos batem → mostra as opções pra VOCÊ escolher (não chuta).
+      await addKimiMessageWithTyping(`Encontrei ${results.length} produtos com esse nome. Toque no card que você quer e depois em **Adicionar** — eu não escolho por você pra não errar o item. 🎯`);
+      setMessages((prev) => [
+        ...prev,
+        { id: Math.random().toString(36).substring(7), sender: 'kimi', text: '', timestamp: new Date(), products: results },
+      ]);
       return;
     }
 
@@ -771,7 +844,7 @@ const KimiClawAssistant: React.FC = () => {
       if (isAdmin) {
         responseText = '👋 Olá, Admin! Aqui estão seus dados de negócio. Pergunte sobre **faturamento**, **pedidos**, **margem/custo** de produtos ou **frete**. Para o painel completo acesse **/admin**.';
       } else {
-        responseText = 'Olá! Sou o KimiClaw AI. Posso buscar produtos, adicionar itens ao carrinho, mudar o idioma, calcular o frete ou inscrever você em novidades. O que deseja?';
+        responseText = 'Olá! Sou o KimiClaw, o assistente de compras da Japan Express. Posso buscar produtos, adicionar itens ao carrinho, montar um orçamento dentro do seu valor, mudar o idioma, calcular o frete ou inscrever você em novidades. O que deseja?';
       }
       await addKimiMessageWithTyping(responseText);
       return;
@@ -842,14 +915,15 @@ const KimiClawAssistant: React.FC = () => {
       }
     }
 
-    // Fallback por regras
-    const suggestions = language === 'pt'
-      ? 'Não encontrei isso. Minhas habilidades: 🔍 **buscar** produtos (ex: "kitkat", "calbee") | 📦 **calcular** frete | 🎟️ **cupom** | 📱 **novidades** | 🗑️ **limpar carrinho**'
+    // 9.9 BLOQUEIO DE ESCOPO — o KimiClaw só ajuda com a loja Japan Express.
+    // Perguntas fora do escopo (conhecimento geral, outras empresas, off-topic) são
+    // recusadas educadamente e redirecionadas para as habilidades da loja.
+    const scopeRefusal = language === 'pt'
+      ? 'Desculpe, só consigo ajudar com a **loja Japan Express** (produtos, preços, frete e pedidos). 🛍️\n\nO que eu posso fazer por você:\n🔍 **buscar** produtos (ex: "kitkat", "biore")\n💰 **orçamento** (ex: "produtos até 550 reais com frete")\n📦 **calcular** frete\n🎟️ **cupom** de boas-vindas\n🗑️ **limpar** carrinho'
       : language === 'ja'
-        ? '機能: 🔍 商品検索 | 📦 送料計算 | 🎟️ クーポン | 📱 お知らせ | 🗑️ カート削除'
-        : "Didn't find that. My skills: 🔍 **search** products | 📦 **calculate** shipping | 🎟️ **coupon** | 📱 **news** | 🗑️ **clear cart**";
-    responseText = suggestions;
-    await addKimiMessageWithTyping(responseText);
+        ? 'Japan Expressストアに関するご質問のみお答えできます（商品・価格・送料・ご注文）。🛍️\n\n🔍 商品検索 / 💰 予算内の商品 / 📦 送料計算 / 🎟️ クーポン / 🗑️ カート削除'
+        : "Sorry, I can only help with the **Japan Express store** (products, prices, shipping, orders). 🛍️\n\nWhat I can do:\n🔍 **search** products | 💰 **budget** (e.g. \"items up to R$550 with shipping\") | 📦 **shipping** | 🎟️ **coupon** | 🗑️ **clear cart**";
+    await addKimiMessageWithTyping(scopeRefusal);
   };
 
   const handleSendMessage = (e?: React.FormEvent) => {
@@ -934,7 +1008,7 @@ const KimiClawAssistant: React.FC = () => {
         <div className="absolute bottom-16 right-2 bg-gradient-to-r from-primary to-accent text-white text-xs px-3 py-1.5 rounded-full shadow-elevated whitespace-nowrap animate-float border border-white/20 select-none">
           <span className="flex items-center gap-1.5 font-medium">
             <Sparkles className="w-3.5 h-3.5 text-yellow-300 animate-pulse" />
-            {language === 'pt' ? 'Experimente o KimiClaw!' : 'Try KimiClaw AI!'}
+            {language === 'pt' ? 'Experimente o KimiClaw!' : 'Try KimiClaw!'}
           </span>
           <div className="absolute -bottom-1 right-5 w-2 h-2 bg-accent rotate-45 border-r border-b border-white/10" />
         </div>
