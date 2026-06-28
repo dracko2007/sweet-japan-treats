@@ -38,10 +38,14 @@ const AdminCalculator: React.FC = () => {
     return () => { alive = false; clearInterval(t); };
   }, []);
 
+  // Margem de segurança de 5% (mesma lógica do carrinho: 5 ienes por cada 100 de
+  // valor). Garante que o orçamento da calculadora fique igual ou ACIMA do valor
+  // que o carrinho cobra — o admin nunca cobra a menos ao usar a calculadora.
+  const SAFETY_MARGIN = 0.05;
   const sellPrice = (row: ProductRow) => {
     const cost = parseFloat(row.costYen) || 0;
     const disc = Math.min(Math.max(parseFloat(row.discountPct) || 0, 0), 50);
-    return cost * 2 * (1 - disc / 100);
+    return cost * 2 * (1 - disc / 100) * (1 + SAFETY_MARGIN);
   };
 
   const totalYen = useMemo(() => rows.reduce((s, r) => s + sellPrice(r), 0), [rows]);
