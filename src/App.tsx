@@ -19,6 +19,9 @@ import { useSeo } from "@/hooks/useSeo";
 import RequireAdmin from "./components/RequireAdmin";
 import CookieBanner from "./components/CookieBanner";
 import InstallPrompt from "./components/InstallPrompt";
+import ExitIntentPopup from "./components/ExitIntentPopup";
+import CartAbandonmentTracker from "./components/CartAbandonmentTracker";
+import CartRecoveryBanner from "./components/CartRecoveryBanner";
 import MaintenancePage from "./pages/Maintenance";
 
 // Code splitting: cada página carregada apenas quando necessária
@@ -194,6 +197,9 @@ const FullApp: React.FC = () => (
               </Routes>
             </Suspense>
           </ErrorBoundary>
+          <ExitIntentPopup />
+          <CartAbandonmentTracker />
+          <CartRecoveryBanner />
         </TooltipProvider>
       </CartProvider>
       </ProductsProvider>

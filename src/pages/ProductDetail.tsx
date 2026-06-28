@@ -22,6 +22,8 @@ import { convertYen as fxConvert } from '@/services/fxService';
 import { productEnglishName } from '@/utils/productName';
 import ProductJsonLd from '@/components/ProductJsonLd';
 import { useSeo } from '@/hooks/useSeo';
+import DeliveryEstimateBadge from '@/components/products/DeliveryEstimate';
+import StockUrgency from '@/components/products/StockUrgency';
 
 const ProductDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -339,6 +341,12 @@ const ProductDetail: React.FC = () => {
                     📦 Produto Importado
                   </div>
                 )}
+
+                {/* Prazo de entrega estimado (por país) + urgência de estoque baixo */}
+                {!deliveryBlocked && (
+                  <DeliveryEstimateBadge country={selectedCountry} className="mb-4" />
+                )}
+                <StockUrgency stock={product.stock} className="mb-4" />
 
                 <div className="flex gap-3 mb-6">
                   <Button

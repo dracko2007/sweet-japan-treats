@@ -18,16 +18,46 @@ import {
   onSnapshot
 } from 'firebase/firestore';
 
-import { 
+import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
+  signInWithPopup,
+  GoogleAuthProvider,
+  FacebookAuthProvider,
+  TwitterAuthProvider,
+  RecaptchaVerifier,
+  signInWithPhoneNumber,
   signOut as firebaseSignOut,
   onAuthStateChanged,
   sendEmailVerification,
   sendPasswordResetEmail
 } from 'firebase/auth';
+import type { AuthProvider, ConfirmationResult } from 'firebase/auth';
 
 import { auth, db, firebaseConfigReady } from '@/config/firebase';
+
+// Provedores sociais suportados no login/cadastro.
+export type SocialProvider = 'google' | 'facebook' | 'twitter';
+
+// Monta o provedor OAuth correto para cada rede social.
+const buildAuthProvider = (key: SocialProvider): AuthProvider => {
+  switch (key) {
+    case 'facebook': {
+      const provider = new FacebookAuthProvider();
+      provider.addScope('email');
+      return provider;
+    }
+    case 'twitter':
+      // Twitter/X usa OAuth 1.0a — sem escopos adicionais.
+      return new TwitterAuthProvider();
+    case 'google':
+    default: {
+      const provider = new GoogleAuthProvider();
+      provider.setCustomParameters({ prompt: 'select_account' });
+      return provider;
+    }
+  }
+};
 
 const isDev = import.meta.env.DEV;
 const devLog = isDev ? console.log.bind(console) : () => {};
@@ -521,6 +551,42 @@ export const firebaseSyncService = {
       devError('❌ [FIREBASE AUTH] Login error:', error);
       throw error;
     }
+  },
+
+  /**
+   * Login social (OAuth popup) — Google, Facebook, Apple ou Twitter/X.
+   * E-mails de provedores federados já vêm verificados, então pulam a etapa de
+   * confirmação manual — o maior gatilho de cadastro. Retorna o User do Firebase.
+   */
+  async loginWithProvider(key: SocialProvider) {
+    ensureFirebaseReady();
+    const provider = buildAuthProvider(key);
+    const result = await signInWithPopup(auth, provider);
+    devLog(`✅ [FIREBASE AUTH] Social login (${key}):`, result.user.uid);
+    return result.user;
+  },
+
+  /** Atalho legado — mantém compatibilidade com chamadas antigas. */
+  async loginWithGoogle() {
+    return this.loginWithProvider('google');
+  },
+
+  /**
+   * Cria o verificador invisível do reCAPTCHA exigido pelo login por telefone.
+   * `containerId` é o id de um elemento vazio já presente no DOM.
+   */
+  createRecaptchaVerifier(containerId: string) {
+    ensureFirebaseReady();
+    return new RecaptchaVerifier(auth, containerId, { size: 'invisible' });
+  },
+
+  /**
+   * Envia o código SMS para o telefone em formato E.164 (ex.: +5511999998888).
+   * Retorna o ConfirmationResult usado depois para confirmar o código digitado.
+   */
+  async sendPhoneCode(phoneE164: string, verifier: RecaptchaVerifier): Promise<ConfirmationResult> {
+    ensureFirebaseReady();
+    return await signInWithPhoneNumber(auth, phoneE164, verifier);
   },
 
   /**

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
-import { Mail, Lock, ArrowRight, UserCircle, KeyRound, MailCheck } from 'lucide-react';
+import { Mail, Lock, ArrowRight, UserCircle, KeyRound, MailCheck, Eye, EyeOff } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,6 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useUser } from '@/context/UserContext';
 import { useLanguage } from '@/context/LanguageContext';
 import LanguageSwitcher from '@/components/LanguageSwitcher';
+import SocialLoginButtons from '@/components/SocialLoginButtons';
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
@@ -31,6 +32,7 @@ const Login: React.FC = () => {
   const [forgotEmail, setForgotEmail] = useState('');
   const [isSendingReset, setIsSendingReset] = useState(false);
   const [needsVerification, setNeedsVerification] = useState(verificationEmailSent);
+  const [showPassword, setShowPassword] = useState(false);
   const [verificationNotice, setVerificationNotice] = useState(() => {
     if (verifiedFromLink) return 'E-mail confirmado. Agora entre com seu e-mail e senha.';
     if (verificationEmailFailed) return 'Conta criada, mas nao conseguimos enviar o link automaticamente. Tente entrar para reenviar.';
@@ -228,17 +230,28 @@ const Login: React.FC = () => {
                         <Lock className="w-4 h-4" />
                         {t('auth.login.password')}
                       </Label>
-                      <Input
-                        id="password"
-                        name="password"
-                        type="password"
-                        placeholder="••••••••"
-                        value={formData.password}
-                        onChange={handleInputChange}
-                        required
-                        minLength={6}
-                        disabled={isLoading}
-                      />
+                      <div className="relative">
+                        <Input
+                          id="password"
+                          name="password"
+                          type={showPassword ? "text" : "password"}
+                          placeholder="••••••••"
+                          value={formData.password}
+                          onChange={handleInputChange}
+                          required
+                          minLength={6}
+                          disabled={isLoading}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          disabled={isLoading}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground disabled:opacity-50"
+                          aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
+                        >
+                          {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
                     </div>
 
                     <div className="text-right">
@@ -253,6 +266,12 @@ const Login: React.FC = () => {
                         {!isLoading && <ArrowRight className="w-5 h-5 ml-2" />}
                       </Button>
                     </div>
+
+                    <div className="relative py-1">
+                      <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-border" /></div>
+                      <div className="relative flex justify-center text-xs uppercase"><span className="bg-card px-2 text-muted-foreground">ou</span></div>
+                    </div>
+                    <SocialLoginButtons disabled={isLoading} />
 
                     <div className="text-center pt-4">
                       <p className="text-sm text-muted-foreground">

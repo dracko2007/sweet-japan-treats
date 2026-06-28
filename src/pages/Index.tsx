@@ -7,6 +7,7 @@ import ShippingBanner from '@/components/home/ShippingBanner';
 import AppDownloadSection from '@/components/AppDownloadSection';
 import { useLanguage } from '@/context/LanguageContext';
 import FlagIcon from '@/components/FlagIcon';
+import WelcomeCouponBanner from '@/components/WelcomeCouponBanner';
 
 const Index: React.FC = () => {
   const { t } = useLanguage();
@@ -14,6 +15,7 @@ const Index: React.FC = () => {
   return (
     <Layout>
       <HeroSection />
+      <WelcomeCouponBanner />
       <FeaturedProducts />
       <HomeVideos />
       <ShippingBanner />

@@ -1,8 +1,10 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { safeStorage } from '@/utils/storage';
 import { firebaseSyncService } from '@/services/firebaseSyncService';
+import type { SocialProvider } from '@/services/firebaseSyncService';
 import { firebaseConfigReady, allowLocalOnly, auth } from '@/config/firebase';
 import { signInWithEmailAndPassword } from 'firebase/auth';
+import type { ConfirmationResult, RecaptchaVerifier } from 'firebase/auth';
 import { ADMIN_EMAIL, ADMIN_USER_ID, isAdminEmail } from '@/config/admin';
 import { adminService } from '@/services/adminService';
 import { referralService } from '@/services/referralService';
@@ -109,6 +111,10 @@ interface UserContextType {
   coupons: Coupon[];
   orders: Order[];
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string; code?: string; needsVerification?: boolean }>;
+  loginWithGoogle: () => Promise<{ success: boolean; error?: string }>;
+  loginWithProvider: (provider: SocialProvider) => Promise<{ success: boolean; error?: string }>;
+  sendPhoneCode: (phoneE164: string, verifier: RecaptchaVerifier) => Promise<{ success: boolean; confirmationResult?: ConfirmationResult; error?: string }>;
+  confirmPhoneCode: (confirmationResult: ConfirmationResult, code: string) => Promise<{ success: boolean; error?: string }>;
   register: (userData: Omit<UserProfile, 'id' | 'createdAt' | 'password'> & { password: string }) => Promise<{ success: boolean; error?: string; verificationEmailSent?: boolean }>;
   logout: () => void;
   updateProfile: (userData: Partial<UserProfile>) => void;
@@ -470,8 +476,13 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
           if (stored && JSON.parse(stored)?.id === ADMIN_USER_ID) return;
         } catch { /* ignore */ }
         
-        // Block unverified users (except admin)
-        if (!firebaseUser.emailVerified && !isAdminEmail(firebaseUser.email)) {
+        // Bloqueia apenas contas por e-mail/senha não verificadas. Logins sociais
+        // (Google/Facebook/Apple/Twitter) e por telefone já são confiáveis pelo
+        // provedor e nunca passam pela confirmação de e-mail — não devem cair aqui.
+        const isPasswordUser = (firebaseUser.providerData || []).some(
+          (p: { providerId?: string } | null) => p?.providerId === 'password'
+        );
+        if (isPasswordUser && !firebaseUser.emailVerified && !isAdminEmail(firebaseUser.email)) {
           devLog('🔥 [FIREBASE] User email not verified, signing out:', firebaseUser.email);
           clearCurrentSession();
           if (!isRegisteringRef.current) {
@@ -928,6 +939,140 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     devLog('User logged out successfully');
   };
 
+  // Cria/recupera o perfil do cliente a partir de um usuário já autenticado no
+  // Firebase (login social ou por telefone) e popula a sessão. No primeiro acesso
+  // cria um perfil mínimo com o cupom de boas-vindas BEMVINDO10, igual ao cadastro.
+  const hydrateSessionFromFirebaseUser = async (
+    fbUser: { uid: string; email?: string | null; displayName?: string | null; phoneNumber?: string | null },
+    fallback?: { name?: string }
+  ): Promise<UserProfile> => {
+    const email = normalizeEmail(fbUser.email || '');
+    const name =
+      fbUser.displayName ||
+      fallback?.name ||
+      (email ? email.split('@')[0] : '') ||
+      (fbUser.phoneNumber ? `Cliente ${fbUser.phoneNumber.slice(-4)}` : 'Cliente');
+
+    let userData = await firebaseSyncService.getUserFromFirestore(fbUser.uid);
+    const localUsers = getAllUsers();
+    const localUser = localUsers.find(
+      (u) => (email && normalizeEmail(u.email) === email) || u.id === fbUser.uid
+    );
+
+    if (!userData) {
+      const newUser: UserProfile = {
+        id: fbUser.uid,
+        name,
+        email,
+        phone: fbUser.phoneNumber || '',
+        address: { postalCode: '', prefecture: '', city: '', address: '' },
+        createdAt: new Date().toISOString(),
+        coupons: [makeWelcomeCoupon()],
+      };
+      if (!localUser) {
+        saveAllUsers([...localUsers, stripSensitive(newUser)]);
+      }
+      firebaseSyncService
+        .syncUserToFirestore(newUser.id, stripSensitive(newUser))
+        .catch((e) => devWarn('⚠️ [SOCIAL LOGIN] sync nuvem falhou:', e));
+      userData = newUser;
+    }
+
+    setUser(userData as UserProfile);
+    setIsAuthenticated(true);
+    setCoupons(resolveUserCoupons(userData as UserProfile));
+    setOrders(getUserOrders((userData as UserProfile).id, email).map(fixTrackingUrl));
+    safeStorage.setItem('user', JSON.stringify(stripSensitive(userData as UserProfile)));
+    return userData as UserProfile;
+  };
+
+  // Mensagem amigável para os erros mais comuns de OAuth popup.
+  const friendlySocialError = (code: string): string => {
+    if (code.includes('popup-closed-by-user') || code.includes('cancelled-popup-request') || code.includes('cancel-popup-request')) {
+      return 'Login cancelado.';
+    }
+    if (code.includes('account-exists-with-different-credential')) {
+      return 'Já existe uma conta com este e-mail usando outro método de login. Entre por aquele método.';
+    }
+    if (code.includes('operation-not-allowed')) {
+      return 'Este método de login ainda não está ativado no Firebase.';
+    }
+    if (code.includes('unauthorized-domain')) {
+      const host = typeof window !== 'undefined' ? window.location.hostname : 'seu domínio';
+      return `Domínio não autorizado no Firebase. Adicione ${host} em Authentication > Settings > Authorized domains.`;
+    }
+    return 'Não foi possível entrar. Tente novamente.';
+  };
+
+  // Login social genérico (Google, Facebook, Apple, Twitter/X). Provedores
+  // federados já trazem o e-mail verificado, então pulam a confirmação manual.
+  const loginWithProvider = async (key: SocialProvider): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const fbUser = await firebaseSyncService.loginWithProvider(key);
+      await hydrateSessionFromFirebaseUser(fbUser);
+      devLog(`✅ [SOCIAL LOGIN] Sucesso (${key})`);
+      return { success: true };
+    } catch (error) {
+      devError(`❌ [SOCIAL LOGIN] Falhou (${key}):`, error);
+      return { success: false, error: friendlySocialError((error as { code?: string })?.code || '') };
+    }
+  };
+
+  // Atalho de compatibilidade.
+  const loginWithGoogle = (): Promise<{ success: boolean; error?: string }> => loginWithProvider('google');
+
+  // ---- Login por telefone (SMS OTP) — fluxo em 2 passos ----
+  // Passo 1: envia o código SMS. O componente cria o RecaptchaVerifier e guarda
+  // o ConfirmationResult devolvido para usar no passo 2.
+  const sendPhoneCode = async (
+    phoneE164: string,
+    verifier: RecaptchaVerifier
+  ): Promise<{ success: boolean; confirmationResult?: ConfirmationResult; error?: string }> => {
+    try {
+      const confirmationResult = await firebaseSyncService.sendPhoneCode(phoneE164, verifier);
+      return { success: true, confirmationResult };
+    } catch (error) {
+      devError('❌ [PHONE LOGIN] Falha ao enviar SMS:', error);
+      const code = (error as { code?: string })?.code || '';
+      if (code.includes('invalid-phone-number')) {
+        return { success: false, error: 'Número inválido. Use o formato internacional, ex.: +5511999998888.' };
+      }
+      if (code.includes('too-many-requests')) {
+        return { success: false, error: 'Muitas tentativas. Aguarde alguns minutos e tente de novo.' };
+      }
+      if (code.includes('operation-not-allowed')) {
+        return { success: false, error: 'Login por telefone ainda não está ativado no Firebase.' };
+      }
+      if (code.includes('captcha-check-failed')) {
+        return { success: false, error: 'Falha na verificação anti-robô. Recarregue a página e tente de novo.' };
+      }
+      return { success: false, error: 'Não foi possível enviar o código SMS. Tente novamente.' };
+    }
+  };
+
+  // Passo 2: confirma o código de 6 dígitos e popula a sessão.
+  const confirmPhoneCode = async (
+    confirmationResult: ConfirmationResult,
+    code: string
+  ): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const cred = await confirmationResult.confirm(code.trim());
+      await hydrateSessionFromFirebaseUser(cred.user);
+      devLog('✅ [PHONE LOGIN] Sucesso:', cred.user.uid);
+      return { success: true };
+    } catch (error) {
+      devError('❌ [PHONE LOGIN] Código inválido:', error);
+      const ecode = (error as { code?: string })?.code || '';
+      if (ecode.includes('invalid-verification-code')) {
+        return { success: false, error: 'Código incorreto. Confira os 6 dígitos do SMS.' };
+      }
+      if (ecode.includes('code-expired')) {
+        return { success: false, error: 'O código expirou. Peça um novo SMS.' };
+      }
+      return { success: false, error: 'Não foi possível confirmar o código. Tente novamente.' };
+    }
+  };
+
   const updateProfile = (userData: Partial<UserProfile>) => {
     if (user) {
       // Deep merge para objetos aninhados como address
@@ -1146,6 +1291,10 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     coupons,
     orders,
     login,
+    loginWithGoogle,
+    loginWithProvider,
+    sendPhoneCode,
+    confirmPhoneCode,
     register,
     logout,
     updateProfile,

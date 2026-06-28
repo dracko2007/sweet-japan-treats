@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
-import { UserCircle, Mail, Lock, Phone, ArrowRight } from 'lucide-react';
+import { UserCircle, Mail, Lock, Phone, ArrowRight, Eye, EyeOff } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,6 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useUser } from '@/context/UserContext';
 import { useLanguage } from '@/context/LanguageContext';
 import LanguageSwitcher from '@/components/LanguageSwitcher';
+import SocialLoginButtons from '@/components/SocialLoginButtons';
 import { isValidEmail, isNonEmpty, runValidations, FieldErrors, COUNTRY_DIAL_CODES, isValidCNPJ, maskCNPJ } from '@/utils/validation';
 
 const Register: React.FC = () => {
@@ -39,6 +40,8 @@ const Register: React.FC = () => {
   });
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<FieldErrors>({});
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   // Redirect after login — volta pra onde o usuário estava (ex: /checkout)
   React.useEffect(() => {
@@ -374,16 +377,26 @@ const Register: React.FC = () => {
                     <Lock className="w-4 h-4" />
                     {t('auth.register.password')}
                   </Label>
-                  <Input
-                    id="password"
-                    name="password"
-                    type="password"
-                    placeholder="••••••••"
-                    value={formData.password}
-                    onChange={handleInputChange}
-                    required
-                    minLength={6}
-                  />
+                  <div className="relative">
+                    <Input
+                      id="password"
+                      name="password"
+                      type={showPassword ? "text" : "password"}
+                      placeholder="••••••••"
+                      value={formData.password}
+                      onChange={handleInputChange}
+                      required
+                      minLength={6}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
+                    >
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
                 </div>
 
                 <div className="space-y-2">
@@ -391,18 +404,28 @@ const Register: React.FC = () => {
                     <Lock className="w-4 h-4" />
                     {t('auth.register.confirmPassword')}
                   </Label>
-                  <Input
-                    id="confirmPassword"
-                    name="confirmPassword"
-                    type="password"
-                    placeholder="••••••••"
-                    value={formData.confirmPassword}
-                    onChange={handleInputChange}
-                    aria-invalid={!!errors.confirmPassword}
-                    className={errors.confirmPassword ? 'border-destructive' : ''}
-                    required
-                    minLength={6}
-                  />
+                  <div className="relative">
+                    <Input
+                      id="confirmPassword"
+                      name="confirmPassword"
+                      type={showConfirmPassword ? "text" : "password"}
+                      placeholder="••••••••"
+                      value={formData.confirmPassword}
+                      onChange={handleInputChange}
+                      aria-invalid={!!errors.confirmPassword}
+                      className={errors.confirmPassword ? 'border-destructive' : ''}
+                      required
+                      minLength={6}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      aria-label={showConfirmPassword ? "Ocultar senha" : "Mostrar senha"}
+                    >
+                      {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
                   {errors.confirmPassword && <p className="text-xs text-destructive">{errors.confirmPassword}</p>}
                 </div>
 
@@ -416,6 +439,12 @@ const Register: React.FC = () => {
                     {!isLoading && <ArrowRight className="w-5 h-5 ml-2" />}
                   </Button>
                 </div>
+
+                <div className="relative py-1">
+                  <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-border" /></div>
+                  <div className="relative flex justify-center text-xs uppercase"><span className="bg-card px-2 text-muted-foreground">ou</span></div>
+                </div>
+                <SocialLoginButtons disabled={isLoading} mode="register" />
 
                 <div className="text-center pt-4">
                   <p className="text-sm text-muted-foreground">

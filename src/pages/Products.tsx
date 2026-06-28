@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Search, X, SlidersHorizontal, ChevronDown } from 'lucide-react';
+import { Search, X, SlidersHorizontal, ChevronDown, Eye, EyeOff } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import ProductCard from '@/components/products/ProductCard';
 import { useProducts } from '@/context/ProductsContext';
@@ -162,6 +162,11 @@ const Products: React.FC = () => {
 
   const hasActiveFilters = !!(sort || catFilter || typeFilter);
   const clearFilters = () => { setSort(null); setCatFilter(null); setTypeFilter(null); };
+
+  // Scroll para topo ao mudar de página
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [page]);
 
   // Fecha o dropdown de filtros ao clicar fora
   const filterRef = useRef<HTMLDivElement>(null);

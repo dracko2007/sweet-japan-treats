@@ -15,6 +15,7 @@ import { POINTS } from '@/services/pointsService';
 import { affiliateService, Affiliate } from '@/services/affiliateService';
 import { couponService as globalCouponService } from '@/services/couponService';
 import { safeStorage } from '@/utils/storage';
+import WelcomeCouponBanner from '@/components/WelcomeCouponBanner';
 
 // Converte um afiliado num "cupom" aplicável (carrega o código para gerar comissão)
 const affiliateToCoupon = (aff: Affiliate, productId?: string | null): Coupon => ({
@@ -200,6 +201,7 @@ const Cart: React.FC = () => {
 
   return (
     <Layout>
+      <WelcomeCouponBanner context="cart" />
       <div className="gradient-hero py-16">
         <div className="container mx-auto px-4">
           <div className="text-center">

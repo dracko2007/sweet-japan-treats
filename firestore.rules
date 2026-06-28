@@ -219,5 +219,22 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // ---------- Newsletter / Leads (captura de e-mail) ----------
+    // Criação pública (visitante anônimo captura o e-mail no exit-intent).
+    // Leitura/deleção restritas ao admin.
+    match /newsletter/{leadId} {
+      allow create: if true;
+      allow read, update, delete: if isAdmin();
+    }
+
+    // ---------- Carrinhos abandonados ----------
+    // Usuário autenticado registra/recupera o próprio carrinho (por UID).
+    // Admin vê tudo. Atualização automática (merge) e deleção ao converter.
+    match /abandoned_carts/{cartId} {
+      allow read: if isAdmin() || (request.auth != null && cartId == request.auth.uid);
+      allow create, update: if request.auth != null && cartId == request.auth.uid;
+      allow delete: if isAdmin() || (request.auth != null && cartId == request.auth.uid);
+    }
+
   }
 }
