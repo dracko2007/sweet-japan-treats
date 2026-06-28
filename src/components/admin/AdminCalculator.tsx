@@ -1,7 +1,7 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Plus, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { getRates } from '@/services/fxService';
+import { getRates, loadFxRates } from '@/services/fxService';
 import { formatPrice } from '@/utils/currency';
 import { getELightRate, getAirParcelRate, getEmsRate, type JapanPostZone } from '@/utils/japanPostRates';
 
@@ -18,7 +18,16 @@ const AdminCalculator: React.FC = () => {
   const [weightKg, setWeightKg] = useState('');
   const [zone, setZone] = useState<JapanPostZone>(5);
 
-  const rates = getRates();
+  // Cotação ao vivo: recarrega a cada 5 min para nunca ficar defasada
+  // em relação ao carrinho (que usa a Wise via LanguageContext).
+  const [rates, setRates] = useState(getRates());
+  useEffect(() => {
+    let alive = true;
+    const refresh = () => loadFxRates().then(r => { if (alive) setRates(r); });
+    refresh();
+    const t = setInterval(refresh, 5 * 60 * 1000);
+    return () => { alive = false; clearInterval(t); };
+  }, []);
 
   const sellPrice = (row: ProductRow) => {
     const cost = parseFloat(row.costYen) || 0;
