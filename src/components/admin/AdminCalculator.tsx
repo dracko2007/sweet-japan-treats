@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Plus, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { getRates, loadFxRates } from '@/services/fxService';
+import { getRates, loadFxRates, convertYen, getRateSource } from '@/services/fxService';
 import { formatPrice } from '@/utils/currency';
 import { getELightRate, getAirParcelRate, getEmsRate, type JapanPostZone } from '@/utils/japanPostRates';
 
@@ -18,12 +18,21 @@ const AdminCalculator: React.FC = () => {
   const [weightKg, setWeightKg] = useState('');
   const [zone, setZone] = useState<JapanPostZone>(5);
 
-  // Cotação ao vivo: recarrega a cada 5 min para nunca ficar defasada
-  // em relação ao carrinho (que usa a Wise via LanguageContext).
+  // Cotação ao vivo (Wise): usa EXATAMENTE o mesmo convertYen() do carrinho/checkout,
+  // então o Total da calculadora bate com o que o cliente paga. Recarrega a cada 5 min
+  // e tem botão manual de atualização para confirmar que está ao vivo.
   const [rates, setRates] = useState(getRates());
+  const [rateSource, setRateSource] = useState(getRateSource());
+  const [refreshing, setRefreshing] = useState(false);
+  const doRefresh = () => {
+    setRefreshing(true);
+    loadFxRates()
+      .then(r => { setRates(r); setRateSource(getRateSource()); })
+      .finally(() => setTimeout(() => setRefreshing(false), 400));
+  };
   useEffect(() => {
     let alive = true;
-    const refresh = () => loadFxRates().then(r => { if (alive) setRates(r); });
+    const refresh = () => loadFxRates().then(r => { if (alive) { setRates(r); setRateSource(getRateSource()); } });
     refresh();
     const t = setInterval(refresh, 5 * 60 * 1000);
     return () => { alive = false; clearInterval(t); };
@@ -40,6 +49,18 @@ const AdminCalculator: React.FC = () => {
   const psFeeYen = (parseInt(psQty) || 0) * 1000;
   const grandTotalYen = totalYen + psFeeYen;
   const profitYen = grandTotalYen - totalCostYen;
+
+  // Conversão consistente com o checkout: convertYen() usa a taxa da Wise ao vivo
+  // + buffer de margem, exatamente como o carrinho. Produtos levam buffer por linha
+  // (como no carrinho); PS e frete são taxas fixas (sem buffer).
+  const productsBrl = rows.reduce((s, r) => s + convertYen(sellPrice(r), 'BRL'), 0);
+  const productsEur = rows.reduce((s, r) => s + convertYen(sellPrice(r), 'EUR'), 0);
+  const psBrl = convertYen(psFeeYen, 'BRL', true);
+  const psEur = convertYen(psFeeYen, 'EUR', true);
+  const subtotalBrl = productsBrl + psBrl;
+  const subtotalEur = productsEur + psEur;
+  const profitBrl = convertYen(profitYen, 'BRL', true);
+  const profitEur = convertYen(profitYen, 'EUR', true);
 
   const addRow = () => {
     setRows(prev => [...prev, { id: nextId.current++, costYen: '', discountPct: '0' }]);
@@ -64,6 +85,22 @@ const AdminCalculator: React.FC = () => {
 
   return (
     <div className="space-y-6 pb-8">
+
+      {/* ── Cotação ao vivo (Wise) ── */}
+      <div className="flex items-center justify-between gap-3 flex-wrap bg-card rounded-xl border border-border px-4 py-2.5">
+        <div className="flex items-center gap-2 text-xs">
+          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-bold ${rateSource === 'wise' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' : rateSource === 'cache' ? 'bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300' : 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'}`}>
+            <span className={`w-1.5 h-1.5 rounded-full ${rateSource === 'wise' ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
+            {rateSource === 'wise' ? 'Wise ao vivo' : rateSource === 'cache' ? 'Wise (cache)' : 'Cotação aproximada'}
+          </span>
+          <span className="text-muted-foreground">
+            ¥1 = <strong className="text-foreground">R$ {rates.BRL.toFixed(4)}</strong> · <strong className="text-foreground">€ {rates.EUR.toFixed(4)}</strong>
+          </span>
+        </div>
+        <button onClick={doRefresh} disabled={refreshing} className="text-xs font-semibold text-primary hover:opacity-70 disabled:opacity-40 flex items-center gap-1">
+          <span className={refreshing ? 'animate-spin inline-block' : ''}>↻</span> {refreshing ? 'Atualizando…' : 'Atualizar agora'}
+        </button>
+      </div>
 
       {/* ── Produtos ── */}
       <div className="bg-card rounded-2xl border border-border p-5">
@@ -115,7 +152,7 @@ const AdminCalculator: React.FC = () => {
                     <span>
                       <span className="font-black text-primary">{yenFmt(sell)}</span>
                       <span className="text-[11px] text-muted-foreground ml-1.5">
-                        {formatPrice(sell * rates.BRL, 'BRL', true)} · {formatPrice(sell * rates.EUR, 'EUR', true)}
+                        {formatPrice(convertYen(sell, 'BRL'), 'BRL', true)} · {formatPrice(convertYen(sell, 'EUR'), 'EUR', true)}
                       </span>
                     </span>
                   ) : (
@@ -154,8 +191,8 @@ const AdminCalculator: React.FC = () => {
           {psFeeYen > 0 && (
             <div className="mt-4 flex gap-4 text-sm font-semibold text-orange-700 dark:text-orange-300">
               <span>{yenFmt(psFeeYen)}</span>
-              <span>{formatPrice(psFeeYen * rates.BRL, 'BRL', true)}</span>
-              <span>{formatPrice(psFeeYen * rates.EUR, 'EUR', true)}</span>
+              <span>{formatPrice(psBrl, 'BRL', true)}</span>
+              <span>{formatPrice(psEur, 'EUR', true)}</span>
             </div>
           )}
         </div>
@@ -192,11 +229,11 @@ const AdminCalculator: React.FC = () => {
         </div>
         <div className="bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-2xl p-4 text-center">
           <p className="text-[11px] font-bold text-green-700 dark:text-green-400 mb-1 uppercase tracking-wide">Total em Reais</p>
-          <p className="text-2xl font-black text-green-900 dark:text-green-200">{formatPrice(grandTotalYen * rates.BRL, 'BRL', true)}</p>
+          <p className="text-2xl font-black text-green-900 dark:text-green-200">{formatPrice(subtotalBrl, 'BRL', true)}</p>
         </div>
         <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-2xl p-4 text-center">
           <p className="text-[11px] font-bold text-blue-700 dark:text-blue-400 mb-1 uppercase tracking-wide">Total em Euro</p>
-          <p className="text-2xl font-black text-blue-900 dark:text-blue-200">{formatPrice(grandTotalYen * rates.EUR, 'EUR', true)}</p>
+          <p className="text-2xl font-black text-blue-900 dark:text-blue-200">{formatPrice(subtotalEur, 'EUR', true)}</p>
         </div>
       </div>
 
@@ -210,11 +247,11 @@ const AdminCalculator: React.FC = () => {
           </div>
           <div>
             <p className="text-xs text-emerald-600 dark:text-emerald-400 mb-0.5">Em Reais</p>
-            <p className="text-3xl font-black text-emerald-800 dark:text-emerald-200">{formatPrice(profitYen * rates.BRL, 'BRL', true)}</p>
+            <p className="text-3xl font-black text-emerald-800 dark:text-emerald-200">{formatPrice(profitBrl, 'BRL', true)}</p>
           </div>
           <div>
             <p className="text-xs text-emerald-600 dark:text-emerald-400 mb-0.5">Em Euro</p>
-            <p className="text-3xl font-black text-emerald-800 dark:text-emerald-200">{formatPrice(profitYen * rates.EUR, 'EUR', true)}</p>
+            <p className="text-3xl font-black text-emerald-800 dark:text-emerald-200">{formatPrice(profitEur, 'EUR', true)}</p>
           </div>
         </div>
       </div>
@@ -283,7 +320,7 @@ const AdminCalculator: React.FC = () => {
               {yenFmt(eRaitoYen)}
             </p>
             <p className="text-sm text-emerald-600 dark:text-emerald-400 mt-0.5">
-              ≈ {formatPrice(eRaitoYen * rates.BRL, 'BRL', true)} · {formatPrice(eRaitoYen * rates.EUR, 'EUR', true)}
+              ≈ {formatPrice(convertYen(eRaitoYen, 'BRL', true), 'BRL', true)} · {formatPrice(convertYen(eRaitoYen, 'EUR', true), 'EUR', true)}
             </p>
           </div>
         )}
@@ -297,7 +334,7 @@ const AdminCalculator: React.FC = () => {
                 </span>
                 <p className="text-2xl font-black text-blue-800 dark:text-blue-200">{yenFmt(kAirYen)}</p>
                 <p className="text-sm text-blue-600 dark:text-blue-400 mt-0.5">
-                  ≈ {formatPrice(kAirYen * rates.BRL, 'BRL', true)} · {formatPrice(kAirYen * rates.EUR, 'EUR', true)}
+                  ≈ {formatPrice(convertYen(kAirYen, 'BRL', true), 'BRL', true)} · {formatPrice(convertYen(kAirYen, 'EUR', true), 'EUR', true)}
                 </p>
               </div>
             )}
@@ -312,13 +349,16 @@ const AdminCalculator: React.FC = () => {
           <div className="space-y-3">
             {shippingOptions.map(opt => {
               const total = grandTotalYen + opt.yen;
+              // Conversão idêntica à do checkout: subtotal (produtos+PS) + frete (taxa, sem buffer).
+              const totalBrl = subtotalBrl + convertYen(opt.yen, 'BRL', true);
+              const totalEur = subtotalEur + convertYen(opt.yen, 'EUR', true);
               return (
                 <div key={opt.label} className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4">
                   <span className="text-xs font-bold text-gray-400 w-40 shrink-0">{opt.label}</span>
                   <div className="flex gap-4 flex-wrap">
                     <span className="text-xl font-black text-white">{yenFmt(total)}</span>
-                    <span className="text-xl font-black text-green-400">{formatPrice(total * rates.BRL, 'BRL', true)}</span>
-                    <span className="text-xl font-black text-blue-400">{formatPrice(total * rates.EUR, 'EUR', true)}</span>
+                    <span className="text-xl font-black text-green-400">{formatPrice(totalBrl, 'BRL', true)}</span>
+                    <span className="text-xl font-black text-blue-400">{formatPrice(totalEur, 'EUR', true)}</span>
                   </div>
                 </div>
               );
