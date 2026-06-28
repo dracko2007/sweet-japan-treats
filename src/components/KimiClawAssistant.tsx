@@ -495,8 +495,62 @@ const KimiClawAssistant: React.FC = () => {
         return;
       }
 
-      const candidates = products
-        .filter((p) => !p.hidden)
+      // ── Filtro por palavra-chave de PRODUTO (correção do bug do "shampoo") ──
+      // Antes o orçamento listava os 5 produtos MAIS BARATOS do catálogo, ignorando
+      // o que o cliente pediu (ex.: pedia "kit de shampoo até 500" e vinham doces).
+      // Agora extraímos as palavras de produto da pergunta (shampoo, kit, protetor...)
+      // e só consideramos produtos que casam com elas. Se nada bater, oferecemos
+      // encomenda em vez de devolver produtos irrelevantes.
+      const BUDGET_STOP = new Set([
+        'frete', 'envio', 'entrega', 'shipping', 'brasil', 'brazil', 'bra', 'br',
+        'valor', 'valores', 'maximo', 'max', 'minimo', 'min', 'limite', 'limites',
+        'reais', 'real', 'reia', 'reis', 'rs', 'yen', 'iene', 'ienes', 'euro', 'euros',
+        'dolar', 'dolares', 'usd', 'para', 'pro', 'pra', 'com', 'de', 'lista', 'faca',
+        'fazer', 'quero', 'queria', 'orcamento', 'orcamentos', 'incluso', 'inclusos',
+        'incluida', 'incluidas', 'gratis', 'abaixo', 'menos', 'passar', 'passe', 'ate',
+        'ja', 'todo', 'todos', 'algum', 'alguns', 'tipo', 'tipos', 'quais', 'qual',
+        'mostra', 'mostrar', 'tem', 'ter', 'existe', 'vende', 'vendem', 'produto',
+        'produtos', 'custar', 'custe', 'gastar', 'gaste',
+      ]);
+      const keywordTokens = tokenize(query).filter((tk) => {
+        const digits = tk.replace(/[^0-9.,]/g, '');
+        return tk.length >= 3 && !BUDGET_STOP.has(tk) && digits === '';
+      });
+
+      // IDs de produtos que casam com as palavras-chave (se houver). Ignorado quando
+      // o cliente não nomeou produto nenhum (ex.: "produtos até 500 com frete").
+      let mustMatchIds: Set<string> | null = null;
+      let keywordExistsInCatalog = false;
+      if (keywordTokens.length > 0) {
+        mustMatchIds = new Set<string>();
+        for (const p of products) {
+          if (p.hidden) continue;
+          const hayParts = [
+            productEnglishName(p), p.id, p.description || '', p.flavor || '',
+            p.category || '', (p.tags || []).join(' '),
+          ].map(normalizeText);
+          const hay = hayParts.join(' ');
+          const matched = keywordTokens.some((tok) => {
+            if (tok.length < 3) return false;
+            if (hay.includes(tok)) return true;
+            // sinônimos/singular-plural comuns de higiene e cosmético
+            if (/^shamp/.test(tok) && hay.includes('shamp')) return true;
+            if (/^shamp/.test(tok) && hay.includes('shampoo')) return true;
+            if (/^condicion/.test(tok) && hay.includes('condicion')) return true;
+            if (/^sabonete/.test(tok) && hay.includes('sabonete')) return true;
+            if (/^hidratant/.test(tok) && hay.includes('hidratant')) return true;
+            return false;
+          });
+          if (matched) {
+            keywordExistsInCatalog = true;
+            mustMatchIds.add(p.id);
+          }
+        }
+      }
+
+      const pool = products.filter((p) => !p.hidden && (!mustMatchIds || mustMatchIds.has(p.id)));
+
+      const candidates = pool
         .map((p) => {
           const priceYen = effectiveYen(p, 'small');
           const shipYen = catalogShippingYen(p, country);
@@ -513,7 +567,24 @@ const KimiClawAssistant: React.FC = () => {
         .slice(0, 5);
 
       if (candidates.length === 0) {
-        await addKimiMessageWithTyping(`Não encontrei nenhum produto (com frete pra **${country}**) que caiba em **${fmtBudget(budgetValue)}**. 😕 Tente um valor um pouco maior, ou fale com um vendedor no WhatsApp **+81 70-1367-1679** (wa.me/817013671679) pra uma cotação sob medida! 📦`);
+        // O cliente nomeou um produto/categoria (ex.: "shampoo") que NÃO existe
+        // no catálogo → não inventa; encaminha pra encomenda (Faça seu Pedido).
+        if (keywordTokens.length > 0 && !keywordExistsInCatalog) {
+          const kw = keywordTokens.map((k) => `**${k}**`).join(', ');
+          await addKimiMessageWithTyping(
+            `Procurei no catálogo por ${kw} com frete pra **${country}** dentro de **${fmtBudget(budgetValue)}**, mas não tenho esse item em estoque agora. 😕\n\nSem problema! 🎌 Você pode **encomendar** pelo **\"Faça seu Pedido\"** no menu do topo — é só mandar o link/foto do shampoo japonês que você quer que a equipe cotiza o preço + frete pra você. 📦`,
+            ['🔍 Procurando no catálogo...']
+          );
+          setTimeout(() => navigate('/faca-seu-pedido'), 700);
+          return;
+        }
+        // O produto existe, mas nenhum cabe no orçamento informado.
+        const dica = keywordTokens.length > 0
+          ? `Tenho **${keywordTokens.map((k) => k).join(', ')}** no catálogo, mas nenhum cabe em **${fmtBudget(budgetValue)}** já com frete. 😕`
+          : `Não encontrei nenhum produto (com frete pra **${country}**) que caiba em **${fmtBudget(budgetValue)}**. 😕`;
+        await addKimiMessageWithTyping(
+          `${dica} Tente um valor um pouco maior, ou fale com um vendedor no WhatsApp **+81 70-1367-1679** (wa.me/817013671679) pra uma cotação sob medida! 📦`
+        );
         return;
       }
 
