@@ -511,6 +511,14 @@ const KimiClawAssistant: React.FC = () => {
         'ja', 'todo', 'todos', 'algum', 'alguns', 'tipo', 'tipos', 'quais', 'qual',
         'mostra', 'mostrar', 'tem', 'ter', 'existe', 'vende', 'vendem', 'produto',
         'produtos', 'custar', 'custe', 'gastar', 'gaste',
+        // Palavras genéricas de EMBALAGEM/QUANTIDADE — não descrevem um produto,
+        // então não podem servir de filtro (ex.: "kit" casaria com KitKat e com
+        // "Kit com 12 Pacotes", devolvendo chocolates/algas quando o cliente
+        // pediu "kit de shampoo"). Devem ser ignoradas.
+        'kit', 'kits', 'pacote', 'pacotes', 'pack', 'packs', 'caixa', 'caixas',
+        'combo', 'conjunto', 'conjuntos', 'unidade', 'unidades', 'embalagem',
+        'embalagens', 'sache', 'saches', 'sachê', 'sachês', 'garrafa', 'garrafas',
+        'pct', 'pcts', 'cx', 'un', 'pote', 'potes', 'tubo', 'tubos',
       ]);
       const keywordTokens = tokenize(query).filter((tk) => {
         const digits = tk.replace(/[^0-9.,]/g, '');
