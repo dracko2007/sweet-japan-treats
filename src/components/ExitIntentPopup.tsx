@@ -275,51 +275,38 @@ const ExitIntentPopup: React.FC = () => {
     );
   }
 
-  // ----- Fallback: guia por e-mail (lead) -----
+  // ----- Fallback: cadastro com pontos e cupons (só não-logados) -----
+  const handleCadastro = useCallback(() => {
+    close();
+    navigate('/cadastro');
+  }, [close, navigate]);
+
   return (
-    <Shell label="Guia gratuito de importação" onClose={close}>
+    <Shell label="Cadastre-se e ganhe recompensas" onClose={close}>
       <div className="bg-gradient-to-br from-pink-600 to-amber-500 p-6 text-center text-white">
-        <Download className="w-10 h-10 mx-auto mb-2" />
+        <Gift className="w-10 h-10 mx-auto mb-2" />
         <h2 className="text-xl font-black leading-tight">
-          Guia Grátis: Importe do Japão sem surpresas
+          Cadastre e ganhe pontos e cupons de desconto
         </h2>
         <p className="text-sm text-white/90 mt-1">
-          O passo a passo para comprar com tranquilidade — sabendo exatamente quanto vai pagar e sem sustos na alfândega. Deixe seu e-mail e receba agora.
+          Crie sua conta agora e receba imediatamente: cupom de boas-vindas 10% OFF + pontos de fidelidade para próximas compras.
         </p>
       </div>
-
-      {status === 'done' ? (
-        <div className="p-6 text-center">
-          <CheckCircle2 className="w-12 h-12 mx-auto mb-3 text-green-500" />
-          <p className="font-bold text-gray-800 dark:text-gray-100">Tudo certo! 🎉</p>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-            Em breve você recebe o guia e ofertas exclusivas no seu e-mail.
-          </p>
-        </div>
-      ) : (
-        <form onSubmit={handleSubmit} className="p-6 space-y-3">
-          <div className="relative">
-            <Mail className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="seu@email.com"
-              className="w-full pl-9 pr-3 py-3 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm focus:ring-2 focus:ring-pink-500 focus:border-pink-500 outline-none"
-              autoFocus
-              required
-            />
-          </div>
-          <button
-            type="submit"
-            disabled={status === 'loading'}
-            className="w-full bg-gradient-to-r from-pink-600 to-amber-500 text-white font-bold py-3 rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
-          >
-            {status === 'loading' ? <Loader2 className="w-4 h-4 animate-spin" /> : <>Quero o guia grátis</>}
-          </button>
-          <p className="text-[11px] text-center text-gray-400">Sem spam. Cancele quando quiser.</p>
-        </form>
-      )}
+      <div className="p-6 space-y-3">
+        <button
+          onClick={handleCadastro}
+          className="w-full bg-gradient-to-r from-pink-600 to-amber-500 text-white font-bold py-3 rounded-xl hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
+        >
+          Cadastrar agora
+        </button>
+        <button
+          onClick={close}
+          className="w-full text-sm text-gray-500 dark:text-gray-400 font-medium py-2 hover:underline"
+        >
+          Agora não
+        </button>
+        <p className="text-[11px] text-center text-gray-400">Leva menos de 1 minuto. Sem cartão de crédito.</p>
+      </div>
     </Shell>
   );
 };
