@@ -1021,6 +1021,28 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
   const loginWithProvider = async (key: SocialProvider): Promise<{ success: boolean; error?: string }> => {
     try {
       const fbUser = await firebaseSyncService.loginWithProvider(key);
+
+      // Check if user already exists in Firestore
+      const existingUser = await firebaseSyncService.getUserFromFirestore(fbUser.uid);
+
+      // Se é novo usuário (não tem cadastro), não logar automaticamente
+      if (!existingUser) {
+        devLog(`ℹ️ [SOCIAL LOGIN] Novo usuário (${key}) — redirecionando para completar cadastro`);
+        // Salvar dados temporários do Google para uso na página de cadastro
+        const tempData = {
+          tempGoogleUser: {
+            uid: fbUser.uid,
+            email: fbUser.email,
+            displayName: fbUser.displayName,
+            photoURL: (fbUser as any).photoURL,
+          },
+          provider: key,
+        };
+        safeStorage.setItem('tempSocialSignUp', JSON.stringify(tempData));
+        return { success: true, error: 'new-user' }; // Sinal para redirecionar
+      }
+
+      // Usuário já existe → fazer login
       await hydrateSessionFromFirebaseUser(fbUser);
       devLog(`✅ [SOCIAL LOGIN] Sucesso (${key})`);
       return { success: true };

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useUser } from '@/context/UserContext';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
@@ -51,6 +52,7 @@ const SocialLoginButton: React.FC<{
   mode?: 'login' | 'register';
   disabled?: boolean;
 }> = ({ provider, mode = 'login', disabled = false }) => {
+  const navigate = useNavigate();
   const { loginWithProvider } = useUser();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
@@ -61,7 +63,11 @@ const SocialLoginButton: React.FC<{
     setLoading(true);
     try {
       const result = await loginWithProvider(provider);
-      if (result.success) {
+      if (result.success && result.error === 'new-user') {
+        // Novo usuário — redirecionar para cadastro
+        toast({ title: 'Completa seu cadastro', description: 'Complete seus dados para finalizar o cadastro.' });
+        navigate('/cadastro');
+      } else if (result.success) {
         toast({ title: 'Login realizado!', description: 'Bem-vindo(a)!' });
       } else if (result.error && result.error !== 'Login cancelado.') {
         toast({ title: 'Não foi possível entrar', description: result.error, variant: 'destructive' });
