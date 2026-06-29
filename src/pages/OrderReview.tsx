@@ -19,6 +19,7 @@ import { formatPrice, getCurrencyByCountry } from '@/utils/currency';
 import { effectiveYen, roundYen } from '@/utils/pricing';
 import { convertYen as fxConvert, yenFromConverted } from '@/services/fxService';
 import { negotiationService } from '@/services/negotiationService';
+import { psFeeWaiver } from '@/utils/psFeeWaiver';
 import { productService } from '@/services/productService';
 import { pointsForSpendYen, POINTS } from '@/services/pointsService';
 import { productEnglishName } from '@/utils/productName';
@@ -581,6 +582,7 @@ const OrderReview: React.FC = () => {
     clearCart();
     safeStorage.removeItem('redeem_points');
     localStorage.removeItem('activeNegId');
+    psFeeWaiver.clear(); // consome a isenção da oferta de saída (já aplicada neste pedido)
     if (negotiationId) {
       negotiationService.markUsed(negotiationId, orderId).catch(() => {});
     }

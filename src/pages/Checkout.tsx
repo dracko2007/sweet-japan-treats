@@ -25,6 +25,7 @@ import { effectiveYen } from '@/utils/pricing';
 import { convertYen as fxConvert, getRates } from '@/services/fxService';
 import { POINTS } from '@/services/pointsService';
 import { safeStorage } from '@/utils/storage';
+import { psFeeWaiver } from '@/utils/psFeeWaiver';
 import { productEnglishName } from '@/utils/productName';
 import { isValidEmail, isValidCPF, isValidPhone, isNonEmpty, maskPhone, runValidations, FieldErrors } from '@/utils/validation';
 import { calcImportTax } from '@/utils/taxRules';
@@ -104,6 +105,10 @@ const Checkout: React.FC = () => {
   const totalQty = items.reduce((s, i) => i.freeGift ? s : s + i.quantity, 0);
   const psFeeQty = items.reduce((s, i) => (i.freeGift || i.product.noPsFee) ? s : s + i.quantity, 0);
   const psFeeYen = psFeeQty * 1000;
+
+  // Isenção da taxa PS pela oferta de saída (exit-intent). Lida uma vez ao montar:
+  // se ativa, a taxa de Personal Shopper é zerada nesta visita (ponto 2 do checkout).
+  const [psFeeWaived] = useState(() => psFeeWaiver.isActive());
 
   const isGuest = !!location.state?.isGuest;
 
@@ -569,9 +574,12 @@ const Checkout: React.FC = () => {
   // Para aprovação manual pelo admin, respeita o valor aprovado (apenas cap no valor real da taxa).
   const maxAutoApprovable = 300 * psFeeQty;
   const isManualApproval = activeNeg?.status === 'approved';
-  const effectivePsFeeDiscountYen = isManualApproval
+  const negPsFeeDiscountYen = isManualApproval
     ? Math.min(psFeeDiscountYen, psFeeYen)
     : Math.min(psFeeDiscountYen, maxAutoApprovable);
+  // Oferta de saída isenta a taxa por completo e tem prioridade sobre a negociação
+  // (limitada ao valor real da taxa — nunca desconta mais do que a taxa atual).
+  const effectivePsFeeDiscountYen = psFeeWaived ? psFeeYen : negPsFeeDiscountYen;
   const psFeeFinalYen = Math.max(0, psFeeYen - effectivePsFeeDiscountYen);
   const psFeeDisplay = convertYenExact(psFeeFinalYen);
   const psFeeOriginalDisplay = convertYenExact(psFeeYen);
@@ -1220,7 +1228,11 @@ const Checkout: React.FC = () => {
                         </div>
                         <div className="flex items-center justify-between mt-1">
                           <span className="text-[10px] text-muted-foreground">{totalQty}x ¥1.000 • serviço de compra</span>
-                          {!activeNeg && (
+                          {psFeeWaived ? (
+                            <span className="text-[10px] text-green-600 font-bold flex items-center gap-0.5">
+                              <CheckCircle2 className="w-3 h-3" /> Isenta — oferta
+                            </span>
+                          ) : !activeNeg && (
                             <button
                               type="button"
                               onClick={() => setNegModalType('ps_fee')}
