@@ -35,6 +35,6 @@
     }
   ],
   "crons": [
-    { "path": "/api/cart-recovery", "schedule": "0 */6 * * *" }
+    { "path": "/api/cart-recovery", "schedule": "0 15 * * *" }
   ]
 }
