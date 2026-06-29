@@ -15,8 +15,9 @@ const SocialLoginButtons: React.FC<{ disabled?: boolean; mode?: 'login' | 'regis
     <SocialLoginButton provider="google" mode={mode} disabled={disabled} />
     {/* Facebook oculto até o app ser finalizado/aprovado no Meta. Reativar removendo o comentário. */}
     {/* <SocialLoginButton provider="facebook" mode={mode} disabled={disabled} /> */}
-    <SocialLoginButton provider="twitter" mode={mode} disabled={disabled} />
-    <PhoneLoginButton disabled={disabled} />
+    {/* Twitter/X e SMS desabilitados para simplificar fluxo de auth. Reativar se necessário. */}
+    {/* <SocialLoginButton provider="twitter" mode={mode} disabled={disabled} /> */}
+    {/* <PhoneLoginButton disabled={disabled} /> */}
   </div>
 );
 
