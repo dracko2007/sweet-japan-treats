@@ -9,18 +9,22 @@ import { psFeeWaiver } from '@/utils/psFeeWaiver';
 import { safeStorage } from '@/utils/storage';
 import type { CartItem } from '@/types';
 
-const SESSION_KEY = 'exit_popup_shown';        // 1× por sessão (sessionStorage → some ao fechar a aba)
+const MARKETING_KEY = 'exit_popup_shown';      // oferta/guia/retenção simples — 1× por sessão
+const WARN_KEY = 'exit_waiver_warn_shown';     // aviso de perda da isenção — 1× por sessão
 const GUIDE_COOLDOWN_KEY = 'exit_intent_shown_at';
 const GUIDE_COOLDOWN_DAYS = 14;
 const MIN_TIME_ON_PAGE_MS = 6000;
 
-type Variant = 'retention' | 'ps_offer' | 'guide';
+// Funil de checkout = /checkout + /order-review (revisão/pagamento).
+const inFunnel = (p: string): boolean => p.startsWith('/checkout') || p.startsWith('/order-review');
 
-const sessionShown = (): boolean => {
-  try { return sessionStorage.getItem(SESSION_KEY) === '1'; } catch { return false; }
+type Variant = 'retention' | 'waiver_warning' | 'ps_offer' | 'guide';
+
+const flagGet = (k: string): boolean => {
+  try { return sessionStorage.getItem(k) === '1'; } catch { return false; }
 };
-const markSessionShown = (): void => {
-  try { sessionStorage.setItem(SESSION_KEY, '1'); } catch { /* noop */ }
+const flagSet = (k: string): void => {
+  try { sessionStorage.setItem(k, '1'); } catch { /* noop */ }
 };
 
 // Quantidade de itens que pagam taxa PS (¥1.000/un): exclui brindes e isentos (noPsFee).
@@ -87,16 +91,14 @@ const ExitIntentPopup: React.FC = () => {
   pathRef.current = location.pathname;
   authRef.current = isAuthenticated;
 
-  // Uma vez disparado/fechado nesta sessão, não dispara de novo.
-  const dismissedRef = useRef(false);
+  // Evita abrir um segundo popup enquanto um já está aberto.
+  const openRef = useRef(false);
+  openRef.current = open;
 
   // Decide qual popup mostrar no momento da saída (lê dados frescos via refs).
   const resolveVariant = useCallback((): Variant | null => {
-    // Funil de checkout = /checkout + /order-review (revisão/pagamento).
-    const path = pathRef.current;
-    const onCheckout = path.startsWith('/checkout') || path.startsWith('/order-review');
     const list = itemsRef.current;
-    if (onCheckout) return list.length > 0 ? 'retention' : null; // ponto 1
+    if (inFunnel(pathRef.current)) return list.length > 0 ? 'retention' : null; // ponto 1
     if (psFeeQtyOf(list) > 0) return 'ps_offer';                 // ponto 2
     // Fallback: guia por e-mail (lead) — só visitante não logado e fora do cooldown.
     if (authRef.current) return null;
@@ -106,18 +108,25 @@ const ExitIntentPopup: React.FC = () => {
   }, []);
 
   const trigger = useCallback(() => {
-    if (dismissedRef.current || sessionShown()) return;
-    const v = resolveVariant();
+    if (openRef.current) return;                 // já há um popup aberto
+    let v = resolveVariant();
     if (!v) return;
-    dismissedRef.current = true;     // trava nesta sessão — nunca reabre
-    markSessionShown();
-    if (v === 'guide') safeStorage.setItem(GUIDE_COOLDOWN_KEY, String(Date.now()));
+    // No checkout com isenção ativa, o lembrete vira AVISO de perda da isenção.
+    if (v === 'retention' && psFeeWaiver.isActive()) v = 'waiver_warning';
+
+    if (v === 'waiver_warning') {
+      if (flagGet(WARN_KEY)) return;             // aviso 1× por sessão (chave própria)
+      flagSet(WARN_KEY);
+    } else {
+      if (flagGet(MARKETING_KEY)) return;        // oferta/guia/retenção 1× por sessão
+      flagSet(MARKETING_KEY);
+      if (v === 'guide') safeStorage.setItem(GUIDE_COOLDOWN_KEY, String(Date.now()));
+    }
     setVariant(v);
     setOpen(true);
   }, [resolveVariant]);
 
   useEffect(() => {
-    if (sessionShown()) { dismissedRef.current = true; return; }
     const start = Date.now();
 
     const onMouseOut = (e: MouseEvent) => {
@@ -144,9 +153,17 @@ const ExitIntentPopup: React.FC = () => {
     };
   }, [trigger]);
 
+  // Sair do funil de checkout sem finalizar invalida a isenção: ela vale só para
+  // fechamento imediato. Progredir /checkout → /order-review NÃO invalida.
+  const prevPathRef = useRef(location.pathname);
+  useEffect(() => {
+    const prev = prevPathRef.current;
+    const cur = location.pathname;
+    if (inFunnel(prev) && !inFunnel(cur)) psFeeWaiver.clear();
+    prevPathRef.current = cur;
+  }, [location.pathname]);
+
   const close = useCallback(() => {
-    dismissedRef.current = true;
-    markSessionShown();
     setOpen(false);
   }, []);
 
@@ -199,6 +216,32 @@ const ExitIntentPopup: React.FC = () => {
     );
   }
 
+  // ----- Aviso: sair do checkout invalida a isenção já aceita -----
+  if (variant === 'waiver_warning') {
+    return (
+      <Shell label="Isenção válida só para finalização imediata" onClose={close}>
+        <div className="bg-gradient-to-br from-pink-600 to-amber-500 p-6 text-center text-white">
+          <Gift className="w-10 h-10 mx-auto mb-2" />
+          <h2 className="text-xl font-black leading-tight">Sua isenção vale só agora!</h2>
+          <p className="text-sm text-white/90 mt-1">
+            A <strong>Taxa de Personal Shopper</strong>{psFeeYen > 0 && <> de <strong>¥ {psFeeYen.toLocaleString()}</strong></>} está
+            isenta <strong>apenas para fechamento imediato</strong>. Se sair desta página agora,
+            a isenção perde a validade e a taxa volta a ser cobrada.
+          </p>
+        </div>
+        <div className="p-6 space-y-3">
+          <button
+            onClick={close}
+            className="w-full bg-gradient-to-r from-pink-600 to-amber-500 text-white font-bold py-3 rounded-xl hover:opacity-90 transition-opacity"
+          >
+            Voltar e finalizar agora
+          </button>
+          <p className="text-[11px] text-center text-gray-400">Conclua o pedido para garantir a isenção.</p>
+        </div>
+      </Shell>
+    );
+  }
+
   // ----- Ponto 2: oferta de isenção da taxa PS fora do checkout -----
   if (variant === 'ps_offer') {
     return (
@@ -207,8 +250,8 @@ const ExitIntentPopup: React.FC = () => {
           <Gift className="w-10 h-10 mx-auto mb-2" />
           <h2 className="text-xl font-black leading-tight">Finalize agora e a taxa sai de graça!</h2>
           <p className="text-sm text-white/90 mt-1">
-            Conclua seu pedido nesta visita e nós <strong>isentamos a Taxa de Personal Shopper</strong>
-            {psFeeYen > 0 && <> de <strong>¥ {psFeeYen.toLocaleString()}</strong></>}.
+            Conclua seu pedido <strong>agora, nesta visita</strong>, e nós <strong>isentamos a Taxa de
+            Personal Shopper</strong>{psFeeYen > 0 && <> de <strong>¥ {psFeeYen.toLocaleString()}</strong></>}.
           </p>
         </div>
         <div className="p-6 space-y-3">
@@ -224,7 +267,9 @@ const ExitIntentPopup: React.FC = () => {
           >
             Agora não
           </button>
-          <p className="text-[11px] text-center text-gray-400">Oferta válida apenas nesta visita.</p>
+          <p className="text-[11px] text-center text-gray-400">
+            Isenção válida só para fechamento imediato — ao sair da página, ela perde a validade.
+          </p>
         </div>
       </Shell>
     );

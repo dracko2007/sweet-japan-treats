@@ -1262,6 +1262,11 @@ const Checkout: React.FC = () => {
                             </span>
                           )}
                         </div>
+                        {psFeeWaived && (
+                          <p className="text-[10px] text-amber-600 dark:text-amber-500 mt-1 leading-snug">
+                            Isenção válida só para finalização imediata — se sair da página, a taxa volta a ser cobrada.
+                          </p>
+                        )}
                         {/* Negociar frete (aparece só depois de selecionar frete e sem negociação ativa) */}
                         {selectedShipping && !activeNeg && (
                           <div className="flex items-center justify-between mt-2 pt-1 border-t border-border/40">
