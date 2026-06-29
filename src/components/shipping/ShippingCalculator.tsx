@@ -39,6 +39,9 @@ const ShippingCalculator: React.FC<ShippingCalculatorProps> = ({
 
   const spaceInfo = getSpaceUsed();
 
+  // Check if there are Custom Request items (Faça seu Pedido) in the cart
+  const hasCustomRequest = items.some(item => item.product?.id?.includes('custom') || item.product?.category === 'custom-request');
+
   const isJapan = destinationCountry === 'Japão';
   const isEurope = ['Portugal', 'França', 'Itália', 'Espanha'].includes(destinationCountry || '');
   const jpZone: JapanPostZone = countryToZone(destinationCountry || 'Brasil');
@@ -124,7 +127,7 @@ const ShippingCalculator: React.FC<ShippingCalculatorProps> = ({
       if (eLightYen) options.push({
         carrier: 'eraito',
         name: 'Japan Post E-Light · 国際eパケットライト',
-        logo: '✉️',
+        logo: '📦',
         cost: fxConvert(eLightYen, currency),
         costYen: eLightYen,
         originalCost: undefined,
@@ -167,18 +170,20 @@ const ShippingCalculator: React.FC<ShippingCalculatorProps> = ({
       isConsultar: true,
     });
 
-    // A combinar — frete calculado após pesagem real
-    options.push({
-      carrier: 'a-combinar',
-      name: 'A Combinar · 要相談',
-      logo: '⚖️',
-      cost: 0,
-      costYen: null,
-      originalCost: undefined,
-      estimatedDays: 'A definir',
-      isConsultar: true,
-      isCombinar: true,
-    } as any);
+    // A combinar — frete calculado após pesagem real (only for custom requests)
+    if (hasCustomRequest) {
+      options.push({
+        carrier: 'a-combinar',
+        name: 'A Combinar · 要相談 (Apenas para encomendas fora do site)',
+        logo: '⚖️',
+        cost: 0,
+        costYen: null,
+        originalCost: undefined,
+        estimatedDays: 'A definir',
+        isConsultar: true,
+        isCombinar: true,
+      } as any);
+    }
 
     return options.sort((a, b) => {
       if ((a as any).isCombinar) return 1;
