@@ -11,12 +11,22 @@
  */
 
 import { db } from '@/config/firebase';
+import { ADMIN_EMAIL, ADMIN_USER_ID } from '@/config/admin';
 import {
   doc, setDoc, increment,
   collection, query, orderBy, limit, getDocs,
 } from 'firebase/firestore';
 
 const SESSION_KEY = 'je_visitor_tracked';
+
+function isAdminLoggedIn(): boolean {
+  try {
+    const raw = localStorage.getItem('user');
+    if (!raw) return false;
+    const u = JSON.parse(raw);
+    return u?.id === ADMIN_USER_ID || u?.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+  } catch { return false; }
+}
 
 // Páginas conhecidas (slug → label legível)
 const PAGE_LABELS: Record<string, string> = {
@@ -74,9 +84,12 @@ export const visitorService = {
   /**
    * Registra uma visita (uma vez por sessão do browser).
    * Chamado no App.tsx na montagem inicial.
+   * Não rastreia visitas do admin.
    */
   async trackVisit(): Promise<void> {
     if (!db) return;
+    // Não rastreia visitas do admin
+    if (isAdminLoggedIn()) return;
     // Só rastreia uma vez por sessão (não por página)
     if (sessionStorage.getItem(SESSION_KEY)) return;
     sessionStorage.setItem(SESSION_KEY, '1');
@@ -122,8 +135,8 @@ export const visitorService = {
    */
   async trackPage(pathname: string): Promise<void> {
     if (!db) return;
-    // Ignora rotas de admin e autenticação
-    if (pathname.startsWith('/admin') || pathname.startsWith('/login')) return;
+    // Ignora rotas de admin e autenticação, e não rastreia o admin
+    if (pathname.startsWith('/admin') || pathname.startsWith('/login') || isAdminLoggedIn()) return;
     try {
       const slug = pathname.startsWith('/produto/') ? '/produto/:id' : pathname;
       const label = PAGE_LABELS[slug] || slug;
@@ -139,6 +152,8 @@ export const visitorService = {
    */
   async trackProduct(productId: string, productName: string): Promise<void> {
     if (!db) return;
+    // Não rastreia visualizações do admin
+    if (isAdminLoggedIn()) return;
     try {
       const ref = doc(db, 'analytics_products', productId);
       await setDoc(ref, {
