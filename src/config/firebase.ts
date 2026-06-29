@@ -1,4 +1,5 @@
 // Firebase Configuration and Initialization
+// Google OAuth: OAuth Client ID configured in Google Cloud Console with Vercel URIs
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
