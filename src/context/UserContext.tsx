@@ -991,17 +991,29 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     if (code.includes('popup-closed-by-user') || code.includes('cancelled-popup-request') || code.includes('cancel-popup-request')) {
       return 'Login cancelado.';
     }
+    if (code.includes('popup-blocked')) {
+      return 'Seu navegador bloqueou a janela de login. Libere os popups para este site e tente novamente.';
+    }
     if (code.includes('account-exists-with-different-credential')) {
       return 'Já existe uma conta com este e-mail usando outro método de login. Entre por aquele método.';
     }
     if (code.includes('operation-not-allowed')) {
-      return 'Este método de login ainda não está ativado no Firebase.';
+      return 'Este método de login ainda não está ativado no Firebase (Authentication > Sign-in method).';
     }
     if (code.includes('unauthorized-domain')) {
       const host = typeof window !== 'undefined' ? window.location.hostname : 'seu domínio';
       return `Domínio não autorizado no Firebase. Adicione ${host} em Authentication > Settings > Authorized domains.`;
     }
-    return 'Não foi possível entrar. Tente novamente.';
+    if (code.includes('network-request-failed')) {
+      return 'Falha de conexão. Verifique sua internet (se estiver usando VPN, tente desativá-la) e tente novamente.';
+    }
+    if (code.includes('configuration-not-found') || code.includes('internal-error') || code.includes('invalid-credential')) {
+      return 'Este provedor não está configurado corretamente no Firebase (faltam App ID/segredo do provedor).';
+    }
+    // Fallback: expõe o código real para facilitar o diagnóstico em produção.
+    return code
+      ? `Não foi possível entrar (${code}). Tente novamente.`
+      : 'Não foi possível entrar. Tente novamente.';
   };
 
   // Login social genérico (Google, Facebook, Apple, Twitter/X). Provedores

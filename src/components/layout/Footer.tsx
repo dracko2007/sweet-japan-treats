@@ -4,8 +4,10 @@ import { Instagram, Facebook, Mail, MapPin, MessageCircle, Smartphone, Twitter }
 import { usePWAInstall } from '@/hooks/usePWAInstall';
 
 const WHATSAPP_NUMBER = '817013671679'; // +81 70-1367-1679
-const TIKTOK_URL = 'https://www.tiktok.com/@japan_express_oficial';
-const X_URL = 'https://x.com/japanexpress_br';
+const INSTAGRAM_URL = 'https://www.instagram.com/japan_express_oficial/';
+const FACEBOOK_URL = 'https://www.facebook.com/japanexpressoficial';
+const TIKTOK_URL = 'https://www.tiktok.com/@japanexpressoficial';
+const X_URL = 'https://x.com/japanexpress_of';
 const WHATSAPP_LINK = `https://wa.me/${WHATSAPP_NUMBER}`;
 const CONTACT_EMAIL = 'contato@japanexpress-store.com';
 import { useLanguage } from '@/context/LanguageContext';
@@ -40,7 +42,7 @@ const Footer: React.FC = () => {
             </p>
             <div className="flex items-center gap-4 mt-6">
               <a
-                href="https://www.instagram.com/japan_express_oficial/"
+                href={INSTAGRAM_URL}
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label="Instagram @japan_express_oficial"
@@ -48,14 +50,20 @@ const Footer: React.FC = () => {
               >
                 <Instagram className="w-5 h-5" />
               </a>
-              <a href="#" className="p-2 rounded-full bg-primary/20 hover:bg-primary/30 transition-colors">
+              <a
+                href={FACEBOOK_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Facebook japanexpressoficial"
+                className="p-2 rounded-full bg-primary/20 hover:bg-primary/30 transition-colors"
+              >
                 <Facebook className="w-5 h-5" />
               </a>
               <a
                 href={TIKTOK_URL}
                 target="_blank"
                 rel="noopener noreferrer"
-                aria-label="TikTok @japan_express_oficial"
+                aria-label="TikTok @japanexpressoficial"
                 className="p-2 rounded-full bg-primary/20 hover:bg-primary/30 transition-colors"
               >
                 <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
@@ -66,7 +74,7 @@ const Footer: React.FC = () => {
                 href={X_URL}
                 target="_blank"
                 rel="noopener noreferrer"
-                aria-label="X (Twitter) @japanexpress_br"
+                aria-label="X (Twitter) @japanexpress_of"
                 className="p-2 rounded-full bg-primary/20 hover:bg-primary/30 transition-colors"
               >
                 <Twitter className="w-5 h-5" />

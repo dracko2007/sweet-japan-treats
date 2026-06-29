@@ -11,7 +11,8 @@ const MIN_TIME_ON_PAGE_MS = 6000;
 
 /**
  * Captura de e-mail de visitantes que vão embora sem comprar (exit-intent).
- * Isca: "Guia: como importar do Japão sem pagar taxa". Dispara ao detectar a
+ * Isca: "Guia: importe do Japão sem surpresas" (transparência de custos/alfândega,
+ * sem prometer isenção de imposto que não depende de nós). Dispara ao detectar a
  * intenção de saída (mouse sai pelo topo no desktop / tempo + scroll no mobile).
  * Não aparece para usuários logados nem repete por 14 dias.
  */
@@ -106,10 +107,10 @@ const ExitIntentPopup: React.FC = () => {
         <div className="bg-gradient-to-br from-pink-600 to-amber-500 p-6 text-center text-white">
           <Download className="w-10 h-10 mx-auto mb-2" />
           <h2 className="text-xl font-black leading-tight">
-            Guia Grátis: Importar do Japão sem pagar taxa
+            Guia Grátis: Importe do Japão sem surpresas
           </h2>
           <p className="text-sm text-white/90 mt-1">
-            O passo a passo para receber seus produtos pagando menos imposto. Deixe seu e-mail e receba agora.
+            O passo a passo para comprar com tranquilidade — sabendo exatamente quanto vai pagar e sem sustos na alfândega. Deixe seu e-mail e receba agora.
           </p>
         </div>
 
