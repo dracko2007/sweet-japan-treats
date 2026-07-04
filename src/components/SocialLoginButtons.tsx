@@ -10,15 +10,22 @@ import PhoneLoginButton from './PhoneLoginButton';
 const SocialLoginButtons: React.FC<{ disabled?: boolean; mode?: 'login' | 'register' }> = ({
   disabled = false,
   mode = 'login',
-}) => (
-  <div className="space-y-3">
-    <SocialLoginButton provider="google" mode={mode} disabled={disabled} />
-    {/* Facebook oculto até o app ser finalizado/aprovado no Meta. Reativar removendo o comentário. */}
-    {/* <SocialLoginButton provider="facebook" mode={mode} disabled={disabled} /> */}
-    {/* Twitter/X e SMS desabilitados para simplificar fluxo de auth. Reativar se necessário. */}
-    {/* <SocialLoginButton provider="twitter" mode={mode} disabled={disabled} /> */}
-    {/* <PhoneLoginButton disabled={disabled} /> */}
-  </div>
-);
+}) => {
+  // All social providers disabled temporarily — email/password login only
+  const disableSocial = true;
+
+  if (disableSocial) {
+    return null; // Hide entire section
+  }
+
+  return (
+    <div className="space-y-3">
+      <SocialLoginButton provider="google" mode={mode} disabled={disabled} />
+      <SocialLoginButton provider="facebook" mode={mode} disabled={disabled} />
+      <SocialLoginButton provider="twitter" mode={mode} disabled={disabled} />
+      <PhoneLoginButton disabled={disabled} />
+    </div>
+  );
+};
 
 export default SocialLoginButtons;

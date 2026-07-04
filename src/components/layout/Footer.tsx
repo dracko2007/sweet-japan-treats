@@ -4,7 +4,7 @@ import { Instagram, Facebook, Mail, MapPin, MessageCircle, Smartphone, Twitter }
 import { usePWAInstall } from '@/hooks/usePWAInstall';
 
 const WHATSAPP_NUMBER = '817013671679'; // +81 70-1367-1679
-const INSTAGRAM_URL = 'https://www.instagram.com/japan_express_oficial/';
+const INSTAGRAM_URL = 'https://www.instagram.com/japan_express_official/';
 const FACEBOOK_URL = 'https://www.facebook.com/japanexpressoficial';
 const TIKTOK_URL = 'https://www.tiktok.com/@japanexpressoficial';
 const X_URL = 'https://x.com/japanexpress_of';
@@ -45,7 +45,7 @@ const Footer: React.FC = () => {
                 href={INSTAGRAM_URL}
                 target="_blank"
                 rel="noopener noreferrer"
-                aria-label="Instagram @japan_express_oficial"
+                aria-label="Instagram @japan_express_official"
                 className="p-2 rounded-full bg-primary/20 hover:bg-primary/30 transition-colors"
               >
                 <Instagram className="w-5 h-5" />
