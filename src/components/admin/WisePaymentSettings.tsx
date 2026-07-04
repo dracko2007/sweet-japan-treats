@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Loader2, Save, Wallet, Landmark, Phone } from 'lucide-react';
+import { Loader2, Save, Wallet, Landmark, Phone, CreditCard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { paymentSettingsService, PaymentSettings } from '@/services/paymentSettingsService';
 import { useToast } from '@/hooks/use-toast';
@@ -28,6 +28,8 @@ const WisePaymentSettings: React.FC = () => {
         pixKey: settings.pixKey.trim(),
         pixReceiverName: settings.pixReceiverName.trim() || 'Japan Express',
         pixCity: settings.pixCity.trim() || 'Sao Paulo',
+        pixEnabled: settings.pixEnabled,
+        cardEnabled: settings.cardEnabled,
         yuchoKigo: settings.yuchoKigo.trim(),
         yuchoNumber: settings.yuchoNumber.trim(),
         yuchoName: settings.yuchoName.trim(),
@@ -112,6 +114,37 @@ const WisePaymentSettings: React.FC = () => {
         <p className="text-[11px] text-muted-foreground">
           O nome e a cidade devem ser os mesmos cadastrados na sua conta do banco/PIX.
         </p>
+        <label className="flex items-center gap-2 text-sm cursor-pointer select-none pt-1">
+          <input
+            type="checkbox"
+            checked={settings.pixEnabled}
+            onChange={(e) => setSettings({ ...settings, pixEnabled: e.target.checked })}
+            className="w-4 h-4 rounded border-input text-primary"
+          />
+          Mostrar a opção <strong>PIX</strong> no checkout (senão aparece "Em manutenção")
+        </label>
+      </div>
+
+      {/* Seção Cartão de Crédito (Stripe) */}
+      <div className="mt-5 pt-5 border-t border-border space-y-2">
+        <div className="flex items-center gap-2 mb-1">
+          <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center">
+            <CreditCard className="w-4 h-4 text-indigo-600" />
+          </div>
+          <div>
+            <p className="font-semibold text-foreground text-sm">Cartão de Crédito (Stripe)</p>
+            <p className="text-xs text-muted-foreground">Requer as chaves do Stripe configuradas no servidor (STRIPE_SECRET_KEY / VITE_STRIPE_PUBLISHABLE_KEY).</p>
+          </div>
+        </div>
+        <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={settings.cardEnabled}
+            onChange={(e) => setSettings({ ...settings, cardEnabled: e.target.checked })}
+            className="w-4 h-4 rounded border-input text-primary"
+          />
+          Mostrar a opção <strong>Cartão</strong> no checkout (senão aparece "Em manutenção")
+        </label>
       </div>
 
       {/* Seção Japão — Yucho Bank e Telefone */}

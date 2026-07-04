@@ -5,8 +5,6 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { CheckCircle, Home, Mail, Printer, Copy, AlertCircle, Smartphone, CreditCard, FileText, Landmark, Wallet, ExternalLink } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { QRCodeSVG } from 'qrcode.react';
 import { formatPrice } from '@/utils/currency';
@@ -23,8 +21,6 @@ const OrderConfirmation: React.FC = () => {
   const [showGuestModal, setShowGuestModal] = useState(isGuest);
 
   const [copied, setCopied] = useState(false);
-  const [cardData, setCardData] = useState({ number: '', name: '', expiry: '', cvv: '' });
-  const [cardStatus, setCardStatus] = useState<'idle' | 'processing' | 'success'>('idle');
   const [wiseLink, setWiseLink] = useState('');
   const [pixSettings, setPixSettings] = useState({ pixKey: '', pixReceiverName: 'Japan Express', pixCity: 'Sao Paulo' });
 
@@ -72,14 +68,6 @@ const OrderConfirmation: React.FC = () => {
     setTimeout(() => setCopied(false), 3000);
   };
 
-  // Cartão ainda não integrado — não confirma pagamento automaticamente.
-  const handleCardPay = (e: React.FormEvent) => {
-    e.preventDefault();
-    toast({
-      title: "Cartão em breve",
-      description: "O pagamento com cartão ainda não está disponível. Use o PIX por enquanto.",
-    });
-  };
 
   const handlePrint = () => {
     window.print();
@@ -103,7 +91,9 @@ const OrderConfirmation: React.FC = () => {
                 {t('order.id')}: <span className="font-mono font-semibold text-gray-900">{order.orderNumber || order.id}</span>
               </p>
               <p className="text-muted-foreground text-sm">
-                {t('order.thanks')}
+                {order.paymentMethod === 'card'
+                  ? 'Pagamento com cartão aprovado! Seu pedido já entrou em preparo.'
+                  : t('order.thanks')}
               </p>
             </div>
 
@@ -264,99 +254,28 @@ const OrderConfirmation: React.FC = () => {
               </div>
             )}
 
-            {/* CREDIT CARD SCREEN */}
+            {/* CREDIT CARD — pagamento já confirmado pelo Stripe antes de chegar nesta tela */}
             {order.paymentMethod === 'card' && (
               <div className="bg-white rounded-3xl border-2 border-pink-500 p-6 mb-8 shadow-md print:hidden space-y-4">
                 <div className="flex items-center gap-2 text-pink-600 font-extrabold text-lg justify-center">
                   <CreditCard className="w-6 h-6" />
                   <span>PAGAMENTO VIA CARTÃO DE CRÉDITO</span>
                 </div>
-
-                {cardStatus === 'idle' && (
-                  <form onSubmit={handleCardPay} className="space-y-4 max-w-md mx-auto pt-2">
-                    <div className="space-y-1">
-                      <Label htmlFor="cardNumber" className="text-xs font-bold text-gray-500">Número do Cartão *</Label>
-                      <Input
-                        id="cardNumber"
-                        type="text"
-                        placeholder="4512 3456 7890 1234"
-                        required
-                        value={cardData.number}
-                        onChange={(e) => {
-                          const val = e.target.value.replace(/\D/g, '').slice(0, 16);
-                          const formatted = val.replace(/(.{4})/g, '$1 ').trim();
-                          setCardData(prev => ({ ...prev, number: formatted }));
-                        }}
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label htmlFor="cardName" className="text-xs font-bold text-gray-500">Nome do Titular *</Label>
-                      <Input
-                        id="cardName"
-                        type="text"
-                        placeholder="Nome como impresso no cartão"
-                        required
-                        value={cardData.name}
-                        onChange={(e) => setCardData(prev => ({ ...prev, name: e.target.value.toUpperCase() }))}
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-1">
-                        <Label htmlFor="cardExpiry" className="text-xs font-bold text-gray-500">Validade *</Label>
-                        <Input
-                          id="cardExpiry"
-                          type="text"
-                          placeholder="MM/AA"
-                          required
-                          value={cardData.expiry}
-                          onChange={(e) => {
-                            const val = e.target.value.replace(/\D/g, '').slice(0, 4);
-                            const formatted = val.length > 2 ? `${val.slice(0, 2)}/${val.slice(2, 4)}` : val;
-                            setCardData(prev => ({ ...prev, expiry: formatted }));
-                          }}
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <Label htmlFor="cardCvv" className="text-xs font-bold text-gray-500">CVV *</Label>
-                        <Input
-                          id="cardCvv"
-                          type="password"
-                          placeholder="123"
-                          maxLength={3}
-                          required
-                          value={cardData.cvv}
-                          onChange={(e) => setCardData(prev => ({ ...prev, cvv: e.target.value.replace(/\D/g, '') }))}
-                        />
-                      </div>
-                    </div>
-                    
-                    <button
-                      type="submit"
-                      className="w-full bg-pink-500 hover:bg-pink-600 text-white font-bold py-3 px-6 rounded-xl transition-all shadow-md active:scale-95"
-                    >
-                      Pagar R$ {order.total.toFixed(2)}
-                    </button>
-                  </form>
-                )}
-
-                {cardStatus === 'processing' && (
-                  <div className="py-8 text-center space-y-3">
-                    <div className="animate-spin rounded-full h-12 w-12 border-4 border-pink-500 border-t-transparent mx-auto"></div>
-                    <p className="text-sm font-bold text-pink-600">Aprovando transação com a operadora do cartão...</p>
+                <div className="bg-green-50 border border-green-200 rounded-2xl p-6 text-center space-y-3">
+                  <div className="w-12 h-12 rounded-full bg-green-500 flex items-center justify-center text-white mx-auto">
+                    ✓
                   </div>
-                )}
-
-                {cardStatus === 'success' && (
-                  <div className="bg-green-50 border border-green-200 rounded-2xl p-6 text-center space-y-3 animate-fade-in">
-                    <div className="w-12 h-12 rounded-full bg-green-500 flex items-center justify-center text-white mx-auto">
-                      ✓
-                    </div>
-                    <h3 className="font-sans font-bold text-lg text-green-800">Transação de Cartão Aprovada!</h3>
-                    <p className="text-xs text-green-700 max-w-sm mx-auto leading-relaxed">
-                      Seu pagamento foi confirmado com sucesso. O pedido foi enviado para separação no porto logístico de Tóquio. Rastreamento {order.country === 'Brasil' ? 'dos Correios' : 'Postal'}: <strong>{order.trackingCode}</strong>.
-                    </p>
-                  </div>
-                )}
+                  <h3 className="font-sans font-bold text-lg text-green-800">Transação de Cartão Aprovada!</h3>
+                  <p className="text-xs text-green-700 max-w-sm mx-auto leading-relaxed">
+                    Seu pagamento foi confirmado com sucesso. O pedido foi enviado para separação no porto logístico de Tóquio.
+                  </p>
+                  <button
+                    onClick={() => navigate('/rastrear')}
+                    className="text-xs font-bold text-green-800 underline hover:no-underline"
+                  >
+                    Acompanhar meu pedido →
+                  </button>
+                </div>
               </div>
             )}
 
@@ -458,7 +377,7 @@ const OrderConfirmation: React.FC = () => {
 
                 {/* Tracking Details — só aparece quando há código de rastreio */}
                 {order.trackingCode && (
-                <div className="bg-pink-50 border border-pink-200 rounded-xl p-4 flex flex-col md:flex-row justify-between gap-3 text-xs md:text-sm">
+                <div className="bg-pink-50 border border-pink-200 rounded-xl p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 text-xs md:text-sm">
                   <div>
                     <span className="text-muted-foreground block">
                       {order.currency === 'JPY'
@@ -467,7 +386,12 @@ const OrderConfirmation: React.FC = () => {
                           ? t('order.tracking.air.br')
                           : t('order.tracking.air.intl')}
                     </span>
-                    <span className="font-mono font-bold text-gray-800 text-base">{order.trackingCode}</span>
+                    <button
+                      onClick={() => navigate('/rastrear')}
+                      className="font-bold text-pink-700 underline hover:no-underline text-base"
+                    >
+                      Acompanhar meu pedido →
+                    </button>
                   </div>
                   <div className="text-right">
                     <span className="text-muted-foreground block">{t('order.logisticStatus')}</span>

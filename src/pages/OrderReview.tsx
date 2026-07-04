@@ -32,6 +32,7 @@ import { referralService } from '@/services/referralService';
 import { calcBrazilTax, calcImportTax } from '@/utils/taxRules';
 import { cpfGuardService, normalizeCPF } from '@/services/cpfGuardService';
 import { thermalPrintService } from '@/services/thermalPrintService';
+import StripeCardForm from '@/components/checkout/StripeCardForm';
 import { db } from '@/config/firebase';
 import { doc, getDoc, setDoc, updateDoc, increment } from 'firebase/firestore';
 
@@ -74,6 +75,7 @@ const OrderReview: React.FC = () => {
   const [paySettings, setPaySettings] = useState<import('@/services/paymentSettingsService').PaymentSettings>({
     wiseLink: '', wiseEnabled: false,
     pixKey: '', pixReceiverName: 'Japan Express', pixCity: 'Sao Paulo',
+    pixEnabled: false, cardEnabled: true,
     yuchoKigo: '', yuchoNumber: '', yuchoName: '', contactPhone: '',
   });
 
@@ -83,7 +85,17 @@ const OrderReview: React.FC = () => {
   const [pixCopied, setPixCopied] = useState(false);
 
   useEffect(() => {
-    paymentSettingsService.get().then(setPaySettings);
+    paymentSettingsService.get().then((s) => {
+      setPaySettings(s);
+      // Se o método pré-selecionado (Wise, por padrão) estiver desativado,
+      // troca automaticamente para o primeiro disponível.
+      setPaymentMethod((current) => {
+        if (formData?.country === 'Japão') return current;
+        const enabledByMethod: Record<string, boolean> = { wise: s.wiseEnabled, pix: s.pixEnabled, card: s.cardEnabled };
+        if (enabledByMethod[current]) return current;
+        return (['wise', 'pix', 'card'] as const).find((m) => enabledByMethod[m]) || current;
+      });
+    });
   }, []);
 
   // Redirect if no form data or shipping
@@ -1002,6 +1014,7 @@ const OrderReview: React.FC = () => {
                   ) : (
                     <>
                       {/* Wise Option (transferência internacional) — principal */}
+                      {paySettings.wiseEnabled ? (
                       <div className={cn(
                         "flex items-start space-x-3 p-4 rounded-xl border-2 transition-all cursor-pointer",
                         paymentMethod === 'wise' ? "border-emerald-500 bg-emerald-50/50" : "border-border hover:border-gray-300"
@@ -1044,36 +1057,87 @@ const OrderReview: React.FC = () => {
                           )}
                         </Label>
                       </div>
+                      ) : (
+                        <div className="flex items-start space-x-3 p-4 rounded-xl border-2 border-border opacity-60 cursor-not-allowed">
+                          <RadioGroupItem value="wise" id="wise" className="mt-1" disabled />
+                          <Label htmlFor="wise" className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <Wallet className="w-5 h-5 text-gray-400" />
+                              <span className="font-bold text-base text-gray-600">Wise (Transferência Internacional)</span>
+                              <span className="text-[10px] bg-gray-400 text-white font-extrabold px-2 py-0.5 rounded-full uppercase">Em manutenção</span>
+                            </div>
+                            <p className="text-xs text-muted-foreground leading-relaxed">
+                              Pagamento via Wise em manutenção. Volta em breve!
+                            </p>
+                          </Label>
+                        </div>
+                      )}
 
-                      {/* PIX Option — desativado, em breve */}
-                      <div className="flex items-start space-x-3 p-4 rounded-xl border-2 border-border opacity-60 cursor-not-allowed">
-                        <RadioGroupItem value="pix" id="pix" className="mt-1" disabled />
-                        <Label htmlFor="pix" className="flex-1">
+                      {/* PIX Option */}
+                      {paySettings.pixEnabled ? (
+                      <div className={cn(
+                        "flex items-start space-x-3 p-4 rounded-xl border-2 transition-all cursor-pointer",
+                        paymentMethod === 'pix' ? "border-pink-500 bg-pink-50/50" : "border-border hover:border-gray-300"
+                      )}>
+                        <RadioGroupItem value="pix" id="pix" className="mt-1" />
+                        <Label htmlFor="pix" className="flex-1 cursor-pointer">
                           <div className="flex items-center gap-2 mb-1">
-                            <Smartphone className="w-5 h-5 text-gray-400" />
-                            <span className="font-bold text-base text-gray-600">PIX</span>
-                            <span className="text-[10px] bg-gray-400 text-white font-extrabold px-2 py-0.5 rounded-full uppercase">Em breve</span>
+                            <Smartphone className="w-5 h-5 text-pink-600" />
+                            <span className="font-bold text-base text-gray-800">PIX</span>
                           </div>
                           <p className="text-xs text-muted-foreground leading-relaxed">
-                            Pagamento via PIX estará disponível em breve. Por enquanto, use o Wise.
+                            Pague via PIX com QR Code ou Copia e Cola — mostraremos na próxima tela.
                           </p>
                         </Label>
                       </div>
+                      ) : (
+                        <div className="flex items-start space-x-3 p-4 rounded-xl border-2 border-border opacity-60 cursor-not-allowed">
+                          <RadioGroupItem value="pix" id="pix" className="mt-1" disabled />
+                          <Label htmlFor="pix" className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <Smartphone className="w-5 h-5 text-gray-400" />
+                              <span className="font-bold text-base text-gray-600">PIX</span>
+                              <span className="text-[10px] bg-gray-400 text-white font-extrabold px-2 py-0.5 rounded-full uppercase">Em manutenção</span>
+                            </div>
+                            <p className="text-xs text-muted-foreground leading-relaxed">
+                              Pagamento via PIX em manutenção. Volta em breve!
+                            </p>
+                          </Label>
+                        </div>
+                      )}
 
-                      {/* Credit Card Option — desativado por enquanto */}
-                      <div className="flex items-start space-x-3 p-4 rounded-xl border-2 border-border opacity-60 cursor-not-allowed">
-                        <RadioGroupItem value="card" id="card" className="mt-1" disabled />
-                        <Label htmlFor="card" className="flex-1">
+                      {/* Credit Card Option (Stripe) */}
+                      {paySettings.cardEnabled ? (
+                      <div className={cn(
+                        "flex items-start space-x-3 p-4 rounded-xl border-2 transition-all cursor-pointer",
+                        paymentMethod === 'card' ? "border-indigo-500 bg-indigo-50/50" : "border-border hover:border-gray-300"
+                      )}>
+                        <RadioGroupItem value="card" id="card" className="mt-1" />
+                        <Label htmlFor="card" className="flex-1 cursor-pointer">
                           <div className="flex items-center gap-2 mb-1">
-                            <CreditCard className="w-5 h-5 text-gray-400" />
-                            <span className="font-bold text-base text-gray-600">Cartão de Crédito</span>
-                            <span className="text-[10px] bg-gray-400 text-white font-extrabold px-2 py-0.5 rounded-full uppercase">Em breve</span>
+                            <CreditCard className="w-5 h-5 text-indigo-600" />
+                            <span className="font-bold text-base text-gray-800">Cartão de Crédito</span>
                           </div>
                           <p className="text-xs text-muted-foreground leading-relaxed">
-                            Pagamento com cartão estará disponível em breve. Por enquanto, use o Wise.
+                            Pague com cartão de crédito de forma segura via Stripe. Confirmação instantânea.
                           </p>
                         </Label>
                       </div>
+                      ) : (
+                        <div className="flex items-start space-x-3 p-4 rounded-xl border-2 border-border opacity-60 cursor-not-allowed">
+                          <RadioGroupItem value="card" id="card" className="mt-1" disabled />
+                          <Label htmlFor="card" className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <CreditCard className="w-5 h-5 text-gray-400" />
+                              <span className="font-bold text-base text-gray-600">Cartão de Crédito</span>
+                              <span className="text-[10px] bg-gray-400 text-white font-extrabold px-2 py-0.5 rounded-full uppercase">Em manutenção</span>
+                            </div>
+                            <p className="text-xs text-muted-foreground leading-relaxed">
+                              Pagamento com cartão em manutenção. Volta em breve!
+                            </p>
+                          </Label>
+                        </div>
+                      )}
                     </>
                   )}
                 </div>
@@ -1375,16 +1439,43 @@ const OrderReview: React.FC = () => {
                   </div>
                 )}
 
-                <div className="border-t pt-4 space-y-3">
-                  <p className="text-xs text-muted-foreground">Após realizar o pagamento, clique no botão abaixo para registrar seu pedido.</p>
-                  <Button onClick={handleFinalizeOrder} className="w-full btn-primary py-4 text-base font-bold rounded-xl gap-2">
-                    <CheckCircle className="w-5 h-5" />
-                    Já realizei o pagamento — Confirmar Pedido
-                  </Button>
-                  <button onClick={() => setPaymentModal(false)} className="text-xs text-muted-foreground hover:underline">
+                {/* Cartão de Crédito (Stripe) — pagamento confirmado automaticamente */}
+                {pendingOrder.paymentMethod === 'card' && (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-center gap-2 text-indigo-600 font-extrabold text-base">
+                      <CreditCard className="w-5 h-5" /> PAGAMENTO COM CARTÃO
+                    </div>
+                    <StripeCardForm
+                      orderId={pendingOrder.id}
+                      amount={Number(pendingOrder.total) || 0}
+                      currency={pendingOrder.currency}
+                      onSuccess={() => {
+                        // Cartão já foi cobrado com sucesso pelo Stripe — diferente de
+                        // PIX/Wise, que ficam 'Pendente' até o comprovante ser enviado.
+                        pendingOrder.status = 'Pago';
+                        handleFinalizeOrder();
+                      }}
+                    />
+                  </div>
+                )}
+
+                {pendingOrder.paymentMethod !== 'card' && (
+                  <div className="border-t pt-4 space-y-3">
+                    <p className="text-xs text-muted-foreground">Após realizar o pagamento, clique no botão abaixo para registrar seu pedido.</p>
+                    <Button onClick={handleFinalizeOrder} className="w-full btn-primary py-4 text-base font-bold rounded-xl gap-2">
+                      <CheckCircle className="w-5 h-5" />
+                      Já realizei o pagamento — Confirmar Pedido
+                    </Button>
+                    <button onClick={() => setPaymentModal(false)} className="text-xs text-muted-foreground hover:underline">
+                      Voltar e revisar o pedido
+                    </button>
+                  </div>
+                )}
+                {pendingOrder.paymentMethod === 'card' && (
+                  <button onClick={() => setPaymentModal(false)} className="text-xs text-muted-foreground hover:underline block mx-auto pt-1">
                     Voltar e revisar o pedido
                   </button>
-                </div>
+                )}
               </div>
             </div>
           </div>

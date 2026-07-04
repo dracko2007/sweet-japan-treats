@@ -16,6 +16,8 @@ export interface PaymentSettings {
   pixKey: string;          // chave PIX (e-mail, CPF, telefone ou aleatória)
   pixReceiverName: string; // nome do recebedor PIX, máx 25 caracteres
   pixCity: string;         // cidade do recebedor PIX, máx 15 caracteres
+  pixEnabled: boolean;     // mostra a opção PIX no checkout internacional
+  cardEnabled: boolean;    // mostra a opção Cartão (Stripe) no checkout internacional
   // Japan payment — Yucho Bank & contact
   yuchoKigo: string;       // 記号 (símbolo da conta ゆうちょ)
   yuchoNumber: string;     // 番号 (número da conta ゆうちょ)
@@ -29,6 +31,8 @@ const DEFAULT: PaymentSettings = {
   pixKey: '',
   pixReceiverName: 'Japan Express',
   pixCity: 'Sao Paulo',
+  pixEnabled: false,
+  cardEnabled: true,
   yuchoKigo: '',
   yuchoNumber: '',
   yuchoName: '',

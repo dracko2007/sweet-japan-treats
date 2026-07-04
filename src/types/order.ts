@@ -40,7 +40,7 @@ export interface OrderData {
   items: CartItem[];
   totalPrice: number;
   shipping?: ShippingInfo;
-  paymentMethod: 'bank' | 'paypay';
+  paymentMethod: 'bank' | 'paypay' | 'yucho' | 'wise' | 'pix' | 'card';
   deliveryTime?: string;
   couponDiscount?: number;
   appliedCoupon?: { code: string; discount: number; [key: string]: any };
@@ -66,7 +66,7 @@ export interface ShippingAddress {
 export interface Order {
   items: OrderItem[];
   totalAmount: number;
-  paymentMethod: 'bank' | 'paypay';
+  paymentMethod: 'bank' | 'paypay' | 'yucho' | 'wise' | 'pix' | 'card';
   status: 'pending' | 'processing' | 'confirmed' | 'shipped' | 'delivered' | 'cancelled';
   shippingAddress: ShippingAddress;
   orderNumber?: string;
