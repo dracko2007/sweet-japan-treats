@@ -117,7 +117,7 @@ const TrackingModal: React.FC<TrackingModalProps> = ({
             </div>
             
             <div class="content">
-              <p><strong>Olá ${order.shippingAddress.name}!</strong></p>
+              <p><strong>Olá ${order.shippingAddress?.name || order.customerName || 'cliente'}!</strong></p>
               
               <p>Seu pedido foi enviado e está a caminho! 🎉</p>
               
@@ -157,22 +157,22 @@ const TrackingModal: React.FC<TrackingModalProps> = ({
               <div style="background: #fff; padding: 20px; border-radius: 8px; margin-top: 20px;">
                 <div class="info-row">
                   <span>Subtotal:</span>
-                  <strong>¥${order.totalPrice.toLocaleString()}</strong>
+                  <strong>¥${(order.totalPrice ?? order.totalAmount ?? 0).toLocaleString()}</strong>
                 </div>
                 <div class="info-row" style="font-size: 18px; color: #FF69B4; border-bottom: none;">
                   <span><strong>Total:</strong></span>
-                  <strong>¥${order.totalPrice.toLocaleString()}</strong>
+                  <strong>¥${(order.totalPrice ?? order.totalAmount ?? 0).toLocaleString()}</strong>
                 </div>
               </div>
 
               <h3 style="color: #FF69B4; margin-top: 30px;">📍 Endereço de Entrega</h3>
               <div style="background: #fff; padding: 20px; border-radius: 8px;">
-                <p style="margin: 5px 0;"><strong>${order.shippingAddress.name}</strong></p>
-                <p style="margin: 5px 0;">〒${order.shippingAddress.postalCode}</p>
-                <p style="margin: 5px 0;">${order.shippingAddress.prefecture}</p>
-                <p style="margin: 5px 0;">${order.shippingAddress.city}</p>
-                <p style="margin: 5px 0;">${order.shippingAddress.address}</p>
-                ${order.shippingAddress.building ? `<p style="margin: 5px 0;">${order.shippingAddress.building}</p>` : ''}
+                <p style="margin: 5px 0;"><strong>${order.shippingAddress?.name || order.customerName || 'N/A'}</strong></p>
+                <p style="margin: 5px 0;">〒${order.shippingAddress?.postalCode || 'N/A'}</p>
+                <p style="margin: 5px 0;">${order.shippingAddress?.prefecture || ''}</p>
+                <p style="margin: 5px 0;">${order.shippingAddress?.city || ''}</p>
+                <p style="margin: 5px 0;">${order.shippingAddress?.address || ''}</p>
+                ${order.shippingAddress?.building ? `<p style="margin: 5px 0;">${order.shippingAddress.building}</p>` : ''}
               </div>
 
               <p style="margin-top: 30px;">
@@ -194,11 +194,11 @@ const TrackingModal: React.FC<TrackingModalProps> = ({
       
       if (import.meta.env.VITE_RESEND_API_KEY) {
         emailSent = await emailService.sendOrderConfirmation({
-          to: order.customerEmail || order.shippingAddress.email,
+          to: order.customerEmail || order.shippingAddress?.email,
           subject: `📦 Pedido Enviado - #${order.orderNumber} - Rastreamento: ${trackingNumber}`,
           html: emailHTML,
           orderNumber: order.orderNumber,
-          customerName: order.shippingAddress.name,
+          customerName: order.shippingAddress?.name || order.customerName || 'N/A',
         });
       }
 
@@ -209,22 +209,22 @@ const TrackingModal: React.FC<TrackingModalProps> = ({
         ).join('\n');
         
         const shippingAddress = `
-${order.shippingAddress.name}
-〒${order.shippingAddress.postalCode}
-${order.shippingAddress.prefecture} ${order.shippingAddress.city}
-${order.shippingAddress.address}
-${order.shippingAddress.building || ''}
+${order.shippingAddress?.name || order.customerName || 'N/A'}
+〒${order.shippingAddress?.postalCode || 'N/A'}
+${order.shippingAddress?.prefecture || ''} ${order.shippingAddress?.city || ''}
+${order.shippingAddress?.address || ''}
+${order.shippingAddress?.building || ''}
         `.trim();
-        
+
         emailSent = await emailServiceSimple.sendTrackingNotification({
-          to_email: order.customerEmail || order.shippingAddress.email,
-          to_name: order.shippingAddress.name,
+          to_email: order.customerEmail || order.shippingAddress?.email,
+          to_name: order.shippingAddress?.name || order.customerName || 'N/A',
           order_number: order.orderNumber,
           tracking_number: trackingNumber,
           carrier_name: carrierName,
           tracking_url: trackingUrl,
           items_list: itemsList,
-          total_price: `¥${order.totalPrice.toLocaleString()}`,
+          total_price: `¥${(order.totalPrice ?? order.totalAmount ?? 0).toLocaleString()}`,
           shipping_address: shippingAddress,
           html_content: emailHTML,
         });
@@ -233,7 +233,7 @@ ${order.shippingAddress.building || ''}
       if (emailSent) {
         toast({
           title: "Email enviado!",
-          description: `Notificação de envio enviada para ${order.shippingAddress.name}`,
+          description: `Notificação de envio enviada para ${order.shippingAddress?.name || order.customerName || 'cliente'}`,
         });
       } else {
         toast({
@@ -244,12 +244,12 @@ ${order.shippingAddress.building || ''}
       }
 
       // Send WhatsApp message if phone is available
-      const customerPhone = order.customerPhone || order.shippingAddress.phone;
+      const customerPhone = order.customerPhone || order.shippingAddress?.phone;
       if (customerPhone) {
         const whatsappMessage = `
 🎉 *Seu Pedido Foi Enviado!*
 
-Olá ${order.shippingAddress.name}!
+Olá ${order.shippingAddress?.name || order.customerName || 'cliente'}!
 
 Seu pedido #${order.orderNumber} foi enviado e está a caminho! 📦
 
@@ -257,11 +257,11 @@ Seu pedido #${order.orderNumber} foi enviado e está a caminho! 📦
 *Código de Rastreamento:* ${trackingNumber}
 
 ${trackingUrl ? `*Rastreie seu pedido aqui:*\n${trackingUrl}\n\n` : 'Use este código para rastrear seu pedido no site da transportadora.\n\n'}*Resumo do Pedido:*
-${order.items.map((item: any) => 
+${order.items.map((item: any) =>
   `• ${item.productName} (${item.size}) - ${item.quantity}x - ¥${(item.price * item.quantity).toLocaleString()}`
 ).join('\n')}
 
-*Total:* ¥${order.totalPrice.toLocaleString()}
+*Total:* ¥${(order.totalPrice ?? order.totalAmount ?? 0).toLocaleString()}
 
 Obrigado por comprar na *Japan Express*! 🌸
         `.trim();
@@ -307,7 +307,7 @@ Obrigado por comprar na *Japan Express*! 🌸
             Marcar como Enviado
           </DialogTitle>
           <DialogDescription>
-            Pedido #{order?.orderNumber} - {order?.shippingAddress.name}
+            Pedido #{order?.orderNumber} - {order?.shippingAddress?.name || order?.customerName || 'N/A'}
           </DialogDescription>
         </DialogHeader>
 

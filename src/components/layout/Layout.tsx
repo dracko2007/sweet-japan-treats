@@ -15,10 +15,12 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const isAdminPage = useLocation().pathname.startsWith('/admin');
   useBirthdayBonus(); // concede 1000 pts no aniversário
   return (
-    <div className="min-h-screen flex flex-col w-full max-w-full overflow-x-hidden">
+    <div className="min-h-screen flex flex-col w-full max-w-full overflow-x-clip">
       <Header />
-      {/* pt-20 = header (80px) + pt extra para a barra de confiança (~28px) nas páginas de cliente */}
-      <main className={`flex-1 w-full max-w-full overflow-x-hidden ${isAdminPage ? 'pt-20' : 'pt-[108px]'}`}>
+      {/* pt-20 = header (80px) + pt extra para a barra de confiança (~28px) nas páginas de cliente.
+          overflow-x-clip (não "hidden"): "hidden" forçaria overflow-y:auto aqui e quebraria os
+          sidebars sticky do carrinho/checkout — clip contém o overflow sem virar scroll container. */}
+      <main className={`flex-1 w-full max-w-full overflow-x-clip ${isAdminPage ? 'pt-20' : 'pt-[108px]'}`}>
         {children}
       </main>
       <Footer />

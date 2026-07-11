@@ -602,7 +602,7 @@ _This is an automated test message_
             ${order.items.map((item: any) => `
               <p>• ${item.productName} (${item.size}) x${item.quantity} - R$${(item.price * item.quantity).toLocaleString()}</p>
             `).join('')}
-            <p class="strong" style="margin-top: 10px;">Total: R$${order.totalPrice.toLocaleString()}</p>
+            <p class="strong" style="margin-top: 10px;">Total: R$${(order.totalPrice ?? order.totalAmount ?? 0).toLocaleString()}</p>
           </div>
 
           <div class="row">
@@ -617,12 +617,12 @@ _This is an automated test message_
             
             <div class="box">
               <h3>📥 DESTINATÁRIO (Aduana Brasil)</h3>
-              <p class="strong">${order.shippingAddress.name || order.name}</p>
+              <p class="strong">${order.shippingAddress?.name || order.name || order.customerName || 'N/A'}</p>
               <p>CPF: ${order.cpf || 'N/A'}</p>
-              <p>CEP: ${order.shippingAddress.postalCode || order.postalCode}</p>
-              <p>${order.shippingAddress.prefecture || order.prefecture} - ${order.shippingAddress.city || order.city}</p>
-              <p>${order.shippingAddress.address || order.address}</p>
-              ${(order.shippingAddress.building || order.building) ? `<p>Complemento: ${order.shippingAddress.building || order.building}</p>` : ''}
+              <p>CEP: ${order.shippingAddress?.postalCode || order.postalCode || 'N/A'}</p>
+              <p>${order.shippingAddress?.prefecture || order.prefecture || ''} - ${order.shippingAddress?.city || order.city || ''}</p>
+              <p>${order.shippingAddress?.address || order.address || ''}</p>
+              ${(order.shippingAddress?.building || order.building) ? `<p>Complemento: ${order.shippingAddress?.building || order.building}</p>` : ''}
               <p>📞 ${order.phone || 'N/A'}</p>
             </div>
           </div>
@@ -937,22 +937,22 @@ _This is an automated test message_
                           Cliente
                         </h4>
                         <div className="space-y-1 text-sm">
-                          <p className="font-medium">{order.shippingAddress.name}</p>
+                          <p className="font-medium">{order.shippingAddress?.name || order.customerName || 'N/A'}</p>
                           <p className="text-muted-foreground flex items-center gap-2">
                             <Mail className="w-4 h-4" />
                             {order.customerEmail || 'N/A'}
                           </p>
                           <p className="text-muted-foreground flex items-center gap-2">
                             <Phone className="w-4 h-4" />
-                            {order.shippingAddress.phone || order.customerName || 'N/A'}
+                            {order.shippingAddress?.phone || order.customerName || 'N/A'}
                           </p>
                           <p className="text-muted-foreground flex items-start gap-2 mt-2">
                             <MapPin className="w-4 h-4 mt-0.5" />
                             <span>
-                              〒{order.shippingAddress.postalCode}<br />
-                              {order.shippingAddress.prefecture} {order.shippingAddress.city}<br />
-                              {order.shippingAddress.address}
-                              {order.shippingAddress.building && <><br />{order.shippingAddress.building}</>}
+                              〒{order.shippingAddress?.postalCode || 'N/A'}<br />
+                              {order.shippingAddress?.prefecture} {order.shippingAddress?.city}<br />
+                              {order.shippingAddress?.address}
+                              {order.shippingAddress?.building && <><br />{order.shippingAddress.building}</>}
                             </span>
                           </p>
                         </div>
