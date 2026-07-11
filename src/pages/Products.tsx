@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Search, X, SlidersHorizontal, ChevronDown, Eye, EyeOff } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
-import ProductCard from '@/components/products/ProductCard';
+import CompactProductCard from '@/components/products/CompactProductCard';
 import { useProducts } from '@/context/ProductsContext';
 import { cn } from '@/lib/utils';
 import { useLanguage } from '@/context/LanguageContext';
@@ -362,24 +362,22 @@ const Products: React.FC = () => {
           )}
 
           {loading ? (
-            <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 lg:gap-5">
-              {Array.from({ length: 8 }).map((_, idx) => (
-                <div key={idx} className="rounded-xl border border-border bg-card overflow-hidden animate-pulse">
+            <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-4">
+              {Array.from({ length: 12 }).map((_, idx) => (
+                <div key={idx} className="rounded-lg border border-border bg-card overflow-hidden animate-pulse">
                   <div className="aspect-square bg-secondary" />
-                  <div className="p-4 space-y-3">
-                    <div className="h-4 bg-secondary rounded w-4/5" />
-                    <div className="h-3 bg-secondary rounded w-full" />
-                    <div className="h-3 bg-secondary rounded w-2/3" />
-                    <div className="h-8 bg-secondary rounded-lg w-full" />
+                  <div className="p-2 space-y-2">
+                    <div className="h-3 bg-secondary rounded w-4/5" />
+                    <div className="h-4 bg-secondary rounded w-2/3" />
                   </div>
                 </div>
               ))}
             </div>
           ) : (
             <>
-              <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 lg:gap-5">
+              <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-4">
                 {pageItems.map((product) => (
-                  <ProductCard key={product.id} product={product} />
+                  <CompactProductCard key={product.id} product={product} />
                 ))}
               </div>
 

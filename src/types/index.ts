@@ -48,6 +48,7 @@ export interface Product {
   featuredAt?: string;       // ISO timestamp de quando foi marcado como destaque (ordena a rotação)
   isNew?: boolean;           // Marca como lançamento (aparece em destaque no filtro "Lançamento")
   salesCount?: number;       // Quantidade vendida (usado no filtro "Mais Vendidos"); atualizado manualmente pelo admin
+  rating?: number;           // Avaliação de 0 a 5 (curada manualmente pelo admin); ausente = não mostra estrelas
   stock?: { unlimited: boolean; quantity: number }; // undefined = ilimitado (retrocompat)
   promoGift?: { buyQuantity: number; giftProductId: string; giftProductName: string; minOrderValueYen?: number };
 }

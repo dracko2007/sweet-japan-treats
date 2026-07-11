@@ -1,154 +1,103 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, Sparkles } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { useProducts } from '@/context/ProductsContext';
-import { useLanguage } from '@/context/LanguageContext';
-import { getTranslatedProductDesc } from '@/data/translations';
-import { i18nDesc } from '@/utils/productI18n';
-import { formatPrice, getCurrencyByCountry } from '@/utils/currency';
-import { effectiveYen, baseYen, hasDiscount } from '@/utils/pricing';
-import { convertYen as fxConvert } from '@/services/fxService';
+import { ArrowRight, Sparkles, Zap, TrendingUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { productEnglishName } from '@/utils/productName';
+import CompactProductCard from '@/components/products/CompactProductCard';
+import { useProducts } from '@/context/ProductsContext';
+import { hasDiscount } from '@/utils/pricing';
 
+type TabId = 'recomendado' | 'ofertas' | 'vendidos';
+
+/**
+ * Grade única de produtos com abas de filtro (estilo Temu: uma grade contínua
+ * em vez de várias seções empilhadas com títulos/fundos diferentes).
+ * As abas "Ofertas" e "Mais Vendidos" só aparecem quando há dados reais.
+ */
 const FeaturedProducts: React.FC = () => {
-  const { t, language, selectedCountry } = useLanguage();
   const { products, loading } = useProducts();
+  const [tab, setTab] = useState<TabId>('recomendado');
 
-  // Produtos marcados como destaque pelo admin. Mostra no máx. 4 por vez;
-  // se houver mais de 4, a janela alterna a cada semana (rotação automática).
-  const featuredProducts = (() => {
+  // Produtos marcados como destaque pelo admin. Mostra no máx. 8 por vez;
+  // se houver mais, a janela alterna a cada semana (rotação automática).
+  const recomendados = useMemo(() => {
     const flagged = products
       .filter(p => !p.hidden && p.featured)
       .sort((a, b) => (a.featuredAt || '').localeCompare(b.featuredAt || ''));
 
-    // Fallback: se ninguém foi marcado, usa os 4 primeiros visíveis (comportamento antigo)
-    if (flagged.length === 0) return products.filter(p => !p.hidden).slice(0, 4);
-    if (flagged.length <= 4) return flagged;
+    const pool = flagged.length > 0 ? flagged : products.filter(p => !p.hidden);
+    if (pool.length <= 12) return pool;
 
-    // Rotação semanal: a janela de 4 avança 4 posições por semana, com wrap-around
     const weeksSinceEpoch = Math.floor(Date.now() / (7 * 24 * 60 * 60 * 1000));
-    const offset = (weeksSinceEpoch * 4) % flagged.length;
+    const offset = (weeksSinceEpoch * 12) % pool.length;
     const result = [];
-    for (let i = 0; i < 4; i++) result.push(flagged[(offset + i) % flagged.length]);
+    for (let i = 0; i < 12; i++) result.push(pool[(offset + i) % pool.length]);
     return result;
-  })();
+  }, [products]);
 
-  const isEuro = ['Portugal', 'França', 'Itália', 'Espanha'].includes(selectedCountry);
-  const currency = getCurrencyByCountry(selectedCountry);
-  const getDisplayPrice = (val: number) => fxConvert(val, currency);
+  const ofertas = useMemo(
+    () => products.filter(p => !p.hidden && hasDiscount(p)).slice(0, 12),
+    [products]
+  );
+
+  const vendidos = useMemo(
+    () =>
+      products
+        .filter(p => !p.hidden && (p.salesCount || 0) > 0)
+        .sort((a, b) => (b.salesCount || 0) - (a.salesCount || 0))
+        .slice(0, 12),
+    [products]
+  );
+
+  const tabs = [
+    { id: 'recomendado' as TabId, label: 'Recomendado', icon: Sparkles, items: recomendados },
+    ...(ofertas.length > 0 ? [{ id: 'ofertas' as TabId, label: 'Ofertas', icon: Zap, items: ofertas }] : []),
+    ...(vendidos.length > 0 ? [{ id: 'vendidos' as TabId, label: 'Mais Vendidos', icon: TrendingUp, items: vendidos }] : []),
+  ];
+
+  const activeTab = tabs.find(t => t.id === tab) || tabs[0];
+  const items = activeTab.items;
 
   return (
-    <section className="py-16 bg-white">
+    <section className="py-10 bg-white">
       <div className="container mx-auto px-4">
-        {/* Section Header */}
-        <div className="text-center mb-12">
-          <div className="inline-flex items-center gap-2 bg-primary/10 text-primary font-semibold text-sm px-4 py-1.5 rounded-full mb-4">
-            <Sparkles className="w-4 h-4" />
-            {t('featured.badge')}
-          </div>
-          <h2 className="font-display text-3xl md:text-4xl font-bold text-gray-900">
-            {t('featured.title')}
-          </h2>
-          <p className="text-muted-foreground mt-3 max-w-xl mx-auto">
-            {t('featured.subtitle')}
-          </p>
+        <div className="flex items-center justify-between gap-3 mb-5">
+          <h2 className="font-display text-2xl md:text-3xl font-bold text-gray-900">Produtos</h2>
+          <Link to="/produtos" className="text-sm font-bold text-pink-600 hover:text-pink-700 flex items-center gap-1 shrink-0">
+            Ver tudo
+            <ArrowRight className="w-4 h-4" />
+          </Link>
         </div>
 
-        {/* Products Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 mb-12">
-          {loading ? Array.from({ length: 4 }).map((_, idx) => (
-            <div key={idx} className="bg-gray-50 border border-gray-100 rounded-xl overflow-hidden animate-pulse">
-              <div className="aspect-square bg-secondary" />
-              <div className="p-3 md:p-4 space-y-3">
-                <div className="h-4 bg-secondary rounded w-4/5" />
-                <div className="h-3 bg-secondary rounded w-full" />
-                <div className="h-6 bg-secondary rounded w-2/3" />
-              </div>
-            </div>
-          )) : featuredProducts.map((product) => {
-            const promo = hasDiscount(product);
-            const smallPrice = getDisplayPrice(effectiveYen(product, 'small'));
-            const smallOriginal = getDisplayPrice(baseYen(product, 'small'));
-
-            return (
-              <Link
-                key={product.id}
-                to={`/produto/${product.id}`}
-                className="group bg-gray-50 border border-gray-100 rounded-xl overflow-hidden shadow-soft hover:shadow-card hover:-translate-y-1 transition-all duration-300 flex flex-col"
-              >
-                {/* Image Section */}
-                <div className="aspect-square bg-white relative overflow-hidden">
-                  <img
-                    src={product.thumbnail || product.image}
-                    alt={productEnglishName(product)}
-                    loading="lazy"
-                    className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                  />
-
-                  {promo && (
-                    <div className="absolute top-2 right-2">
-                      <span className="bg-red-600 text-white font-black text-[10px] px-2 py-0.5 rounded-full shadow-sm">
-                        -{product.discountPercent}%
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Origin Tag (real, não fake) */}
-                  <div className="absolute top-2 left-2">
-                    {selectedCountry === 'Japão' ? (
-                      <span className="bg-green-600 text-white font-black text-[9px] px-2 py-0.5 rounded shadow-sm tracking-wider uppercase">
-                        {t('featured.tag.domestic')} 🇯🇵
-                      </span>
-                    ) : (
-                      <span className="bg-primary text-white font-black text-[9px] px-2 py-0.5 rounded shadow-sm tracking-wider uppercase">
-                        {t('featured.tag.imported')} ✈️
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Content Section */}
-                <div className="p-3 md:p-4 flex-1 flex flex-col justify-between">
-                  <div>
-                    <h3 className="font-sans font-bold text-sm text-gray-800 line-clamp-1 group-hover:text-primary transition-colors">
-                      {productEnglishName(product)}
-                    </h3>
-                    <p className="text-xs text-muted-foreground mt-1 line-clamp-2 leading-relaxed">
-                      {i18nDesc(product, language) || getTranslatedProductDesc(product.id, t)}
-                    </p>
-                  </div>
-
-                  <div className="mt-4 flex items-baseline justify-between">
-                    <span className="flex items-baseline gap-1.5">
-                      <span className={cn('text-lg md:text-xl font-bold', promo ? 'text-red-600' : 'text-primary')}>
-                        {formatPrice(smallPrice, currency)}
-                      </span>
-                      {promo && (
-                        <span className="text-[11px] font-semibold text-gray-500 line-through">
-                          {formatPrice(smallOriginal, currency)}
-                        </span>
-                      )}
-                    </span>
-                    <span className="text-[11px] font-medium text-primary group-hover:underline">
-                      {t('featured.details')}
-                    </span>
-                  </div>
-                </div>
-              </Link>
-            );
-          })}
+        <div className="flex gap-2 mb-6 overflow-x-auto scrollbar-hide">
+          {tabs.map(({ id, label, icon: Icon }) => (
+            <button
+              key={id}
+              onClick={() => setTab(id)}
+              className={cn(
+                'shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-bold border transition-colors',
+                tab === id
+                  ? 'bg-pink-500 text-white border-pink-500'
+                  : 'bg-white text-gray-600 border-gray-200 hover:border-pink-300 hover:text-pink-600'
+              )}
+            >
+              <Icon className="w-3.5 h-3.5" />
+              {label}
+            </button>
+          ))}
         </div>
 
-        {/* View All CTA */}
-        <div className="text-center">
-          <Button asChild size="lg" className="btn-primary font-bold rounded-full px-8 shadow-md">
-            <Link to="/produtos">
-              {t('featured.viewAll')}
-              <ArrowRight className="w-5 h-5 ml-2" />
-            </Link>
-          </Button>
+        <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-3 md:gap-4">
+          {loading
+            ? Array.from({ length: 12 }).map((_, idx) => (
+                <div key={idx} className="bg-gray-50 border border-gray-100 rounded-lg overflow-hidden animate-pulse">
+                  <div className="aspect-square bg-secondary" />
+                  <div className="p-2 space-y-2">
+                    <div className="h-3 bg-secondary rounded w-4/5" />
+                    <div className="h-4 bg-secondary rounded w-2/3" />
+                  </div>
+                </div>
+              ))
+            : items.map(product => <CompactProductCard key={product.id} product={product} />)}
         </div>
       </div>
     </section>

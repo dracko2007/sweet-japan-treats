@@ -24,6 +24,7 @@ import ProductJsonLd from '@/components/ProductJsonLd';
 import { useSeo } from '@/hooks/useSeo';
 import DeliveryEstimateBadge from '@/components/products/DeliveryEstimate';
 import StockUrgency from '@/components/products/StockUrgency';
+import { recentlyViewed } from '@/utils/recentlyViewed';
 
 const ProductDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -64,6 +65,7 @@ const ProductDetail: React.FC = () => {
       import('@/services/visitorService').then(({ visitorService }) => {
         visitorService.trackProduct(product.id, product.name).catch(() => {});
       });
+      recentlyViewed.track(product.id);
     }
   }, [product?.id]);
 

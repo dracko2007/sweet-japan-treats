@@ -1032,6 +1032,25 @@ const ProductManager: React.FC = () => {
                   />
                   <p className="text-[11px] text-muted-foreground mt-1.5">Usado no filtro "Mais Vendidos".</p>
                 </div>
+
+                <div className="bg-secondary/40 border border-border rounded-lg p-3">
+                  <label className="text-sm font-semibold block mb-1">⭐ Avaliação (1–5)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={5}
+                    step={0.1}
+                    value={editing?.rating ?? ''}
+                    onChange={e => {
+                      const raw = e.target.value;
+                      const n = raw === '' ? undefined : Math.min(5, Math.max(0, Number(raw)));
+                      setEditing({ ...editing!, rating: n });
+                    }}
+                    placeholder="Ex: 4.8"
+                    className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm"
+                  />
+                  <p className="text-[11px] text-muted-foreground mt-1.5">Deixe vazio para não mostrar estrelas na loja.</p>
+                </div>
               </div>
 
               {/* Estoque */}
