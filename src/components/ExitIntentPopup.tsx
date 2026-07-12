@@ -62,12 +62,12 @@ const Shell: React.FC<{ label: string; onClose: () => void; children: React.Reac
  * depois de fechado — acaba com a sensação de "vírus" de reaparecer toda hora.
  *
  * O conteúdo depende de onde o cliente está ao tentar sair:
- *  - /checkout  → lembrete para não abandonar o pedido (ponto 1).
- *  - fora do checkout + carrinho com itens que pagam taxa PS → oferta: finalize agora
- *    e a Taxa de Personal Shopper sai de graça (ponto 2). Aceitar leva ao checkout
- *    com a isenção ativa (ver utils/psFeeWaiver).
- *  - fora do checkout + carrinho sem taxa → guia por e-mail (lead, só visitante não
- *    logado e respeitando cooldown de 14 dias).
+ *  - /checkout com taxa PS e sem isenção ativa → oferta: finalize agora e a Taxa de
+ *    Personal Shopper sai de graça (aceitar concede a isenção; ver utils/psFeeWaiver).
+ *  - /checkout ou /order-review nos demais casos → lembrete para não abandonar o pedido.
+ *  - FORA do checkout → a oferta de isenção NUNCA aparece (o cliente ainda pode estar
+ *    escolhendo produtos). Só o guia por e-mail (lead) para visitante não logado,
+ *    respeitando cooldown de 14 dias.
  *
  * Desktop: detecta o mouse saindo pelo topo. Mobile: tempo na página + scroll.
  */
@@ -98,9 +98,17 @@ const ExitIntentPopup: React.FC = () => {
   // Decide qual popup mostrar no momento da saída (lê dados frescos via refs).
   const resolveVariant = useCallback((): Variant | null => {
     const list = itemsRef.current;
-    if (inFunnel(pathRef.current)) return list.length > 0 ? 'retention' : null; // ponto 1
-    if (psFeeQtyOf(list) > 0) return 'ps_offer';                 // ponto 2
-    // Fallback: guia por e-mail (lead) — só visitante não logado e fora do cooldown.
+    const path = pathRef.current;
+    // Dentro do funil de checkout (cliente já está finalizando).
+    if (inFunnel(path)) {
+      if (list.length === 0) return null;
+      // Só na página de checkout (endereço), com taxa PS e sem isenção ativa,
+      // oferecemos a isenção por finalizar agora. Caso contrário, retenção simples.
+      if (path.startsWith('/checkout') && psFeeQtyOf(list) > 0 && !psFeeWaiver.isActive()) return 'ps_offer';
+      return 'retention';
+    }
+    // FORA do checkout: NÃO oferecemos a isenção — o cliente ainda pode estar
+    // escolhendo produtos. Só o guia por e-mail (lead) para visitante não logado.
     if (authRef.current) return null;
     const last = Number(safeStorage.getItem(GUIDE_COOLDOWN_KEY) || 0);
     if (Date.now() - last <= GUIDE_COOLDOWN_DAYS * 86400000) return null;
@@ -167,12 +175,14 @@ const ExitIntentPopup: React.FC = () => {
     setOpen(false);
   }, []);
 
-  // Aceitar a oferta: concede a isenção da taxa PS e leva ao checkout para finalizar.
+  // Aceitar a oferta: concede a isenção da taxa PS. A oferta só aparece já no
+  // /checkout, então normalmente basta aplicar (o valor reage via evento); se por
+  // acaso estiver fora do funil, leva ao checkout para finalizar.
   const acceptPsOffer = useCallback(() => {
     psFeeWaiver.grant();
     close();
-    navigate('/checkout');
-  }, [close, navigate]);
+    if (!inFunnel(location.pathname)) navigate('/checkout');
+  }, [close, navigate, location.pathname]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

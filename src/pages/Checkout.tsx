@@ -25,7 +25,7 @@ import { effectiveYen } from '@/utils/pricing';
 import { convertYen as fxConvert, getRates } from '@/services/fxService';
 import { POINTS } from '@/services/pointsService';
 import { safeStorage } from '@/utils/storage';
-import { psFeeWaiver } from '@/utils/psFeeWaiver';
+import { psFeeWaiver, PS_FEE_WAIVER_EVENT } from '@/utils/psFeeWaiver';
 import { productEnglishName } from '@/utils/productName';
 import { isValidEmail, isValidCPF, isValidPhone, isNonEmpty, maskPhone, runValidations, FieldErrors } from '@/utils/validation';
 import { calcImportTax } from '@/utils/taxRules';
@@ -108,7 +108,14 @@ const Checkout: React.FC = () => {
 
   // Isenção da taxa PS pela oferta de saída (exit-intent). Lida uma vez ao montar:
   // se ativa, a taxa de Personal Shopper é zerada nesta visita (ponto 2 do checkout).
-  const [psFeeWaived] = useState(() => psFeeWaiver.isActive());
+  // Reativo: se a isenção for concedida enquanto já estamos no checkout
+  // (ex.: aceitar a oferta no popup de saída), o valor atualiza sem remontar.
+  const [psFeeWaived, setPsFeeWaived] = useState(() => psFeeWaiver.isActive());
+  useEffect(() => {
+    const sync = () => setPsFeeWaived(psFeeWaiver.isActive());
+    window.addEventListener(PS_FEE_WAIVER_EVENT, sync);
+    return () => window.removeEventListener(PS_FEE_WAIVER_EVENT, sync);
+  }, []);
 
   const isGuest = !!location.state?.isGuest;
 

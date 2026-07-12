@@ -9,11 +9,19 @@
 const KEY = 'ps_fee_waiver_until';
 const TTL_MINUTES = 60;
 
+// Evento disparado quando a isenção muda, para páginas já montadas (ex.: /checkout)
+// reagirem sem precisar remontar.
+export const PS_FEE_WAIVER_EVENT = 'psfee-waiver-changed';
+const emitChange = (): void => {
+  try { window.dispatchEvent(new Event(PS_FEE_WAIVER_EVENT)); } catch { /* SSR/no window */ }
+};
+
 export const psFeeWaiver = {
   /** Concede a isenção (chamado quando o cliente aceita a oferta no popup). */
   grant(): void {
     try {
       sessionStorage.setItem(KEY, String(Date.now() + TTL_MINUTES * 60_000));
+      emitChange();
     } catch {
       /* storage indisponível — sem isenção, cobra a taxa normalmente */
     }
@@ -38,6 +46,7 @@ export const psFeeWaiver = {
   clear(): void {
     try {
       sessionStorage.removeItem(KEY);
+      emitChange();
     } catch {
       /* noop */
     }
