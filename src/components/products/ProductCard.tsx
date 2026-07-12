@@ -164,7 +164,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
               decoding="async"
               width={300}
               height={300}
-              className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-200 ${isHovered ? 'opacity-0' : 'opacity-100'}`}
+              className={`absolute inset-0 w-full h-full object-cover transition-all duration-500 ease-out group-hover/image:scale-105 motion-reduce:transform-none ${isHovered ? 'opacity-0' : 'opacity-100'}`}
             />
             {isHovered && (
               <video
@@ -187,7 +187,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
             decoding="async"
             width={300}
             height={300}
-            className="absolute inset-0 w-full h-full object-cover"
+            className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 ease-out group-hover/image:scale-105 motion-reduce:transform-none"
           />
         ) : (
           <div className="absolute inset-0 bg-gradient-to-br from-caramel-light/40 to-primary/30 flex items-center justify-center">
@@ -249,13 +249,13 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
           <button
             onClick={(e) => { e.stopPropagation(); handleToggleFavorite(); }}
             className={cn(
-              "p-2 rounded-full backdrop-blur-sm transition-all",
-              isFavorite 
-                ? "bg-red-500 text-white hover:bg-red-600" 
+              "p-2 rounded-full backdrop-blur-sm transition-all hover:scale-110 active:scale-95 motion-reduce:transform-none",
+              isFavorite
+                ? "bg-red-500 text-white hover:bg-red-600"
                 : "bg-white/90 dark:bg-gray-800/90 text-gray-700 dark:text-gray-200 hover:bg-white dark:hover:bg-gray-800"
             )}
           >
-            <Heart className={cn("w-5 h-5", isFavorite && "fill-current")} />
+            <Heart className={cn("w-5 h-5 transition-transform", isFavorite && "fill-current animate-[pop_0.3s_ease-out]")} />
           </button>
           <button
             onClick={(e) => { e.stopPropagation(); handleShare(); }}
@@ -358,7 +358,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
             <Button
               onClick={handleAddToCart}
               size="sm"
-              className={cn('w-full rounded-lg transition-all btn-primary text-xs font-bold h-9', added && 'bg-accent hover:bg-accent')}
+              className={cn('w-full rounded-lg transition-all btn-primary text-xs font-bold h-9 active:scale-95 motion-reduce:active:scale-100', added && 'bg-accent hover:bg-accent')}
             >
               {added ? (
                 <><Check className="w-4 h-4 mr-1" /> {t('productDetail.added')}</>

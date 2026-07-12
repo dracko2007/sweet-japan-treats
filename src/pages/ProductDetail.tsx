@@ -210,9 +210,9 @@ const ProductDetail: React.FC = () => {
       <section className="py-12 bg-background">
         <div className="container mx-auto px-4">
           <div className="max-w-6xl mx-auto">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 animate-fade-in motion-reduce:animate-none">
               <div>
-                <ProductGallery 
+                <ProductGallery
                   images={images} 
                   productName={translatedName}
                   video={product.video}

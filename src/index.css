@@ -253,4 +253,25 @@
     from { opacity: 0; }
     to { opacity: 1; }
   }
+
+  /* "Pop" curto — usado no coração ao favoritar */
+  @keyframes pop {
+    0%   { transform: scale(1); }
+    40%  { transform: scale(1.35); }
+    100% { transform: scale(1); }
+  }
+}
+
+/* Acessibilidade: quem pede menos movimento não recebe animações decorativas
+   (loop/entrada). Transições curtas de UI seguem funcionando via motion-reduce. */
+@media (prefers-reduced-motion: reduce) {
+  .animate-float,
+  .animate-fade-up,
+  .animate-fade-in,
+  .animate-marquee,
+  .animate-bounce,
+  .animate-pulse,
+  .animate-ping {
+    animation: none !important;
+  }
 }

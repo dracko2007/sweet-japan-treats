@@ -20,13 +20,13 @@ const Index: React.FC = () => {
     <Layout>
       <HeroSection />
       <WelcomeCouponBanner />
-      <CategoryQuickNav />
-      <FeaturedProducts />
+      <ScrollReveal><CategoryQuickNav /></ScrollReveal>
+      <ScrollReveal><FeaturedProducts /></ScrollReveal>
       <RecentlyViewed />
       <ScrollReveal><HomeVideos /></ScrollReveal>
-      <ShippingBanner />
+      <ScrollReveal><ShippingBanner /></ScrollReveal>
       <ScrollReveal><NewsletterSection /></ScrollReveal>
-      <AppDownloadSection />
+      <ScrollReveal><AppDownloadSection /></ScrollReveal>
 
     </Layout>
   );
