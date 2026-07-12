@@ -1,10 +1,14 @@
-// Serverless email endpoint. It sends through Zoho SMTP and, for account
-// verification, can generate the official Firebase Auth verification link.
+// Serverless email endpoint. It sends through the Google Workspace (Gmail) SMTP
+// account noreply@ and, for account verification, can generate the official
+// Firebase Auth verification link.
 import nodemailer from 'nodemailer';
 import { cert, getApps, initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 
-const FROM = 'contato@japanexpress-store.com';
+// Remetente padrão de todos os e-mails transacionais (Google Workspace).
+const FROM = 'noreply@japanexpress-store.com';
+// Respostas caem numa caixa monitorada (noreply não é lida).
+const REPLY_TO = 'contato@japanexpress-store.com';
 const BRAND = 'Japan Express';
 
 const escapeHtml = (value) =>
@@ -23,7 +27,7 @@ const wrap = (inner) => `
     </div>
     <div style="padding:24px;color:#333;font-size:15px;line-height:1.6">${inner}</div>
     <div style="padding:14px;text-align:center;font-size:11px;color:#999;border-top:1px solid #eee">
-      ${BRAND} &middot; ${FROM} &middot; japanexpress-store.com
+      ${BRAND} &middot; ${REPLY_TO} &middot; japanexpress-store.com
     </div>
   </div>`;
 
@@ -115,7 +119,8 @@ export default async function handler(req, res) {
     return;
   }
 
-  const pass = process.env.ZOHO_MAIL_PASSWORD;
+  // App Password da conta Google Workspace noreply@ (2FA obrigatório na conta).
+  const pass = process.env.NOREPLY_EMAIL_PASSWORD || process.env.GMAIL_APP_PASSWORD;
   if (!pass) {
     res.status(503).json({ error: 'Email not configured' });
     return;
@@ -159,13 +164,13 @@ export default async function handler(req, res) {
     const { subject, html } = buildTemplate(type, body.name || '', body.code || '', extra);
 
     const transporter = nodemailer.createTransport({
-      host: 'smtp.zoho.jp',
+      host: 'smtp.gmail.com',
       port: 465,
       secure: true,
       auth: { user: FROM, pass },
     });
 
-    const info = await transporter.sendMail({ from: `"${BRAND}" <${FROM}>`, to, subject, html });
+    const info = await transporter.sendMail({ from: `"${BRAND}" <${FROM}>`, replyTo: REPLY_TO, to, subject, html });
     res.status(200).json({
       ok: true,
       type,

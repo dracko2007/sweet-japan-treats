@@ -9,7 +9,9 @@ import { cert, getApps, initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
 
-const FROM = 'contato@japanexpress-store.com';
+// Remetente padrão (Google Workspace); respostas caem numa caixa monitorada.
+const FROM = 'noreply@japanexpress-store.com';
+const REPLY_TO = 'contato@japanexpress-store.com';
 const BRAND = 'Japan Express';
 const THRESHOLD_MIN = 90; // carrinhos parados há mais de 90 min
 
@@ -86,7 +88,8 @@ export default async function handler(req, res) {
     return;
   }
 
-  const pass = process.env.ZOHO_MAIL_PASSWORD;
+  // App Password da conta Google Workspace noreply@ (2FA obrigatório na conta).
+  const pass = process.env.NOREPLY_EMAIL_PASSWORD || process.env.GMAIL_APP_PASSWORD;
   if (!pass) {
     res.status(503).json({ error: 'Email not configured' });
     return;
@@ -112,7 +115,7 @@ export default async function handler(req, res) {
     }
 
     const transporter = nodemailer.createTransport({
-      host: 'smtp.zoho.jp', port: 465, secure: true,
+      host: 'smtp.gmail.com', port: 465, secure: true,
       auth: { user: FROM, pass },
     });
 
@@ -131,7 +134,7 @@ export default async function handler(req, res) {
           data.items || [],
           origin,
         );
-        await transporter.sendMail({ from: `"${BRAND}" <${FROM}>`, to: email, subject, html });
+        await transporter.sendMail({ from: `"${BRAND}" <${FROM}>`, replyTo: REPLY_TO, to: email, subject, html });
 
         // Marca como enviado para não repetir.
         await docSnap.ref.update({ reminderSent: true, reminderSentAt: Date.now() });
