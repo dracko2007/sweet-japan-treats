@@ -17,13 +17,74 @@ export const EU_VAT_RATES: Record<string, number> = {
   Espanha:  0.21,
 };
 
-export function calcBrazilTax(price: number): { federal: number; icms: number; total: number } {
+export function calcBrazilTax(price: number, icmsRate: number = BRAZIL_TAX.icmsRate): { federal: number; icms: number; total: number } {
   const federal =
     price < BRAZIL_TAX.thresholdBRL
       ? price * BRAZIL_TAX.belowRate
       : price * BRAZIL_TAX.aboveRate - BRAZIL_TAX.aboveOffset;
-  const icms = (price + federal) * BRAZIL_TAX.icmsRate;
+  const icms = (price + federal) * icmsRate;
   return { federal, icms, total: federal + icms };
+}
+
+// ── ICMS por estado (alíquota interna aproximada, 2024/2025) ────────────────
+// Usada na importação: incide a alíquota interna do estado de DESTINO.
+// Valores aproximados (variam com FECP/legislação) — bom para orçamento.
+export const ICMS_BY_UF: Record<string, number> = {
+  AC: 0.19, AL: 0.20, AP: 0.18, AM: 0.20, BA: 0.205, CE: 0.20,
+  DF: 0.20, ES: 0.17, GO: 0.19, MA: 0.23, MG: 0.18, MS: 0.17,
+  MT: 0.17, PA: 0.19, PB: 0.20, PR: 0.195, PE: 0.205, PI: 0.225,
+  RJ: 0.22, RN: 0.20, RS: 0.17, RO: 0.195, RR: 0.20, SC: 0.17,
+  SP: 0.18, SE: 0.20, TO: 0.20,
+};
+
+// Faixas de CEP → UF (prefixo de 5 dígitos). Fonte: Correios.
+const CEP_RANGES: { min: number; max: number; uf: string }[] = [
+  { min: 1000,  max: 19999, uf: 'SP' },
+  { min: 20000, max: 28999, uf: 'RJ' },
+  { min: 29000, max: 29999, uf: 'ES' },
+  { min: 30000, max: 39999, uf: 'MG' },
+  { min: 40000, max: 48999, uf: 'BA' },
+  { min: 49000, max: 49999, uf: 'SE' },
+  { min: 50000, max: 56999, uf: 'PE' },
+  { min: 57000, max: 57999, uf: 'AL' },
+  { min: 58000, max: 58999, uf: 'PB' },
+  { min: 59000, max: 59999, uf: 'RN' },
+  { min: 60000, max: 63999, uf: 'CE' },
+  { min: 64000, max: 64999, uf: 'PI' },
+  { min: 65000, max: 65999, uf: 'MA' },
+  { min: 66000, max: 68899, uf: 'PA' },
+  { min: 68900, max: 68999, uf: 'AP' },
+  { min: 69000, max: 69299, uf: 'AM' },
+  { min: 69300, max: 69399, uf: 'RR' },
+  { min: 69400, max: 69899, uf: 'AM' },
+  { min: 69900, max: 69999, uf: 'AC' },
+  { min: 70000, max: 72799, uf: 'DF' },
+  { min: 72800, max: 72999, uf: 'GO' },
+  { min: 73000, max: 73699, uf: 'DF' },
+  { min: 73700, max: 76799, uf: 'GO' },
+  { min: 76800, max: 76999, uf: 'RO' },
+  { min: 77000, max: 77999, uf: 'TO' },
+  { min: 78000, max: 78899, uf: 'MT' },
+  { min: 78900, max: 78999, uf: 'RO' },
+  { min: 79000, max: 79999, uf: 'MS' },
+  { min: 80000, max: 87999, uf: 'PR' },
+  { min: 88000, max: 89999, uf: 'SC' },
+  { min: 90000, max: 99999, uf: 'RS' },
+];
+
+/** Extrai a UF a partir do CEP (aceita "01000-000", "01000000", etc.). */
+export function ufFromCep(cep: string): string | null {
+  const digits = (cep || '').replace(/\D/g, '');
+  if (digits.length < 5) return null;
+  const prefix = parseInt(digits.slice(0, 5), 10);
+  const hit = CEP_RANGES.find(r => prefix >= r.min && prefix <= r.max);
+  return hit ? hit.uf : null;
+}
+
+/** Alíquota de ICMS a partir do CEP; fallback = média (BRAZIL_TAX.icmsRate). */
+export function icmsRateFromCep(cep: string): { uf: string | null; rate: number } {
+  const uf = ufFromCep(cep);
+  return { uf, rate: uf ? (ICMS_BY_UF[uf] ?? BRAZIL_TAX.icmsRate) : BRAZIL_TAX.icmsRate };
 }
 
 export function calcEuVat(price: number, country: string): number {

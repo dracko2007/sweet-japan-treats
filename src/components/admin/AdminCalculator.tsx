@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { getRates, loadFxRates, convertYen, getRateSource } from '@/services/fxService';
 import { formatPrice } from '@/utils/currency';
 import { getELightRate, getAirParcelRate, getEmsRate, type JapanPostZone } from '@/utils/japanPostRates';
+import { calcBrazilTax, icmsRateFromCep, EU_VAT_RATES, calcUsSalesTax, US_SALES_TAX } from '@/utils/taxRules';
 
 interface ProductRow {
   id: number;
@@ -17,6 +18,14 @@ const AdminCalculator: React.FC = () => {
   const [psQty, setPsQty] = useState('');
   const [weightKg, setWeightKg] = useState('');
   const [zone, setZone] = useState<JapanPostZone>(5);
+
+  // ── Imposto de importação (destino) ──
+  const [taxDest, setTaxDest] = useState<'BR' | 'EU' | 'US' | 'none'>('BR');
+  const [cep, setCep] = useState('');
+  const [euCountry, setEuCountry] = useState<keyof typeof EU_VAT_RATES>('Portugal');
+  const [usState, setUsState] = useState('CA');
+  const [includeFreight, setIncludeFreight] = useState(false);
+  const [freightIdx, setFreightIdx] = useState(0);
 
   // Cotação ao vivo (Wise): usa EXATAMENTE o mesmo convertYen() do carrinho/checkout,
   // então o Total da calculadora bate com o que o cliente paga. Recarrega a cada 5 min
@@ -50,7 +59,11 @@ const AdminCalculator: React.FC = () => {
 
   const totalYen = useMemo(() => rows.reduce((s, r) => s + sellPrice(r), 0), [rows]);
   const totalCostYen = useMemo(() => rows.reduce((s, r) => s + (parseFloat(r.costYen) || 0), 0), [rows]);
-  const psFeeYen = (parseInt(psQty) || 0) * 1000;
+
+  // Taxa Personal Shopper AUTOMÁTICA: 1 item por input box (linha de produto).
+  // Se o admin digitar um valor manual no campo, ele sobrepõe a contagem automática.
+  const effPsQty = psQty.trim() === '' ? rows.length : (parseInt(psQty) || 0);
+  const psFeeYen = effPsQty * 1000;
   const grandTotalYen = totalYen + psFeeYen;
   const profitYen = grandTotalYen - totalCostYen;
 
@@ -61,8 +74,11 @@ const AdminCalculator: React.FC = () => {
   const productsEur = rows.reduce((s, r) => s + convertYen(sellPrice(r), 'EUR'), 0);
   const psBrl = convertYen(psFeeYen, 'BRL', true);
   const psEur = convertYen(psFeeYen, 'EUR', true);
+  const productsUsd = rows.reduce((s, r) => s + convertYen(sellPrice(r), 'USD'), 0);
+  const psUsd = convertYen(psFeeYen, 'USD', true);
   const subtotalBrl = productsBrl + psBrl;
   const subtotalEur = productsEur + psEur;
+  const subtotalUsd = productsUsd + psUsd;
   const profitBrl = convertYen(profitYen, 'BRL', true);
   const profitEur = convertYen(profitYen, 'EUR', true);
 
@@ -86,6 +102,33 @@ const AdminCalculator: React.FC = () => {
   if (eRaitoYen != null) shippingOptions.push({ label: '✉️ e-Packet Light (≤2kg)', yen: eRaitoYen });
   if (emsYen    != null) shippingOptions.push({ label: '🚀 EMS', yen: emsYen });
   if (kAirYen   != null) shippingOptions.push({ label: '✈️ Air Parcel', yen: kAirYen });
+
+  // ── Imposto de importação sobre produtos + Personal Shopper (+ frete opcional) ──
+  // A base pode incluir o frete (valor CIF) quando "Incluir frete" está marcado.
+  // Brasil: 60% federal (Remessa Conforme) + ICMS da UF do CEP.
+  // Europa: IVA/VAT do país. EUA: sales tax do estado.
+  const selFreight = includeFreight && shippingOptions.length > 0
+    ? shippingOptions[Math.min(freightIdx, shippingOptions.length - 1)]
+    : null;
+  const freightYen = selFreight ? selFreight.yen : 0;
+  const freightBrl = convertYen(freightYen, 'BRL', true);
+  const freightEur = convertYen(freightYen, 'EUR', true);
+  const freightUsd = convertYen(freightYen, 'USD', true);
+
+  const taxBaseBrl = subtotalBrl + freightBrl;
+  const taxBaseEur = subtotalEur + freightEur;
+  const taxBaseUsd = subtotalUsd + freightUsd;
+
+  const { uf, rate: icmsRate } = icmsRateFromCep(cep);
+  const brTax = calcBrazilTax(taxBaseBrl, icmsRate); // { federal, icms, total }
+  const euRate = EU_VAT_RATES[euCountry] ?? 0.20;
+  const euTax = taxBaseEur * euRate;
+  const usRate = US_SALES_TAX[usState] ?? 0;
+  const usTax = calcUsSalesTax(taxBaseUsd, usState);
+
+  const totalWithTaxBrl = taxBaseBrl + brTax.total;
+  const totalWithTaxEur = taxBaseEur + euTax;
+  const totalWithTaxUsd = taxBaseUsd + usTax;
 
   return (
     <div className="space-y-6 pb-8">
@@ -179,16 +222,18 @@ const AdminCalculator: React.FC = () => {
 
       {/* ── Taxa Personal Shopper ── */}
       <div className="bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-800 rounded-2xl p-4">
-        <p className="text-[11px] font-bold text-orange-700 dark:text-orange-400 uppercase tracking-wide mb-3">🛍️ Taxa Personal Shopper (¥1.000/item)</p>
+        <p className="text-[11px] font-bold text-orange-700 dark:text-orange-400 uppercase tracking-wide mb-3">🛍️ Taxa Personal Shopper (¥1.000/item) — automática: 1 por item</p>
         <div className="flex items-center gap-4 flex-wrap">
           <div className="flex flex-col gap-1">
-            <label className="text-xs text-orange-600 dark:text-orange-400 font-medium">Quantidade de itens</label>
+            <label className="text-xs text-orange-600 dark:text-orange-400 font-medium">
+              Qtd de itens <span className="opacity-70">(auto = {rows.length}; edite para sobrepor)</span>
+            </label>
             <input
               type="number"
               min="0"
               value={psQty}
               onChange={e => setPsQty(e.target.value)}
-              placeholder="0"
+              placeholder={String(rows.length)}
               className="w-32 border border-orange-300 dark:border-orange-700 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-400"
             />
           </div>
@@ -213,7 +258,7 @@ const AdminCalculator: React.FC = () => {
             </div>
             {psFeeYen > 0 && (
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Taxa Personal Shopper ({parseInt(psQty) || 0} × ¥1.000)</span>
+                <span className="text-muted-foreground">Taxa Personal Shopper ({effPsQty} × ¥1.000)</span>
                 <span className="font-bold text-orange-600 dark:text-orange-400">{yenFmt(psFeeYen)}</span>
               </div>
             )}
@@ -221,9 +266,167 @@ const AdminCalculator: React.FC = () => {
               <span className="font-semibold">Subtotal (produtos + PS)</span>
               <span className="font-black text-primary text-base">{yenFmt(grandTotalYen)}</span>
             </div>
+            {/* Adendo: total de itens + subtotal em R$ e € */}
+            <div className="grid grid-cols-3 gap-2 border-t border-border pt-2 mt-2">
+              <div className="text-center">
+                <p className="text-[10px] uppercase text-muted-foreground font-bold">Total itens</p>
+                <p className="font-black text-foreground">{rows.length}</p>
+              </div>
+              <div className="text-center">
+                <p className="text-[10px] uppercase text-muted-foreground font-bold">Total Real</p>
+                <p className="font-black text-green-600 dark:text-green-400">{formatPrice(subtotalBrl, 'BRL', true)}</p>
+              </div>
+              <div className="text-center">
+                <p className="text-[10px] uppercase text-muted-foreground font-bold">Total Euro</p>
+                <p className="font-black text-blue-600 dark:text-blue-400">{formatPrice(subtotalEur, 'EUR', true)}</p>
+              </div>
+            </div>
           </div>
         </div>
       )}
+
+      {/* ── Imposto de importação (destino) ── */}
+      <div className="bg-rose-50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-800 rounded-2xl p-5">
+        <p className="text-[11px] font-bold text-rose-700 dark:text-rose-400 uppercase tracking-wide mb-3">🏛️ Imposto de importação (destino)</p>
+
+        <div className="flex flex-wrap gap-2 mb-4">
+          {([
+            { d: 'BR', label: '🇧🇷 Brasil (60% + ICMS)' },
+            { d: 'EU', label: '🇪🇺 Europa (IVA)' },
+            { d: 'US', label: '🇺🇸 EUA (Sales Tax)' },
+            { d: 'none', label: 'Sem imposto' },
+          ] as { d: 'BR' | 'EU' | 'US' | 'none'; label: string }[]).map(({ d, label }) => (
+            <button
+              key={d}
+              onClick={() => setTaxDest(d)}
+              className={`px-3 py-2 rounded-lg text-xs font-bold border transition-colors ${taxDest === d ? 'bg-rose-600 text-white border-rose-600' : 'border-rose-300 dark:border-rose-700 text-rose-700 dark:text-rose-300 hover:bg-rose-100 dark:hover:bg-rose-900/30'}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {/* Incluir frete na base do imposto (valor CIF) */}
+        {taxDest !== 'none' && shippingOptions.length > 0 && (
+          <div className="flex flex-wrap items-center gap-3 mb-4 text-sm">
+            <label className="inline-flex items-center gap-2 font-medium text-rose-700 dark:text-rose-300">
+              <input type="checkbox" checked={includeFreight} onChange={e => setIncludeFreight(e.target.checked)} className="accent-rose-600" />
+              Incluir frete na base (CIF)
+            </label>
+            {includeFreight && (
+              <select
+                value={freightIdx}
+                onChange={e => setFreightIdx(Number(e.target.value))}
+                className="border border-rose-300 dark:border-rose-700 rounded-lg px-2 py-1.5 text-xs bg-white dark:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-rose-400"
+              >
+                {shippingOptions.map((opt, i) => (
+                  <option key={opt.label} value={i}>{opt.label} — {yenFmt(opt.yen)}</option>
+                ))}
+              </select>
+            )}
+          </div>
+        )}
+
+        {/* Brasil: CEP → UF → ICMS */}
+        {taxDest === 'BR' && (
+          <div className="space-y-3">
+            <div className="flex flex-col gap-1 max-w-xs">
+              <label className="text-xs text-rose-600 dark:text-rose-400 font-medium">CEP de destino (define o ICMS do estado)</label>
+              <input
+                type="text"
+                inputMode="numeric"
+                value={cep}
+                onChange={e => setCep(e.target.value)}
+                placeholder="01000-000"
+                className="w-40 border border-rose-300 dark:border-rose-700 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-rose-400"
+              />
+              <span className="text-[11px] text-rose-600 dark:text-rose-400">
+                {uf ? `Estado: ${uf} · ICMS ${(icmsRate * 100).toFixed(1)}%` : `CEP incompleto — usando ICMS médio ${(icmsRate * 100).toFixed(1)}%`}
+              </span>
+            </div>
+            {taxBaseBrl > 0 && (
+              <div className="text-sm space-y-1">
+                <div className="flex justify-between max-w-md"><span className="text-muted-foreground">Base (produtos + PS{includeFreight ? ' + frete' : ''})</span><span className="font-semibold">{formatPrice(taxBaseBrl, 'BRL', true)}</span></div>
+                <div className="flex justify-between max-w-md"><span className="text-muted-foreground">Imposto federal (60%)</span><span className="font-semibold">{formatPrice(brTax.federal, 'BRL', true)}</span></div>
+                <div className="flex justify-between max-w-md"><span className="text-muted-foreground">ICMS {uf ? `(${uf})` : ''} {(icmsRate * 100).toFixed(1)}%</span><span className="font-semibold">{formatPrice(brTax.icms, 'BRL', true)}</span></div>
+                <div className="flex justify-between max-w-md border-t border-rose-200 dark:border-rose-800 pt-1"><span className="font-bold text-rose-700 dark:text-rose-300">Total impostos</span><span className="font-black text-rose-700 dark:text-rose-300">{formatPrice(brTax.total, 'BRL', true)}</span></div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Europa: IVA por país */}
+        {taxDest === 'EU' && (
+          <div className="space-y-3">
+            <div className="flex flex-col gap-1 max-w-xs">
+              <label className="text-xs text-rose-600 dark:text-rose-400 font-medium">País (define a alíquota do IVA)</label>
+              <select
+                value={euCountry}
+                onChange={e => setEuCountry(e.target.value as keyof typeof EU_VAT_RATES)}
+                className="w-48 border border-rose-300 dark:border-rose-700 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-rose-400"
+              >
+                {Object.entries(EU_VAT_RATES).map(([c, r]) => (
+                  <option key={c} value={c}>{c} — IVA {(r * 100).toFixed(0)}%</option>
+                ))}
+              </select>
+            </div>
+            {taxBaseEur > 0 && (
+              <div className="text-sm space-y-1">
+                <div className="flex justify-between max-w-md"><span className="text-muted-foreground">Base (produtos + PS{includeFreight ? ' + frete' : ''})</span><span className="font-semibold">{formatPrice(taxBaseEur, 'EUR', true)}</span></div>
+                <div className="flex justify-between max-w-md border-t border-rose-200 dark:border-rose-800 pt-1"><span className="font-bold text-rose-700 dark:text-rose-300">IVA {euCountry} ({(euRate * 100).toFixed(0)}%)</span><span className="font-black text-rose-700 dark:text-rose-300">{formatPrice(euTax, 'EUR', true)}</span></div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* EUA: sales tax por estado */}
+        {taxDest === 'US' && (
+          <div className="space-y-3">
+            <div className="flex flex-col gap-1 max-w-xs">
+              <label className="text-xs text-rose-600 dark:text-rose-400 font-medium">Estado (define o sales tax)</label>
+              <select
+                value={usState}
+                onChange={e => setUsState(e.target.value)}
+                className="w-48 border border-rose-300 dark:border-rose-700 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-rose-400"
+              >
+                {Object.entries(US_SALES_TAX).map(([st, r]) => (
+                  <option key={st} value={st}>{st} — {(r * 100).toFixed(2)}%</option>
+                ))}
+              </select>
+            </div>
+            {taxBaseUsd > 0 && (
+              <div className="text-sm space-y-1">
+                <div className="flex justify-between max-w-md"><span className="text-muted-foreground">Base (produtos + PS{includeFreight ? ' + frete' : ''})</span><span className="font-semibold">{formatPrice(taxBaseUsd, 'USD', true)}</span></div>
+                <div className="flex justify-between max-w-md border-t border-rose-200 dark:border-rose-800 pt-1"><span className="font-bold text-rose-700 dark:text-rose-300">Sales Tax {usState} ({(usRate * 100).toFixed(2)}%)</span><span className="font-black text-rose-700 dark:text-rose-300">{formatPrice(usTax, 'USD', true)}</span></div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Total com imposto */}
+        {taxDest !== 'none' && grandTotalYen > 0 && (
+          <div className="mt-4 pt-3 border-t border-rose-200 dark:border-rose-800 flex flex-wrap gap-6">
+            {taxDest === 'BR' && (
+              <div>
+                <p className="text-[11px] uppercase font-bold text-rose-600 dark:text-rose-400">Total c/ imposto (R$)</p>
+                <p className="text-2xl font-black text-rose-800 dark:text-rose-200">{formatPrice(totalWithTaxBrl, 'BRL', true)}</p>
+              </div>
+            )}
+            {taxDest === 'EU' && (
+              <div>
+                <p className="text-[11px] uppercase font-bold text-rose-600 dark:text-rose-400">Total c/ imposto (€)</p>
+                <p className="text-2xl font-black text-rose-800 dark:text-rose-200">{formatPrice(totalWithTaxEur, 'EUR', true)}</p>
+              </div>
+            )}
+            {taxDest === 'US' && (
+              <div>
+                <p className="text-[11px] uppercase font-bold text-rose-600 dark:text-rose-400">Total c/ imposto ($)</p>
+                <p className="text-2xl font-black text-rose-800 dark:text-rose-200">{formatPrice(totalWithTaxUsd, 'USD', true)}</p>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* ── Totais (produtos + PS fee) ── */}
       <div className="grid grid-cols-3 gap-4">
