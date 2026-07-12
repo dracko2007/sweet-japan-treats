@@ -59,6 +59,7 @@ export default async function handler(req, res) {
     const orderId = String(body.orderId || '').trim();
     const email = String(body.email || '').trim().toLowerCase();
     const name = String(body.name || '').trim();
+    const itemCount = Number.isFinite(Number(body.itemCount)) ? Math.max(0, Math.floor(Number(body.itemCount))) : 0;
 
     const validCurrencies = Object.keys(MIN_CHARGE_BY_CURRENCY);
     if (!validCurrencies.includes(currency)) {
@@ -80,10 +81,17 @@ export default async function handler(req, res) {
     const stripe = new Stripe(secretKey);
     const customerId = await getEnglishCustomerId(stripe, email, name);
 
+    // Descrição em inglês exibida no recibo nativo do Stripe (uma linha; o
+    // recibo de PaymentIntent não lista itens, então damos um resumo útil).
+    const description = orderId
+      ? `Japan Express — Order ${orderId}${itemCount > 0 ? ` (${itemCount} item${itemCount === 1 ? '' : 's'})` : ''}`
+      : undefined;
+
     const paymentIntent = await stripe.paymentIntents.create({
       amount: stripeAmount,
       currency: currency.toLowerCase(),
       automatic_payment_methods: { enabled: true },
+      description,
       // Recibo automático do Stripe é enviado a este e-mail (em inglês via customer locale).
       receipt_email: email || undefined,
       customer: customerId || undefined,

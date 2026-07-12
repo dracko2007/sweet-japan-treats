@@ -18,6 +18,7 @@ interface StripeCardFormProps {
   currency: string;
   email?: string;
   customerName?: string;
+  itemCount?: number;
   onSuccess: () => void;
 }
 
@@ -73,7 +74,7 @@ const CheckoutForm: React.FC<Pick<StripeCardFormProps, 'onSuccess'>> = ({ onSucc
   );
 };
 
-const StripeCardForm: React.FC<StripeCardFormProps> = ({ orderId, amount, currency, email, customerName, onSuccess }) => {
+const StripeCardForm: React.FC<StripeCardFormProps> = ({ orderId, amount, currency, email, customerName, itemCount, onSuccess }) => {
   const [clientSecret, setClientSecret] = useState('');
   const [error, setError] = useState('');
 
@@ -82,7 +83,7 @@ const StripeCardForm: React.FC<StripeCardFormProps> = ({ orderId, amount, curren
     fetch('/api/create-payment-intent', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ orderId, amount, currency, email, name: customerName }),
+      body: JSON.stringify({ orderId, amount, currency, email, name: customerName, itemCount }),
     })
       .then((res) => res.json())
       .then((data) => {
