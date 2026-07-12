@@ -43,8 +43,11 @@ erp/whatsapp-service/.wwebjs_cache/
 
 .vercel
 
-# Firebase credentials (NUNCA commitar)
+# Firebase / Google service-account credentials (NUNCA commitar)
 serviceAccountKey.json
+key.json
+*-service-account*.json
+*serviceAccount*.json
 image-urls.json
 
 # Scripts auxiliares de setup (dev)

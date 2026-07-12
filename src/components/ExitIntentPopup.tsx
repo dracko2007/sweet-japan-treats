@@ -286,10 +286,12 @@ const ExitIntentPopup: React.FC = () => {
   }
 
   // ----- Fallback: cadastro com pontos e cupons (só não-logados) -----
-  const handleCadastro = useCallback(() => {
+  // Função simples (NÃO useCallback): está após early-returns condicionais, então
+  // um hook aqui violaria as Regras dos Hooks e quebraria o componente ao abrir.
+  const handleCadastro = () => {
     close();
     navigate('/cadastro');
-  }, [close, navigate]);
+  };
 
   return (
     <Shell label="Cadastre-se e ganhe recompensas" onClose={close}>

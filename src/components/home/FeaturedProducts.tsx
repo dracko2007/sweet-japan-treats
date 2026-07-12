@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { ArrowRight, Sparkles, Zap, TrendingUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import CompactProductCard from '@/components/products/CompactProductCard';
+import ScrollReveal from '@/components/ScrollReveal';
 import { useProducts } from '@/context/ProductsContext';
 import { hasDiscount } from '@/utils/pricing';
 
@@ -97,7 +98,11 @@ const FeaturedProducts: React.FC = () => {
                   </div>
                 </div>
               ))
-            : items.map(product => <CompactProductCard key={product.id} product={product} />)}
+            : items.map((product, idx) => (
+                <ScrollReveal key={product.id} delay={(idx % 6) * 50}>
+                  <CompactProductCard product={product} />
+                </ScrollReveal>
+              ))}
         </div>
       </div>
     </section>
