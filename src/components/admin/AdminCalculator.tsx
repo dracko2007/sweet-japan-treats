@@ -553,24 +553,63 @@ const AdminCalculator: React.FC = () => {
       {shippingOptions.length > 0 && grandTotalYen > 0 && (
         <div className="bg-gray-900 dark:bg-gray-950 rounded-2xl p-5 border-2 border-gray-700">
           <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wide mb-4">🧾 Total Geral (produtos + PS + frete)</p>
-          <div className="space-y-3">
+          <div className="space-y-4">
             {shippingOptions.map(opt => {
               const total = grandTotalYen + opt.yen;
               // Conversão idêntica à do checkout: subtotal (produtos+PS) + frete (taxa, sem buffer).
               const totalBrl = subtotalBrl + convertYen(opt.yen, 'BRL', true);
               const totalEur = subtotalEur + convertYen(opt.yen, 'EUR', true);
+
+              // Base de imposto CIF desta opção = produtos + PS + este frete, na moeda do destino.
+              // Usa o destino/CEP preenchidos acima para mostrar o total COM imposto.
+              let taxLine: { cur: 'BRL' | 'EUR' | 'USD'; base: number; tax: number; withTax: number; label: string } | null = null;
+              if (taxDest === 'BR') {
+                const base = subtotalBrl + convertYen(opt.yen, 'BRL', true);
+                const t = calcBrazilTax(base, icmsRate).total;
+                taxLine = { cur: 'BRL', base, tax: t, withTax: base + t, label: `Imposto Brasil (60% + ICMS ${(icmsRate * 100).toFixed(1)}%)` };
+              } else if (taxDest === 'EU') {
+                const base = subtotalEur + convertYen(opt.yen, 'EUR', true);
+                const t = base * euRate;
+                taxLine = { cur: 'EUR', base, tax: t, withTax: base + t, label: `IVA ${euCountry} (${(euRate * 100).toFixed(0)}%)` };
+              } else if (taxDest === 'US') {
+                const base = subtotalUsd + convertYen(opt.yen, 'USD', true);
+                const t = calcUsSalesTax(base, usState);
+                taxLine = { cur: 'USD', base, tax: t, withTax: base + t, label: `Sales Tax ${usState} (${(usRate * 100).toFixed(2)}%)` };
+              }
+
               return (
-                <div key={opt.label} className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4">
-                  <span className="text-xs font-bold text-gray-400 w-40 shrink-0">{opt.label}</span>
-                  <div className="flex gap-4 flex-wrap">
-                    <span className="text-xl font-black text-white">{yenFmt(total)}</span>
-                    <span className="text-xl font-black text-green-400">{formatPrice(totalBrl, 'BRL', true)}</span>
-                    <span className="text-xl font-black text-blue-400">{formatPrice(totalEur, 'EUR', true)}</span>
+                <div key={opt.label} className="border-b border-gray-700 last:border-0 pb-3 last:pb-0">
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4">
+                    <span className="text-xs font-bold text-gray-400 w-40 shrink-0">{opt.label}</span>
+                    <div className="flex gap-4 flex-wrap">
+                      <span className="text-xl font-black text-white">{yenFmt(total)}</span>
+                      <span className="text-xl font-black text-green-400">{formatPrice(totalBrl, 'BRL', true)}</span>
+                      <span className="text-xl font-black text-blue-400">{formatPrice(totalEur, 'EUR', true)}</span>
+                    </div>
                   </div>
+                  {taxLine && (
+                    <div className="mt-2 sm:ml-40 grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-1 text-xs">
+                      <div>
+                        <p className="text-gray-500 uppercase font-bold text-[10px]">Sem imposto</p>
+                        <p className="font-bold text-gray-300">{formatPrice(taxLine.base, taxLine.cur, true)}</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-500 uppercase font-bold text-[10px]">{taxLine.label}</p>
+                        <p className="font-bold text-rose-400">+ {formatPrice(taxLine.tax, taxLine.cur, true)}</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-500 uppercase font-bold text-[10px]">Total c/ imposto</p>
+                        <p className="font-black text-rose-300 text-sm">{formatPrice(taxLine.withTax, taxLine.cur, true)}</p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })}
           </div>
+          {taxDest === 'none' && (
+            <p className="mt-3 text-[11px] text-gray-500">💡 Selecione o destino e preencha o CEP na seção de imposto acima para ver o total com/sem imposto por frete.</p>
+          )}
         </div>
       )}
 
