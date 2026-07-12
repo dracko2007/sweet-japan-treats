@@ -1449,6 +1449,8 @@ const OrderReview: React.FC = () => {
                       orderId={pendingOrder.id}
                       amount={Number(pendingOrder.total) || 0}
                       currency={pendingOrder.currency}
+                      email={pendingOrder.email}
+                      customerName={pendingOrder.name}
                       onSuccess={() => {
                         // Cartão já foi cobrado com sucesso pelo Stripe — diferente de
                         // PIX/Wise, que ficam 'Pendente' até o comprovante ser enviado.
