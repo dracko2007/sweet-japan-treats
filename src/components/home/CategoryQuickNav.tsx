@@ -22,24 +22,26 @@ const CategoryQuickNav: React.FC = () => {
   if (!loading && visibleCategories.length === 0) return null;
 
   return (
-    <section className="py-10 bg-white border-b border-gray-100">
+    <section className="py-4 bg-white border-b border-gray-100">
       <div className="container mx-auto px-4">
-        <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1 scrollbar-hide sm:grid sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-9 sm:overflow-visible">
+        <div className="flex gap-2.5 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-hide sm:flex-wrap sm:justify-center sm:overflow-visible">
           {loading
             ? Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="shrink-0 w-24 sm:w-auto h-24 rounded-2xl bg-gray-100 animate-pulse" />
+                <div key={i} className="shrink-0 h-10 w-28 rounded-full bg-gray-100 animate-pulse" />
               ))
             : visibleCategories.map((cat) => (
                 <Link
                   key={cat.id}
                   to={`/produtos/${cat.id}`}
-                  className="group shrink-0 w-24 sm:w-auto flex flex-col items-center justify-center gap-1.5 rounded-2xl border border-gray-100 bg-gray-50 hover:bg-pink-50 hover:border-pink-200 p-3.5 transition-all duration-200 hover:-translate-y-0.5"
+                  className="group shrink-0 flex items-center gap-2 rounded-full border border-gray-100 bg-gray-50 hover:bg-pink-50 hover:border-pink-200 px-4 py-2 transition-all duration-200 hover:-translate-y-0.5"
                 >
-                  <span className="text-2xl group-hover:scale-110 transition-transform">{cat.icon}</span>
-                  <span className="text-[11px] font-bold text-gray-700 text-center leading-tight line-clamp-1">
+                  <span className="text-lg group-hover:scale-110 transition-transform">{cat.icon}</span>
+                  <span className="text-xs font-bold text-gray-700 leading-none whitespace-nowrap">
                     {cat.label}
                   </span>
-                  <span className="text-[10px] text-pink-500 font-semibold">{counts[cat.id]} itens</span>
+                  <span className="text-[10px] text-pink-500 font-semibold leading-none whitespace-nowrap">
+                    {counts[cat.id]}
+                  </span>
                 </Link>
               ))}
         </div>

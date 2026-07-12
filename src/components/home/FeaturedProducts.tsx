@@ -58,7 +58,7 @@ const FeaturedProducts: React.FC = () => {
   const items = activeTab.items;
 
   return (
-    <section className="py-10 bg-white">
+    <section className="pt-4 pb-10 bg-white">
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between gap-3 mb-5">
           <h2 className="font-display text-2xl md:text-3xl font-bold text-gray-900">Produtos</h2>
