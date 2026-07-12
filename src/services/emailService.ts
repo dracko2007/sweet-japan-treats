@@ -42,91 +42,31 @@ export const emailService = {
       devLog('🔢 Tracking Number:', data.trackingNumber);
     }
     
-    // If no API key, fallback to console logging
-    if (!RESEND_API_KEY) {
-      devWarn('⚠️ VITE_RESEND_API_KEY not configured - opening email preview');
-      devLog('💡 Configure VITE_RESEND_API_KEY in .env and Vercel to enable automatic emails');
-      
-      // Open email in new window for testing
-      const emailWindow = window.open('', '_blank');
-      if (emailWindow) {
-        emailWindow.document.write(data.html);
-        emailWindow.document.close();
-      }
-      
-      return false;
-    }
-    
+    // Envio unificado via endpoint SMTP noreply@ (Google Workspace). Substitui o
+    // Resend. Anti-abuso ancorado no pedido real (orderNumber) no servidor; para
+    // e-mails de teste do admin, cai no fallback de conta no Firebase Auth.
     try {
-      devLog('📤 Sending request to Resend API...');
-      devLog('📤 API Key configured:', !!RESEND_API_KEY, RESEND_API_KEY?.substring(0, 10) + '...');
-      devLog('📤 Request body:', {
-        from: FROM_EMAIL,
-        to: data.to,
-        subject: data.subject,
-        htmlLength: data.html.length
-      });
-      
-      const requestBody = {
-        from: FROM_EMAIL,
-        to: data.to,
-        subject: data.subject,
-        html: data.html
-      };
-      
-      devLog('📤 Making fetch request...');
-      
-      const response = await fetch('https://api.resend.com/emails', {
+      const response = await fetch('/api/send-email', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${RESEND_API_KEY}`
-        },
-        body: JSON.stringify(requestBody)
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'transactional',
+          to: data.to,
+          orderId: data.orderNumber,
+          subject: data.subject,
+          html: data.html,
+        }),
       });
-
-      devLog('📥 Response received!');
-      devLog('📥 Response status:', response.status, response.statusText);
-      devLog('📥 Response headers:', Object.fromEntries(response.headers.entries()));
-
-      const responseText = await response.text();
-      devLog('📥 Response body (raw):', responseText);
-      
-      let result;
-      try {
-        result = JSON.parse(responseText);
-      } catch (e) {
-        devError('❌ Failed to parse response as JSON:', e);
-        result = { error: responseText };
-      }
-      
-      devLog('📥 Response data (parsed):', result);
 
       if (!response.ok) {
-        devError('❌ Resend API error:', {
-          status: response.status,
-          statusText: response.statusText,
-          error: result
-        });
-        
-        // Show detailed error to user
-        const errorMessage = result.message || result.error || 'Erro desconhecido';
-        alert(`❌ Erro ao enviar email:\n\n${errorMessage}\n\nStatus: ${response.status}\n\nVerifique o console (F12) para mais detalhes.`);
-        
+        const errText = await response.text().catch(() => '');
+        devError('❌ send-email error:', response.status, errText);
         return false;
       }
-
-      devLog('✅ Email sent successfully via Resend!');
-      devLog('📧 Email ID:', result.id);
+      devLog('✅ Email enviado via /api/send-email (noreply)');
       return true;
     } catch (error) {
       devError('❌ Error sending email:', error);
-      devError('❌ Error details:', {
-        name: (error as Error).name,
-        message: (error as Error).message,
-        stack: (error as Error).stack
-      });
-      alert(`❌ Erro ao enviar email:\n\n${(error as Error).message}\n\nVerifique sua conexão e o console (F12).`);
       return false;
     }
   },

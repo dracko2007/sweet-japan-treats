@@ -72,17 +72,10 @@ export const emailServiceSimple = {
    * Send order confirmation email to customer
    */
   sendOrderConfirmation: async (orderData: any): Promise<boolean> => {
-    devLog('📧 EmailJS - Sending order confirmation to customer');
-    
-    if (!EMAILJS_SERVICE_ID || !EMAILJS_TEMPLATE_ID_CUSTOMER || !EMAILJS_PUBLIC_KEY) {
-      devError('❌ EmailJS NÃO configurado');
-      return false;
-    }
-    
+    devLog('📧 Sending order confirmation to customer (noreply SMTP)');
+
     try {
-      await loadEmailJS();
-      
-      const itemsList = orderData.items.map((item: CartItem) => 
+      const itemsList = orderData.items.map((item: CartItem) =>
         `${productEnglishName(item.product as any)} (${item.size}) x${item.quantity} - ¥${(item.product.prices[item.size] * item.quantity).toLocaleString()}`
       );
       
@@ -228,25 +221,23 @@ Enviado com carinho e rapidez.
 </body>
 </html>`;
       
-      const emailParams = {
-        to_email: orderData.formData.email,
-        to_name: orderData.formData.name,
-        subject: `✅ Pedido Confirmado - #${orderData.orderNumber}`,
-        message: htmlContent,
-      };
-      
-      devLog('📤 Sending order confirmation email via EmailJS...');
-      
-      const response = await getEmailJS().send(
-        EMAILJS_SERVICE_ID,
-        EMAILJS_TEMPLATE_ID_CUSTOMER,
-        emailParams
-      );
-      
-      devLog('✅ Email sent successfully!');
-      devLog('📧 Response:', response);
-      return true;
-      
+      // Envio via endpoint SMTP noreply@ (Google Workspace) — anti-abuso ancorado
+      // no pedido real (orderId) no servidor. Substitui o EmailJS.
+      const res = await fetch('/api/send-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'transactional',
+          to: orderData.formData.email,
+          orderId: orderData.orderNumber,
+          subject: `✅ Pedido Confirmado - #${orderData.orderNumber}`,
+          html: htmlContent,
+        }),
+      });
+
+      devLog('📤 Order confirmation sent via /api/send-email:', res.status);
+      return res.ok;
+
     } catch (error) {
       devError('❌ Error sending email:', error);
       return false;

@@ -4,6 +4,7 @@
 import nodemailer from 'nodemailer';
 import { cert, getApps, initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
+import { getFirestore } from 'firebase-admin/firestore';
 
 // Remetente padrão de todos os e-mails transacionais (Google Workspace).
 const FROM = 'noreply@japanexpress-store.com';
@@ -66,6 +67,34 @@ function firebaseAdminAuth() {
     initializeApp({ credential: cert(serviceAccount) });
   }
   return getAuth();
+}
+
+function firebaseAdminDb() {
+  firebaseAdminAuth(); // garante initializeApp
+  return getFirestore();
+}
+
+// Anti-abuso p/ e-mails transacionais (recibo/rastreio): o destinatário precisa
+// ser o dono de um pedido real no Firestore. Retry curto absorve o lag de sync
+// (o pedido é gravado no client logo antes de disparar o e-mail).
+async function orderAllowsEmail(orderId, to) {
+  if (!orderId) return false;
+  const db = firebaseAdminDb();
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const snap = await db.collection('orders').doc(String(orderId)).get();
+      if (snap.exists) {
+        const d = snap.data() || {};
+        const emails = [d.customerEmail, d.email].map((e) => String(e || '').trim().toLowerCase());
+        if (emails.includes(to)) return true;
+        return false; // pedido existe mas e-mail não bate → não autoriza
+      }
+    } catch {
+      /* tenta de novo */
+    }
+    if (attempt < 2) await new Promise((r) => setTimeout(r, 700));
+  }
+  return false;
 }
 
 async function buildVerificationLink(email, req) {
@@ -134,34 +163,54 @@ export default async function handler(req, res) {
       return;
     }
 
-    // Verificação de evento: o destinatário precisa existir no Firebase Auth.
-    // Isso âncora o envio a um fato que o servidor controla — sem conta real,
-    // o endpoint não pode ser usado para mandar emails para endereços arbitrários.
-    // O 2FA é a única exceção: o código é gerado imediatamente após o cadastro,
-    // antes de o usuário confirmar o email, então getUserByEmail já funciona.
-    try {
-      await firebaseAdminAuth().getUserByEmail(to);
-    } catch {
-      // Não revela se o email existe ou não — resposta genérica para ambos os casos
-      res.status(400).json({ error: 'invalid request' });
-      return;
-    }
+    const type = String(body.type || 'welcome');
+    let subject;
+    let html;
 
-    let type = String(body.type || 'welcome');
-    let extra = {};
-    let linkError = null;
-    if (type === 'verify') {
-      // Se o link de verificação do Firebase falhar (ex.: domínio não autorizado),
-      // não derruba o e-mail: cai para o template de boas-vindas e envia mesmo assim.
-      try {
-        extra = { link: await buildVerificationLink(to, req) };
-      } catch (linkErr) {
-        linkError = String(linkErr?.message || linkErr);
-        console.warn('[send-email] verify link falhou, enviando welcome:', linkError);
-        type = 'welcome';
+    if (type === 'transactional') {
+      // Recibo de compra / rastreio: o HTML já vem renderizado pelo client.
+      // Anti-abuso: só envia se o destinatário for dono de um pedido real
+      // (Firestore) OU tiver conta no Firebase Auth — nunca para e-mail arbitrário.
+      subject = String(body.subject || '').trim();
+      html = String(body.html || '');
+      if (!subject || !html) {
+        res.status(400).json({ error: 'missing subject or html' });
+        return;
       }
+      let allowed = await orderAllowsEmail(String(body.orderId || '').trim(), to);
+      if (!allowed) {
+        try { await firebaseAdminAuth().getUserByEmail(to); allowed = true; } catch { /* não autoriza */ }
+      }
+      if (!allowed) {
+        res.status(400).json({ error: 'invalid request' });
+        return;
+      }
+    } else {
+      // verify / 2fa / welcome — âncora: o destinatário precisa existir no Firebase
+      // Auth (sem conta real, o endpoint não vira relay aberto). O 2FA é gerado logo
+      // após o cadastro, então getUserByEmail já funciona.
+      try {
+        await firebaseAdminAuth().getUserByEmail(to);
+      } catch {
+        // Não revela se o email existe ou não — resposta genérica
+        res.status(400).json({ error: 'invalid request' });
+        return;
+      }
+
+      let extra = {};
+      let effectiveType = type;
+      if (type === 'verify') {
+        // Se o link de verificação do Firebase falhar (ex.: domínio não autorizado),
+        // não derruba o e-mail: cai para o template de boas-vindas e envia mesmo assim.
+        try {
+          extra = { link: await buildVerificationLink(to, req) };
+        } catch (linkErr) {
+          console.warn('[send-email] verify link falhou, enviando welcome:', String(linkErr?.message || linkErr));
+          effectiveType = 'welcome';
+        }
+      }
+      ({ subject, html } = buildTemplate(effectiveType, body.name || '', body.code || '', extra));
     }
-    const { subject, html } = buildTemplate(type, body.name || '', body.code || '', extra);
 
     const transporter = nodemailer.createTransport({
       host: 'smtp.gmail.com',
