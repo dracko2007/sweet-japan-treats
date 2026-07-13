@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Plus, Pencil, Trash2, X, Image as ImageIcon, Loader2, PackageOpen, Sparkles, GripVertical, Save, Gift, Infinity, Search } from 'lucide-react';
+import { Plus, Pencil, Trash2, X, Image as ImageIcon, Loader2, PackageOpen, Sparkles, GripVertical, Save, Gift, Infinity, Search, Star } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Product, ProductVariant } from '@/types';
@@ -431,6 +431,13 @@ const ProductManager: React.FC = () => {
     const [moved] = g.splice(from, 1);
     g.splice(to, 0, moved);
     setEditing({ ...editing, gallery: g, image: g[0] || '' });
+  };
+
+  // Marca uma foto como capa (move para o topo) e desativa o vídeo como capa — só um dos dois pode ser a capa.
+  const setPhotoAsCover = (idx: number) => {
+    if (!editing) return;
+    if (idx !== 0) moveImage(idx, 0);
+    setEditing((prev) => (prev ? { ...prev, videoCover: undefined } : prev));
   };
 
   const handleVideoFile = async (files: FileList | null) => {
@@ -1345,13 +1352,28 @@ const ProductManager: React.FC = () => {
                     >
                       <img src={img} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover pointer-events-none" />
                       {idx === 0 ? (
-                        <span className="absolute top-0 left-0 bg-primary text-primary-foreground text-[9px] px-1 rounded-br font-bold">Capa</span>
+                        <span className={cn(
+                          "absolute top-0 left-0 text-[9px] px-1 rounded-br font-bold",
+                          editing.videoCover ? "bg-black/50 text-white" : "bg-primary text-primary-foreground"
+                        )}>
+                          {editing.videoCover ? 'Poster' : 'Capa'}
+                        </span>
                       ) : (
                         <span className="absolute top-0 left-0 bg-black/50 text-white text-[9px] px-1 rounded-br">{idx + 1}</span>
                       )}
                       <span className="absolute bottom-0.5 left-0.5 bg-black/50 text-white rounded p-0.5 opacity-0 group-hover:opacity-100 transition">
                         <GripVertical className="w-3 h-3" />
                       </span>
+                      {(idx !== 0 || editing.videoCover) && (
+                        <button
+                          type="button"
+                          onClick={() => setPhotoAsCover(idx)}
+                          title="Usar esta foto como capa"
+                          className="absolute bottom-0.5 right-0.5 bg-black/60 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition"
+                        >
+                          <Star className="w-3 h-3" />
+                        </button>
+                      )}
                       <button
                         onClick={() => removeImage(idx)}
                         className="absolute top-0.5 right-0.5 bg-black/60 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition"
@@ -1371,7 +1393,9 @@ const ProductManager: React.FC = () => {
                   )}
                 </div>
                 <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={(e) => handleFiles(e.target.files)} />
-                <p className="text-xs text-muted-foreground mt-1">🖱️ Arraste as fotos para mudar a ordem — a <strong>primeira é a capa</strong>. As imagens são reduzidas automaticamente.</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  🖱️ Arraste para reordenar — a <strong>primeira é a capa</strong>. Passe o mouse e clique na <Star className="w-3 h-3 inline -mt-0.5" /> de outra foto para torná-la a capa. As imagens são reduzidas automaticamente.
+                </p>
               </div>
 
               {/* Vídeo do produto */}
