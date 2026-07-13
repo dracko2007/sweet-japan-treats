@@ -85,7 +85,7 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({
                         playsInline
                         preload="auto"
                         aria-hidden="true"
-                        className="absolute inset-0 w-full h-full object-cover blur-3xl scale-110 opacity-80"
+                        className="absolute inset-0 w-full h-full bg-white object-cover blur-3xl scale-110 opacity-80"
                       />
                       <video
                         src={slide.videoSrc}
@@ -95,7 +95,7 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({
                         playsInline
                         preload="auto"
                         poster={slide.image}
-                        className="relative w-full h-full object-contain"
+                        className="relative w-full h-full bg-white object-contain"
                       />
                     </>
                   ) : slide.image ? (
