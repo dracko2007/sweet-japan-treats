@@ -96,7 +96,7 @@ const PromoCarouselSection: React.FC = () => {
 
   return (
     <div className="container mx-auto px-4 pt-6 pb-8">
-      <HeroCarousel slides={slides} autoplay autoplayInterval={8000} />
+      <HeroCarousel slides={slides} autoplay autoplayInterval={11000} />
     </div>
   );
 };
