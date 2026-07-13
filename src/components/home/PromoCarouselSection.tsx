@@ -79,6 +79,7 @@ const PromoCarouselSection: React.FC = () => {
       list.push({
         id: `featured-${p.id}`,
         image: p.gallery?.[0] || p.image || p.thumbnail || STORE_IMAGE,
+        videoSrc: p.videoCover ? p.video : undefined,
         layout: 'split',
         badge: t('featured.badge') || 'Seleção em destaque',
         title: productEnglishName(p),

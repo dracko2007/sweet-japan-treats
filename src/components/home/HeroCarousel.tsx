@@ -166,13 +166,23 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({
                       original de cada foto. */}
                   <div className="relative flex-1 md:flex-[0_0_48%] flex items-center justify-center p-2 sm:p-3 min-h-[200px] bg-white">
                     <div className="relative w-full h-full max-w-[620px] max-h-[620px] aspect-square flex items-center justify-center">
-                      {slide.image && (
+                      {slide.videoSrc ? (
+                        <video
+                          src={slide.videoSrc}
+                          autoPlay
+                          muted
+                          loop
+                          playsInline
+                          poster={slide.image}
+                          className="w-full h-full object-contain"
+                        />
+                      ) : slide.image ? (
                         <img
                           src={slide.image}
                           alt={slide.title}
                           className="max-w-full max-h-full w-auto h-auto object-contain"
                         />
-                      )}
+                      ) : null}
                     </div>
                   </div>
                 </div>
