@@ -6,14 +6,15 @@ interface ProductGalleryProps {
   images: string[];
   productName: string;
   video?: string;
+  videoCover?: boolean;
 }
 
-const ProductGallery: React.FC<ProductGalleryProps> = ({ images, productName, video }) => {
+const ProductGallery: React.FC<ProductGalleryProps> = ({ images, productName, video, videoCover }) => {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // Combina vídeo e imagens
-  const allMedia = video ? [video, ...images] : images;
+  // Combina vídeo e imagens — se for a capa, vídeo vem primeiro; senão, vai pro fim
+  const allMedia = video ? (videoCover ? [video, ...images] : [...images, video]) : images;
   const selectedMedia = allMedia[selectedIndex];
   const isVideo = selectedMedia === video;
 

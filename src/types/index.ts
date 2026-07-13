@@ -30,6 +30,7 @@ export interface Product {
   thumbnail?: string; // WebP 300px ~30KB — usado nos cards de lista
   gallery?: string[]; // Múltiplas imagens do produto
   video?: string; // Vídeo do produto (opcional)
+  videoCover?: boolean; // Se true, o vídeo é a capa (toca direto no card/galeria, sem precisar de hover)
   flavor: string;
   // 'exterior-only' = produto japonês, só vende fora do Japão
   // 'japan-only'    = produto importado (ex: brasileiro), só vende dentro do Japão

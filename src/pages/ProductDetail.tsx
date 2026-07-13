@@ -213,9 +213,10 @@ const ProductDetail: React.FC = () => {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 animate-fade-in motion-reduce:animate-none">
               <div>
                 <ProductGallery
-                  images={images} 
+                  images={images}
                   productName={translatedName}
                   video={product.video}
+                  videoCover={product.videoCover}
                 />
               </div>
 

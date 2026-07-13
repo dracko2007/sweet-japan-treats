@@ -154,7 +154,20 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
         onMouseLeave={() => setIsHovered(false)}
         onClick={() => navigate(`/produto/${product.id}`)}
       >
-        {product.video ? (
+        {product.video && product.videoCover ? (
+          /* Vídeo é a capa — toca direto, sem precisar de hover. Poster cobre até o vídeo carregar. */
+          <video
+            key={product.video}
+            src={product.video}
+            poster={product.thumbnail || product.image}
+            autoPlay
+            loop
+            muted
+            playsInline
+            className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 ease-out group-hover/image:scale-105 motion-reduce:transform-none"
+            onError={(e) => { (e.target as HTMLVideoElement).style.display = 'none'; }}
+          />
+        ) : product.video ? (
           <>
             {/* Poster sempre visível — vídeo só carrega/toca no hover para não travar a página */}
             <img

@@ -460,7 +460,7 @@ const ProductManager: React.FC = () => {
 
   const removeVideo = () => {
     if (!editing) return;
-    setEditing({ ...editing, video: undefined });
+    setEditing({ ...editing, video: undefined, videoCover: undefined });
   };
 
   const save = async () => {
@@ -1387,6 +1387,20 @@ const ProductManager: React.FC = () => {
                       className="w-40 h-40 rounded-lg border border-border object-cover bg-black"
                     />
                     <div className="flex flex-col gap-2">
+                      <label className="flex items-center gap-2 cursor-pointer select-none text-sm">
+                        <input
+                          type="checkbox"
+                          checked={!!editing.videoCover}
+                          onChange={(e) => setEditing({ ...editing, videoCover: e.target.checked || undefined })}
+                          className="w-4 h-4 rounded accent-primary"
+                        />
+                        <span>🎬 <strong>Usar vídeo como capa</strong></span>
+                      </label>
+                      <p className="text-[11px] text-muted-foreground -mt-1 max-w-[220px]">
+                        {editing.videoCover
+                          ? 'O vídeo toca direto no card e na galeria — a 1ª foto vira o poster (thumbnail).'
+                          : 'Sem isso, o vídeo só toca ao passar o mouse sobre o produto.'}
+                      </p>
                       <button
                         type="button"
                         onClick={() => videoRef.current?.click()}
