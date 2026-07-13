@@ -7,10 +7,20 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 const CLOUD_NAME = 'dw4j4tpub';
 const UPLOAD_PRESET = 'japanexpress';
 const UPLOAD_URL = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`;
+const UPLOAD_URL_VIDEO = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/video/upload`;
 
 async function uploadToFirebase(blob: Blob, folder: string): Promise<string> {
   if (!storage) throw new Error('Firebase Storage indisponível.');
   const ext = blob.type.includes('webp') ? 'webp' : blob.type.includes('png') ? 'png' : 'jpg';
+  const path = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+  const storageRef = ref(storage, path);
+  await uploadBytes(storageRef, blob, { contentType: blob.type });
+  return getDownloadURL(storageRef);
+}
+
+async function uploadVideoToFirebase(blob: Blob, folder: string): Promise<string> {
+  if (!storage) throw new Error('Firebase Storage indisponível.');
+  const ext = blob.type.includes('webm') ? 'webm' : blob.type.includes('quicktime') ? 'mov' : 'mp4';
   const path = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
   const storageRef = ref(storage, path);
   await uploadBytes(storageRef, blob, { contentType: blob.type });
@@ -92,5 +102,26 @@ export const cloudinaryService = {
 
     // 3) Último recurso: imagem comprimida em base64 (sem rede — sempre funciona)
     return compressToDataUrl(dataUrl, 900, 0.82);
+  },
+
+  async uploadVideoFile(file: File, folder: string): Promise<string> {
+    try {
+      const form = new FormData();
+      form.append('file', file);
+      form.append('upload_preset', UPLOAD_PRESET);
+      form.append('folder', folder);
+      const response = await fetch(UPLOAD_URL_VIDEO, { method: 'POST', body: form });
+      if (response.ok) {
+        const data = await response.json();
+        return data.secure_url as string;
+      }
+      const err = await response.json().catch(() => ({}));
+      console.warn(`Cloudinary vídeo indisponível (${response.status}): ${err?.error?.message}. Tentando Firebase Storage.`);
+    } catch (e) {
+      console.warn('Cloudinary vídeo offline, tentando Firebase Storage:', e);
+    }
+
+    // Fallback: Firebase Storage (sem último recurso base64 — vídeo é grande demais para o Firestore)
+    return uploadVideoToFirebase(file, folder);
   },
 };

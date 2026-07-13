@@ -12,6 +12,7 @@ const VARIANT_PRESETS = ['Pequeno', 'Médio', 'Grande', 'Kit'];
 const UNIT_PRESETS = ['1 unidade', '2 unidades', '3 unidades', '4 unidades', '5 unidades', '6 unidades', '10 unidades'];
 const ALL_PRESETS = [...VARIANT_PRESETS, ...UNIT_PRESETS];
 const MAX_PHOTOS = 9; // capa + até 8 fotos extras
+const MAX_VIDEO_MB = 50; // limite de upload de vídeo do produto
 import { useProducts } from '@/context/ProductsContext';
 import { productService } from '@/services/productService';
 import { cloudinaryService } from '@/services/cloudinaryService';
@@ -132,11 +133,13 @@ const ProductManager: React.FC = () => {
   const [isNew, setIsNew] = useState(false);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadingVideo, setUploadingVideo] = useState(false);
   const [enriching, setEnriching] = useState(false);
   const [enrichFields, setEnrichFields] = useState({ price: true, images: true, description: true, weight: true });
   const marginPct = 100;
   const [tagInput, setTagInput] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
+  const videoRef = useRef<HTMLInputElement>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterCat, setFilterCat] = useState<string>('all');
 
@@ -428,6 +431,36 @@ const ProductManager: React.FC = () => {
     const [moved] = g.splice(from, 1);
     g.splice(to, 0, moved);
     setEditing({ ...editing, gallery: g, image: g[0] || '' });
+  };
+
+  const handleVideoFile = async (files: FileList | null) => {
+    const file = files?.[0];
+    if (!file || !editing) return;
+    if (!file.type.startsWith('video/')) {
+      toast({ title: 'Selecione um arquivo de vídeo (mp4, webm, mov)', variant: 'destructive' });
+      return;
+    }
+    if (file.size > MAX_VIDEO_MB * 1024 * 1024) {
+      toast({ title: `Vídeo muito grande`, description: `Máximo ${MAX_VIDEO_MB}MB. Comprima o arquivo e tente novamente.`, variant: 'destructive' });
+      return;
+    }
+    setUploadingVideo(true);
+    try {
+      const folder = `japanexpress/products/${editing.id || 'temp-' + Date.now()}`;
+      const url = await cloudinaryService.uploadVideoFile(file, folder);
+      setEditing((prev) => (prev ? { ...prev, video: url } : prev));
+      toast({ title: '✅ Vídeo enviado' });
+    } catch (e: any) {
+      toast({ title: 'Erro ao enviar vídeo', description: e?.message, variant: 'destructive' });
+    } finally {
+      setUploadingVideo(false);
+      if (videoRef.current) videoRef.current.value = '';
+    }
+  };
+
+  const removeVideo = () => {
+    if (!editing) return;
+    setEditing({ ...editing, video: undefined });
   };
 
   const save = async () => {
@@ -1339,6 +1372,52 @@ const ProductManager: React.FC = () => {
                 </div>
                 <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={(e) => handleFiles(e.target.files)} />
                 <p className="text-xs text-muted-foreground mt-1">🖱️ Arraste as fotos para mudar a ordem — a <strong>primeira é a capa</strong>. As imagens são reduzidas automaticamente.</p>
+              </div>
+
+              {/* Vídeo do produto */}
+              <div>
+                <label className="text-sm font-semibold block mb-1">Vídeo do produto (opcional, mp4)</label>
+                {editing.video ? (
+                  <div className="flex items-start gap-3">
+                    <video
+                      src={editing.video}
+                      controls
+                      muted
+                      playsInline
+                      className="w-40 h-40 rounded-lg border border-border object-cover bg-black"
+                    />
+                    <div className="flex flex-col gap-2">
+                      <button
+                        type="button"
+                        onClick={() => videoRef.current?.click()}
+                        disabled={uploadingVideo}
+                        className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-secondary hover:bg-secondary/70 flex items-center gap-1.5"
+                      >
+                        {uploadingVideo ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+                        Trocar vídeo
+                      </button>
+                      <button
+                        type="button"
+                        onClick={removeVideo}
+                        className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 flex items-center gap-1.5"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" /> Remover vídeo
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => videoRef.current?.click()}
+                    disabled={uploadingVideo}
+                    className="w-40 h-20 rounded-lg border-2 border-dashed border-border flex items-center justify-center gap-2 text-muted-foreground hover:border-primary hover:text-primary transition text-sm font-semibold"
+                  >
+                    {uploadingVideo ? <Loader2 className="w-5 h-5 animate-spin" /> : <Plus className="w-5 h-5" />}
+                    {uploadingVideo ? 'Enviando…' : 'Adicionar vídeo'}
+                  </button>
+                )}
+                <input ref={videoRef} type="file" accept="video/mp4,video/webm,video/quicktime" hidden onChange={(e) => handleVideoFile(e.target.files)} />
+                <p className="text-xs text-muted-foreground mt-1">🎬 Mostrado ao passar o mouse sobre o produto na loja (hover). Máximo {MAX_VIDEO_MB}MB.</p>
               </div>
             </div>
 
