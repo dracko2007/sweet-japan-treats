@@ -95,7 +95,7 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({
                         playsInline
                         preload="auto"
                         poster={slide.image}
-                        className="relative w-full h-full bg-white object-contain"
+                        className="relative w-full h-full object-contain"
                       />
                     </>
                   ) : slide.image ? (
