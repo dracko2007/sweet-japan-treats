@@ -83,6 +83,7 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({
                         muted
                         loop
                         playsInline
+                        preload="auto"
                         aria-hidden="true"
                         className="absolute inset-0 w-full h-full object-cover blur-3xl scale-110 opacity-80"
                       />
@@ -92,6 +93,7 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({
                         muted
                         loop
                         playsInline
+                        preload="auto"
                         poster={slide.image}
                         className="relative w-full h-full object-contain"
                       />
@@ -173,6 +175,7 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({
                           muted
                           loop
                           playsInline
+                          preload="auto"
                           poster={slide.image}
                           className="w-full h-full object-contain"
                         />
