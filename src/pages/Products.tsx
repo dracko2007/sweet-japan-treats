@@ -1,8 +1,9 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { useParams, Link } from 'react-router-dom';
-import { Search, X, SlidersHorizontal, ChevronDown, Eye, EyeOff } from 'lucide-react';
+import { useParams, Link, useSearchParams } from 'react-router-dom';
+import { Search, X, SlidersHorizontal, ChevronDown, Eye, EyeOff, Menu } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import CompactProductCard from '@/components/products/CompactProductCard';
+import SidebarFilters from '@/components/products/SidebarFilters';
 import { useProducts } from '@/context/ProductsContext';
 import { cn } from '@/lib/utils';
 import { useLanguage } from '@/context/LanguageContext';
@@ -25,7 +26,9 @@ const CATEGORY_ICONS: Record<string, string> = {
 
 const Products: React.FC = () => {
   const { category } = useParams<{ category?: string }>();
+  const [searchParams] = useSearchParams();
   const { t, language } = useLanguage();
+  const [showFiltersPanel, setShowFiltersPanel] = useState(false);
 
   const SORT_OPTIONS = [
     { key: 'preco-menor' as SortKey, label: t('productsPage.sortPriceAsc') || 'Menor preço' },
@@ -80,7 +83,7 @@ const Products: React.FC = () => {
   };
   const { products, loading } = useProducts();
 
-  const [query,      setQuery]      = useState('');
+  const [query,      setQuery]      = useState(searchParams.get('q') || '');
   const [sort,       setSort]       = useState<SortKey | null>(null);
   const [catFilter,  setCatFilter]  = useState<string | null>(null); // só em /todos
   const [typeFilter, setTypeFilter] = useState<string | null>(null);
@@ -193,128 +196,6 @@ const Products: React.FC = () => {
               {t('productsPage.description')}
             </p>
           </div>
-
-          {/* Toolbar compacta: categorias + busca + botão de filtros */}
-          <div className="mt-6 flex flex-col lg:flex-row lg:items-center gap-3">
-            <div className="flex flex-wrap gap-2 flex-1 justify-center lg:justify-start">
-              {navCategories.map((cat) => (
-                <Link
-                  key={cat.id}
-                  to={cat.href}
-                  onClick={() => { setQuery(''); setPage(1); }}
-                  className={cn(
-                    "px-3.5 py-1.5 rounded-full font-medium text-xs transition-all",
-                    currentRoute === cat.id
-                      ? "bg-primary text-primary-foreground shadow-soft"
-                      : "bg-card text-muted-foreground hover:text-foreground hover:bg-secondary"
-                  )}
-                >
-                  {cat.label}
-                </Link>
-              ))}
-            </div>
-
-            <div className="flex items-center gap-2 shrink-0 justify-center">
-              <div className="relative w-full sm:w-52">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
-                <input
-                  type="text"
-                  value={query}
-                  onChange={(e) => { setQuery(e.target.value); setPage(1); }}
-                  placeholder={t('productsPage.search')}
-                  className="w-full pl-9 pr-8 py-2 text-sm rounded-full border border-border bg-card text-foreground shadow-sm focus:ring-2 focus:ring-primary focus:outline-none transition"
-                />
-                {query && (
-                  <button onClick={() => setQuery('')} className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-secondary text-muted-foreground" aria-label="Limpar busca">
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                )}
-              </div>
-              <div className="relative" ref={filterRef}>
-                <button
-                  onClick={() => setFiltersOpen(v => !v)}
-                  className={cn(
-                    "flex items-center gap-1.5 px-3 py-2 rounded-full border text-sm font-semibold transition-colors shrink-0",
-                    hasActiveFilters ? "bg-primary text-primary-foreground border-primary" : "bg-card border-border text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  <SlidersHorizontal className="w-4 h-4" />
-                  <span className="hidden sm:inline">{t('productsPage.filters')}</span>
-                  {hasActiveFilters && <span className="bg-white/30 text-[10px] px-1.5 py-0.5 rounded-full font-bold">●</span>}
-                  <ChevronDown className={cn("w-4 h-4 transition-transform", filtersOpen && "rotate-180")} />
-                </button>
-
-                {/* Lista suspensa de filtros */}
-                {filtersOpen && (
-                  <div className="absolute right-0 top-full mt-2 z-40 w-[min(20rem,88vw)] max-h-[70vh] overflow-y-auto bg-card border border-border rounded-2xl shadow-elevated p-4 space-y-4 text-left">
-                    {/* Ordenar */}
-                    <div>
-                      <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground mb-1.5">{t('productsPage.sort')}</p>
-                      <div className="flex flex-wrap gap-1.5">
-                        {SORT_OPTIONS.map(opt => (
-                          <button key={opt.key} onClick={() => { setSort(sort === opt.key ? null : opt.key); setPage(1); }}
-                            className={cn("px-3 py-1 rounded-full text-xs font-semibold border transition-all",
-                              sort === opt.key ? "bg-primary text-primary-foreground border-primary" : "bg-card text-muted-foreground border-border hover:text-foreground")}>
-                            {opt.label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Categoria — só na rota /todos */}
-                    {isAllRoute && availableCats.length > 0 && (
-                      <div>
-                        <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground mb-1.5">{t('productsPage.categoryFilter')}</p>
-                        <div className="flex flex-wrap gap-1.5">
-                          <button onClick={() => { setCatFilter(null); setPage(1); }}
-                            className={cn("px-3 py-1 rounded-full text-xs font-semibold border transition-all",
-                              !catFilter ? "bg-primary text-primary-foreground border-primary" : "bg-card text-muted-foreground border-border hover:text-foreground")}>
-                            {t('productsPage.allCategories')}
-                          </button>
-                          {availableCats.map(id => (
-                            <button key={id} onClick={() => { setCatFilter(catFilter === id ? null : id); setPage(1); }}
-                              className={cn("px-3 py-1 rounded-full text-xs font-semibold border transition-all",
-                                catFilter === id ? "bg-primary text-primary-foreground border-primary" : "bg-card text-muted-foreground border-border hover:text-foreground")}>
-                              {getCatIcon(id)} {getCategoryLabel(id)}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Tipo — dinâmico */}
-                    {availableTypes.length > 0 && (
-                      <div>
-                        <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground mb-1.5">{t('productsPage.typeFilter')}</p>
-                        <div className="flex flex-wrap gap-1.5">
-                          <button onClick={() => { setTypeFilter(null); setPage(1); }}
-                            className={cn("px-3 py-1 rounded-full text-xs font-semibold border transition-all",
-                              !typeFilter ? "bg-secondary text-foreground border-foreground/20" : "bg-card text-muted-foreground border-border hover:text-foreground")}>
-                            {t('productsPage.allTypes')}
-                          </button>
-                          {availableTypes.map(type => (
-                            <button key={type} onClick={() => { setTypeFilter(typeFilter === type ? null : type); setPage(1); }}
-                              className={cn("px-3 py-1 rounded-full text-xs font-semibold border transition-all capitalize",
-                                typeFilter === type ? "bg-secondary text-foreground border-foreground/20" : "bg-card text-muted-foreground border-border hover:text-foreground")}>
-                              {type}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Limpar */}
-                    {hasActiveFilters && (
-                      <button onClick={clearFilters}
-                        className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground font-semibold pt-1 border-t border-border w-full justify-center">
-                        <X className="w-3.5 h-3.5" /> {t('productsPage.clearFilters')}
-                      </button>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
         </div>
       </div>
 
@@ -361,61 +242,127 @@ const Products: React.FC = () => {
             </div>
           )}
 
-          {loading ? (
-            <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-4">
-              {Array.from({ length: 12 }).map((_, idx) => (
-                <div key={idx} className="rounded-lg border border-border bg-card overflow-hidden animate-pulse">
-                  <div className="aspect-square bg-secondary" />
-                  <div className="p-2 space-y-2">
-                    <div className="h-3 bg-secondary rounded w-4/5" />
-                    <div className="h-4 bg-secondary rounded w-2/3" />
-                  </div>
-                </div>
-              ))}
+          {/* Layout: Filtro Lateral + Grid de Produtos */}
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+            {/* Filtro Lateral — Desktop (20% width) */}
+            <div className="hidden lg:block">
+              <SidebarFilters
+                categories={availableCats.map(id => allCategories.find(c => c.id === id)!).filter(Boolean)}
+                types={availableTypes}
+                selectedCategory={catFilter}
+                selectedType={typeFilter}
+                onCategoryChange={(id) => { setCatFilter(id); setPage(1); }}
+                onTypeChange={(type) => { setTypeFilter(type); setPage(1); }}
+              />
             </div>
-          ) : (
-            <>
-              <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-4">
-                {pageItems.map((product) => (
-                  <CompactProductCard key={product.id} product={product} />
-                ))}
+
+            {/* Botão Mobile para abrir filtros */}
+            <div className="lg:hidden mb-4">
+              <button
+                onClick={() => setShowFiltersPanel(!showFiltersPanel)}
+                className="w-full flex items-center gap-2 px-4 py-3 rounded-lg border border-border bg-card hover:bg-secondary/50 transition-colors font-semibold"
+              >
+                <Menu className="w-5 h-5" />
+                {t('productsPage.filters') || 'Filtros'}
+              </button>
+
+              {/* Filtro em Modal/Panel Mobile */}
+              {showFiltersPanel && (
+                <div className="mt-4 p-4 rounded-lg border border-border bg-card">
+                  <SidebarFilters
+                    categories={availableCats.map(id => allCategories.find(c => c.id === id)!).filter(Boolean)}
+                    types={availableTypes}
+                    selectedCategory={catFilter}
+                    selectedType={typeFilter}
+                    onCategoryChange={(id) => { setCatFilter(id); setPage(1); setShowFiltersPanel(false); }}
+                    onTypeChange={(type) => { setTypeFilter(type); setPage(1); setShowFiltersPanel(false); }}
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Grid de Produtos (80% width) */}
+            <div className="lg:col-span-4">
+              {/* Toolbar: Sort */}
+              <div className="mb-6 flex items-center justify-between">
+                <p className="text-sm text-muted-foreground">
+                  {total} {total !== 1 ? t('productsPage.products_plural') : t('productsPage.products')}
+                </p>
+                <div className="flex items-center gap-2">
+                  <label htmlFor="sort" className="text-sm font-semibold text-muted-foreground">
+                    {t('productsPage.sort')}:
+                  </label>
+                  <select
+                    id="sort"
+                    value={sort || ''}
+                    onChange={(e) => { setSort((e.target.value as SortKey) || null); setPage(1); }}
+                    className="px-3 py-2 text-sm rounded-lg border border-border bg-card text-foreground focus:ring-2 focus:ring-primary focus:outline-none"
+                  >
+                    <option value="">{t('productsPage.relevance') || 'Relevância'}</option>
+                    {SORT_OPTIONS.map(opt => (
+                      <option key={opt.key} value={opt.key}>{opt.label}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
-              {displayProducts.length > 0 && (
-                <Pagination
-                  page={page}
-                  totalPages={totalPages}
-                  onPageChange={setPage}
-                  rangeStart={rangeStart}
-                  rangeEnd={rangeEnd}
-                  total={total}
-                  className="mt-12"
-                />
-              )}
-
-              {displayProducts.length === 0 && (
-            <div className="text-center py-16">
-              {query || hasActiveFilters ? (
-                <div>
-                  <p className="text-muted-foreground mb-3">
-                    {query
-                      ? <>Nenhum produto encontrado para "<strong className="text-foreground">{query}</strong>".</>
-                      : 'Nenhum produto com esses filtros.'}
-                  </p>
-                  <button
-                    onClick={() => { setQuery(''); clearFilters(); }}
-                    className="text-primary font-semibold hover:underline"
-                  >
-                    Limpar busca e filtros
-                  </button>
+              {loading ? (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 md:gap-4">
+                  {Array.from({ length: 12 }).map((_, idx) => (
+                    <div key={idx} className="rounded-lg border border-border bg-card overflow-hidden animate-pulse">
+                      <div className="aspect-square bg-secondary" />
+                      <div className="p-2 space-y-2">
+                        <div className="h-3 bg-secondary rounded w-4/5" />
+                        <div className="h-4 bg-secondary rounded w-2/3" />
+                      </div>
+                    </div>
+                  ))}
                 </div>
               ) : (
-                <p className="text-muted-foreground">{t('productsPage.noProducts')}</p>
+                <>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 md:gap-4">
+                    {pageItems.map((product) => (
+                      <CompactProductCard key={product.id} product={product} />
+                    ))}
+                  </div>
+
+                  {displayProducts.length > 0 && (
+                    <Pagination
+                      page={page}
+                      totalPages={totalPages}
+                      onPageChange={setPage}
+                      rangeStart={rangeStart}
+                      rangeEnd={rangeEnd}
+                      total={total}
+                      className="mt-12"
+                    />
+                  )}
+
+                  {displayProducts.length === 0 && (
+                    <div className="text-center py-16 col-span-full">
+                      {query || hasActiveFilters ? (
+                        <div>
+                          <p className="text-muted-foreground mb-3">
+                            {query
+                              ? <>Nenhum produto encontrado para "<strong className="text-foreground">{query}</strong>".</>
+                              : 'Nenhum produto com esses filtros.'}
+                          </p>
+                          <button
+                            onClick={() => { setQuery(''); clearFilters(); }}
+                            className="text-primary font-semibold hover:underline"
+                          >
+                            Limpar busca e filtros
+                          </button>
+                        </div>
+                      ) : (
+                        <p className="text-muted-foreground">{t('productsPage.noProducts')}</p>
+                      )}
+                    </div>
+                  )}
+                </>
               )}
             </div>
-              )}
-            </>
-          )}
+          </div>
         </div>
       </section>
     </Layout>

@@ -773,7 +773,13 @@ export const translations: Record<Language, Record<string, string>> = {
     "business.toast.errorDesc": "Tente novamente em instantes.",
     "business.sent.title": "Solicitação recebida! 🏢",
     "business.sent.desc": "Vamos analisar o volume e montar uma cotação com preço e frete (container/aéreo) para a sua empresa.",
-    "business.sent.again": "Fazer outra solicitação"
+    "business.sent.again": "Fazer outra solicitação",
+    "nav.search": "Buscar...",
+    "filter.categories": "Categorias",
+    "filter.types": "Tipos",
+    "filter.all": "Todos",
+    "filter.clear": "Limpar Filtros",
+    "productsPage.relevance": "Relevância"
   },
   "en": {
     "nav.products": "Products",

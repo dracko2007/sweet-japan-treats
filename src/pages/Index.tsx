@@ -1,6 +1,6 @@
 import React from 'react';
 import Layout from '@/components/layout/Layout';
-import HeroSection from '@/components/home/HeroSection';
+import PromoCarouselSection from '@/components/home/PromoCarouselSection';
 import CategoryQuickNav from '@/components/home/CategoryQuickNav';
 import FeaturedProducts from '@/components/home/FeaturedProducts';
 import RecentlyViewed from '@/components/home/RecentlyViewed';
@@ -9,25 +9,34 @@ import ShippingBanner from '@/components/home/ShippingBanner';
 import NewsletterSection from '@/components/home/NewsletterSection';
 import AppDownloadSection from '@/components/AppDownloadSection';
 import ScrollReveal from '@/components/ScrollReveal';
-import { useLanguage } from '@/context/LanguageContext';
-import FlagIcon from '@/components/FlagIcon';
 import WelcomeCouponBanner from '@/components/WelcomeCouponBanner';
 
 const Index: React.FC = () => {
-  const { t } = useLanguage();
-
   return (
     <Layout>
-      <HeroSection />
+      {/* Carrossel: loja + promoção ativa do admin + produtos em destaque */}
+      <PromoCarouselSection />
+
       <WelcomeCouponBanner />
       <ScrollReveal><CategoryQuickNav /></ScrollReveal>
-      <ScrollReveal><FeaturedProducts /></ScrollReveal>
-      <RecentlyViewed />
-      <ScrollReveal><HomeVideos /></ScrollReveal>
-      <ScrollReveal><ShippingBanner /></ScrollReveal>
-      <ScrollReveal><NewsletterSection /></ScrollReveal>
-      <ScrollReveal><AppDownloadSection /></ScrollReveal>
 
+      {/* Most Viewed / Featured Products */}
+      <ScrollReveal><FeaturedProducts /></ScrollReveal>
+
+      {/* Recently Viewed */}
+      <RecentlyViewed />
+
+      {/* Videos */}
+      <ScrollReveal><HomeVideos /></ScrollReveal>
+
+      {/* Shipping Banner */}
+      <ScrollReveal><ShippingBanner /></ScrollReveal>
+
+      {/* Newsletter */}
+      <ScrollReveal><NewsletterSection /></ScrollReveal>
+
+      {/* App Download */}
+      <ScrollReveal><AppDownloadSection /></ScrollReveal>
     </Layout>
   );
 };

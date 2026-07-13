@@ -1,13 +1,13 @@
 import React, { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, Sparkles, Zap, TrendingUp } from 'lucide-react';
+import { ArrowRight, Eye, Zap, TrendingUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import CompactProductCard from '@/components/products/CompactProductCard';
 import ScrollReveal from '@/components/ScrollReveal';
 import { useProducts } from '@/context/ProductsContext';
 import { hasDiscount } from '@/utils/pricing';
 
-type TabId = 'recomendado' | 'ofertas' | 'vendidos';
+type TabId = 'vistos' | 'vendidos' | 'ofertas';
 
 /**
  * Grade única de produtos com abas de filtro (estilo Temu: uma grade contínua
@@ -16,11 +16,11 @@ type TabId = 'recomendado' | 'ofertas' | 'vendidos';
  */
 const FeaturedProducts: React.FC = () => {
   const { products, loading } = useProducts();
-  const [tab, setTab] = useState<TabId>('recomendado');
+  const [tab, setTab] = useState<TabId>('vistos');
 
-  // Produtos marcados como destaque pelo admin. Mostra no máx. 8 por vez;
+  // "Mais Vistos": produtos marcados como destaque pelo admin. Mostra no máx. 8 por vez;
   // se houver mais, a janela alterna a cada semana (rotação automática).
-  const recomendados = useMemo(() => {
+  const vistos = useMemo(() => {
     const flagged = products
       .filter(p => !p.hidden && p.featured)
       .sort((a, b) => (a.featuredAt || '').localeCompare(b.featuredAt || ''));
@@ -50,9 +50,9 @@ const FeaturedProducts: React.FC = () => {
   );
 
   const tabs = [
-    { id: 'recomendado' as TabId, label: 'Recomendado', icon: Sparkles, items: recomendados },
-    ...(ofertas.length > 0 ? [{ id: 'ofertas' as TabId, label: 'Ofertas', icon: Zap, items: ofertas }] : []),
+    { id: 'vistos' as TabId, label: 'Mais Vistos', icon: Eye, items: vistos },
     ...(vendidos.length > 0 ? [{ id: 'vendidos' as TabId, label: 'Mais Vendidos', icon: TrendingUp, items: vendidos }] : []),
+    ...(ofertas.length > 0 ? [{ id: 'ofertas' as TabId, label: 'Ofertas', icon: Zap, items: ofertas }] : []),
   ];
 
   const activeTab = tabs.find(t => t.id === tab) || tabs[0];

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { ShoppingCart, Menu, X, ChevronDown, UserCircle, Heart, Lock, Package, ShieldCheck as ShieldCheckIcon, Plane } from 'lucide-react';
+import { ShoppingCart, Menu, X, ChevronDown, UserCircle, Heart, Lock, Package, ShieldCheck as ShieldCheckIcon, Plane, Search } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
 import { useUser } from '@/context/UserContext';
 import { useLanguage } from '@/context/LanguageContext';
@@ -17,6 +17,8 @@ import { useSiteSettings } from '@/hooks/useSiteSettings';
 const Header: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isProductsOpen, setIsProductsOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('all');
   const { totalItems } = useCart();
   const { isAuthenticated, user, isAdmin } = useUser();
   const { t, selectedCountry } = useLanguage();
@@ -34,14 +36,6 @@ const Header: React.FC = () => {
   );
 
   const navItems = [
-    {
-      label: t('nav.products'),
-      href: '/produtos',
-      submenu: categoriesWithProducts.map((c) => ({
-        label: `${c.icon} ${c.label}`,
-        href: `/produtos/${c.id}`,
-      })),
-    },
     { label: t('nav.offers'), href: '/ofertas' },
     ...(settings.vlogEnabled ? [{ label: t('nav.vlog'), href: '/vlog' }] : []),
     { label: t('nav.shipping'), href: '/frete' },
@@ -61,6 +55,14 @@ const Header: React.FC = () => {
     { icon: Package,         text: 'Remessa Conforme' },
     { icon: Plane,           text: 'Envio direto do Japão 🇯🇵' },
   ];
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      const url = selectedCategory !== 'all' ? `/produtos/${selectedCategory}?q=${encodeURIComponent(searchQuery)}` : `/produtos?q=${encodeURIComponent(searchQuery)}`;
+      window.location.href = url;
+    }
+  };
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-md border-b border-border">
@@ -90,7 +92,9 @@ const Header: React.FC = () => {
           </div>
         </div>
       )}
+
       <div className="container mx-auto px-4">
+        {/* Top Bar: Logo + Search + User Menu */}
         <div className="flex items-center justify-between h-20 gap-4">
           {/* Logo */}
           <Link to="/" className="flex items-center gap-1.5 sm:gap-2.5 group shrink-0">
@@ -101,75 +105,33 @@ const Header: React.FC = () => {
             </div>
           </Link>
 
-          {/* Desktop Navigation (escondida no painel admin) */}
-          <nav className={cn("items-center gap-1", isAdminPage ? "hidden" : "hidden xl:flex")}>
-            {navItems.map((item, index) => (
-              <div key={item.label} className="relative group flex items-center">
-                {index > 0 && (
-                  <span className="w-px h-4 bg-border/60 mr-1 shrink-0" />
-                )}
-                {item.submenu ? (
-                  <button
-                    className={cn(
-                      "flex items-center gap-1 text-sm font-medium transition-all px-3 py-1.5 rounded-full whitespace-nowrap",
-                      isActive(item.href)
-                        ? "bg-primary/10 text-primary"
-                        : "text-muted-foreground hover:text-foreground hover:bg-secondary/70"
-                    )}
-                    onMouseEnter={() => setIsProductsOpen(true)}
-                    onMouseLeave={() => setIsProductsOpen(false)}
-                  >
-                    {item.label}
-                    <ChevronDown className="w-4 h-4" />
-                  </button>
-                ) : (
-                  <Link
-                    to={item.href}
-                    className={cn(
-                      "text-sm font-medium transition-all px-3 py-1.5 rounded-full whitespace-nowrap",
-                      isActive(item.href)
-                        ? "bg-primary/10 text-primary"
-                        : "text-muted-foreground hover:text-foreground hover:bg-secondary/70"
-                    )}
-                  >
-                    {item.label}
-                  </Link>
-                )}
+          {/* Search Bar — Desktop (escondida no admin) */}
+          {!isAdminPage && (
+            <form onSubmit={handleSearch} className="hidden md:flex flex-1 mx-4 items-center gap-2 bg-secondary/50 rounded-lg border border-border overflow-hidden max-w-2xl">
+              <input
+                type="text"
+                placeholder={t('nav.search') || 'Buscar...'}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="flex-1 bg-transparent px-4 py-2 text-sm outline-none"
+              />
+              <select
+                value={selectedCategory}
+                onChange={(e) => setSelectedCategory(e.target.value)}
+                className="bg-transparent px-3 py-2 text-sm border-l border-border outline-none cursor-pointer"
+              >
+                <option value="all">{t('nav.products.all') || 'Todos'}</option>
+                {categoriesWithProducts.map((c) => (
+                  <option key={c.id} value={c.id}>{c.icon} {c.label}</option>
+                ))}
+              </select>
+              <button type="submit" className="px-4 py-2 text-primary-foreground bg-primary hover:bg-primary/90 transition-colors">
+                <Search className="w-5 h-5" />
+              </button>
+            </form>
+          )}
 
-                {/* Dropdown */}
-                {item.submenu && (
-                  <div 
-                    className={cn(
-                      "absolute top-full left-0 pt-2 transition-all duration-200",
-                      isProductsOpen ? "opacity-100 visible" : "opacity-0 invisible"
-                    )}
-                    onMouseEnter={() => setIsProductsOpen(true)}
-                    onMouseLeave={() => setIsProductsOpen(false)}
-                  >
-                    <div className="bg-card rounded-lg shadow-card border border-border py-2 min-w-[180px]">
-                      <Link
-                        to={item.href}
-                        className="block px-4 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors"
-                      >
-                        {t('nav.products.all')}
-                      </Link>
-                      {item.submenu.map((sub) => (
-                        <Link
-                          key={sub.href}
-                          to={sub.href}
-                          className="block px-4 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors"
-                        >
-                          {sub.label}
-                        </Link>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            ))}
-          </nav>
-
-          {/* Cart, Language & Mobile Menu */}
+          {/* Right Menu: Wishlist, Cart, User, Language */}
           <div className="flex items-center gap-1.5 sm:gap-3">
             {/* País (cima) + Idioma (baixo) — idioma sempre visível, país aparece a partir de md */}
             {!isAdminPage && (
@@ -229,7 +191,7 @@ const Header: React.FC = () => {
             )}
 
             <button
-              className="xl:hidden p-2 rounded-full hover:bg-secondary/50 transition-colors"
+              className="md:hidden p-2 rounded-full hover:bg-secondary/50 transition-colors"
               onClick={() => setIsMenuOpen(!isMenuOpen)}
             >
               {isMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
@@ -237,9 +199,58 @@ const Header: React.FC = () => {
           </div>
         </div>
 
+        {/* Navigation Menu — Desktop (hidden no admin) */}
+        {!isAdminPage && (
+          <nav className="hidden md:flex items-center gap-1 pb-3 overflow-x-auto">
+            <Link to="/produtos" className="text-sm font-medium px-3 py-1.5 rounded-full whitespace-nowrap hover:bg-secondary/70 transition-colors">
+              {t('nav.products')}
+            </Link>
+            {navItems.map((item) => (
+              <Link
+                key={item.label}
+                to={item.href}
+                className={cn(
+                  "text-sm font-medium px-3 py-1.5 rounded-full whitespace-nowrap transition-colors",
+                  isActive(item.href)
+                    ? "bg-primary/10 text-primary"
+                    : "text-muted-foreground hover:bg-secondary/70"
+                )}
+              >
+                {item.label}
+              </Link>
+            ))}
+          </nav>
+        )}
+
         {/* Mobile Navigation */}
         {isMenuOpen && (
-          <nav className="xl:hidden py-4 border-t border-border animate-fade-up">
+          <nav className="md:hidden py-4 border-t border-border animate-fade-up">
+            {/* Mobile Search */}
+            {!isAdminPage && (
+              <form onSubmit={handleSearch} className="mb-4 flex gap-2 bg-secondary/50 rounded-lg border border-border overflow-hidden">
+                <input
+                  type="text"
+                  placeholder={t('nav.search') || 'Buscar...'}
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="flex-1 bg-transparent px-4 py-2 text-sm outline-none"
+                />
+                <select
+                  value={selectedCategory}
+                  onChange={(e) => setSelectedCategory(e.target.value)}
+                  className="bg-transparent px-3 py-2 text-sm border-l border-border outline-none cursor-pointer"
+                >
+                  <option value="all">{t('nav.products.all') || 'Todos'}</option>
+                  {categoriesWithProducts.map((c) => (
+                    <option key={c.id} value={c.id}>{c.icon} {c.label}</option>
+                  ))}
+                </select>
+                <button type="submit" className="px-4 py-2 text-primary-foreground bg-primary hover:bg-primary/90 transition-colors">
+                  <Search className="w-5 h-5" />
+                </button>
+              </form>
+            )}
+
             {/* Switchers (escondidos no admin) */}
             {!isAdminPage && (
               <div className="flex flex-col items-center gap-3 pb-4 mb-4 border-b border-border">
@@ -248,37 +259,34 @@ const Header: React.FC = () => {
               </div>
             )}
 
-            {!isAdminPage && navItems.map((item) => (
-              <div key={item.label}>
+            {!isAdminPage && (
+              <>
                 <Link
-                  to={item.href}
-                  className={cn(
-                    "block py-3 text-base font-medium transition-colors",
-                    isActive(item.href) ? "text-primary" : "text-muted-foreground"
-                  )}
+                  to="/produtos"
+                  className="block py-3 text-base font-medium transition-colors text-muted-foreground hover:text-foreground"
                   onClick={() => setIsMenuOpen(false)}
                 >
-                  {item.label}
+                  {t('nav.products')}
                 </Link>
-                {item.submenu && (
-                  <div className="pl-4">
-                    {item.submenu.map((sub) => (
-                      <Link
-                        key={sub.href}
-                        to={sub.href}
-                        className="block py-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
-                        onClick={() => setIsMenuOpen(false)}
-                      >
-                        {sub.label}
-                      </Link>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ))}
-            <Button 
+                {navItems.map((item) => (
+                  <Link
+                    key={item.label}
+                    to={item.href}
+                    className={cn(
+                      "block py-3 text-base font-medium transition-colors",
+                      isActive(item.href) ? "text-primary" : "text-muted-foreground"
+                    )}
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    {item.label}
+                  </Link>
+                ))}
+              </>
+            )}
+
+            <Button
               asChild
-              variant="ghost" 
+              variant="ghost"
               className="w-full justify-start mt-2 text-base font-medium"
             >
               <Link to={isAuthenticated ? "/perfil" : "/cadastro"} onClick={() => setIsMenuOpen(false)}>
