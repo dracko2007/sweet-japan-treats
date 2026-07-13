@@ -14,6 +14,9 @@ import { productEnglishName } from '@/utils/productName';
 // falhar por CSP/rede em alguns ambientes de preview.
 const STORE_IMAGE = '/icons/icon-512x512.png';
 const STORE_VIDEO = '/videos/store-intro.mp4';
+// Poster do slide institucional: branco (mesma cor do fundo do slide) em vez do
+// ícone rosa — evita o flash "logo some, vira fundo rosa" antes do vídeo tocar.
+const STORE_POSTER = '/videos/store-intro-poster.png';
 
 /**
  * Carrossel da home: 1º slide institucional (loja no Japão) + promoção ativa
@@ -44,7 +47,7 @@ const PromoCarouselSection: React.FC = () => {
     const list: CarouselSlide[] = [
       {
         id: 'store',
-        image: STORE_IMAGE,
+        image: STORE_POSTER,
         videoSrc: STORE_VIDEO,
         layout: 'center',
         badge: t('hero.badge'),
