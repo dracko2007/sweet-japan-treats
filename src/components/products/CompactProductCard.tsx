@@ -31,6 +31,7 @@ const CompactProductCard: React.FC<CompactProductCardProps> = ({ product }) => {
   const { toast } = useToast();
   const { selectedCountry } = useLanguage();
   const [isFavorite, setIsFavorite] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
 
   useEffect(() => {
     if (user?.email) setIsFavorite(wishlistService.isInWishlist(user.email, product.id));
@@ -79,13 +80,54 @@ const CompactProductCard: React.FC<CompactProductCardProps> = ({ product }) => {
       onClick={() => navigate(`/produto/${product.id}`)}
       className="group cursor-pointer bg-white border border-gray-100 rounded-lg overflow-hidden hover:shadow-md transition-shadow flex flex-col"
     >
-      <div className="aspect-square bg-gray-50 relative overflow-hidden">
-        <img
-          src={product.thumbnail || product.image}
-          alt={name}
-          loading="lazy"
-          className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-        />
+      <div
+        className="aspect-square bg-gray-50 relative overflow-hidden"
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+      >
+        {product.video && product.videoCover ? (
+          /* Vídeo é a capa — toca direto, sem precisar de hover. Poster cobre até o vídeo carregar. */
+          <video
+            key={product.video}
+            src={product.video}
+            poster={product.thumbnail || product.image}
+            autoPlay
+            loop
+            muted
+            playsInline
+            className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+            onError={(e) => { (e.target as HTMLVideoElement).style.display = 'none'; }}
+          />
+        ) : product.video ? (
+          <>
+            {/* Poster sempre visível — vídeo só carrega/toca no hover para não travar a página */}
+            <img
+              src={product.thumbnail || product.image}
+              alt={name}
+              loading="lazy"
+              className={`absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 ${isHovered ? 'opacity-0' : 'opacity-100'}`}
+            />
+            {isHovered && (
+              <video
+                key={product.video}
+                src={product.video}
+                autoPlay
+                loop
+                muted
+                playsInline
+                className="absolute inset-0 w-full h-full object-cover"
+                onError={(e) => { (e.target as HTMLVideoElement).style.display = 'none'; }}
+              />
+            )}
+          </>
+        ) : (
+          <img
+            src={product.thumbnail || product.image}
+            alt={name}
+            loading="lazy"
+            className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+          />
+        )}
         {promoActive && (
           <span className="absolute top-1.5 left-1.5 bg-red-600 text-white text-[10px] font-black px-1.5 py-0.5 rounded">
             -{product.discountPercent}%
