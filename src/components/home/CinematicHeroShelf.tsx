@@ -383,8 +383,8 @@ const CinematicHeroShelf: React.FC<CinematicHeroShelfProps> = ({
     <div
       key="intro"
       className={cn(
-        'cinematic-panel relative flex w-screen shrink-0 items-center justify-center overflow-hidden px-6',
-        reduced ? 'h-screen' : 'h-full',
+        'cinematic-panel relative flex w-screen shrink-0 items-center justify-center overflow-hidden px-4 md:px-6',
+        reduced ? 'min-h-[60dvh] md:min-h-screen' : 'h-full',
       )}
     >
       {/* Sem `loop`: ao terminar, a imagem final fica em cena e o recomeço
@@ -463,18 +463,18 @@ const CinematicHeroShelf: React.FC<CinematicHeroShelfProps> = ({
           logoMoment && 'opacity-0',
         )}
       >
-        <p className="cinematic-reveal font-jp mb-5 text-xs uppercase tracking-[0.5em] text-pink-200/90">
+        <p className="cinematic-reveal font-jp mb-2 text-[10px] uppercase tracking-[0.35em] text-pink-200/90 md:mb-5 md:text-xs md:tracking-[0.5em]">
           日本の美容 · Curadoria
         </p>
-        <h1 className="cinematic-reveal mb-6 font-display text-5xl font-light leading-[1.05] tracking-tight text-white drop-shadow-[0_2px_16px_rgba(0,0,0,0.5)] md:text-7xl">
+        <h1 className="cinematic-reveal mb-3 font-display text-3xl font-light leading-[1.05] tracking-tight text-white drop-shadow-[0_2px_16px_rgba(0,0,0,0.5)] sm:text-4xl md:mb-6 md:text-7xl">
           Beleza <span className="font-jp italic text-pink-300">Japonesa</span>
           <br />
           em cada detalhe
         </h1>
-        <p className="cinematic-reveal mb-10 max-w-md text-base leading-relaxed text-white/80 drop-shadow md:text-lg">
+        <p className="cinematic-reveal mb-4 max-w-sm text-xs leading-relaxed text-white/80 drop-shadow line-clamp-3 md:mb-10 md:max-w-md md:text-lg md:line-clamp-none">
           Os melhores cosméticos, papelaria, acessórios e doces direto do Japão para você, com frete seguro. Veja a aba "Como Funciona" e entenda todo o processo, do pedido à entrega.
         </p>
-        <div className="cinematic-reveal flex items-center gap-2 text-xs uppercase tracking-[0.3em] text-white/70">
+        <div className="cinematic-reveal flex items-center gap-2 text-[10px] uppercase tracking-[0.22em] text-white/70 md:text-xs md:tracking-[0.3em]">
           <ArrowDown className="cinematic-bob h-3 w-3" />
           <span>Role para começar</span>
         </div>
@@ -487,7 +487,7 @@ const CinematicHeroShelf: React.FC<CinematicHeroShelfProps> = ({
       key={p.id}
       className={cn(
         'cinematic-panel relative flex w-screen shrink-0 items-center overflow-hidden',
-        reduced ? 'h-screen' : 'h-full',
+        reduced ? 'min-h-[60dvh] md:min-h-screen' : 'h-full',
       )}
     >
       <div
@@ -505,39 +505,39 @@ const CinematicHeroShelf: React.FC<CinematicHeroShelfProps> = ({
           background: `radial-gradient(55% 45% at 50% 62%, ${p.accent}14 0%, transparent 72%)`,
         }}
       />
-      <div className="relative z-10 mx-auto flex w-full max-w-6xl flex-col items-center gap-8 px-6 md:flex-row md:gap-16">
+      <div className="relative z-10 mx-auto flex w-full max-w-6xl flex-col items-center gap-3 px-4 md:flex-row md:gap-16 md:px-6">
         <div className="cinematic-reveal flex flex-1 justify-center">
           <img
             src={p.image}
             alt={`${p.brand} ${p.name}`}
             loading="lazy"
-            className="cinematic-product-img h-[38vh] max-h-[440px] w-auto object-contain md:h-[58vh]"
+            className="cinematic-product-img h-[20vh] max-h-[180px] w-auto object-contain md:h-[58vh] md:max-h-[440px]"
           />
         </div>
         <div className="max-w-md flex-1">
-          <div className="cinematic-reveal mb-5 flex items-center gap-3">
+          <div className="cinematic-reveal mb-2 flex items-center gap-3 md:mb-5">
             <span className="h-px w-10" style={{ background: p.accent }} />
             <span
-              className="font-jp text-xs uppercase tracking-[0.35em]"
+              className="font-jp text-[10px] uppercase tracking-[0.25em] md:text-xs md:tracking-[0.35em]"
               style={{ color: p.accent }}
             >
               {p.brand}
             </span>
           </div>
-          <h2 className="cinematic-reveal mb-3 font-display text-4xl font-light leading-tight text-pink-950 md:text-5xl">
+          <h2 className="cinematic-reveal mb-1 font-display text-2xl font-light leading-tight text-pink-950 md:mb-3 md:text-5xl">
             {p.name}
           </h2>
-          <p className="cinematic-reveal font-jp mb-5 text-lg text-pink-700/70">
+          <p className="cinematic-reveal font-jp mb-2 text-sm text-pink-700/70 md:mb-5 md:text-lg">
             {p.nameJa}
           </p>
-          <p className="cinematic-reveal mb-7 leading-relaxed text-pink-950/60">
+          <p className="cinematic-reveal mb-3 text-xs leading-relaxed text-pink-950/60 line-clamp-2 md:mb-7 md:text-base md:line-clamp-none">
             {p.description}
           </p>
-          <div className="cinematic-reveal flex items-center gap-6">
-            <span className="font-display text-2xl text-pink-950">{p.price}</span>
+          <div className="cinematic-reveal flex items-center gap-4 md:gap-6">
+            <span className="font-display text-xl text-pink-950 md:text-2xl">{p.price}</span>
             <Link
               to={p.link}
-              className="group inline-flex items-center gap-2 text-sm font-medium text-pink-700 transition-colors hover:text-pink-900"
+              className="group inline-flex items-center gap-2 text-xs font-medium text-pink-700 transition-colors hover:text-pink-900 md:text-sm"
             >
               Ver produto
               <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
@@ -552,34 +552,34 @@ const CinematicHeroShelf: React.FC<CinematicHeroShelfProps> = ({
     <div
       key="outro"
       className={cn(
-        'cinematic-panel relative flex w-screen shrink-0 items-center justify-center overflow-hidden px-6',
-        reduced ? 'h-screen' : 'h-full',
+        'cinematic-panel relative flex w-screen shrink-0 items-center justify-center overflow-hidden px-4 md:px-6',
+        reduced ? 'min-h-[60dvh] md:min-h-screen' : 'h-full',
       )}
     >
       <div className="cinematic-kanji font-jp pointer-events-none absolute bottom-[6%] left-[8%] select-none text-[42vmin] leading-none">
         蜜
       </div>
       <div className="relative z-10 flex max-w-xl flex-col items-center text-center">
-        <ShoppingBag className="cinematic-reveal mb-6 h-10 w-10 text-pink-600" />
-        <h2 className="cinematic-reveal mb-5 font-display text-4xl font-light leading-tight text-pink-950 md:text-6xl">
+        <ShoppingBag className="cinematic-reveal mb-3 h-7 w-7 text-pink-600 md:mb-6 md:h-10 md:w-10" />
+        <h2 className="cinematic-reveal mb-3 font-display text-3xl font-light leading-tight text-pink-950 md:mb-5 md:text-6xl">
           Explore a coleção
           <br />
           completa
         </h2>
-        <p className="cinematic-reveal mb-9 max-w-sm text-pink-950/60">
+        <p className="cinematic-reveal mb-4 max-w-xs text-sm text-pink-950/60 md:mb-9 md:max-w-sm md:text-base">
           Cosméticos originais importados do Japão, com envio rápido e seguro
           para todo o Brasil.
         </p>
         <div className="cinematic-reveal flex flex-col gap-3 sm:flex-row">
           <Link
             to="/produtos/cosmeticos"
-            className="inline-flex items-center justify-center gap-2 rounded-full bg-pink-600 px-8 py-3 text-sm font-medium text-white transition-colors hover:bg-pink-700"
+            className="inline-flex items-center justify-center gap-2 rounded-full bg-pink-600 px-6 py-2.5 text-xs font-medium text-white transition-colors hover:bg-pink-700 md:px-8 md:py-3 md:text-sm"
           >
             Ver cosméticos <ArrowRight className="h-4 w-4" />
           </Link>
           <Link
             to="/faca-seu-pedido"
-            className="inline-flex items-center justify-center gap-2 rounded-full border border-pink-300 px-8 py-3 text-sm font-medium text-pink-700 transition-colors hover:bg-pink-50"
+            className="inline-flex items-center justify-center gap-2 rounded-full border border-pink-300 px-6 py-2.5 text-xs font-medium text-pink-700 transition-colors hover:bg-pink-50 md:px-8 md:py-3 md:text-sm"
           >
             Fazer meu pedido
           </Link>
@@ -593,9 +593,11 @@ const CinematicHeroShelf: React.FC<CinematicHeroShelfProps> = ({
       ref={sectionRef}
       className={cn(
         'relative w-full overflow-hidden bg-gradient-to-b from-pink-50 via-white to-pink-50/40',
-        // Altura = viewport menos o header fixo (--shelf-top), para o hero
-        // pinado caber inteiro abaixo do header sem cortes.
-        reduced ? '' : 'h-[calc(100dvh-var(--shelf-top,0px))]',
+        // No smartphone, ocupa 58% da tela (cerca de 1/3 menor). Desktop
+        // preserva a experiência cinematográfica em viewport completo.
+        reduced
+          ? ''
+          : 'h-[58dvh] min-h-[420px] max-h-[520px] md:h-[calc(100dvh-var(--shelf-top,0px))] md:min-h-0 md:max-h-none',
       )}
       aria-label="Vitrine cinematográfica de cosméticos japoneses"
     >
@@ -615,18 +617,18 @@ const CinematicHeroShelf: React.FC<CinematicHeroShelfProps> = ({
 
       {/* Barra superior */}
       {!reduced && (
-        <div className="absolute left-0 right-0 top-0 z-30 flex items-center justify-end px-6 py-5 md:px-12">
-          <div className="flex items-center gap-6">
+        <div className="absolute left-0 right-0 top-0 z-30 flex items-center justify-end px-4 py-3 md:px-12 md:py-5">
+          <div className="flex items-center gap-4 md:gap-6">
             <span
               ref={counterRef}
-              className="font-jp text-xs tracking-[0.35em] text-white/80 mix-blend-difference"
+              className="font-jp text-[10px] tracking-[0.3em] text-white/80 mix-blend-difference md:text-xs md:tracking-[0.35em]"
             >
               {`01 / ${String(TOTAL_PANELS).padStart(2, '0')}`}
             </span>
             <button
               type="button"
               onClick={handleSkip}
-              className="text-xs uppercase tracking-[0.25em] text-white/70 mix-blend-difference transition-opacity hover:opacity-100"
+              className="text-[10px] uppercase tracking-[0.2em] text-white/70 mix-blend-difference transition-opacity hover:opacity-100 md:text-xs md:tracking-[0.25em]"
             >
               Pular ↓
             </button>
@@ -654,7 +656,7 @@ const CinematicHeroShelf: React.FC<CinematicHeroShelfProps> = ({
               style={{ transform: 'scaleX(0)' }}
             />
           </div>
-          <div className="absolute bottom-6 left-1/2 z-30 flex -translate-x-1/2 items-center gap-2 text-xs uppercase tracking-[0.3em] text-white/70 mix-blend-difference">
+          <div className="absolute bottom-6 left-1/2 z-30 hidden -translate-x-1/2 items-center gap-2 text-xs uppercase tracking-[0.3em] text-white/70 mix-blend-difference md:flex">
             <ArrowDown className="cinematic-bob h-3 w-3" />
             <span>Role para explorar a prateleira</span>
           </div>
