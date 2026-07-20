@@ -79,13 +79,13 @@ export default defineConfig(({ mode }) => ({
         description: "Produtos originais do Japão entregues com cuidado.",
         start_url: "/?hero=transition&utm_source=pwa",
         display: "standalone",
-        background_color: "#ec4899",
+        background_color: "#e05d9a",
         theme_color: "#ec4899",
         lang: "pt-BR",
         icons: [
           { src: "/icons/icon-192x192.png?v=3", sizes: "192x192", type: "image/png", purpose: "any" },
-          { src: "/icons/icon-splash-512x512.png?v=8", sizes: "512x512", type: "image/png", purpose: "any" },
-          { src: "/icons/icon-maskable-512x512.png?v=8", sizes: "512x512", type: "image/png", purpose: "maskable" },
+          { src: "/icons/icon-splash-512x512.png?v=9", sizes: "512x512", type: "image/png", purpose: "any" },
+          { src: "/icons/icon-maskable-512x512.png?v=9", sizes: "512x512", type: "image/png", purpose: "maskable" },
         ],
       },
       devOptions: {

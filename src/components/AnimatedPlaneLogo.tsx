@@ -24,7 +24,7 @@ const AnimatedPlaneLogo: React.FC<AnimatedPlaneLogoProps> = ({
     style={{ width: size, height: size }}
   >
     <img
-      src="/logo.jpg"
+      src="/icons/logo-complete-384x384.png?v=9"
       alt=""
       width={size}
       height={size}
@@ -33,6 +33,7 @@ const AnimatedPlaneLogo: React.FC<AnimatedPlaneLogoProps> = ({
     />
     <video
       src="/videos/pwa-logo-transition.mp4"
+      poster="/icons/logo-complete-384x384.png?v=9"
       autoPlay
       muted
       loop
