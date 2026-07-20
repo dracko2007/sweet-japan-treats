@@ -1,8 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Smartphone, Download, Share, Plus, X, Check, Wifi, Bell, Zap } from 'lucide-react';
 import { usePWAInstall } from '@/hooks/usePWAInstall';
 import AnimatedPlaneLogo from '@/components/AnimatedPlaneLogo';
-import type { CarouselSlide } from '@/components/home/HeroCarousel';
 
 // Guia passo a passo para Android / Chrome (modal)
 const AndroidGuide: React.FC<{ onClose: () => void }> = ({ onClose }) => (
@@ -138,72 +137,7 @@ const IOSGuide: React.FC<{ onClose: () => void }> = ({ onClose }) => (
   </div>
 );
 
-interface AppDownloadSectionProps {
-  heroSlides: CarouselSlide[];
-}
-
-const FALLBACK_PHONE_HERO: CarouselSlide = {
-  id: 'pwa-preview',
-  image: '/icons/icon-512x512.png',
-  badge: 'Japan Express',
-  title: 'Do Japão para você',
-  ctaLink: '/',
-};
-
-const PhoneHeroPreview: React.FC<{ slides: CarouselSlide[] }> = ({ slides }) => {
-  const [currentIndex, setCurrentIndex] = useState(0);
-
-  useEffect(() => {
-    if (slides.length < 2 || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-
-    const interval = window.setInterval(() => {
-      setCurrentIndex((index) => (index + 1) % slides.length);
-    }, 3800);
-
-    return () => window.clearInterval(interval);
-  }, [slides.length]);
-
-  useEffect(() => {
-    setCurrentIndex((index) => Math.min(index, Math.max(slides.length - 1, 0)));
-  }, [slides.length]);
-
-  const hero = slides[currentIndex] ?? FALLBACK_PHONE_HERO;
-
-  return (
-    <div className="relative h-[132px] overflow-hidden rounded-xl bg-gradient-to-br from-pink-100 via-white to-fuchsia-100">
-      <img
-        key={hero.id}
-        src={hero.image || FALLBACK_PHONE_HERO.image}
-        alt=""
-        className="h-full w-full animate-in fade-in zoom-in-95 object-cover duration-500"
-      />
-      <div className="absolute inset-0 bg-gradient-to-r from-slate-950/80 via-slate-900/35 to-transparent" />
-      <div className="absolute inset-x-0 top-0 p-2">
-        <span className="inline-flex max-w-full rounded-full bg-white/90 px-1.5 py-0.5 text-[6px] font-black uppercase tracking-[0.08em] text-pink-600 line-clamp-1">
-          {hero.badge || 'Novidades'}
-        </span>
-        <p className="mt-1 max-w-[72%] text-[10px] font-black leading-tight text-white line-clamp-2">
-          {hero.title}
-        </p>
-        <span className="mt-1 inline-flex rounded-md bg-pink-500 px-1.5 py-0.5 text-[7px] font-bold text-white">
-          Ver agora →
-        </span>
-      </div>
-      {slides.length > 1 && (
-        <div className="absolute bottom-1.5 left-1/2 flex -translate-x-1/2 gap-1">
-          {slides.map((slide, index) => (
-            <span
-              key={slide.id}
-              className={`h-1 rounded-full transition-all ${index === currentIndex ? 'w-3 bg-white' : 'w-1 bg-white/60'}`}
-            />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-};
-
-const AppDownloadSection: React.FC<AppDownloadSectionProps> = ({ heroSlides }) => {
+const AppDownloadSection: React.FC = () => {
   const { platform, canInstall, isInstalled, install } = usePWAInstall();
   const [showIOSGuide, setShowIOSGuide]         = useState(false);
   const [showAndroidGuide, setShowAndroidGuide] = useState(false);
@@ -336,37 +270,29 @@ const AppDownloadSection: React.FC<AppDownloadSectionProps> = ({ heroSlides }) =
                 <div className="w-52 h-96 bg-gray-900 rounded-[2.5rem] border-4 border-gray-700 shadow-2xl overflow-hidden relative">
                   {/* Notch */}
                   <div className="absolute top-0 left-1/2 -translate-x-1/2 w-20 h-5 bg-gray-900 rounded-b-xl z-10" />
-                  {/* Tela com os mesmos heróis ativos da página inicial */}
-                  <div className="absolute inset-0 bg-gradient-to-b from-pink-50 to-white">
-                    <div className="flex items-center gap-2 border-b border-gray-100 bg-white px-3 pb-2 pt-7">
-                      <AnimatedPlaneLogo size={28} alt="" />
-                      <div>
-                        <p className="text-[9px] font-black leading-none text-gray-900">Japan</p>
-                        <p className="mt-0.5 bg-pink-500 px-1 text-[7px] font-bold leading-tight text-white">Express</p>
-                      </div>
-                      <div className="ml-auto flex h-5 w-5 items-center justify-center rounded-full bg-pink-100">
-                        <span className="text-[8px]">🛒</span>
-                      </div>
-                    </div>
-                    <div className="space-y-2 p-2">
-                      <PhoneHeroPreview slides={heroSlides} />
-                      <div className="grid grid-cols-3 gap-1.5">
-                        {['Novidades', 'Ofertas', 'Pedidos'].map((label) => (
-                          <div key={label} className="rounded-lg border border-pink-100 bg-white px-1 py-1.5 text-center">
-                            <span className="block text-[7px] font-bold text-gray-700">{label}</span>
-                          </div>
-                        ))}
-                      </div>
-                      <div className="flex items-center gap-1.5 rounded-lg bg-pink-50 px-2 py-1.5">
-                        <span className="text-[8px]">✈</span>
-                        <span className="text-[7px] font-semibold text-pink-700">Do Japão direto para você</span>
-                      </div>
-                    </div>
+                  {/* Mesma vinheta cinematográfica usada pelo hero transition */}
+                  <div className="absolute inset-0 bg-pink-500">
+                    <video
+                      src="/videos/hero-store-transition.mp4"
+                      poster="/videos/hero-intro-poster.jpg"
+                      autoPlay
+                      muted
+                      loop
+                      playsInline
+                      preload="auto"
+                      aria-label="Hero transition da Japan Express"
+                      className="h-full w-full object-cover motion-reduce:hidden"
+                    />
+                    <img
+                      src="/logo.jpg"
+                      alt="Japan Express"
+                      className="hidden h-full w-full object-cover motion-reduce:block"
+                    />
                   </div>
                 </div>
                 <div className="absolute -bottom-4 left-1/2 h-6 w-40 -translate-x-1/2 rounded-full bg-black/20 blur-xl" />
                 <div className="absolute -right-6 -top-4 rounded-2xl border border-pink-100 bg-white p-2 shadow-xl">
-                  <AnimatedPlaneLogo size={48} alt="" />
+                  <AnimatedPlaneLogo size={48} />
                   <p className="mt-1 text-center text-[8px] font-medium leading-none text-gray-600">Japan<br/>Express</p>
                 </div>
               </div>

@@ -1,5 +1,4 @@
 import React from 'react';
-import { PlaneTakeoff } from 'lucide-react';
 
 interface AnimatedPlaneLogoProps {
   size?: number;
@@ -9,9 +8,8 @@ interface AnimatedPlaneLogoProps {
 }
 
 /**
- * Logo usada dentro da experiência web/PWA. O ícone instalado no sistema
- * permanece estático por limitação das plataformas; aqui o avião ganha movimento
- * durante o carregamento e nas prévias do app.
+ * Recorte leve da vinheta do hero transition. O ícone nativo instalado continua
+ * estático por limitação do Android/iOS; a experiência web/PWA usa a animação real.
  */
 const AnimatedPlaneLogo: React.FC<AnimatedPlaneLogoProps> = ({
   size = 48,
@@ -20,20 +18,28 @@ const AnimatedPlaneLogo: React.FC<AnimatedPlaneLogoProps> = ({
   alt = 'Japan Express',
 }) => (
   <div
-    className={`relative inline-flex shrink-0 overflow-hidden rounded-full ${className}`}
+    role="img"
+    aria-label={alt}
+    className={`relative inline-flex shrink-0 overflow-hidden rounded-full bg-pink-500 ${className}`}
     style={{ width: size, height: size }}
   >
     <img
       src="/logo.jpg"
-      alt={alt}
+      alt=""
       width={size}
       height={size}
+      aria-hidden="true"
       className={`h-full w-full object-cover ${imageClassName}`}
     />
-    <PlaneTakeoff
+    <video
+      src="/videos/pwa-logo-transition.mp4"
+      autoPlay
+      muted
+      loop
+      playsInline
+      preload="auto"
       aria-hidden="true"
-      strokeWidth={2.75}
-      className="pwa-logo-plane pointer-events-none absolute left-[42%] top-[64%] h-[30%] w-[30%] text-white drop-shadow-[0_1px_2px_rgba(131,24,67,0.55)]"
+      className={`absolute inset-0 h-full w-full object-cover motion-reduce:hidden ${imageClassName}`}
     />
   </div>
 );

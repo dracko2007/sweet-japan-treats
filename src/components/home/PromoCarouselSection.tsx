@@ -23,11 +23,7 @@ const STORE_POSTER = '/videos/store-intro-poster.png';
  * do admin (siteContent/homePromotion) + produtos marcados como destaque.
  * Não requer nenhuma mudança no painel admin — só lê dados já existentes.
  */
-interface PromoCarouselSectionProps {
-  onSlidesChange?: (slides: CarouselSlide[]) => void;
-}
-
-const PromoCarouselSection: React.FC<PromoCarouselSectionProps> = ({ onSlidesChange }) => {
+const PromoCarouselSection: React.FC = () => {
   const { t, selectedCountry } = useLanguage();
   const { products } = useProducts();
   const [promo, setPromo] = useState<ActivePromo | null | undefined>(undefined);
@@ -112,10 +108,6 @@ const PromoCarouselSection: React.FC<PromoCarouselSectionProps> = ({ onSlidesCha
 
     return list;
   }, [t, promo, featured, currency]);
-  useEffect(() => {
-    onSlidesChange?.(slides);
-  }, [onSlidesChange, slides]);
-
 
   return (
     <div className="container mx-auto px-3 pt-4 pb-5 sm:px-4 sm:pt-6 sm:pb-7">

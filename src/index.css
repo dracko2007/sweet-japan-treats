@@ -504,31 +504,6 @@
     animation: cinematic-plane 2.6s ease-in-out infinite;
   }
 
-  /* Logo da PWA: o avião percorre o selo sem alterar o ícone nativo instalado. */
-  @keyframes pwa-logo-plane-flight {
-    0%,
-    12% {
-      opacity: 0;
-      transform: translate(-115%, 75%) rotate(-16deg) scale(0.72);
-    }
-    25% {
-      opacity: 1;
-    }
-    68% {
-      opacity: 1;
-      transform: translate(65%, -24%) rotate(-16deg) scale(1);
-    }
-    80%,
-    100% {
-      opacity: 0;
-      transform: translate(80%, -30%) rotate(-16deg) scale(1);
-    }
-  }
-  .pwa-logo-plane {
-    animation: pwa-logo-plane-flight 2.8s ease-in-out infinite;
-    transform-origin: center;
-    will-change: opacity, transform;
-  }
 
   @media (prefers-reduced-motion: reduce) {
     .cinematic-bob {
@@ -537,11 +512,6 @@
     .cinematic-plane {
       animation: none;
       opacity: 0.9;
-    }
-    .pwa-logo-plane {
-      animation: none;
-      opacity: 0.9;
-      transform: translate(65%, -24%) rotate(-16deg);
     }
   }
 }

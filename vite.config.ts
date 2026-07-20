@@ -23,9 +23,9 @@ export default defineConfig(({ mode }) => ({
       workbox: {
         skipWaiting: true,
         clientsClaim: true,
-        // Pré-cacheia apenas assets com hash (JS/CSS) — NÃO cacheia HTML para
-        // que index.html venha sempre da rede (evita "old chunks" após deploy)
-        globPatterns: ["**/*.{js,css,ico,jpg,jpeg,png,svg,woff2}"],
+        // Pré-cacheia os assets leves e a vinheta compacta da marca. O HTML
+        // continua vindo da rede para evitar chunks antigos após deploy.
+        globPatterns: ["**/*.{js,css,ico,jpg,jpeg,png,svg,woff2}", "videos/pwa-logo-transition.mp4"],
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         // Limpa caches de versões antigas automaticamente
         cleanupOutdatedCaches: true,
@@ -77,9 +77,9 @@ export default defineConfig(({ mode }) => ({
         name: "Japan Express - Importados do Japão",
         short_name: "Japan Express",
         description: "Produtos originais do Japão entregues com cuidado.",
-        start_url: "/?utm_source=pwa",
+        start_url: "/?hero=transition&utm_source=pwa",
         display: "standalone",
-        background_color: "#ffffff",
+        background_color: "#ec4899",
         theme_color: "#ec4899",
         lang: "pt-BR",
         icons: [

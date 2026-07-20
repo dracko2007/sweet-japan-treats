@@ -1,8 +1,5 @@
-import React, { useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import React from 'react';
 import Layout from '@/components/layout/Layout';
-import PromoCarouselSection from '@/components/home/PromoCarouselSection';
-import type { CarouselSlide } from '@/components/home/HeroCarousel';
 import CategoryQuickNav from '@/components/home/CategoryQuickNav';
 import FeaturedProducts from '@/components/home/FeaturedProducts';
 import RecentlyViewed from '@/components/home/RecentlyViewed';
@@ -14,38 +11,31 @@ import ScrollReveal from '@/components/ScrollReveal';
 import WelcomeCouponBanner from '@/components/WelcomeCouponBanner';
 import CinematicHeroShelfTransition from '@/components/home/CinematicHeroShelfTransition';
 
-const Index: React.FC = () => {
-  const [searchParams] = useSearchParams();
-  const [heroSlides, setHeroSlides] = useState<CarouselSlide[]>([]);
-  const showTransitionHero = searchParams.get('hero') === 'transition';
-  return (
-    <Layout>
-      {showTransitionHero && <CinematicHeroShelfTransition />}
-      {/* Carrossel: loja + promoção ativa do admin + produtos em destaque */}
-      <PromoCarouselSection onSlidesChange={setHeroSlides} />
+const Index: React.FC = () => (
+  <Layout>
+    <CinematicHeroShelfTransition />
 
-      <WelcomeCouponBanner />
-      <ScrollReveal><CategoryQuickNav /></ScrollReveal>
+    <WelcomeCouponBanner />
+    <ScrollReveal><CategoryQuickNav /></ScrollReveal>
 
-      {/* Most Viewed / Featured Products */}
-      <ScrollReveal><FeaturedProducts /></ScrollReveal>
+    {/* Most Viewed / Featured Products */}
+    <ScrollReveal><FeaturedProducts /></ScrollReveal>
 
-      {/* Recently Viewed */}
-      <RecentlyViewed />
+    {/* Recently Viewed */}
+    <RecentlyViewed />
 
-      {/* Videos */}
-      <ScrollReveal><HomeVideos /></ScrollReveal>
+    {/* Videos */}
+    <ScrollReveal><HomeVideos /></ScrollReveal>
 
-      {/* Shipping Banner */}
-      <ScrollReveal><ShippingBanner /></ScrollReveal>
+    {/* Shipping Banner */}
+    <ScrollReveal><ShippingBanner /></ScrollReveal>
 
-      {/* Newsletter */}
-      <ScrollReveal><NewsletterSection /></ScrollReveal>
+    {/* Newsletter */}
+    <ScrollReveal><NewsletterSection /></ScrollReveal>
 
-      {/* App Download */}
-      <ScrollReveal><AppDownloadSection heroSlides={heroSlides} /></ScrollReveal>
-    </Layout>
-  );
-};
+    {/* App Download */}
+    <ScrollReveal><AppDownloadSection /></ScrollReveal>
+  </Layout>
+);
 
 export default Index;

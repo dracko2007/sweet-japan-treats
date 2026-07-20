@@ -10,10 +10,9 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700;800&display=swap" />
-    <!-- Vídeo do 1º slide do carrossel da home: preload de alta prioridade evita o
-         flash do ícone estático enquanto o vídeo baixa. fetchpriority deixa o browser
-         balancear com o resto do carregamento em vez de brigar por banda. -->
-    <link rel="preload" as="video" href="/videos/store-intro.mp4" type="video/mp4" fetchpriority="high" />
+    <!-- Hero transition padrão: preload evita atraso entre o loader e a
+         experiência cinematográfica da home/PWA. -->
+    <link rel="preload" as="video" href="/videos/hero-store-transition.mp4" type="video/mp4" fetchpriority="high" />
     <script src="/init.js"></script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <link rel="icon" type="image/png" sizes="192x192" href="/favicon.png?v=2" />
@@ -53,14 +52,14 @@
       <!-- Esqueleto instantâneo: aparece ANTES do JS desenhar a loja (melhora o LCP
            e tira a "tela branca"). O React substitui este conteúdo ao montar o app.
            Sem JavaScript inline (compatível com a CSP). -->
-      <div id="initial-loader" style="position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#fff;font-family:system-ui,Segoe UI,Roboto,sans-serif">
+      <div id="initial-loader" style="position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#ec4899;font-family:system-ui,Segoe UI,Roboto,sans-serif">
         <div class="je-boot-logo" aria-label="Japan Express">
           <img src="/logo.jpg" alt="Japan Express" />
-          <span class="je-boot-plane" aria-hidden="true">✈︎</span>
+          <video src="/videos/pwa-logo-transition.mp4" autoplay muted loop playsinline preload="auto" aria-hidden="true"></video>
         </div>
-        <div style="margin-top:16px;font-size:13px;color:#9ca3af">Carregando produtos…</div>
+        <div style="margin-top:16px;font-size:13px;color:rgba(255,255,255,.82)">Carregando Japan Express…</div>
       </div>
-      <style>#initial-loader{opacity:1;transition:opacity .2s}.je-boot-logo{position:relative;width:86px;height:86px;overflow:hidden;border-radius:9999px;box-shadow:0 12px 28px rgba(190,24,93,.2)}.je-boot-logo img{width:100%;height:100%;object-fit:cover}.je-boot-plane{position:absolute;left:37px;top:53px;color:#fff;font:700 21px/1 Arial,sans-serif;text-shadow:0 1px 2px rgba(131,24,67,.7);animation:je-boot-flight 2.8s ease-in-out infinite}@keyframes je-boot-flight{0%,12%{opacity:0;transform:translate(-31px,19px) rotate(-16deg) scale(.72)}25%,68%{opacity:1}68%{transform:translate(17px,-7px) rotate(-16deg)}80%,100%{opacity:0;transform:translate(23px,-10px) rotate(-16deg)}}@media (prefers-reduced-motion:reduce){.je-boot-plane{animation:none;opacity:.9;transform:translate(17px,-7px) rotate(-16deg)}}</style>
+      <style>#initial-loader{opacity:1;transition:opacity .2s}.je-boot-logo{position:relative;width:86px;height:86px;overflow:hidden;border-radius:9999px;background:#ec4899;box-shadow:0 12px 28px rgba(190,24,93,.2)}.je-boot-logo img,.je-boot-logo video{width:100%;height:100%;object-fit:cover}.je-boot-logo video{position:absolute;inset:0}@media (prefers-reduced-motion:reduce){.je-boot-logo video{display:none}}</style>
     </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
