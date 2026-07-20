@@ -84,8 +84,8 @@ export default defineConfig(({ mode }) => ({
         lang: "pt-BR",
         icons: [
           { src: "/icons/icon-192x192.png?v=3", sizes: "192x192", type: "image/png", purpose: "any" },
-          { src: "/icons/icon-splash-512x512.png?v=6", sizes: "512x512", type: "image/png", purpose: "any" },
-          { src: "/icons/icon-maskable-512x512.png?v=4", sizes: "512x512", type: "image/png", purpose: "maskable" },
+          { src: "/icons/icon-splash-512x512.png?v=7", sizes: "512x512", type: "image/png", purpose: "any" },
+          { src: "/icons/icon-maskable-512x512.png?v=7", sizes: "512x512", type: "image/png", purpose: "maskable" },
         ],
       },
       devOptions: {
