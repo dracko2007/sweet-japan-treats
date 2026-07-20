@@ -1,4 +1,5 @@
 import React from 'react';
+import { useSearchParams } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
 import PromoCarouselSection from '@/components/home/PromoCarouselSection';
 import CategoryQuickNav from '@/components/home/CategoryQuickNav';
@@ -10,10 +11,15 @@ import NewsletterSection from '@/components/home/NewsletterSection';
 import AppDownloadSection from '@/components/AppDownloadSection';
 import ScrollReveal from '@/components/ScrollReveal';
 import WelcomeCouponBanner from '@/components/WelcomeCouponBanner';
+import CinematicHeroShelf from '@/components/home/CinematicHeroShelf';
+import CinematicHeroShelfTransition from '@/components/home/CinematicHeroShelfTransition';
 
 const Index: React.FC = () => {
+  const [searchParams] = useSearchParams();
+  const showTransitionHero = searchParams.get('hero') === 'transition';
   return (
     <Layout>
+      {showTransitionHero ? <CinematicHeroShelfTransition /> : <CinematicHeroShelf />}
       {/* Carrossel: loja + promoção ativa do admin + produtos em destaque */}
       <PromoCarouselSection />
 

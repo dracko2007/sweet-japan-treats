@@ -1,4 +1,5 @@
 import React, { Suspense, lazy, useEffect } from "react";
+import { SmoothScroll } from '@/lib/smoothScroll';
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -160,6 +161,7 @@ const FullApp: React.FC = () => (
           <Toaster />
           <Sonner />
           <ScrollToTop />
+          <SmoothScroll>
           <ErrorBoundary>
             <Suspense fallback={null}>
               <Routes>
@@ -197,6 +199,7 @@ const FullApp: React.FC = () => (
               </Routes>
             </Suspense>
           </ErrorBoundary>
+          </SmoothScroll>
           <ExitIntentPopup />
           <CartAbandonmentTracker />
           <CartRecoveryBanner />
