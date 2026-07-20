@@ -17,8 +17,9 @@ export default {
     },
     extend: {
       fontFamily: {
-        display: ["Playfair Display", "serif"],
-        body: ["Lato", "sans-serif"],
+        display: ["Outfit", "sans-serif"],
+        body: ["Inter", "sans-serif"],
+        brand: ["Georgia", "Times New Roman", "serif"],
       },
       colors: {
         border: "hsl(var(--border))",

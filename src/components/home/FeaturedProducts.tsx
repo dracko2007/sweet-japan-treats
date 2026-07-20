@@ -6,6 +6,7 @@ import CompactProductCard from '@/components/products/CompactProductCard';
 import ScrollReveal from '@/components/ScrollReveal';
 import { useProducts } from '@/context/ProductsContext';
 import { hasDiscount } from '@/utils/pricing';
+import { useLanguage } from '@/context/LanguageContext';
 
 type TabId = 'vistos' | 'vendidos' | 'ofertas';
 
@@ -16,6 +17,7 @@ type TabId = 'vistos' | 'vendidos' | 'ofertas';
  */
 const FeaturedProducts: React.FC = () => {
   const { products, loading } = useProducts();
+  const { t } = useLanguage();
   const [tab, setTab] = useState<TabId>('vistos');
 
   // "Mais Vistos": produtos marcados como destaque pelo admin. Mostra no máx. 8 por vez;
@@ -59,47 +61,57 @@ const FeaturedProducts: React.FC = () => {
   const items = activeTab.items;
 
   return (
-    <section className="pt-4 pb-10 bg-white">
-      <div className="container mx-auto px-4">
-        <div className="flex items-center justify-between gap-3 mb-5">
-          <h2 className="font-display text-2xl md:text-3xl font-bold text-gray-900">Produtos</h2>
-          <Link to="/produtos" className="text-sm font-bold text-pink-600 hover:text-pink-700 flex items-center gap-1 shrink-0">
-            Ver tudo
-            <ArrowRight className="w-4 h-4" />
+    <section className="relative overflow-hidden bg-gradient-to-b from-white via-pink-50/25 to-white py-10 sm:py-14">
+      <div className="pointer-events-none absolute -left-28 top-20 h-72 w-72 rounded-full bg-fuchsia-200/20 blur-3xl" />
+      <div className="container relative mx-auto px-4">
+        <div className="mb-7 flex flex-col justify-between gap-5 md:flex-row md:items-end">
+          <div className="max-w-2xl">
+            <p className="text-[11px] font-black uppercase tracking-[0.2em] text-pink-500">{t('featured.badge')}</p>
+            <h2 className="mt-1.5 text-3xl font-black tracking-[-0.035em] text-slate-950 md:text-4xl">{t('featured.title')}</h2>
+            <p className="mt-2 text-sm leading-relaxed text-slate-500 md:text-base">{t('featured.subtitle')}</p>
+          </div>
+          <Link
+            to="/produtos"
+            className="group inline-flex w-fit items-center gap-2 rounded-2xl border border-pink-100 bg-white px-4 py-2.5 text-sm font-extrabold text-pink-600 shadow-sm transition-all hover:-translate-y-0.5 hover:border-pink-200 hover:shadow-md"
+          >
+            {t('featured.viewAll')}
+            <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
           </Link>
         </div>
 
-        <div className="flex gap-2 mb-6 overflow-x-auto scrollbar-hide">
+        <div className="mb-7 flex gap-2 overflow-x-auto rounded-2xl border border-pink-100/80 bg-white/75 p-2 shadow-sm backdrop-blur-xl scrollbar-hide md:w-fit">
           {tabs.map(({ id, label, icon: Icon }) => (
             <button
+              type="button"
               key={id}
               onClick={() => setTab(id)}
               className={cn(
-                'shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-bold border transition-colors',
+                'shrink-0 flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-extrabold transition-all duration-300',
                 tab === id
-                  ? 'bg-pink-500 text-white border-pink-500'
-                  : 'bg-white text-gray-600 border-gray-200 hover:border-pink-300 hover:text-pink-600'
+                  ? 'bg-gradient-to-r from-pink-500 to-fuchsia-500 text-white shadow-lg shadow-pink-500/20'
+                  : 'text-slate-500 hover:bg-pink-50 hover:text-pink-600'
               )}
+              aria-pressed={tab === id}
             >
-              <Icon className="w-3.5 h-3.5" />
+              <Icon className="h-4 w-4" />
               {label}
             </button>
           ))}
         </div>
 
-        <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-3 md:gap-4">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4 xl:grid-cols-5">
           {loading
-            ? Array.from({ length: 12 }).map((_, idx) => (
-                <div key={idx} className="bg-gray-50 border border-gray-100 rounded-lg overflow-hidden animate-pulse">
-                  <div className="aspect-square bg-secondary" />
-                  <div className="p-2 space-y-2">
-                    <div className="h-3 bg-secondary rounded w-4/5" />
-                    <div className="h-4 bg-secondary rounded w-2/3" />
+            ? Array.from({ length: 10 }).map((_, idx) => (
+                <div key={idx} className="overflow-hidden rounded-2xl border border-pink-100 bg-white shadow-sm animate-pulse">
+                  <div className="aspect-square bg-pink-50" />
+                  <div className="space-y-2 p-3">
+                    <div className="h-3 w-4/5 rounded bg-pink-50" />
+                    <div className="h-4 w-2/3 rounded bg-pink-50" />
                   </div>
                 </div>
               ))
             : items.map((product, idx) => (
-                <ScrollReveal key={product.id} delay={(idx % 6) * 50}>
+                <ScrollReveal key={product.id} delay={(idx % 5) * 55}>
                   <CompactProductCard product={product} />
                 </ScrollReveal>
               ))}

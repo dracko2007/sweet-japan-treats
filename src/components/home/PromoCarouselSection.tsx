@@ -53,8 +53,20 @@ const PromoCarouselSection: React.FC = () => {
         badge: t('hero.badge'),
         title: `${t('hero.title.1')} ${t('hero.title.highlight')} ${t('hero.title.2')}`,
         subtitle: t('hero.description'),
+        titleParts: {
+          before: t('hero.title.1'),
+          highlight: t('hero.title.highlight'),
+          after: t('hero.title.2'),
+        },
         ctaLabel: t('hero.cta.products') || 'Ver Produtos',
         ctaLink: '/produtos',
+        secondaryCtaLabel: t('hero.cta.story') || 'Como funciona',
+        secondaryCtaLink: '/como-funciona',
+        highlights: [
+          t('hero.badge.recipe'),
+          t('hero.badge.tradition'),
+          t('featured.tag.imported'),
+        ],
       },
     ];
 
@@ -98,8 +110,8 @@ const PromoCarouselSection: React.FC = () => {
   }, [t, promo, featured, currency]);
 
   return (
-    <div className="container mx-auto px-4 pt-6 pb-8">
-      <HeroCarousel slides={slides} autoplay autoplayInterval={11000} />
+    <div className="container mx-auto px-3 pt-4 pb-5 sm:px-4 sm:pt-6 sm:pb-7">
+      <HeroCarousel slides={slides} autoplay autoplayInterval={9000} />
     </div>
   );
 };

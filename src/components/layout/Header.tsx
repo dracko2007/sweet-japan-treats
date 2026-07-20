@@ -65,11 +65,11 @@ const Header: React.FC = () => {
   };
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-md border-b border-border">
+    <header className="fixed inset-x-0 top-0 z-50 border-b border-pink-100/80 bg-white/90 shadow-[0_12px_35px_-28px_rgba(157,23,77,0.5)] backdrop-blur-xl">
       {/* Barra de confiança — esconde no painel admin.
           Mobile: marquee contínuo (não corta as pontas). Desktop: centralizado. */}
       {!isAdminPage && (
-        <div className="bg-primary text-primary-foreground text-[11px] font-semibold overflow-hidden">
+        <div className="overflow-hidden bg-gradient-to-r from-pink-600 via-primary to-fuchsia-600 text-[11px] font-semibold text-primary-foreground shadow-sm">
           {/* Desktop (lg+): centralizado, cabe inteiro */}
           <div className="hidden lg:flex items-center justify-center gap-6 px-4 py-1.5 whitespace-nowrap">
             {trustItems.map(({ icon: Icon, text }) => (
@@ -95,38 +95,40 @@ const Header: React.FC = () => {
 
       <div className="container mx-auto px-4">
         {/* Top Bar: Logo + Search + User Menu */}
-        <div className="flex items-center justify-between h-20 gap-4">
+        <div className="flex h-20 items-center justify-between gap-4">
           {/* Logo */}
-          <Link to="/" className="flex items-center gap-1.5 sm:gap-2.5 group shrink-0">
-            <JapanExpressLogo size={56} className="w-11 h-11 sm:w-14 sm:h-14 animate-float drop-shadow-lg group-hover:scale-105 transition-transform shrink-0" />
+          <Link to="/" className="group flex shrink-0 items-center gap-1.5 sm:gap-2.5" aria-label="Japan Express — início">
+            <JapanExpressLogo size={56} className="h-11 w-11 shrink-0 drop-shadow-lg transition-transform duration-300 group-hover:-rotate-3 group-hover:scale-105 sm:h-14 sm:w-14" />
             <div className="flex items-baseline gap-1">
-              <span className="font-display text-xl sm:text-2xl lg:text-3xl font-black text-foreground tracking-tight">Japan</span>
-              <span className="font-display text-base sm:text-lg lg:text-2xl font-extrabold text-white bg-gradient-to-r from-primary to-accent shadow-md px-1.5 sm:px-2 py-0.5 rounded-lg transform -rotate-6">Express</span>
+              <span className="font-brand text-xl font-black tracking-tight text-foreground sm:text-2xl lg:text-3xl">Japan</span>
+              <span className="-rotate-6 rounded-lg bg-gradient-to-r from-primary to-accent px-1.5 py-0.5 font-display text-base font-extrabold text-white shadow-md transition-transform duration-300 group-hover:-rotate-3 sm:px-2 sm:text-lg lg:text-2xl">Express</span>
             </div>
           </Link>
 
           {/* Search Bar — Desktop (escondida no admin) */}
           {!isAdminPage && (
-            <form onSubmit={handleSearch} className="hidden md:flex flex-1 mx-4 items-center gap-2 bg-secondary/50 rounded-lg border border-border overflow-hidden max-w-2xl">
+            <form onSubmit={handleSearch} className="mx-4 hidden max-w-2xl flex-1 items-center gap-2 overflow-hidden rounded-2xl border border-pink-100 bg-white/90 shadow-sm transition-all focus-within:border-pink-300 focus-within:shadow-lg focus-within:shadow-pink-100/60 md:flex">
               <input
                 type="text"
                 placeholder={t('nav.search') || 'Buscar...'}
+                aria-label={t('nav.search') || 'Buscar produtos'}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="flex-1 bg-transparent px-4 py-2 text-sm outline-none"
+                className="flex-1 bg-transparent px-4 py-2.5 text-sm outline-none placeholder:text-slate-400"
               />
               <select
                 value={selectedCategory}
                 onChange={(e) => setSelectedCategory(e.target.value)}
-                className="bg-transparent px-3 py-2 text-sm border-l border-border outline-none cursor-pointer"
+                aria-label={t('nav.products.all') || 'Categoria'}
+                className="cursor-pointer border-l border-pink-100 bg-transparent px-3 py-2.5 text-sm outline-none"
               >
                 <option value="all">{t('nav.products.all') || 'Todos'}</option>
                 {categoriesWithProducts.map((c) => (
                   <option key={c.id} value={c.id}>{c.icon} {c.label}</option>
                 ))}
               </select>
-              <button type="submit" className="px-4 py-2 text-primary-foreground bg-primary hover:bg-primary/90 transition-colors">
-                <Search className="w-5 h-5" />
+              <button type="submit" className="m-1 flex h-9 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-accent text-primary-foreground shadow-md transition-all hover:scale-105 hover:shadow-lg" aria-label={t('nav.search') || 'Buscar'}>
+                <Search className="h-4 w-4" />
               </button>
             </form>
           )}
@@ -178,9 +180,10 @@ const Header: React.FC = () => {
                 )}
                 <Link
                   to="/carrinho"
-                  className="relative p-1.5 rounded-full hover:bg-secondary/50 transition-colors"
+                  className="relative rounded-xl border border-transparent p-2 transition-all hover:border-pink-100 hover:bg-pink-50"
+                  aria-label={`${t('nav.cart') || 'Carrinho'}${totalItems > 0 ? ` — ${totalItems}` : ''}`}
                 >
-                  <ShoppingCart className="w-5 h-5 text-foreground" />
+                  <ShoppingCart className="h-5 w-5 text-foreground" />
                   {totalItems > 0 && (
                     <span className="absolute -top-1 -right-1 w-4 h-4 bg-primary text-primary-foreground text-[10px] font-bold rounded-full flex items-center justify-center">
                       {totalItems}
@@ -193,6 +196,9 @@ const Header: React.FC = () => {
             <button
               className="md:hidden p-2 rounded-full hover:bg-secondary/50 transition-colors"
               onClick={() => setIsMenuOpen(!isMenuOpen)}
+              type="button"
+              aria-label={isMenuOpen ? 'Fechar menu' : 'Abrir menu'}
+              aria-expanded={isMenuOpen}
             >
               {isMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
             </button>
@@ -201,8 +207,8 @@ const Header: React.FC = () => {
 
         {/* Navigation Menu — Desktop (hidden no admin) */}
         {!isAdminPage && (
-          <nav className="hidden md:flex items-center gap-1 pb-3 overflow-x-auto">
-            <Link to="/produtos" className="text-sm font-medium px-3 py-1.5 rounded-full whitespace-nowrap hover:bg-secondary/70 transition-colors">
+          <nav className="hidden items-center gap-1 overflow-x-auto border-t border-pink-100/60 pb-2 pt-2 md:flex" aria-label="Navegação principal">
+            <Link to="/produtos" className="rounded-full bg-pink-50 px-3 py-1.5 text-sm font-bold text-pink-600 transition-all hover:-translate-y-0.5 hover:bg-pink-100 whitespace-nowrap">
               {t('nav.products')}
             </Link>
             {navItems.map((item) => (

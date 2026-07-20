@@ -17,10 +17,10 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   return (
     <div className="min-h-screen flex flex-col w-full max-w-full overflow-x-clip">
       <Header />
-      {/* pt-20 = header (80px) + navegação (48px) + pt extra para a barra de confiança (~28px) nas páginas de cliente = ~156px total
-          overflow-x-clip (não "hidden"): "hidden" forçaria overflow-y:auto aqui e quebraria os
-          sidebars sticky do carrinho/checkout — clip contém o overflow sem virar scroll container. */}
-      <main className={`flex-1 w-full max-w-full overflow-x-clip ${isAdminPage ? 'pt-20' : 'pt-[156px] md:pt-[140px]'}`}>
+      {/* Cliente mobile: barra de confiança (~28px) + topo (80px) = 108px.
+          Desktop também inclui a navegação (~32px), totalizando ~140px.
+          overflow-x-clip contém efeitos 3D sem criar um novo scroll container. */}
+      <main className={`flex-1 w-full max-w-full overflow-x-clip ${isAdminPage ? 'pt-20' : 'pt-[108px] md:pt-[140px]'}`}>
         {children}
       </main>
       <Footer />
