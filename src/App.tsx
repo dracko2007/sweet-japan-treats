@@ -23,6 +23,7 @@ import InstallPrompt from "./components/InstallPrompt";
 import ExitIntentPopup from "./components/ExitIntentPopup";
 import CartAbandonmentTracker from "./components/CartAbandonmentTracker";
 import CartRecoveryBanner from "./components/CartRecoveryBanner";
+import AnimatedPlaneLogo from "./components/AnimatedPlaneLogo";
 import MaintenancePage from "./pages/Maintenance";
 
 // Code splitting: cada página carregada apenas quando necessária
@@ -216,7 +217,7 @@ const FullApp: React.FC = () => (
 const CheckingScreen: React.FC = () => (
   <div className="min-h-screen bg-gradient-to-b from-pink-100 via-pink-50 to-white flex items-center justify-center">
     <div className="flex flex-col items-center gap-4">
-      <img src="/logo.jpg" alt="Japan Express" className="w-20 h-20 rounded-full object-cover shadow-lg animate-pulse" />
+      <AnimatedPlaneLogo size={80} className="shadow-lg" />
       <div className="flex gap-1.5">
         <span className="w-2 h-2 rounded-full bg-primary/60 animate-bounce [animation-delay:0ms]" />
         <span className="w-2 h-2 rounded-full bg-primary/60 animate-bounce [animation-delay:150ms]" />

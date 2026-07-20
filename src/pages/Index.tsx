@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
 import PromoCarouselSection from '@/components/home/PromoCarouselSection';
+import type { CarouselSlide } from '@/components/home/HeroCarousel';
 import CategoryQuickNav from '@/components/home/CategoryQuickNav';
 import FeaturedProducts from '@/components/home/FeaturedProducts';
 import RecentlyViewed from '@/components/home/RecentlyViewed';
@@ -15,12 +16,13 @@ import CinematicHeroShelfTransition from '@/components/home/CinematicHeroShelfTr
 
 const Index: React.FC = () => {
   const [searchParams] = useSearchParams();
+  const [heroSlides, setHeroSlides] = useState<CarouselSlide[]>([]);
   const showTransitionHero = searchParams.get('hero') === 'transition';
   return (
     <Layout>
       {showTransitionHero && <CinematicHeroShelfTransition />}
       {/* Carrossel: loja + promoção ativa do admin + produtos em destaque */}
-      <PromoCarouselSection />
+      <PromoCarouselSection onSlidesChange={setHeroSlides} />
 
       <WelcomeCouponBanner />
       <ScrollReveal><CategoryQuickNav /></ScrollReveal>
@@ -41,7 +43,7 @@ const Index: React.FC = () => {
       <ScrollReveal><NewsletterSection /></ScrollReveal>
 
       {/* App Download */}
-      <ScrollReveal><AppDownloadSection /></ScrollReveal>
+      <ScrollReveal><AppDownloadSection heroSlides={heroSlides} /></ScrollReveal>
     </Layout>
   );
 };
