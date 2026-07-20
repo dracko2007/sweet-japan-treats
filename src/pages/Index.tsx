@@ -11,7 +11,6 @@ import NewsletterSection from '@/components/home/NewsletterSection';
 import AppDownloadSection from '@/components/AppDownloadSection';
 import ScrollReveal from '@/components/ScrollReveal';
 import WelcomeCouponBanner from '@/components/WelcomeCouponBanner';
-import CinematicHeroShelf from '@/components/home/CinematicHeroShelf';
 import CinematicHeroShelfTransition from '@/components/home/CinematicHeroShelfTransition';
 
 const Index: React.FC = () => {
@@ -19,7 +18,7 @@ const Index: React.FC = () => {
   const showTransitionHero = searchParams.get('hero') === 'transition';
   return (
     <Layout>
-      {showTransitionHero ? <CinematicHeroShelfTransition /> : <CinematicHeroShelf />}
+      {showTransitionHero && <CinematicHeroShelfTransition />}
       {/* Carrossel: loja + promoção ativa do admin + produtos em destaque */}
       <PromoCarouselSection />
 
