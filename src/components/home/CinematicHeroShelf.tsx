@@ -384,7 +384,7 @@ const CinematicHeroShelf: React.FC<CinematicHeroShelfProps> = ({
       key="intro"
       className={cn(
         'cinematic-panel relative flex w-screen shrink-0 items-center justify-center overflow-hidden px-4 md:px-6',
-        reduced ? 'min-h-[60dvh] md:min-h-screen' : 'h-full',
+        reduced ? 'min-h-[53dvh] md:min-h-screen' : 'h-full',
       )}
     >
       {/* Sem `loop`: ao terminar, a imagem final fica em cena e o recomeço
@@ -487,7 +487,7 @@ const CinematicHeroShelf: React.FC<CinematicHeroShelfProps> = ({
       key={p.id}
       className={cn(
         'cinematic-panel relative flex w-screen shrink-0 items-center overflow-hidden',
-        reduced ? 'min-h-[60dvh] md:min-h-screen' : 'h-full',
+        reduced ? 'min-h-[53dvh] md:min-h-screen' : 'h-full',
       )}
     >
       <div
@@ -511,7 +511,7 @@ const CinematicHeroShelf: React.FC<CinematicHeroShelfProps> = ({
             src={p.image}
             alt={`${p.brand} ${p.name}`}
             loading="lazy"
-            className="cinematic-product-img h-[20vh] max-h-[180px] w-auto object-contain md:h-[58vh] md:max-h-[440px]"
+            className="cinematic-product-img h-[18vh] max-h-[165px] w-auto object-contain md:h-[58vh] md:max-h-[440px]"
           />
         </div>
         <div className="max-w-md flex-1">
@@ -553,7 +553,7 @@ const CinematicHeroShelf: React.FC<CinematicHeroShelfProps> = ({
       key="outro"
       className={cn(
         'cinematic-panel relative flex w-screen shrink-0 items-center justify-center overflow-hidden px-4 md:px-6',
-        reduced ? 'min-h-[60dvh] md:min-h-screen' : 'h-full',
+        reduced ? 'min-h-[53dvh] md:min-h-screen' : 'h-full',
       )}
     >
       <div className="cinematic-kanji font-jp pointer-events-none absolute bottom-[6%] left-[8%] select-none text-[42vmin] leading-none">
@@ -593,11 +593,11 @@ const CinematicHeroShelf: React.FC<CinematicHeroShelfProps> = ({
       ref={sectionRef}
       className={cn(
         'relative w-full overflow-hidden bg-gradient-to-b from-pink-50 via-white to-pink-50/40',
-        // No smartphone, ocupa 58% da tela (cerca de 1/3 menor). Desktop
-        // preserva a experiência cinematográfica em viewport completo.
+        // No smartphone, ocupa 53% da tela. Desktop preserva a experiência
+        // cinematográfica em viewport completo.
         reduced
           ? ''
-          : 'h-[58dvh] min-h-[420px] max-h-[520px] md:h-[calc(100dvh-var(--shelf-top,0px))] md:min-h-0 md:max-h-none',
+          : 'h-[53dvh] min-h-[390px] max-h-[480px] md:h-[calc(100dvh-var(--shelf-top,0px))] md:min-h-0 md:max-h-none',
       )}
       aria-label="Vitrine cinematográfica de cosméticos japoneses"
     >
