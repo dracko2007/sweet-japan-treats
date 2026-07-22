@@ -98,16 +98,17 @@ async function orderAllowsEmail(orderId, to) {
 }
 
 // Anti-abuso para e-mail promocional (campanha do admin): o destinatário precisa
-// ser um cliente real — ter cadastro (coleção "users") ou um pedido (coleção
-// "orders"). Espelha a população que o admin seleciona no modal de notificação
-// promocional (customerService.getAllCustomersAsync lê a coleção "users"). O
-// Admin SDK acessa o Firestore direto, ignorando as regras do client. Tenta o
-// e-mail original e o minúsculo: Auth grava minúsculo, mas cadastros de
-// convidado podem guardar o caso original (where do Firestore é sensível a caso).
+// ser um cliente real — (1) cadastro/pedido no Firestore OU (2) conta no Firebase
+// Auth. O Auth cobre clientes com conta real que ainda não sincronizaram
+// perfil/pedido no Firestore (só existem no safeStorage do admin) — sem ele, o
+// gate rejeitaria quem já recebia via getUserByEmail. O Admin SDK acessa o
+// Firestore direto, ignorando as regras do client. where do Firestore é sensível
+// a caso, então testa o e-mail original e o minúsculo.
 async function customerExists(toRaw, toLower) {
+  const candidates = [...new Set([toLower, toRaw].filter(Boolean))];
+  // 1) Firestore: cadastro (users) ou pedido (orders).
   try {
     const db = firebaseAdminDb();
-    const candidates = [...new Set([toLower, toRaw].filter(Boolean))];
     for (const email of candidates) {
       const byEmail = await db.collection('users').where('email', '==', email).limit(1).get();
       if (!byEmail.empty) return true;
@@ -116,7 +117,13 @@ async function customerExists(toRaw, toLower) {
       const byOrder = await db.collection('orders').where('customerEmail', '==', email).limit(1).get();
       if (!byOrder.empty) return true;
     }
-    return false;
+  } catch {
+    /* Firestore indisponível — segue para o fallback do Auth */
+  }
+  // 2) Firebase Auth (case-insensitive): conta real do cliente.
+  try {
+    await firebaseAdminAuth().getUserByEmail(toLower);
+    return true;
   } catch {
     return false;
   }
