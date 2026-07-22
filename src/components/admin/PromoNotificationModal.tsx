@@ -308,14 +308,14 @@ const PromoNotificationModal: React.FC<Props> = ({ onClose }) => {
     if (channel === 'email' || channel === 'both') {
       // E-mail vai pelo /api/send-email (Nodemailer + Google Workspace SMTP,
       // remetente noreply@japanexpress-store.com) — NÃO pelo Resend direto do
-      // navegador. Anti-abuso do endpoint: só entrega para quem tem conta no
-      // Firebase Auth (todo cliente selecionado) ou é dono de pedido real.
+      // navegador. Anti-abuso do endpoint (tipo "promo"): só entrega para
+      // clientes reais (cadastro ou pedido no Firestore) — cobre convidados.
       for (const r of targets) {
         try {
           const res = await fetch('/api/send-email', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ to: r.email, type: 'transactional', subject, html: buildHtml(r.name) }),
+            body: JSON.stringify({ to: r.email, type: 'promo', subject, html: buildHtml(r.name) }),
           });
           const data = await res.json().catch(() => ({})) as { error?: string };
           partial.push({ email: r.email, ok: res.ok, channel: 'email', error: res.ok ? undefined : (data.error || `HTTP ${res.status}`) });

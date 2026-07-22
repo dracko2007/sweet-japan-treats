@@ -97,6 +97,31 @@ async function orderAllowsEmail(orderId, to) {
   return false;
 }
 
+// Anti-abuso para e-mail promocional (campanha do admin): o destinatário precisa
+// ser um cliente real — ter cadastro (coleção "users") ou um pedido (coleção
+// "orders"). Espelha a população que o admin seleciona no modal de notificação
+// promocional (customerService.getAllCustomersAsync lê a coleção "users"). O
+// Admin SDK acessa o Firestore direto, ignorando as regras do client. Tenta o
+// e-mail original e o minúsculo: Auth grava minúsculo, mas cadastros de
+// convidado podem guardar o caso original (where do Firestore é sensível a caso).
+async function customerExists(toRaw, toLower) {
+  try {
+    const db = firebaseAdminDb();
+    const candidates = [...new Set([toLower, toRaw].filter(Boolean))];
+    for (const email of candidates) {
+      const byEmail = await db.collection('users').where('email', '==', email).limit(1).get();
+      if (!byEmail.empty) return true;
+      const byId = await db.collection('users').doc(email).get();
+      if (byId.exists) return true;
+      const byOrder = await db.collection('orders').where('customerEmail', '==', email).limit(1).get();
+      if (!byOrder.empty) return true;
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
+
 async function buildVerificationLink(email, req) {
   return firebaseAdminAuth().generateEmailVerificationLink(email, {
     url: `${siteOrigin(req)}/login?verified=1`,
@@ -157,7 +182,8 @@ export default async function handler(req, res) {
 
   try {
     const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
-    const to = String(body.to || '').trim().toLowerCase();
+    const toRaw = String(body.to || '').trim();
+    const to = toRaw.toLowerCase();
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to)) {
       res.status(400).json({ error: 'invalid email' });
       return;
@@ -167,19 +193,28 @@ export default async function handler(req, res) {
     let subject;
     let html;
 
-    if (type === 'transactional') {
-      // Recibo de compra / rastreio: o HTML já vem renderizado pelo client.
-      // Anti-abuso: só envia se o destinatário for dono de um pedido real
-      // (Firestore) OU tiver conta no Firebase Auth — nunca para e-mail arbitrário.
+    if (type === 'transactional' || type === 'promo') {
+      // HTML já vem renderizado pelo client: recibo/rastreio (transacional) ou
+      // campanha promocional montada no modal do admin.
       subject = String(body.subject || '').trim();
       html = String(body.html || '');
       if (!subject || !html) {
         res.status(400).json({ error: 'missing subject or html' });
         return;
       }
-      let allowed = await orderAllowsEmail(String(body.orderId || '').trim(), to);
-      if (!allowed) {
-        try { await firebaseAdminAuth().getUserByEmail(to); allowed = true; } catch { /* não autoriza */ }
+
+      let allowed = false;
+      if (type === 'promo') {
+        // Marketing: só entrega para clientes reais (cadastro ou pedido no
+        // Firestore) — espelha quem o admin seleciona no modal. Anti-abuso:
+        // nunca para um endereço que não seja cliente conhecido da loja.
+        allowed = await customerExists(toRaw, to);
+      } else {
+        // Transacional (recibo/rastreio): dono de um pedido real OU conta no Firebase Auth.
+        allowed = await orderAllowsEmail(String(body.orderId || '').trim(), to);
+        if (!allowed) {
+          try { await firebaseAdminAuth().getUserByEmail(to); allowed = true; } catch { /* não autoriza */ }
+        }
       }
       if (!allowed) {
         res.status(400).json({ error: 'invalid request' });
