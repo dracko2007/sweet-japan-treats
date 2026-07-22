@@ -31,6 +31,7 @@ import { Wallet } from 'lucide-react';
 import { referralService } from '@/services/referralService';
 import { calcBrazilTax, calcImportTax } from '@/utils/taxRules';
 import { cpfGuardService, normalizeCPF } from '@/services/cpfGuardService';
+import { promoCampaignService } from '@/services/promoCampaignService';
 import { thermalPrintService } from '@/services/thermalPrintService';
 import StripeCardForm from '@/components/checkout/StripeCardForm';
 import { db } from '@/config/firebase';
@@ -45,7 +46,7 @@ const devError = isDev ? console.error.bind(console) : () => {};
 const OrderReview: React.FC = () => {
   const { items, clearCart } = useCart();
   const { refresh: refreshProducts } = useProducts();
-  const { consumeCouponByCode, user, addPoints, addOrder } = useUser();
+  const { consumeCouponByCode, user, addPoints, addOrder, addCoupon } = useUser();
   const [pointsToUse, setPointsToUse] = useState<number>(() => {
     const v = Number(safeStorage.getItem('redeem_points'));
     return Number.isFinite(v) && v > 0 ? v : 0;
@@ -292,6 +293,12 @@ const OrderReview: React.FC = () => {
           setAppliedCoupon(null);
           return;
         }
+      }
+      // 3. Campanha promocional (?promo=CODE): 1 resgate por CPF.
+      const promoCode = safeStorage.getItem('promo_applied');
+      if (promoCode && await promoCampaignService.hasUsed(promoCode, cpfRaw)) {
+        toast({ title: '🎟️ Promoção já utilizada', description: 'Esta promoção já foi resgatada com este CPF.', variant: 'destructive' });
+        return;
       }
     }
     // ─────────────────────────────────────────────────────────────────────────
@@ -542,6 +549,41 @@ const OrderReview: React.FC = () => {
           ].filter(Boolean).join(' · '),
         });
       }
+    }
+
+    // 🎟️ Campanha promocional (e-mail/push): credita pontos, concede cupom de
+    // próxima compra e registra o uso por CPF (anti-abuso). Limpa o resgate.
+    const appliedPromoCode = safeStorage.getItem('promo_applied');
+    if (appliedPromoCode) {
+      const custEmail = String(formData.email || user?.email || '').trim().toLowerCase();
+      promoCampaignService.validate(appliedPromoCode).then((vres) => {
+        const camp = vres.campaign;
+        if (camp?.mechanic === 'points' && (camp.points || 0) > 0) {
+          if (!isGuest && user) {
+            addPoints(camp.points || 0);
+            toast({ title: '🎁 Pontos da promoção', description: `+${camp.points} pontos creditados!` });
+          } else if (custEmail) {
+            firebaseSyncService.addPointsToUserByEmail(custEmail, camp.points || 0).catch(() => {});
+          }
+        }
+        if (camp?.mechanic === 'coupon' && camp.couponCode && !isGuest && user) {
+          addCoupon({
+            id: `promo-${camp.code}`,
+            code: camp.couponCode,
+            description: `Cupom promocional ${camp.couponCode}`,
+            discount: 10,
+            discountType: 'percentage',
+            expiresAt: new Date(Date.now() + 30 * 86400000).toISOString(),
+            isUsed: false,
+          });
+          toast({ title: '🎟️ Cupom resgatado', description: `${camp.couponCode} disponível em Meus Cupons para a próxima compra!` });
+        }
+      });
+      void promoCampaignService.recordUsage(appliedPromoCode, formData.cpf || '', custEmail, orderId);
+      safeStorage.removeItem('promo_applied');
+      safeStorage.removeItem('pending_promo');
+      safeStorage.removeItem('pending_promo_gift');
+      safeStorage.removeItem('pending_promo_points');
     }
 
     // Track referral progress (only when purchase is in BRL)

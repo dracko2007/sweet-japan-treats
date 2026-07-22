@@ -8,6 +8,8 @@ import { ActivePromo, PROMO_TYPES } from '@/types/promotion';
 import { db } from '@/config/firebase';
 import { collection, getDocs, doc, getDoc, deleteDoc } from 'firebase/firestore';
 import { ensureAdminAuth } from '@/utils/adminAuth';
+import { promoCampaignService } from '@/services/promoCampaignService';
+import type { PromoCampaign } from '@/types/promoCampaign';
 
 const STORE_URL = 'https://japanexpress-store.com';
 
@@ -217,7 +219,7 @@ const PromoNotificationModal: React.FC<Props> = ({ onClose }) => {
        </div>`
     : '';
 
-  const buildHtml = (name: string) => `<!DOCTYPE html>
+  const buildHtml = (name: string, ctaUrl: string = productUrl) => `<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="utf-8">
@@ -272,7 +274,7 @@ const PromoNotificationModal: React.FC<Props> = ({ onClose }) => {
         </div>
       </div>` : ''}
       <p class="extra">${extraMsg}</p>
-      <a class="cta" href="${productUrl}">${ctaLabel}</a>
+      <a class="cta" href="${ctaUrl}">${ctaLabel}</a>
     </div>
     <div class="footer">
       Japan Express · <a href="${STORE_URL}">japanexpress-store.com</a><br>
@@ -303,6 +305,35 @@ const PromoNotificationModal: React.FC<Props> = ({ onClose }) => {
       }
     }
     setResults([]);
+    // Cria a campanha resgatável por código (1 por disparo) e arma o código no
+    // link do e-mail/push — sem isso, a oferta do e-mail nunca se aplica no carrinho.
+    const promoCode = `PROMO-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+    const extraDiscount = Math.max(1, Math.min(90, discountPct || 0));
+    const totalDiscount = mechanic === 'discount' ? Math.min(90, baseDiscount + extraDiscount) : 0;
+    try {
+      const campaign: PromoCampaign = {
+        code: promoCode,
+        mechanic,
+        productId: selectedProduct?.id,
+        giftProductId: giftProductId || undefined,
+        couponCode: mechanic === 'coupon' ? (couponCode.trim().toUpperCase() || undefined) : undefined,
+        discountPct: mechanic === 'discount' ? totalDiscount : undefined,
+        points: mechanic === 'points' ? Math.max(1, pointsCount || 0) : undefined,
+        headline,
+        tagline: offer.tagline,
+        description: offer.description,
+        badge: offer.badge,
+        productName: selectedProduct?.name,
+        createdAt: Date.now(),
+        expiresAt: Date.now() + 30 * 86400000,
+        active: true,
+        perCpfLimit: 1,
+      };
+      await promoCampaignService.create(campaign);
+    } catch (e) {
+      console.warn('[promo] campanha não criada — e-mail segue sem resgate:', e instanceof Error ? e.message : e);
+    }
+    const ctaUrl = `${productUrl}${productUrl.includes('?') ? '&' : '?'}promo=${promoCode}`;
     const partial: SendResult[] = [];
 
     if (channel === 'email' || channel === 'both') {
@@ -315,7 +346,7 @@ const PromoNotificationModal: React.FC<Props> = ({ onClose }) => {
           const res = await fetch('/api/send-email', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ to: r.email, type: 'promo', subject, html: buildHtml(r.name) }),
+            body: JSON.stringify({ to: r.email, type: 'promo', subject, html: buildHtml(r.name, ctaUrl) }),
           });
           const data = await res.json().catch(() => ({})) as { error?: string };
           partial.push({ email: r.email, ok: res.ok, channel: 'email', error: res.ok ? undefined : (data.error || `HTTP ${res.status}`) });
@@ -339,6 +370,7 @@ const PromoNotificationModal: React.FC<Props> = ({ onClose }) => {
               emails: reachableByPush.map(c => c.email),
               title: offer.tagline,
               body: offer.description,
+              url: ctaUrl,
             }),
           });
           const data = await res.json();

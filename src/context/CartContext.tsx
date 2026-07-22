@@ -63,6 +63,31 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         freeGiftFromProductId: item.product.id,
       });
     }
+    // Brinde de campanha promocional (BOGO via link de e-mail ?promo=CODE):
+    // quando o produto qualificante está no carrinho, adiciona o presente grátis.
+    try {
+      const raw = safeStorage.getItem('pending_promo_gift');
+      if (raw) {
+        const g = JSON.parse(raw);
+        if (g && g.productId && rawItems.some(i => i.product.id === g.productId)) {
+          const giftId = g.giftProductId || g.productId;
+          if (!addedGiftIds.has(giftId)) {
+            const giftProduct = products.find(p => p.id === giftId);
+            if (giftProduct) {
+              addedGiftIds.add(giftId);
+              gifts.push({
+                product: giftProduct,
+                size: 'small',
+                quantity: 1,
+                variantLabel: 'Presente da promoção 🎁',
+                freeGift: true,
+                freeGiftFromProductId: g.productId,
+              });
+            }
+          }
+        }
+      }
+    } catch { /* JSON inválido — ignora */ }
     return gifts;
   }, [rawItems, products]);
 

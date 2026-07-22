@@ -32,6 +32,12 @@ const ScrollToTop = () => {
         safeStorage.removeItem('affiliate_ref_product');
       }
     }
+    // Código de campanha promocional (?promo=CODE) vindo do e-mail/push —
+    // armado para o carrinho aplicar a oferta (desconto/brinde/pontos).
+    const promo = params.get('promo');
+    if (promo) {
+      safeStorage.setItem('pending_promo', promo.trim().toUpperCase());
+    }
   }, [search, pathname]);
 
   return null;

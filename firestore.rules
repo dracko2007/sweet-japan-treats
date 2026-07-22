@@ -248,5 +248,19 @@ service cloud.firestore {
         || (request.auth != null && resource.data.customerEmail == request.auth.token.email);
     }
 
+
+    // ---------- Campanhas promocionais (notificação por e-mail/push) ----------
+    // Leitura pública por código (get): qualquer visitante resgata a oferta.
+    // O doc só guarda parâmetros da oferta (sem dados sensíveis). Só admin cria.
+    match /promo_campaigns/{campaignId} {
+      allow get: if true;
+      allow list, create, update, delete: if isAdmin();
+    }
+    // Uso por CPF (anti-abuso: 1 resgate por CPF). Criação pública (id = code_cpf),
+    // get público — sem list para não permitir enumeração de quem usou.
+    match /promo_usage/{usageId} {
+      allow get, create: if true;
+      allow list, update, delete: if isAdmin();
+    }
   }
 }

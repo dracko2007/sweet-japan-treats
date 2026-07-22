@@ -14,6 +14,7 @@ import { convertYen as fxConvert } from '@/services/fxService';
 import { POINTS } from '@/services/pointsService';
 import { affiliateService, Affiliate } from '@/services/affiliateService';
 import { couponService as globalCouponService } from '@/services/couponService';
+import { promoCampaignService } from '@/services/promoCampaignService';
 import { safeStorage } from '@/utils/storage';
 import WelcomeCouponBanner from '@/components/WelcomeCouponBanner';
 
@@ -122,6 +123,42 @@ const Cart: React.FC = () => {
         }
       });
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Aplica automaticamente a campanha promocional do link de e-mail/push (?promo=CODE):
+  // discount → cupom % no carrinho; bogo/bogo_other → brinde (CartContext lê
+  // pending_promo_gift); points → crédito pós-compra (OrderReview lê pending_promo_points).
+  useEffect(() => {
+    const code = safeStorage.getItem('pending_promo');
+    if (!code || activeCoupon) return;
+    let cancelled = false;
+    promoCampaignService.validate(code).then((res) => {
+      if (cancelled || !res.valid || !res.campaign) return;
+      const c = res.campaign;
+      safeStorage.setItem('promo_applied', c.code);
+      if (c.mechanic === 'discount') {
+        const pct = Math.max(1, Math.min(90, c.discountPct || 0));
+        setActiveCoupon({
+          id: `promo-${c.code}`,
+          code: c.code,
+          description: c.tagline || `Promoção ${c.code}`,
+          discount: pct,
+          discountType: 'percentage',
+          expiresAt: c.expiresAt ? new Date(c.expiresAt).toISOString() : new Date(Date.now() + 30 * 86400000).toISOString(),
+          isUsed: false,
+        });
+      } else if (c.mechanic === 'bogo' || c.mechanic === 'bogo_other') {
+        safeStorage.setItem('pending_promo_gift', JSON.stringify({
+          code: c.code,
+          productId: c.productId,
+          giftProductId: c.mechanic === 'bogo' ? c.productId : c.giftProductId,
+        }));
+      } else if (c.mechanic === 'points') {
+        safeStorage.setItem('pending_promo_points', JSON.stringify({ code: c.code, points: c.points || 0 }));
+      }
+    });
+    return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
