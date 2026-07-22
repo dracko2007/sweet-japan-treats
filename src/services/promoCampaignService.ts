@@ -22,7 +22,12 @@ export const promoCampaignService = {
     if (!db) return;
     await ensureAdminAuth();
     const id = norm(c.code).toLowerCase();
-    await setDoc(doc(db, COL, id), { ...c, code: norm(c.code) });
+    // O SDK client do Firestore rejeita campos undefined (o Admin SDK os ignora) —
+    // removemos antes de gravar para não abortar a criação da campanha.
+    const payload = Object.fromEntries(
+      Object.entries({ ...c, code: norm(c.code) }).filter(([, v]) => v !== undefined)
+    );
+    await setDoc(doc(db, COL, id), payload);
     devLog('[promoCampaign] criada:', c.code, c.mechanic);
   },
 
