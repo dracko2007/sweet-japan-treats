@@ -4,6 +4,8 @@ import { Button } from '@/components/ui/button';
 import { customerService, CustomerStats } from '@/services/customerService';
 import { useProducts } from '@/context/ProductsContext';
 import { Product } from '@/types';
+import { db } from '@/config/firebase';
+import { collection, getDocs } from 'firebase/firestore';
 
 const RESEND_API_KEY = import.meta.env.VITE_RESEND_API_KEY;
 const FROM_EMAIL = import.meta.env.VITE_FROM_EMAIL || 'onboarding@resend.dev';
@@ -13,6 +15,7 @@ const MONTHS = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','A
 
 type Channel = 'email' | 'app' | 'both';
 type GenderFilter = 'todos' | 'masculino' | 'feminino' | 'outro';
+type SendResult = { email: string; ok: boolean; channel: 'email' | 'app'; error?: string };
 
 interface Props { onClose: () => void }
 
@@ -23,6 +26,7 @@ const PromoNotificationModal: React.FC<Props> = ({ onClose }) => {
   const { products: allProducts, loading: productsLoading } = useProducts();
   const products = allProducts.filter(p => !p.hidden);
   const [allCustomers, setAllCustomers] = useState<CustomerStats[]>([]);
+  const [customersLoading, setCustomersLoading] = useState(true);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
 
   // Composer
@@ -35,15 +39,60 @@ const PromoNotificationModal: React.FC<Props> = ({ onClose }) => {
   const [genderFilter, setGenderFilter] = useState<GenderFilter>('todos');
   const [birthdayMonths, setBirthdayMonths] = useState<string[]>([]); // ["01","03"]
   const [channel, setChannel] = useState<Channel>('email');
+  const [selectedEmails, setSelectedEmails] = useState<Set<string>>(new Set());
+
+  // Push: clientes com inscrição ativa agora (coleção push_subscriptions) — define quem é
+  // alcançável pelo canal "app", sem depender de FCM (Web Push puro via VAPID).
+  const [pushSubscribedEmails, setPushSubscribedEmails] = useState<Set<string>>(new Set());
+  const [pushSubsLoading, setPushSubsLoading] = useState(true);
 
   // Send state
   const [sending, setSending] = useState(false);
-  const [results, setResults] = useState<{ email: string; ok: boolean }[]>([]);
+  const [results, setResults] = useState<SendResult[]>([]);
   const [sent, setSent] = useState(false);
   const [tab, setTab] = useState<'compose' | 'preview'>('compose');
 
+  // Clientes: usa a mesma fonte real (Firestore) da aba "Clientes" — a versão local
+  // (customerService.getAllCustomers, só localStorage) só vê quem já passou por ESTE
+  // navegador, deixando a lista vazia/incompleta numa sessão de admin nova.
   useEffect(() => {
-    setAllCustomers(customerService.getAllCustomers().filter(c => c.email?.includes('@')));
+    let cancelled = false;
+    const timeout = new Promise<CustomerStats[]>((resolve) => setTimeout(() => resolve([]), 8000));
+    Promise.race([customerService.getAllCustomersAsync(), timeout]).then((list) => {
+      if (cancelled) return;
+      setAllCustomers(list.filter(c => c.email?.includes('@')));
+      setCustomersLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, []);
+
+  // Quem já tem push ativo agora (só o admin lê essa coleção — regra Firestore).
+  // Corrida com timeout: sob instabilidade de rede o Firestore pode nunca resolver/rejeitar
+  // essa consulta (visto em teste); sem isso a mensagem "Verificando..." travaria para sempre.
+  useEffect(() => {
+    let cancelled = false;
+    const fetchSubs = async () => {
+      if (!db) return new Set<string>();
+      try {
+        const snap = await getDocs(collection(db, 'push_subscriptions'));
+        const emails = new Set<string>();
+        snap.forEach((d) => {
+          const email = d.data().customerEmail;
+          if (email) emails.add(String(email).toLowerCase());
+        });
+        return emails;
+      } catch {
+        // sem permissão (regra ainda não implantada) ou offline — canal "app" fica sem alcance
+        return new Set<string>();
+      }
+    };
+    const timeout = new Promise<Set<string>>((resolve) => setTimeout(() => resolve(new Set()), 6000));
+    Promise.race([fetchSubs(), timeout]).then((emails) => {
+      if (cancelled) return;
+      setPushSubscribedEmails(emails);
+      setPushSubsLoading(false);
+    });
+    return () => { cancelled = true; };
   }, []);
 
   // Apply filters
@@ -55,6 +104,24 @@ const PromoNotificationModal: React.FC<Props> = ({ onClose }) => {
     }
     return true;
   });
+
+  // O filtro grosso (gênero/aniversário, ou o carregamento inicial da lista) reinicia a
+  // seleção fina marcando todo mundo que passou nele — o admin desmarca individualmente
+  // quem não quer incluir.
+  useEffect(() => {
+    setSelectedEmails(new Set(filtered.map(c => c.email)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [genderFilter, birthdayMonths, allCustomers]);
+
+  const toggleCustomer = (email: string) =>
+    setSelectedEmails(prev => {
+      const next = new Set(prev);
+      if (next.has(email)) next.delete(email); else next.add(email);
+      return next;
+    });
+
+  const targets = filtered.filter(c => selectedEmails.has(c.email));
+  const reachableByPush = targets.filter(c => pushSubscribedEmails.has(c.email));
 
   const toggleMonth = (m: string) =>
     setBirthdayMonths(prev => prev.includes(m) ? prev.filter(x => x !== m) : [...prev, m]);
@@ -131,31 +198,63 @@ const PromoNotificationModal: React.FC<Props> = ({ onClose }) => {
 </body>
 </html>`;
 
-  const sendEmails = async () => {
-    if (channel === 'app') {
-      alert('Envio só pelo app requer configuração de VAPID keys / Firebase Cloud Messaging. Em desenvolvimento.');
-      return;
-    }
-    if (!RESEND_API_KEY) { alert('VITE_RESEND_API_KEY não configurada no Vercel.'); return; }
-    if (filtered.length === 0) { alert('Nenhum cliente corresponde ao filtro selecionado.'); return; }
+  const sendPromo = async () => {
+    if (targets.length === 0) { alert('Selecione ao menos um cliente.'); return; }
 
     setSending(true);
     setResults([]);
-    const partial: { email: string; ok: boolean }[] = [];
+    const partial: SendResult[] = [];
 
-    for (const r of filtered) {
-      try {
-        const res = await fetch('https://api.resend.com/emails', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${RESEND_API_KEY}` },
-          body: JSON.stringify({ from: FROM_EMAIL, to: r.email, subject, html: buildHtml(r.name) }),
-        });
-        partial.push({ email: r.email, ok: res.ok });
-      } catch {
-        partial.push({ email: r.email, ok: false });
+    if (channel === 'email' || channel === 'both') {
+      if (!RESEND_API_KEY) {
+        alert('VITE_RESEND_API_KEY não configurada no Vercel.');
+        setSending(false);
+        return;
+      }
+      for (const r of targets) {
+        try {
+          const res = await fetch('https://api.resend.com/emails', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${RESEND_API_KEY}` },
+            body: JSON.stringify({ from: FROM_EMAIL, to: r.email, subject, html: buildHtml(r.name) }),
+          });
+          partial.push({ email: r.email, ok: res.ok, channel: 'email' });
+        } catch {
+          partial.push({ email: r.email, ok: false, channel: 'email' });
+        }
+        setResults([...partial]);
+        await new Promise(resolve => setTimeout(resolve, 200));
+      }
+    }
+
+    if (channel === 'app' || channel === 'both') {
+      if (reachableByPush.length === 0) {
+        partial.push({ email: '(nenhum selecionado tem push ativo)', ok: false, channel: 'app' });
+      } else {
+        try {
+          const res = await fetch('/api/send-push', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              emails: reachableByPush.map(c => c.email),
+              title: headline,
+              body: extraMsg,
+              url: productUrl,
+              image: selectedProduct?.thumbnail || selectedProduct?.image || undefined,
+            }),
+          });
+          const data = await res.json();
+          if (res.ok && data.ok) {
+            const pushResults = data.results as { email: string; ok: boolean; error?: string }[];
+            for (const r of pushResults) partial.push({ email: r.email, ok: r.ok, channel: 'app', error: r.error });
+          } else {
+            partial.push({ email: '(push)', ok: false, channel: 'app', error: data.error || 'Falha ao enviar' });
+          }
+        } catch (e) {
+          partial.push({ email: '(push)', ok: false, channel: 'app', error: e instanceof Error ? e.message : String(e) });
+        }
       }
       setResults([...partial]);
-      await new Promise(resolve => setTimeout(resolve, 200));
     }
 
     setSending(false);
@@ -175,7 +274,7 @@ const PromoNotificationModal: React.FC<Props> = ({ onClose }) => {
             <Mail className="w-5 h-5 text-primary" />
             <h2 className="font-bold text-lg">Notificação Promocional</h2>
             <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full font-semibold">
-              {filtered.length} destinatário{filtered.length !== 1 ? 's' : ''}
+              {targets.length} destinatário{targets.length !== 1 ? 's' : ''}
             </span>
           </div>
           <div className="flex items-center gap-2">
@@ -202,7 +301,9 @@ const PromoNotificationModal: React.FC<Props> = ({ onClose }) => {
                 <div className="flex items-center gap-2 text-sm font-semibold">
                   <Filter className="w-4 h-4" /> Filtrar destinatários
                   <span className="ml-auto text-xs font-normal text-muted-foreground">
-                    {allCustomers.length} cadastrados → <span className="text-primary font-semibold">{filtered.length} selecionados</span>
+                    {customersLoading
+                      ? 'Carregando clientes…'
+                      : <>{allCustomers.length} cadastrados → <span className="text-primary font-semibold">{filtered.length} no filtro</span></>}
                   </span>
                 </div>
 
@@ -254,6 +355,50 @@ const PromoNotificationModal: React.FC<Props> = ({ onClose }) => {
                   </div>
                 </div>
 
+                {/* Clientes individuais */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-xs font-semibold text-muted-foreground flex items-center gap-1">
+                      <Users className="w-3.5 h-3.5" /> CLIENTES ({targets.length}/{filtered.length} selecionados)
+                    </p>
+                    <div className="flex gap-2">
+                      <button type="button" onClick={() => setSelectedEmails(new Set(filtered.map(c => c.email)))} className="text-[11px] font-semibold text-primary hover:underline">
+                        Selecionar todos
+                      </button>
+                      <button type="button" onClick={() => setSelectedEmails(new Set())} className="text-[11px] font-semibold text-muted-foreground hover:underline">
+                        Limpar seleção
+                      </button>
+                    </div>
+                  </div>
+                  {customersLoading ? (
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground py-3">
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" /> Carregando clientes…
+                    </div>
+                  ) : filtered.length === 0 ? (
+                    <p className="text-xs text-muted-foreground py-2">Nenhum cliente cadastrado corresponde ao filtro.</p>
+                  ) : (
+                    <div className="max-h-48 overflow-y-auto border border-border rounded-lg divide-y divide-border bg-background">
+                      {filtered.map(c => (
+                        <label key={c.email} className="flex items-center gap-2 px-3 py-2 text-xs cursor-pointer hover:bg-secondary/50">
+                          <input
+                            type="checkbox"
+                            checked={selectedEmails.has(c.email)}
+                            onChange={() => toggleCustomer(c.email)}
+                            className="w-3.5 h-3.5 rounded border-input text-primary focus:ring-primary shrink-0"
+                          />
+                          <span className="font-medium truncate max-w-[35%]">{c.name}</span>
+                          <span className="text-muted-foreground truncate">{c.email}</span>
+                          {pushSubscribedEmails.has(c.email) && (
+                            <span className="ml-auto flex items-center gap-0.5 text-[10px] font-semibold text-green-600 shrink-0">
+                              <Smartphone className="w-3 h-3" /> push
+                            </span>
+                          )}
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
                 {/* Canal */}
                 <div>
                   <p className="text-xs font-semibold text-muted-foreground mb-2">CANAL</p>
@@ -273,7 +418,20 @@ const PromoNotificationModal: React.FC<Props> = ({ onClose }) => {
                     ))}
                   </div>
                   {(channel === 'app' || channel === 'both') && (
-                    <p className="text-xs text-amber-600 mt-1.5">⚠️ Push no app requer VAPID/FCM (em desenvolvimento). Apenas e-mail será enviado agora.</p>
+                    pushSubsLoading ? (
+                      <p className="text-xs text-muted-foreground mt-1.5 flex items-center gap-1.5">
+                        <Loader2 className="w-3 h-3 animate-spin" /> Verificando quem tem push ativo…
+                      </p>
+                    ) : reachableByPush.length === 0 ? (
+                      <p className="text-xs text-amber-600 mt-1.5">
+                        ⚠️ Nenhum dos clientes selecionados ativou notificações push ainda (eles ativam em "Meu Perfil").
+                        {channel === 'app' ? ' Nada será enviado.' : ' Só o e-mail será enviado.'}
+                      </p>
+                    ) : (
+                      <p className="text-xs text-green-600 mt-1.5 flex items-center gap-1">
+                        <Smartphone className="w-3 h-3" /> {reachableByPush.length} de {targets.length} selecionados vão receber push de verdade.
+                      </p>
+                    )
                   )}
                 </div>
               </div>
@@ -349,11 +507,12 @@ const PromoNotificationModal: React.FC<Props> = ({ onClose }) => {
                     {sent && <span className={successCount > 0 ? 'text-green-600' : 'text-red-600'}>{successCount > 0 ? '✓ Concluído' : '✗ Falhou'}</span>}
                   </div>
                   <div className="max-h-40 overflow-y-auto divide-y divide-border">
-                    {results.map(r => (
-                      <div key={r.email} className="flex items-center gap-2 px-3 py-1.5 text-xs">
+                    {results.map((r, i) => (
+                      <div key={`${r.channel}-${r.email}-${i}`} className="flex items-center gap-2 px-3 py-1.5 text-xs">
                         {r.ok ? <CheckCircle className="w-3.5 h-3.5 text-green-500 shrink-0" /> : <AlertCircle className="w-3.5 h-3.5 text-red-500 shrink-0" />}
+                        {r.channel === 'app' ? <Smartphone className="w-3 h-3 text-muted-foreground shrink-0" /> : <Mail className="w-3 h-3 text-muted-foreground shrink-0" />}
                         <span className="truncate">{r.email}</span>
-                        <span className={`ml-auto ${r.ok ? 'text-green-600' : 'text-red-500'}`}>{r.ok ? 'ok' : 'erro'}</span>
+                        <span className={`ml-auto ${r.ok ? 'text-green-600' : 'text-red-500'}`} title={r.error}>{r.ok ? 'ok' : (r.error || 'erro')}</span>
                       </div>
                     ))}
                   </div>
@@ -373,12 +532,12 @@ const PromoNotificationModal: React.FC<Props> = ({ onClose }) => {
         {/* Footer */}
         <div className="p-5 border-t border-border flex gap-3 justify-end shrink-0">
           <Button variant="outline" onClick={onClose}>Fechar</Button>
-          <Button onClick={sendEmails} disabled={sending || sent || filtered.length === 0} className="gap-2">
+          <Button onClick={sendPromo} disabled={sending || sent || targets.length === 0} className="gap-2">
             {sending
-              ? <><Loader2 className="w-4 h-4 animate-spin" /> Enviando {results.length}/{filtered.length}...</>
+              ? <><Loader2 className="w-4 h-4 animate-spin" /> Enviando…</>
               : sent
                 ? <><CheckCircle className="w-4 h-4" /> Concluído</>
-                : <><Send className="w-4 h-4" /> Enviar para {filtered.length} cliente{filtered.length !== 1 ? 's' : ''}</>}
+                : <><Send className="w-4 h-4" /> Enviar para {targets.length} cliente{targets.length !== 1 ? 's' : ''}</>}
           </Button>
         </div>
       </div>

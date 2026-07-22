@@ -29,6 +29,7 @@ export interface UserProfile {
   document?: string;          // Documento de identificação para envio internacional (passaporte, NIF, etc.)
   gender?: 'masculino' | 'feminino' | 'outro';
   whatsappMarketing?: boolean;
+  pushEnabled?: boolean;      // notificações push (Web Push/VAPID) ativas neste navegador
   points?: number; // Pontos de fidelidade (reviews, vídeos)
   birthdayBonusYear?: number; // Ano em que já recebeu os 1000 pts de aniversário
   address: {

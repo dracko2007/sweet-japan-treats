@@ -1,7 +1,7 @@
 import { safeStorage } from '@/utils/storage';
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { User, Mail, Phone, MapPin, Calendar, Gift, ShoppingBag, Edit2, LogOut, Package, RotateCcw, Cloud, Truck, Tag, Megaphone, ArrowRight, Handshake, CheckCircle2, XCircle, Hourglass, FileText } from 'lucide-react';
+import { User, Mail, Phone, MapPin, Calendar, Gift, ShoppingBag, Edit2, LogOut, Package, RotateCcw, Cloud, Truck, Tag, Megaphone, ArrowRight, Handshake, CheckCircle2, XCircle, Hourglass, FileText, Bell, BellOff } from 'lucide-react';
 import { negotiationService } from '@/services/negotiationService';
 import type { Negotiation } from '@/types/negotiation';
 import Layout from '@/components/layout/Layout';
@@ -25,6 +25,7 @@ import ReviewModal from '@/components/products/ReviewModal';
 import { Star } from 'lucide-react';
 import SocialFollowRewards from '@/components/profile/SocialFollowRewards';
 import ReferralCard from '@/components/profile/ReferralCard';
+import { pushService } from '@/services/pushService';
 
 const isDev = import.meta.env.DEV;
 const devLog = isDev ? console.log.bind(console) : () => {};
@@ -41,6 +42,43 @@ const Profile: React.FC = () => {
   const { toast } = useToast();
   const [isEditing, setIsEditing] = useState(false);
   const [editedUser, setEditedUser] = useState<Partial<UserProfile>>(user || {});
+
+  // Notificações push (Web Push/VAPID) — estado real da inscrição neste navegador,
+  // checado no navegador (não só a flag `pushEnabled` do perfil, que pode ficar
+  // desatualizada se o cliente trocar de dispositivo ou limpar os dados do site).
+  const [pushSubscribed, setPushSubscribed] = useState(false);
+  const [pushBusy, setPushBusy] = useState(false);
+  useEffect(() => {
+    pushService.isSubscribed().then(setPushSubscribed);
+  }, []);
+
+  const togglePush = async () => {
+    if (!user) return;
+    setPushBusy(true);
+    try {
+      if (pushSubscribed) {
+        const res = await pushService.unsubscribe();
+        if (res.ok) {
+          setPushSubscribed(false);
+          updateProfile({ pushEnabled: false });
+          toast({ title: 'Notificações desativadas', description: 'Você não vai mais receber push neste dispositivo.' });
+        } else {
+          toast({ title: 'Erro ao desativar', description: res.error, variant: 'destructive' });
+        }
+      } else {
+        const res = await pushService.subscribe({ email: user.email, name: user.name });
+        if (res.ok) {
+          setPushSubscribed(true);
+          updateProfile({ pushEnabled: true });
+          toast({ title: '🔔 Notificações ativadas!', description: 'Você vai receber promoções e novidades por push.' });
+        } else {
+          toast({ title: 'Não foi possível ativar', description: res.error, variant: 'destructive' });
+        }
+      }
+    } finally {
+      setPushBusy(false);
+    }
+  };
 
   // País do ENDEREÇO (independente do idioma do site). Define qual busca de CEP
   // e qual lista de estados/províncias usar.
@@ -648,6 +686,34 @@ const Profile: React.FC = () => {
                         {user.whatsappMarketing ? t('profile.marketing.disable') : t('profile.marketing.enable')}
                       </button>
                     </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-muted-foreground flex items-center gap-2">
+                      <Bell className="w-4 h-4" />
+                      Notificações Push
+                    </Label>
+                    {pushService.isSupported() ? (
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <p className="font-medium text-foreground">
+                          {pushSubscribed ? 'Ativadas neste dispositivo' : 'Desativadas'}
+                        </p>
+                        <button
+                          onClick={togglePush}
+                          disabled={pushBusy}
+                          className={`text-xs font-semibold px-3 py-1.5 rounded-lg border transition-colors disabled:opacity-60 ${
+                            pushSubscribed
+                              ? 'border-red-300 text-red-600 hover:bg-red-50'
+                              : 'border-green-300 text-green-600 hover:bg-green-50'
+                          }`}
+                        >
+                          {pushBusy ? 'Aguarde…' : pushSubscribed ? 'Desativar' : 'Ativar'}
+                        </button>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                        <BellOff className="w-3.5 h-3.5" /> Não suportado neste navegador
+                      </p>
+                    )}
                   </div>
                   {user.birthdate && (
                     <div className="space-y-2">
