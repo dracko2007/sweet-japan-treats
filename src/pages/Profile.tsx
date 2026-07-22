@@ -25,6 +25,7 @@ import ReviewModal from '@/components/products/ReviewModal';
 import { Star } from 'lucide-react';
 import SocialFollowRewards from '@/components/profile/SocialFollowRewards';
 import ReferralCard from '@/components/profile/ReferralCard';
+import PromoNotificationsCard from '@/components/profile/PromoNotificationsCard';
 import { pushService } from '@/services/pushService';
 
 const isDev = import.meta.env.DEV;
@@ -813,6 +814,9 @@ const Profile: React.FC = () => {
                 )}
               </div>
             )}
+
+            {/* Notificações & Promoções (campanhas enviadas pelo admin) */}
+            <PromoNotificationsCard />
 
             {/* Coupons */}
             <div className="bg-card rounded-2xl border border-border p-6 lg:p-8">

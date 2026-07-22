@@ -15,6 +15,7 @@ export interface PromoCampaign {
   description?: string;
   badge?: string;
   productName?: string;    // só p/ exibição
+  productImage?: string;   // só p/ exibição (feed de notificações do perfil)
   createdAt: number;       // ms
   expiresAt?: number;      // ms (opcional)
   active: boolean;

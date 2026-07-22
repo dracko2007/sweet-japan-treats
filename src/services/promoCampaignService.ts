@@ -29,6 +29,29 @@ export const promoCampaignService = {
     );
     await setDoc(doc(db, COL, id), payload);
     devLog('[promoCampaign] criada:', c.code, c.mechanic);
+    // Publica no feed de notificações do perfil (siteContent/promoNotifications).
+    // siteContent já tem leitura pública nas regras — nenhum deploy de regras a mais.
+    // Falha aqui não aborta a campanha (o resgate por link continua valendo).
+    try {
+      const feedRef = doc(db, 'siteContent', 'promoNotifications');
+      const feedSnap = await getDoc(feedRef);
+      // Doc externo: narrowing runtime em vez de cast inline.
+      const feedData: unknown = feedSnap.exists() ? feedSnap.data() : null;
+      const prev = feedData && typeof feedData === 'object' && 'items' in feedData && Array.isArray(feedData.items)
+        ? feedData.items
+        : [];
+      const item = Object.fromEntries(
+        Object.entries({
+          code: norm(c.code), mechanic: c.mechanic, headline: c.headline,
+          tagline: c.tagline, description: c.description, badge: c.badge,
+          productId: c.productId, productName: c.productName, productImage: c.productImage,
+          createdAt: c.createdAt, expiresAt: c.expiresAt,
+        }).filter(([, v]) => v !== undefined)
+      );
+      await setDoc(feedRef, { items: [item, ...prev].slice(0, 10), updatedAt: Date.now() });
+    } catch (e) {
+      devWarn('[promoCampaign] feed não publicado:', e instanceof Error ? e.message : e);
+    }
   },
 
   /** Validação pública: ativa e não expirada. */

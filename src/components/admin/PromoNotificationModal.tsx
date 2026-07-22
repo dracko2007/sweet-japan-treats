@@ -324,6 +324,7 @@ const PromoNotificationModal: React.FC<Props> = ({ onClose }) => {
         description: offer.description,
         badge: offer.badge,
         productName: selectedProduct?.name,
+        productImage: selectedProduct?.thumbnail || selectedProduct?.image || undefined,
         createdAt: Date.now(),
         expiresAt: Date.now() + 30 * 86400000,
         active: true,
