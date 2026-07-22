@@ -9,6 +9,7 @@ import { usePagination } from '@/hooks/usePagination';
 import Pagination from '@/components/Pagination';
 import { firebaseSyncService } from '@/services/firebaseSyncService';
 import { negotiationService } from '@/services/negotiationService';
+import { promoCampaignService } from '@/services/promoCampaignService';
 import { ensureAdminAuth } from '@/utils/adminAuth';
 import { requireAdminPassword } from '@/utils/adminGuard';
 import { safeStorage } from '@/utils/storage';
@@ -301,7 +302,7 @@ const CustomerList: React.FC = () => {
       toast({ title: 'Sem permissão', description: 'Reset completo requer nível financeiro (Nível 3).', variant: 'destructive' });
       return;
     }
-    if (!confirm('⚠️ RESET COMPLETO DO SITE?\n\nIsso vai apagar:\n• Todos os pedidos\n• Todas as negociações\n• Todos os pontos de fidelidade\n• Todos os cupons dos clientes\n• Histórico de uso de cupons\n\n✅ Mantém: contas, produtos, configurações.')) return;
+    if (!confirm('⚠️ RESET COMPLETO DO SITE?\n\nIsso vai apagar:\n• Todos os pedidos\n• Todas as negociações\n• Todos os pontos de fidelidade\n• Todos os cupons dos clientes\n• Histórico de uso de cupons\n• Campanhas promocionais e feed de notificações\n\n✅ Mantém: contas, produtos, configurações.')) return;
     if (!confirm('Tem CERTEZA ABSOLUTA? Esta ação é IRREVERSÍVEL!')) return;
     if (!(await requireAdminPassword('reset completo do site'))) return;
 
@@ -312,6 +313,7 @@ const CustomerList: React.FC = () => {
         negotiationService.deleteAllNegotiations(),
         firebaseSyncService.deleteAllCouponUsage(),
         firebaseSyncService.resetAllUsersData(),
+        promoCampaignService.deleteAllCampaignData(),
       ]);
 
       // Limpa localStorage: sakura_orders, carrinho, negociação ativa

@@ -126,25 +126,14 @@ const Cart: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Aplica automaticamente a campanha promocional do link de e-mail/push (?promo=CODE):
-  // discount → cupom % no carrinho; bogo/bogo_other → brinde (CartContext lê
-  // pending_promo_gift); points → crédito pós-compra (OrderReview lê pending_promo_points).
+  // Campanha promocional (?promo=CODE): armPending (compartilhado com a página
+  // do produto) valida e arma preço original/brinde/pontos; aqui aplicamos só
+  // o cupom % quando a mecânica é desconto.
   useEffect(() => {
-    const code = safeStorage.getItem('pending_promo');
-    if (!code || activeCoupon) return;
+    if (activeCoupon) return;
     let cancelled = false;
-    promoCampaignService.validate(code).then((res) => {
-      if (cancelled || !res.valid || !res.campaign) return;
-      const c = res.campaign;
-      safeStorage.setItem('promo_applied', c.code);
-      // Preço original: se o admin NÃO marcou "manter desconto inicial", o produto
-      // qualificante perde o discountPercent enquanto a promo está armada.
-      if (c.productId && !c.keepProductDiscount) {
-        safeStorage.setItem('promo_full_price', JSON.stringify({ code: c.code, productId: c.productId }));
-      } else {
-        safeStorage.removeItem('promo_full_price');
-      }
-      window.dispatchEvent(new Event('promo-pricing-changed'));
+    promoCampaignService.armPending().then((c) => {
+      if (cancelled || !c) return;
       if (c.mechanic === 'discount') {
         const pct = Math.max(1, Math.min(90, c.discountPct || 0));
         setActiveCoupon({
@@ -156,14 +145,6 @@ const Cart: React.FC = () => {
           expiresAt: c.expiresAt ? new Date(c.expiresAt).toISOString() : new Date(Date.now() + 30 * 86400000).toISOString(),
           isUsed: false,
         });
-      } else if (c.mechanic === 'bogo' || c.mechanic === 'bogo_other') {
-        safeStorage.setItem('pending_promo_gift', JSON.stringify({
-          code: c.code,
-          productId: c.productId,
-          giftProductId: c.mechanic === 'bogo' ? c.productId : c.giftProductId,
-        }));
-      } else if (c.mechanic === 'points') {
-        safeStorage.setItem('pending_promo_points', JSON.stringify({ code: c.code, points: c.points || 0 }));
       }
     });
     return () => { cancelled = true; };

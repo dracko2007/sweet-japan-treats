@@ -182,12 +182,15 @@ const PromoNotificationModal: React.FC<Props> = ({ onClose }) => {
     switch (mechanic) {
       case 'discount': {
         const extra = Math.max(1, Math.min(90, discountPct || 0));
-        const total = baseDiscount > 0 ? Math.min(90, baseDiscount + extra) : extra;
+        // Sem o checkbox "manter desconto inicial", a base é DESCARTADA: anuncia
+        // e aplica só o extra sobre o preço cheio (sem propaganda enganosa).
+        const base = keepInitialDiscount ? baseDiscount : 0;
+        const total = base > 0 ? Math.min(90, base + extra) : extra;
         return {
           badge: `-${total}%`,
-          tagline: baseDiscount > 0 ? 'Compre agora e ganhe mais desconto' : `${extra}% de desconto`,
-          description: baseDiscount > 0
-            ? `${name} já está com ${baseDiscount}% OFF. Compre agora e ganhe mais ${extra}% de desconto — total de ${total}% OFF!`
+          tagline: base > 0 ? 'Compre agora e ganhe mais desconto' : `${extra}% de desconto`,
+          description: base > 0
+            ? `${name} já está com ${base}% OFF. Compre agora e ganhe mais ${extra}% de desconto — total de ${total}% OFF!`
             : `Aproveite ${name} com ${extra}% de desconto.`,
         };
       }
@@ -312,7 +315,6 @@ const PromoNotificationModal: React.FC<Props> = ({ onClose }) => {
     // link do e-mail/push — sem isso, a oferta do e-mail nunca se aplica no carrinho.
     const promoCode = `PROMO-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
     const extraDiscount = Math.max(1, Math.min(90, discountPct || 0));
-    const totalDiscount = mechanic === 'discount' ? Math.min(90, baseDiscount + extraDiscount) : 0;
     try {
       const campaign: PromoCampaign = {
         code: promoCode,
@@ -320,7 +322,7 @@ const PromoNotificationModal: React.FC<Props> = ({ onClose }) => {
         productId: selectedProduct?.id,
         giftProductId: giftProductId || undefined,
         couponCode: mechanic === 'coupon' ? (couponCode.trim().toUpperCase() || undefined) : undefined,
-        discountPct: mechanic === 'discount' ? (keepInitialDiscount ? extraDiscount : totalDiscount) : undefined,
+        discountPct: mechanic === 'discount' ? extraDiscount : undefined,
         keepProductDiscount: keepInitialDiscount,
         points: mechanic === 'points' ? Math.max(1, pointsCount || 0) : undefined,
         headline,

@@ -2,9 +2,10 @@
 // validação pública por código (qualquer visitante resgata) e controle de uso
 // por CPF (anti-abuso: 1 resgate por CPF, como o cupom de afiliado).
 import { db } from '@/config/firebase';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { collection, deleteDoc, doc, getDoc, getDocs, setDoc } from 'firebase/firestore';
 import { ensureAdminAuth } from '@/utils/adminAuth';
 import type { PromoCampaign } from '@/types/promoCampaign';
+import { safeStorage } from '@/utils/storage';
 
 const isDev = import.meta.env.DEV;
 const devLog = isDev ? console.log.bind(console) : () => {};
@@ -52,6 +53,48 @@ export const promoCampaignService = {
     } catch (e) {
       devWarn('[promoCampaign] feed não publicado:', e instanceof Error ? e.message : e);
     }
+  },
+
+  /** Valida o código pendente (?promo=) e ARMA os efeitos locais: preço original
+   *  (promo_full_price), brinde (pending_promo_gift) e pontos. Idempotente —
+   *  chamado pela página do produto E pelo carrinho, aí a página já exibe o
+   *  preço coerente com o que será cobrado. */
+  async armPending(): Promise<PromoCampaign | null> {
+    const code = safeStorage.getItem('pending_promo');
+    if (!code) return null;
+    const res = await this.validate(code);
+    if (!res.valid || !res.campaign) return null;
+    const c = res.campaign;
+    safeStorage.setItem('promo_applied', norm(c.code));
+    if (c.productId && !c.keepProductDiscount) {
+      safeStorage.setItem('promo_full_price', JSON.stringify({ code: norm(c.code), productId: c.productId }));
+    } else {
+      safeStorage.removeItem('promo_full_price');
+    }
+    if (c.mechanic === 'bogo' || c.mechanic === 'bogo_other') {
+      safeStorage.setItem('pending_promo_gift', JSON.stringify({
+        code: norm(c.code),
+        productId: c.productId,
+        giftProductId: c.mechanic === 'bogo' ? c.productId : c.giftProductId,
+      }));
+    } else if (c.mechanic === 'points') {
+      safeStorage.setItem('pending_promo_points', JSON.stringify({ code: norm(c.code), points: c.points || 0 }));
+    }
+    window.dispatchEvent(new Event('promo-pricing-changed'));
+    return c;
+  },
+
+  /** Admin: apaga TODAS as campanhas, usos por CPF e zera o feed de notificações
+   *  (mantém cadastros) — usado pelo RESET COMPLETO DO SITE. */
+  async deleteAllCampaignData(): Promise<void> {
+    if (!db) return;
+    await ensureAdminAuth();
+    const [camps, uses] = await Promise.all([
+      getDocs(collection(db, COL)),
+      getDocs(collection(db, USAGE)),
+    ]);
+    await Promise.all([...camps.docs, ...uses.docs].map((d) => deleteDoc(d.ref)));
+    await setDoc(doc(db, 'siteContent', 'promoNotifications'), { items: [], updatedAt: Date.now() });
   },
 
   /** Validação pública: ativa e não expirada. */

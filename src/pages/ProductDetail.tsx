@@ -25,6 +25,8 @@ import { useSeo } from '@/hooks/useSeo';
 import DeliveryEstimateBadge from '@/components/products/DeliveryEstimate';
 import StockUrgency from '@/components/products/StockUrgency';
 import { recentlyViewed } from '@/utils/recentlyViewed';
+import { promoCampaignService } from '@/services/promoCampaignService';
+import { safeStorage } from '@/utils/storage';
 
 const ProductDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -35,7 +37,31 @@ const ProductDetail: React.FC = () => {
   const { t, language, selectedCountry } = useLanguage();
   const { products, loading: productsLoading } = useProducts();
 
-  const product = products.find(p => p.id === id);
+  const baseProduct = products.find(p => p.id === id);
+  // Resgate promocional armado sem "manter desconto inicial": a página exibe o
+  // preço ORIGINAL do produto qualificante — coerente com o que o carrinho vai
+  // cobrar. armPending valida o ?promo= já no primeiro acesso à página.
+  const [promoTick, setPromoTick] = useState(0);
+  useEffect(() => {
+    const bump = () => setPromoTick((t) => t + 1);
+    window.addEventListener('promo-pricing-changed', bump);
+    return () => window.removeEventListener('promo-pricing-changed', bump);
+  }, []);
+  useEffect(() => { promoCampaignService.armPending(); }, [id]);
+  const product = React.useMemo(() => {
+    if (!baseProduct) return baseProduct;
+    try {
+      const raw = safeStorage.getItem('promo_full_price');
+      if (!raw) return baseProduct;
+      const flag = JSON.parse(raw);
+      return flag && flag.productId === baseProduct.id && (baseProduct.discountPercent || 0) > 0
+        ? { ...baseProduct, discountPercent: 0 }
+        : baseProduct;
+    } catch {
+      return baseProduct;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [baseProduct, promoTick]);
   const productVariants = product ? getVariants(product) : [];
   const [selectedSize, setSelectedSize] = useState<string>('small');
   const selectedVariant = productVariants.find((v) => v.id === selectedSize) || productVariants[0];
