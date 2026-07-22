@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Mail, Send, Users, CheckCircle, AlertCircle, Loader2, Package, Eye, Filter, Smartphone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { customerService, CustomerStats } from '@/services/customerService';
-import { productService } from '@/services/productService';
+import { useProducts } from '@/context/ProductsContext';
 import { Product } from '@/types';
 
 const RESEND_API_KEY = import.meta.env.VITE_RESEND_API_KEY;
@@ -17,7 +17,11 @@ type GenderFilter = 'todos' | 'masculino' | 'feminino' | 'outro';
 interface Props { onClose: () => void }
 
 const PromoNotificationModal: React.FC<Props> = ({ onClose }) => {
-  const [products, setProducts] = useState<Product[]>([]);
+  // Reaproveita a lista já carregada pelo ProductsContext (mesma fonte da aba "Produtos") em
+  // vez de refazer o fetch no Firestore — evita o dropdown aparecer vazio enquanto essa 2ª
+  // consulta ainda está em andamento (sem indicador de carregamento próprio).
+  const { products: allProducts, loading: productsLoading } = useProducts();
+  const products = allProducts.filter(p => !p.hidden);
   const [allCustomers, setAllCustomers] = useState<CustomerStats[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
 
@@ -40,7 +44,6 @@ const PromoNotificationModal: React.FC<Props> = ({ onClose }) => {
 
   useEffect(() => {
     setAllCustomers(customerService.getAllCustomers().filter(c => c.email?.includes('@')));
-    productService.getMerged().then(list => setProducts(list.filter(p => !p.hidden)));
   }, []);
 
   // Apply filters
@@ -284,15 +287,21 @@ const PromoNotificationModal: React.FC<Props> = ({ onClose }) => {
                 <select
                   value={selectedProduct?.id || ''}
                   onChange={e => setSelectedProduct(products.find(p => p.id === e.target.value) || null)}
-                  className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary"
+                  disabled={productsLoading && products.length === 0}
+                  className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-60"
                 >
-                  <option value="">— Sem produto específico —</option>
+                  <option value="">
+                    {productsLoading && products.length === 0 ? 'Carregando produtos…' : '— Sem produto específico —'}
+                  </option>
                   {products.map(p => (
                     <option key={p.id} value={p.id}>
                       {p.name}{p.discountPercent ? ` 🔥 -${p.discountPercent}%` : ''}
                     </option>
                   ))}
                 </select>
+                {!productsLoading && products.length === 0 && (
+                  <p className="text-xs text-amber-600 mt-1">Nenhum produto publicado encontrado. Cadastre ou publique um produto na aba "Produtos".</p>
+                )}
                 {selectedProduct && (
                   <div className="mt-2 flex items-center gap-3 p-2 bg-secondary/50 rounded-lg">
                     {(selectedProduct.thumbnail || selectedProduct.image) && (
