@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { X, Mail, Send, Users, CheckCircle, AlertCircle, Loader2, Package, Eye, Filter, Smartphone } from 'lucide-react';
+import { X, Mail, Send, Users, CheckCircle, AlertCircle, Loader2, Package, Eye, Filter, Smartphone, Sparkles, Percent, Star, Ticket, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { customerService, CustomerStats } from '@/services/customerService';
 import { useProducts } from '@/context/ProductsContext';
 import { Product } from '@/types';
+import { ActivePromo, PROMO_TYPES } from '@/types/promotion';
 import { db } from '@/config/firebase';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, doc, getDoc, deleteDoc } from 'firebase/firestore';
+import { ensureAdminAuth } from '@/utils/adminAuth';
 
-const RESEND_API_KEY = import.meta.env.VITE_RESEND_API_KEY;
-const FROM_EMAIL = import.meta.env.VITE_FROM_EMAIL || 'onboarding@resend.dev';
 const STORE_URL = 'https://japanexpress-store.com';
 
 const MONTHS = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
@@ -16,6 +16,14 @@ const MONTHS = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','A
 type Channel = 'email' | 'app' | 'both';
 type GenderFilter = 'todos' | 'masculino' | 'feminino' | 'outro';
 type SendResult = { email: string; ok: boolean; channel: 'email' | 'app'; error?: string };
+// Mecânica (tipo) da oferta exibida no corpo do e-mail/push.
+type PromoMechanic = 'none' | 'discount' | 'bogo' | 'bogo_other' | 'points' | 'coupon';
+
+interface PromoOffer {
+  badge: string;       // selo curto: "-15%", "COMPRE 1 GANHE 1", "+100 PONTOS"
+  tagline: string;     // tipo da promoção: "Compre 1 e Ganhe 1"
+  description: string; // frase com nome do produto
+}
 
 interface Props { onClose: () => void }
 
@@ -28,6 +36,15 @@ const PromoNotificationModal: React.FC<Props> = ({ onClose }) => {
   const [allCustomers, setAllCustomers] = useState<CustomerStats[]>([]);
   const [customersLoading, setCustomersLoading] = useState(true);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  // Mecânica da promoção (tipo de oferta exibida no corpo do e-mail/push).
+  const [mechanic, setMechanic] = useState<PromoMechanic>('discount');
+  const [discountPct, setDiscountPct] = useState(15);
+  const [giftProductId, setGiftProductId] = useState('');
+  const [pointsCount, setPointsCount] = useState(100);
+  const [couponCode, setCouponCode] = useState('');
+  // Conflito: produto já é a promoção ativa do site (siteContent/homePromotion).
+  const [homePromo, setHomePromo] = useState<ActivePromo | null>(null);
+  const [conflictChoice, setConflictChoice] = useState<'cancel' | 'stack'>('stack');
 
   // Composer
   const [subject, setSubject] = useState('🌸 Oferta Especial - Japan Express');
@@ -38,7 +55,7 @@ const PromoNotificationModal: React.FC<Props> = ({ onClose }) => {
   // Filters
   const [genderFilter, setGenderFilter] = useState<GenderFilter>('todos');
   const [birthdayMonths, setBirthdayMonths] = useState<string[]>([]); // ["01","03"]
-  const [channel, setChannel] = useState<Channel>('email');
+  const [channel, setChannel] = useState<Channel>('app');
   const [selectedEmails, setSelectedEmails] = useState<Set<string>>(new Set());
 
   // Push: clientes com inscrição ativa agora (coleção push_subscriptions) — define quem é
@@ -95,6 +112,15 @@ const PromoNotificationModal: React.FC<Props> = ({ onClose }) => {
     return () => { cancelled = true; };
   }, []);
 
+  // Promoção ativa do site (siteContent/homePromotion) — para detectar conflito quando o
+  // produto selecionado já é a promoção atual da página inicial.
+  useEffect(() => {
+    if (!db) return;
+    getDoc(doc(db, 'siteContent', 'homePromotion'))
+      .then(snap => { if (snap.exists()) setHomePromo(snap.data() as ActivePromo); })
+      .catch(() => { /* sem permissão/offline — segue sem detecção de conflito */ });
+  }, []);
+
   // Apply filters
   const filtered = allCustomers.filter(c => {
     if (genderFilter !== 'todos' && c.gender !== genderFilter) return false;
@@ -133,6 +159,63 @@ const PromoNotificationModal: React.FC<Props> = ({ onClose }) => {
   const promoPrice = selectedProduct?.discountPercent && productPrice
     ? Math.round(productPrice * (1 - selectedProduct.discountPercent / 100))
     : null;
+
+  // Produto de presente (mecânica "compre 1 e ganhe outro produto").
+  const giftProduct = products.find(p => p.id === giftProductId) || null;
+  // Conflito: o produto escolhido já é a promoção ativa do site.
+  const conflictActive = !!(homePromo && selectedProduct && homePromo.productId === selectedProduct.id);
+  // Desconto que o produto já carrega (campo próprio + eventual promoção do site empilhada).
+  const baseDiscount = (() => {
+    let d = selectedProduct?.discountPercent ?? 0;
+    if (conflictActive && conflictChoice === 'stack' && homePromo?.discountPct) d = Math.max(d, homePromo.discountPct);
+    return d;
+  })();
+
+  // "Loop" que aplica a mecânica escolhida e monta o corpo da promoção: badge + tipo + frase.
+  const buildOffer = (): PromoOffer => {
+    const name = selectedProduct?.name ?? 'o produto selecionado';
+    switch (mechanic) {
+      case 'discount': {
+        const extra = Math.max(1, Math.min(90, discountPct || 0));
+        const total = baseDiscount > 0 ? Math.min(90, baseDiscount + extra) : extra;
+        return {
+          badge: `-${total}%`,
+          tagline: baseDiscount > 0 ? 'Compre agora e ganhe mais desconto' : `${extra}% de desconto`,
+          description: baseDiscount > 0
+            ? `${name} já está com ${baseDiscount}% OFF. Compre agora e ganhe mais ${extra}% de desconto — total de ${total}% OFF!`
+            : `Aproveite ${name} com ${extra}% de desconto.`,
+        };
+      }
+      case 'bogo':
+        return { badge: 'COMPRE 1 GANHE 1', tagline: 'Compre 1 e Ganhe 1', description: `Compre um ${name} e leve dois! Oferta por tempo limitado.` };
+      case 'bogo_other':
+        return giftProduct
+          ? { badge: 'COMPRE E GANHE', tagline: 'Compre 1 e ganhe outro produto', description: `Compre ${name} e ganhe ${giftProduct.name} de presente!` }
+          : { badge: 'COMPRE E GANHE', tagline: 'Compre 1 e ganhe outro produto', description: `Compre ${name} e ganhe outro produto de presente!` };
+      case 'points': {
+        const pts = Math.max(1, pointsCount || 0);
+        return { badge: `+${pts} PONTOS`, tagline: 'Compre e ganhe pontos', description: `Compre ${name} e ganhe ${pts} pontos no programa de fidelidade.` };
+      }
+      case 'coupon': {
+        const code = couponCode.trim();
+        return code
+          ? { badge: `CUPOM ${code}`, tagline: 'Compre e ganhe um cupom', description: `Compre ${name} e ganhe um cupom ${code} para usar na próxima compra.` }
+          : { badge: 'GANHE UM CUPOM', tagline: 'Compre e ganhe um cupom', description: `Compre ${name} e ganhe um cupom de desconto para a próxima compra.` };
+      }
+      default:
+        return { badge: 'OFERTA', tagline: headline, description: extraMsg };
+    }
+  };
+
+  const offer = buildOffer();
+  // Versão HTML do selo + linha da oferta para o template do e-mail.
+  const offerHtml = selectedProduct
+    ? `<div style="background:linear-gradient(135deg,#fef3c7,#ede9fe);border:1px solid #fcd34d;border-radius:10px;padding:12px 14px;margin:0 0 14px">
+         <div style="font-size:12px;font-weight:800;color:#b45309;letter-spacing:.04em">${offer.badge}</div>
+         <div style="font-size:15px;font-weight:700;color:#111;margin-top:2px">${offer.tagline}</div>
+         <div style="font-size:13px;color:#4b5563;margin-top:4px;line-height:1.5">${offer.description}</div>
+       </div>`
+    : '';
 
   const buildHtml = (name: string) => `<!DOCTYPE html>
 <html lang="pt-BR">
@@ -179,6 +262,7 @@ const PromoNotificationModal: React.FC<Props> = ({ onClose }) => {
         <div class="product-info">
           <div class="product-name">${selectedProduct.name}</div>
           ${selectedProduct.flavor ? `<div class="product-flavor">${selectedProduct.flavor}</div>` : ''}
+          ${offerHtml}
           <div class="price-row">
             ${promoPrice
               ? `<span class="price-promo">¥${promoPrice.toLocaleString()}</span><span class="price-original">¥${productPrice?.toLocaleString()}</span>`
@@ -202,28 +286,44 @@ const PromoNotificationModal: React.FC<Props> = ({ onClose }) => {
     if (targets.length === 0) { alert('Selecione ao menos um cliente.'); return; }
 
     setSending(true);
+    // Resolução de conflito: cancelar a promoção ativa do site antes de disparar a nova.
+    if (conflictActive && conflictChoice === 'cancel') {
+      if (!window.confirm(`Isto vai CANCELAR a promoção atual do site ("${homePromo?.productName ?? ''}") antes de enviar. Continuar?`)) {
+        setSending(false);
+        return;
+      }
+      try {
+        await ensureAdminAuth();
+        if (db) await deleteDoc(doc(db, 'siteContent', 'homePromotion'));
+        setHomePromo(null);
+      } catch (e) {
+        alert('Não foi possível cancelar a promoção do site: ' + (e instanceof Error ? e.message : String(e)));
+        setSending(false);
+        return;
+      }
+    }
     setResults([]);
     const partial: SendResult[] = [];
 
     if (channel === 'email' || channel === 'both') {
-      if (!RESEND_API_KEY) {
-        alert('VITE_RESEND_API_KEY não configurada no Vercel.');
-        setSending(false);
-        return;
-      }
+      // E-mail vai pelo /api/send-email (Nodemailer + Google Workspace SMTP,
+      // remetente noreply@japanexpress-store.com) — NÃO pelo Resend direto do
+      // navegador. Anti-abuso do endpoint: só entrega para quem tem conta no
+      // Firebase Auth (todo cliente selecionado) ou é dono de pedido real.
       for (const r of targets) {
         try {
-          const res = await fetch('https://api.resend.com/emails', {
+          const res = await fetch('/api/send-email', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${RESEND_API_KEY}` },
-            body: JSON.stringify({ from: FROM_EMAIL, to: r.email, subject, html: buildHtml(r.name) }),
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ to: r.email, type: 'transactional', subject, html: buildHtml(r.name) }),
           });
-          partial.push({ email: r.email, ok: res.ok, channel: 'email' });
-        } catch {
-          partial.push({ email: r.email, ok: false, channel: 'email' });
+          const data = await res.json().catch(() => ({})) as { error?: string };
+          partial.push({ email: r.email, ok: res.ok, channel: 'email', error: res.ok ? undefined : (data.error || `HTTP ${res.status}`) });
+        } catch (e) {
+          partial.push({ email: r.email, ok: false, channel: 'email', error: e instanceof Error ? e.message : String(e) });
         }
         setResults([...partial]);
-        await new Promise(resolve => setTimeout(resolve, 200));
+        await new Promise(resolve => setTimeout(resolve, 250));
       }
     }
 
@@ -237,10 +337,8 @@ const PromoNotificationModal: React.FC<Props> = ({ onClose }) => {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               emails: reachableByPush.map(c => c.email),
-              title: headline,
-              body: extraMsg,
-              url: productUrl,
-              image: selectedProduct?.thumbnail || selectedProduct?.image || undefined,
+              title: offer.tagline,
+              body: offer.description,
             }),
           });
           const data = await res.json();
@@ -476,6 +574,85 @@ const PromoNotificationModal: React.FC<Props> = ({ onClose }) => {
                   </div>
                 )}
               </div>
+              {/* Conflito com a promoção ativa do site */}
+              {conflictActive && (
+                <div className="border border-amber-300 bg-amber-50 dark:bg-amber-950/30 rounded-xl p-3 space-y-2">
+                  <p className="text-xs font-semibold text-amber-700 dark:text-amber-400 flex items-center gap-1.5">
+                    <AlertTriangle className="w-3.5 h-3.5 shrink-0" /> Este produto já está na promoção ativa do site
+                    ({homePromo?.discountPct ? `-${homePromo.discountPct}%` : (PROMO_TYPES.find(t => t.value === homePromo?.type)?.label ?? 'promoção')}).
+                  </p>
+                  <div className="flex flex-col gap-1.5 pl-5">
+                    <label className="flex items-center gap-2 text-xs cursor-pointer">
+                      <input type="radio" checked={conflictChoice === 'cancel'} onChange={() => setConflictChoice('cancel')} className="w-3.5 h-3.5 text-primary" />
+                      Cancelar a promoção atual do site e aplicar esta nova
+                    </label>
+                    <label className="flex items-center gap-2 text-xs cursor-pointer">
+                      <input type="radio" checked={conflictChoice === 'stack'} onChange={() => setConflictChoice('stack')} className="w-3.5 h-3.5 text-primary" />
+                      Manter a promoção atual{mechanic === 'discount' ? ' e somar o desconto extra abaixo' : ''}
+                    </label>
+                  </div>
+                </div>
+              )}
+
+              {/* ── MECÂNICA DA PROMOÇÃO ──────────────────── */}
+              <div className="border border-border rounded-xl p-4 space-y-3 bg-secondary/20">
+                <p className="text-sm font-semibold flex items-center gap-1.5"><Sparkles className="w-3.5 h-3.5" /> Mecânica da promoção</p>
+                <div className="grid sm:grid-cols-2 gap-3 items-center">
+                  <select
+                    value={mechanic}
+                    onChange={e => setMechanic(e.target.value as PromoMechanic)}
+                    className="border border-border rounded-lg px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary"
+                  >
+                    <option value="discount">🏷️ Desconto (%)</option>
+                    <option value="bogo">🎁 Compre 1 e Ganhe 1</option>
+                    <option value="bogo_other">🎁 Compre 1 e Ganhe outro produto</option>
+                    <option value="points">⭐ Compre e Ganhe pontos</option>
+                    <option value="coupon">🎟️ Compre e Ganhe um cupom</option>
+                    <option value="none">📦 Só destacar o produto</option>
+                  </select>
+                  {mechanic === 'discount' && (
+                    <label className="flex items-center gap-2 text-sm">
+                      <Percent className="w-4 h-4 text-muted-foreground shrink-0" />
+                      <input type="number" min={1} max={90} value={discountPct}
+                        onChange={e => setDiscountPct(Math.max(1, Math.min(90, Number(e.target.value) || 0)))}
+                        className="w-24 border border-border rounded-lg px-2 py-1.5 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary" />
+                      <span className="text-muted-foreground">% de desconto</span>
+                    </label>
+                  )}
+                  {mechanic === 'bogo_other' && (
+                    <select value={giftProductId} onChange={e => setGiftProductId(e.target.value)}
+                      className="border border-border rounded-lg px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary">
+                      <option value="">— Produto de presente —</option>
+                      {products.filter(p => p.id !== selectedProduct?.id).map(p => (
+                        <option key={p.id} value={p.id}>{p.name}</option>
+                      ))}
+                    </select>
+                  )}
+                  {mechanic === 'points' && (
+                    <label className="flex items-center gap-2 text-sm">
+                      <Star className="w-4 h-4 text-muted-foreground shrink-0" />
+                      <input type="number" min={1} value={pointsCount}
+                        onChange={e => setPointsCount(Math.max(1, Number(e.target.value) || 0))}
+                        className="w-28 border border-border rounded-lg px-2 py-1.5 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary" />
+                      <span className="text-muted-foreground">pontos</span>
+                    </label>
+                  )}
+                  {mechanic === 'coupon' && (
+                    <label className="flex items-center gap-2 text-sm">
+                      <Ticket className="w-4 h-4 text-muted-foreground shrink-0" />
+                      <input type="text" value={couponCode} onChange={e => setCouponCode(e.target.value.toUpperCase())}
+                        placeholder="Ex: PROMO10" maxLength={20}
+                        className="flex-1 border border-border rounded-lg px-2 py-1.5 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary" />
+                    </label>
+                  )}
+                </div>
+                <div className="text-xs bg-background border border-border rounded-lg p-2.5">
+                  <span className="font-bold text-primary">{offer.badge}</span>
+                  {' · '}<span className="font-medium">{offer.tagline}</span>
+                  <p className="text-muted-foreground mt-1">{offer.description}</p>
+                </div>
+              </div>
+
 
               {/* ── TEXTO ─────────────────────────────── */}
               <div>
