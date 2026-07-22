@@ -137,6 +137,14 @@ const Cart: React.FC = () => {
       if (cancelled || !res.valid || !res.campaign) return;
       const c = res.campaign;
       safeStorage.setItem('promo_applied', c.code);
+      // Preço original: se o admin NÃO marcou "manter desconto inicial", o produto
+      // qualificante perde o discountPercent enquanto a promo está armada.
+      if (c.productId && !c.keepProductDiscount) {
+        safeStorage.setItem('promo_full_price', JSON.stringify({ code: c.code, productId: c.productId }));
+      } else {
+        safeStorage.removeItem('promo_full_price');
+      }
+      window.dispatchEvent(new Event('promo-pricing-changed'));
       if (c.mechanic === 'discount') {
         const pct = Math.max(1, Math.min(90, c.discountPct || 0));
         setActiveCoupon({
@@ -163,6 +171,16 @@ const Cart: React.FC = () => {
   }, []);
 
   const handleRemoveCoupon = () => {
+    // Cupom de campanha: desarma o resgate inteiro (inclusive o preço original),
+    // senão o cliente ficaria sem o desconto da página E sem a promoção.
+    if (activeCoupon?.id?.startsWith('promo-')) {
+      safeStorage.removeItem('promo_applied');
+      safeStorage.removeItem('pending_promo');
+      safeStorage.removeItem('pending_promo_gift');
+      safeStorage.removeItem('pending_promo_points');
+      safeStorage.removeItem('promo_full_price');
+      window.dispatchEvent(new Event('promo-pricing-changed'));
+    }
     setActiveCoupon(null);
   };
 

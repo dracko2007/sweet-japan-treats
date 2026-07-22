@@ -34,6 +34,15 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [rawItems, setRawItems] = useState<CartItem[]>(loadCart);
   const { products } = useProducts();
 
+  // Reage a armar/desarmar o resgate promocional (Cart.tsx dispara o evento) —
+  // safeStorage não é reativo, então usamos um tick para re-derivar preço/brinde.
+  const [promoTick, setPromoTick] = useState(0);
+  useEffect(() => {
+    const bump = () => setPromoTick((t) => t + 1);
+    window.addEventListener('promo-pricing-changed', bump);
+    return () => window.removeEventListener('promo-pricing-changed', bump);
+  }, []);
+
   // Persist only non-gift items to localStorage
   useEffect(() => {
     safeStorage.setItem(CART_STORAGE_KEY, JSON.stringify(rawItems));
@@ -89,10 +98,31 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     } catch { /* JSON inválido — ignora */ }
     return gifts;
-  }, [rawItems, products]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rawItems, products, promoTick]);
+
+  // Campanha promocional com "manter desconto inicial" DESMARCADO: o produto
+  // qualificante volta ao preço ORIGINAL (discountPercent zerado) enquanto o
+  // resgate está armado — evita empilhar o desconto da página com o da oferta.
+  const adjustedItems = useMemo<CartItem[]>(() => {
+    try {
+      const raw = safeStorage.getItem('promo_full_price');
+      if (!raw) return rawItems;
+      const flag = JSON.parse(raw);
+      if (!flag || !flag.productId) return rawItems;
+      return rawItems.map((i) =>
+        i.product.id === flag.productId && (i.product.discountPercent || 0) > 0
+          ? { ...i, product: { ...i.product, discountPercent: 0 } }
+          : i
+      );
+    } catch {
+      return rawItems;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rawItems, promoTick]);
 
   // All items exposed to consumers = regular + auto-gifts
-  const items = useMemo(() => [...rawItems, ...giftItems], [rawItems, giftItems]);
+  const items = useMemo(() => [...adjustedItems, ...giftItems], [adjustedItems, giftItems]);
 
   const addToCart = useCallback((product: Product, size: string, quantity = 1, variantLabel?: string) => {
     setRawItems(prev => {
@@ -149,10 +179,10 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     [items]
   );
 
-  // Price excludes free gifts
+  // Price excludes free gifts (usa itens ajustados p/ refletir o preço original da promo)
   const totalPrice = useMemo(
-    () => rawItems.reduce((sum, item) => sum + effectiveYen(item.product, item.size) * item.quantity, 0),
-    [rawItems]
+    () => adjustedItems.reduce((sum, item) => sum + effectiveYen(item.product, item.size) * item.quantity, 0),
+    [adjustedItems]
   );
 
   const getSpaceUsed = useCallback(() => {

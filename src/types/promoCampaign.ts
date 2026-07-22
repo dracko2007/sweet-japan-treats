@@ -16,6 +16,7 @@ export interface PromoCampaign {
   badge?: string;
   productName?: string;    // só p/ exibição
   productImage?: string;   // só p/ exibição (feed de notificações do perfil)
+  keepProductDiscount?: boolean; // true = mantém o discountPercent do produto junto com a promo; false/ausente = produto volta ao preço original
   createdAt: number;       // ms
   expiresAt?: number;      // ms (opcional)
   active: boolean;

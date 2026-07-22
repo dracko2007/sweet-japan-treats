@@ -44,6 +44,9 @@ const PromoNotificationModal: React.FC<Props> = ({ onClose }) => {
   const [giftProductId, setGiftProductId] = useState('');
   const [pointsCount, setPointsCount] = useState(100);
   const [couponCode, setCouponCode] = useState('');
+  // Manter o desconto inicial do produto (discountPercent) junto com a promo?
+  // Desmarcado (padrão): o carrinho cobra o preço ORIGINAL e só a oferta vale.
+  const [keepInitialDiscount, setKeepInitialDiscount] = useState(false);
   // Conflito: produto já é a promoção ativa do site (siteContent/homePromotion).
   const [homePromo, setHomePromo] = useState<ActivePromo | null>(null);
   const [conflictChoice, setConflictChoice] = useState<'cancel' | 'stack'>('stack');
@@ -266,11 +269,11 @@ const PromoNotificationModal: React.FC<Props> = ({ onClose }) => {
           ${selectedProduct.flavor ? `<div class="product-flavor">${selectedProduct.flavor}</div>` : ''}
           ${offerHtml}
           <div class="price-row">
-            ${promoPrice
+            ${(keepInitialDiscount && promoPrice)
               ? `<span class="price-promo">¥${promoPrice.toLocaleString()}</span><span class="price-original">¥${productPrice?.toLocaleString()}</span>`
               : `<span class="price-normal">¥${productPrice?.toLocaleString()}</span>`}
           </div>
-          ${selectedProduct.discountPercent ? `<span class="badge-off">-${selectedProduct.discountPercent}% OFF</span>` : ''}
+          ${(keepInitialDiscount && selectedProduct.discountPercent) ? `<span class="badge-off">-${selectedProduct.discountPercent}% OFF</span>` : ''}
         </div>
       </div>` : ''}
       <p class="extra">${extraMsg}</p>
@@ -317,7 +320,8 @@ const PromoNotificationModal: React.FC<Props> = ({ onClose }) => {
         productId: selectedProduct?.id,
         giftProductId: giftProductId || undefined,
         couponCode: mechanic === 'coupon' ? (couponCode.trim().toUpperCase() || undefined) : undefined,
-        discountPct: mechanic === 'discount' ? totalDiscount : undefined,
+        discountPct: mechanic === 'discount' ? (keepInitialDiscount ? extraDiscount : totalDiscount) : undefined,
+        keepProductDiscount: keepInitialDiscount,
         points: mechanic === 'points' ? Math.max(1, pointsCount || 0) : undefined,
         headline,
         tagline: offer.tagline,
@@ -650,6 +654,16 @@ const PromoNotificationModal: React.FC<Props> = ({ onClose }) => {
                         onChange={e => setDiscountPct(Math.max(1, Math.min(90, Number(e.target.value) || 0)))}
                         className="w-24 border border-border rounded-lg px-2 py-1.5 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary" />
                       <span className="text-muted-foreground">% de desconto</span>
+                    </label>
+                  )}
+                  {(selectedProduct?.discountPercent ?? 0) > 0 && (
+                    <label className="flex items-start gap-2 text-xs cursor-pointer sm:col-span-2 text-muted-foreground">
+                      <input type="checkbox" checked={keepInitialDiscount} onChange={e => setKeepInitialDiscount(e.target.checked)}
+                        className="w-3.5 h-3.5 mt-0.5 accent-primary shrink-0" />
+                      <span>
+                        Manter o desconto inicial do produto (-{selectedProduct?.discountPercent}%) junto com a promoção.
+                        {' '}<strong>Desmarcado:</strong> o produto volta ao preço original no carrinho e só a oferta da notificação vale.
+                      </span>
                     </label>
                   )}
                   {mechanic === 'bogo_other' && (

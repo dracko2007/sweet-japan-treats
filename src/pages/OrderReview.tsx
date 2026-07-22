@@ -584,6 +584,7 @@ const OrderReview: React.FC = () => {
       safeStorage.removeItem('pending_promo');
       safeStorage.removeItem('pending_promo_gift');
       safeStorage.removeItem('pending_promo_points');
+      safeStorage.removeItem('promo_full_price');
     }
 
     // Track referral progress (only when purchase is in BRL)
