@@ -10,7 +10,8 @@
 //
 // Produtos são públicos no Firestore (allow read: if true) — lê via REST sem auth.
 
-const FIREBASE_PROJECT_ID = process.env.FIREBASE_PROJECT_ID || '';
+import { fetchProducts, escapeXml, isVisibleInternationally } from './_lib/firestore-products.js';
+
 const SITE_URL = 'https://www.japanexpress-store.com';
 
 // Taxa fixa de fallback (mesma base do fxService) — feed precisa ser determinístico.
@@ -91,45 +92,6 @@ function productWeightG(p) {
   return 500; // base padrão
 }
 
-// ── Leitura de produtos do Firestore via REST ────────────────────────────────
-async function fetchProducts() {
-  const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/products?pageSize=300`;
-  const all = [];
-  let pageToken = '';
-  do {
-    const res = await fetch(pageToken ? `${url}&pageToken=${pageToken}` : url);
-    if (!res.ok) throw new Error('Firestore read failed: ' + res.status);
-    const data = await res.json();
-    (data.documents || []).forEach(doc => {
-      const id = doc.name.split('/').pop();
-      all.push({ id, ...parseFirestoreFields(doc.fields || {}) });
-    });
-    pageToken = data.nextPageToken || '';
-  } while (pageToken);
-  return all;
-}
-
-// Converte o formato de campos do Firestore REST para objeto JS plano
-function parseFirestoreFields(fields) {
-  const out = {};
-  for (const [k, v] of Object.entries(fields)) out[k] = parseValue(v);
-  return out;
-}
-function parseValue(v) {
-  if ('stringValue' in v) return v.stringValue;
-  if ('integerValue' in v) return Number(v.integerValue);
-  if ('doubleValue' in v) return Number(v.doubleValue);
-  if ('booleanValue' in v) return v.booleanValue;
-  if ('mapValue' in v) return parseFirestoreFields(v.mapValue.fields || {});
-  if ('arrayValue' in v) return (v.arrayValue.values || []).map(parseValue);
-  if ('nullValue' in v) return null;
-  return undefined;
-}
-
-function escapeXml(s) {
-  return String(s || '').replace(/[<>&'"]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', "'": '&apos;', '"': '&quot;' }[c]));
-}
-
 // Países de destino por região do feed (ISO Merchant + zona Japan Post).
 // Cada feed declara o frete para TODOS os países da sua moeda — o Google exige
 // que o frete cubra os países de destino, senão reprova com "falta info de frete".
@@ -154,10 +116,7 @@ function buildCatalog(products, region) {
 
   return products
     .filter(p => {
-      if (p.hidden) return false;
-      // Produtos "exterior-only" não vendem no Japão → ok para feed BR/EU
-      // Produtos "japan-only" não devem aparecer no feed internacional
-      if (p.deliveryRestrict === 'japan-only') return false;
+      if (!isVisibleInternationally(p)) return false;
       return getVariants(p).length > 0;
     })
     .map(p => {
@@ -254,11 +213,6 @@ function toXml(items, region) {
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
-
-  if (!FIREBASE_PROJECT_ID) {
-    res.status(500).json({ error: 'FIREBASE_PROJECT_ID não configurado' });
-    return;
-  }
 
   const region = ['eu', 'us'].includes(req.query.region) ? req.query.region : 'br';
   const format = req.query.format === 'json' ? 'json' : 'xml';

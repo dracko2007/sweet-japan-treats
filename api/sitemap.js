@@ -1,48 +1,9 @@
 // Sitemap dinâmico: páginas estáticas + TODOS os produtos (/produto/:id).
 // Antes o sitemap era estático e não listava produtos — o Google não descobria as
 // páginas que mais convertem. Produtos são públicos no Firestore (leitura REST sem auth).
+import { fetchProducts, escapeXml, isVisibleInternationally } from './_lib/firestore-products.js';
 
-const FIREBASE_PROJECT_ID = process.env.FIREBASE_PROJECT_ID || '';
 const SITE_ORIGIN = 'https://japanexpress-store.com';
-
-async function fetchProducts() {
-  const base = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/products?pageSize=300`;
-  const all = [];
-  let pageToken = '';
-  do {
-    const url = pageToken ? `${base}&pageToken=${pageToken}` : base;
-    const res = await fetch(url);
-    if (!res.ok) throw new Error('Firestore read failed: ' + res.status);
-    const data = await res.json();
-    (data.documents || []).forEach(doc => {
-      const id = doc.name.split('/').pop();
-      all.push({ id, ...parseFields(doc.fields || {}) });
-    });
-    pageToken = data.nextPageToken || '';
-  } while (pageToken);
-  return all;
-}
-
-function parseFields(fields) {
-  const out = {};
-  for (const [k, v] of Object.entries(fields)) out[k] = parseValue(v);
-  return out;
-}
-function parseValue(v) {
-  if ('stringValue' in v) return v.stringValue;
-  if ('integerValue' in v) return Number(v.integerValue);
-  if ('doubleValue' in v) return Number(v.doubleValue);
-  if ('booleanValue' in v) return v.booleanValue;
-  if ('mapValue' in v) return parseFields(v.mapValue.fields || {});
-  if ('arrayValue' in v) return (v.arrayValue.values || []).map(parseValue);
-  if ('timestampValue' in v) return v.timestampValue;
-  if ('nullValue' in v) return null;
-  return undefined;
-}
-
-function escapeXml(s) {
-  return String(s || '').replace(/[<>&'\"]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', "'": '&apos;', '"': '&quot;' }[c]));
-}
 
 function toIso(ts) {
   try {
@@ -72,15 +33,10 @@ const STATIC_PAGES = [
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
 
-  if (!FIREBASE_PROJECT_ID) {
-    res.status(500).json({ error: 'FIREBASE_PROJECT_ID não configurado' });
-    return;
-  }
-
   try {
     const products = await fetchProducts();
     // Mesmo filtro do feed: escondidos e "japan-only" não entram no catálogo internacional
-    const visible = products.filter(p => !p.hidden && p.deliveryRestrict !== 'japan-only');
+    const visible = products.filter(isVisibleInternationally);
 
     const staticUrls = STATIC_PAGES.map(p =>
       `  <url>\n    <loc>${SITE_ORIGIN}${p.loc}</loc>\n    <changefreq>${p.changefreq}</changefreq>\n    <priority>${p.priority}</priority>\n  </url>`
