@@ -1,7 +1,7 @@
 {
-  "name": "sweet-japan-whatsapp",
+  "name": "japan-express-whatsapp",
   "version": "1.0.0",
-  "description": "WhatsApp automation service for Sweet Japan Treats ERP",
+  "description": "WhatsApp automation service for Japan Express ERP",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

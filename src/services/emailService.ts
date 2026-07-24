@@ -6,6 +6,8 @@
 
 import type { EmailOrderData, CartItem, ShippingLabelData } from '@/types/order';
 import { productEnglishName } from '@/utils/productName';
+import { authenticatedFetch } from '@/services/authenticatedFetch';
+import { COMPANY_PROFILE } from '@/config/companyProfile';
 
 const isDev = import.meta.env.DEV;
 const devLog = isDev ? console.log.bind(console) : () => {};
@@ -23,9 +25,6 @@ interface EmailData {
   shippingLabelData?: ShippingLabelData;
 }
 
-// Resend API configuration
-const RESEND_API_KEY = import.meta.env.VITE_RESEND_API_KEY;
-const FROM_EMAIL = import.meta.env.VITE_FROM_EMAIL || 'onboarding@resend.dev'; // Use Resend's test domain if not configured
 
 export const emailService = {
   /**
@@ -33,31 +32,22 @@ export const emailService = {
    */
   sendOrderConfirmation: async (data: EmailData): Promise<boolean> => {
     devLog('📧 Email Service - Sending order confirmation email');
-    devLog('📧 API Key configured:', !!RESEND_API_KEY);
-    devLog('📧 From:', FROM_EMAIL);
-    devLog('📧 To:', data.to);
-    devLog('📧 Subject:', data.subject);
     devLog('📧 Order Number:', data.orderNumber);
     if (data.trackingNumber) {
       devLog('🔢 Tracking Number:', data.trackingNumber);
     }
     
-    // Envio unificado via endpoint SMTP noreply@ (Google Workspace). Substitui o
-    // Resend. Anti-abuso ancorado no pedido real (orderNumber) no servidor; para
-    // e-mails de teste do admin, cai no fallback de conta no Firebase Auth.
+    // O servidor lê o pedido real e renderiza o template; assunto/HTML do
+    // navegador nunca são aceitos como conteúdo de e-mail.
     try {
-      const response = await fetch('/api/send-email', {
+      const response = await authenticatedFetch('/api/send-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          type: 'transactional',
-          to: data.to,
+          type: data.trackingNumber ? 'tracking' : 'order',
           orderId: data.orderNumber,
-          subject: data.subject,
-          html: data.html,
         }),
       });
-
       if (!response.ok) {
         const errText = await response.text().catch(() => '');
         devError('❌ send-email error:', response.status, errText);
@@ -86,10 +76,10 @@ export const emailService = {
       recipientPostal: formData.postalCode,
       recipientAddress: `${formData.prefecture} ${formData.city} ${formData.address} ${formData.building || ''}`.trim(),
       recipientPhone: formData.phone,
-      senderName: 'Paula Shiokawa',
-      senderPostal: '518-0225',
-      senderAddress: 'Hiroshima-ken, Japan',
-      senderPhone: '070-1367-1679',
+      senderName: `${COMPANY_PROFILE.contactName} / ${COMPANY_PROFILE.brand}`,
+      senderPostal: COMPANY_PROFILE.fulfillmentOrigin.postalCode,
+      senderAddress: COMPANY_PROFILE.fulfillmentOrigin.formatted,
+      senderPhone: COMPANY_PROFILE.whatsapp.domestic,
       carrier: shipping?.carrier || '',
       deliveryTime: deliveryTime || 'Qualquer horário'
     });
@@ -381,11 +371,11 @@ export const emailService = {
             <!-- Sender Section -->
             <div class="label-section">
               <div class="label-section-title">📤 REMETENTE (ご依頼主)</div>
-              <div class="postal-code">〒 518-0225</div>
-              <div class="address-line"><strong>Paula Shiokawa</strong></div>
-              <div class="address-line">Hiroshima-ken, Japan</div>
-              <div class="address-line">三重県 伊賀市 桐ヶ丘 5-292</div>
-              <div class="address-line">📞 070-1367-1679</div>
+              <div class="postal-code">〒 ${COMPANY_PROFILE.fulfillmentOrigin.postalCode}</div>
+              <div class="address-line"><strong>${COMPANY_PROFILE.contactName}</strong></div>
+              <div class="address-line">${COMPANY_PROFILE.fulfillmentOrigin.prefecture}, ${COMPANY_PROFILE.fulfillmentOrigin.country}</div>
+              <div class="address-line">${COMPANY_PROFILE.fulfillmentOrigin.formattedJa.replace(`〒${COMPANY_PROFILE.fulfillmentOrigin.postalCode} `, '')}</div>
+              <div class="address-line">📞 ${COMPANY_PROFILE.whatsapp.domestic}</div>
             </div>
 
             <!-- QR Code Section -->

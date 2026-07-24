@@ -1,5 +1,5 @@
 """
-Firebase Integration Module para Sweet Japan Treats ERP
+Firebase Integration Module para Japan Express ERP
 Conecta ao Firestore do projeto localstorage-98492
 """
 

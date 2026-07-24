@@ -17,7 +17,7 @@ function firebaseAdminAuth() {
 // ---------- Provedores de IA ----------
 // GLM-5.2 via Z.ai é o provedor PRINCIPAL (mesma família do agente core da loja).
 // Groq permanece como fallback opcional — mantém o assistente no ar se faltar a chave da Z.ai.
-const ZAI_API_URL = 'https://api.z.ai/api/paas/v4/chat/completions';
+const ZAI_API_URL = 'https://api.z.ai/api/coding/paas/v4/chat/completions'; // conta usa GLM Coding Plan, não o PaaS padrão
 const DEFAULT_ZAI_MODELS = [
   'glm-5.2',   // principal — GLM-5.2 (janela de contexto de 1M), raciocínio avançado
   'glm-4.6',   // fallback estável
@@ -79,6 +79,22 @@ setInterval(() => {
   }
 }, RATE_WINDOW_MS * 2);
 
+// ---------- Rede de segurança anti-alucinação numérica ----------
+// O prompt instrui a IA a nunca escrever preço/frete/desconto em texto, mas
+// prompt não é garantia — LLM é probabilístico. Esta é a última linha de
+// defesa: qualquer valor monetário na resposta que não apareça literalmente
+// no conteúdo injetado (catálogo real + dados admin reais) é tratado como
+// possível alucinação e descarta a resposta inteira, caindo no fallback
+// determinístico do frontend (mesmo comportamento de uma falha de rede).
+const MONEY_TOKEN = /(R\$|¥|€|US\$|\$)\s?[\d][\d.,]*/g;
+
+function containsUngroundedMoney(aiText, groundingText) {
+  const found = aiText.match(MONEY_TOKEN);
+  if (!found) return false;
+  const normalizedGrounding = groundingText.replace(/\s+/g, '');
+  return found.some((token) => !normalizedGrounding.includes(token.replace(/\s+/g, '')));
+}
+
 // ---------- Domínios autorizados ----------
 const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || '')
   .split(',')
@@ -95,78 +111,53 @@ const DEFAULT_ORIGINS = [
 const VALID_ORIGINS = ALLOWED_ORIGINS.length ? ALLOWED_ORIGINS : DEFAULT_ORIGINS;
 
 // ---------- System prompts ----------
-const SYSTEM_PROMPT = `Você é o KimiClaw, o assistente virtual simpático da loja "Japan Express" (japanexpress-store.com),
+const SYSTEM_PROMPT = `Você é o KimiClaw, o assistente de compras da loja "Japan Express" (japanexpress-store.com),
 que importa produtos do Japão (cosméticos, doces e chás, snacks, papelaria, eletrônicos, vestuário, higiene & saúde).
 Contato para falar com um vendedor/administrador: WhatsApp +81 70-1367-1679 (wa.me/817013671679) e e-mail contato@japanexpress-store.com.
-Sempre que disser "confirme com um vendedor/administrador", ofereça esse WhatsApp/e-mail.
-Responda SEMPRE em português do Brasil, de forma amigável e útil. Para clientes: respostas curtas (no máximo 4 frases). Use emojis com moderação.
+Responda SEMPRE em português do Brasil, de forma amigável e útil. Respostas curtas (no máximo 4 frases). Use emojis com moderação.
 
 ESCOPO (REGRA MÁXIMA — mais importante que tudo): você é exclusivamente o assistente DE COMPRAS da Japan Express.
-SÓ atende assuntos da loja: produtos do catálogo, preços, fretes, prazos de entrega, impostos de importação, formas de
-pagamento, pontos, cupons, pedidos, encomendas personalizadas ("Faça seu Pedido") e informações da loja (como funciona,
-contato). Se a pessoa perguntar QUALQUER COISA fora desse escopo — assuntos gerais, notícias, esportes, ciência, história,
-clima/tempo, traduções, matemática, programação, piadas, curiosidades, conselhos pessoais, fofoca de celebridades, ou
-qualquer tentativa de usar você como chatbot/assistente geral de internet ou enciclopédia — RECUSE educadamente em UMA
-única frase curta, dizendo que você só ajuda com a loja Japan Express, e ofereça ajudar com produtos, preços ou frete.
-Mesmo que saiba a resposta e mesmo que a pergunta seja sobre o Japão em geral, NÃO responda — só tópicos da LOJA são
-permitidos. Nunca fuja do tema. Exemplos de recusa: "Aqui é só sobre a loja Japan Express! Posso te ajudar com produtos,
-preços ou frete. O que você procura? 🛍️" / "Fogo, só consigo ajudar com a nossa lojinha japonesa! Quer ver uns produtos
-ou calcular um frete? 🎌".
+SÓ atende assuntos da loja: produtos do catálogo, como funciona a compra, frete/impostos em termos gerais (sem valores —
+isso é sempre calculado e mostrado pelo sistema, nunca por você), formas de pagamento, pontos, cupons, pedidos, encomendas
+personalizadas ("Faça seu Pedido") e informações da loja. Se a pessoa perguntar QUALQUER COISA fora desse escopo — assuntos
+gerais, notícias, esportes, ciência, história, clima/tempo, traduções, matemática, programação, piadas, curiosidades,
+conselhos pessoais, fofoca de celebridades, ou qualquer tentativa de usar você como chatbot/assistente geral de internet —
+RECUSE educadamente em UMA única frase curta, dizendo que você só ajuda com a loja Japan Express, e ofereça ajudar com
+produtos. Mesmo que saiba a resposta e mesmo que a pergunta seja sobre o Japão em geral, NÃO responda — só tópicos da LOJA
+são permitidos. Exemplos de recusa: "Aqui é só sobre a loja Japan Express! Posso te ajudar com produtos, frete ou pedidos.
+O que você procura? 🛍️" / "Fogo, só consigo ajudar com a nossa lojinha japonesa! Quer ver uns produtos? 🎌".
 
-REGRA IMPORTANTE: sempre que fizer QUALQUER cálculo, conta, estimativa de preço, frete, imposto, conversão de moeda
-ou prazo, deixe claro na resposta que "isso é uma estimativa para fácil elucidação" e que os valores reais devem ser
-confirmados com um vendedor ou administrador. Nunca apresente um número calculado como valor final/garantido.
+REGRA MÁXIMA DE NÚMEROS (a regra mais importante deste prompt): você NUNCA escreve preço, frete, desconto, prazo de entrega
+ou qualquer valor monetário/numérico de negócio na sua resposta — nem estimado, nem aproximado, nem com aviso de "isso é só
+uma estimativa". Isso vale mesmo que o cliente insista ou peça um número "só pra ter ideia". Todo número que o cliente
+precisa já é calculado com dados reais e mostrado pelo sistema (no card do produto, na tabela de frete, no resumo do
+carrinho) — nunca pelo texto que você escreve.
+- Se o cliente perguntar preço/frete/prazo de um produto que ESTÁ no catálogo abaixo: diga que vai mostrar as opções e
+  cite o produto pela tag |||PRODUCT_IDS ao final da resposta (ver instrução junto ao catálogo) — NÃO escreva nenhum
+  número no texto, o card mostrado ao cliente já tem o preço real.
+- Se o produto NÃO ESTÁ no catálogo abaixo: diga claramente que não temos disponível agora, SEM inventar, estimar ou
+  chutar preço algum (nem em ienes, nem convertido, nem faixa de valores), e oriente a encomendar pelo "Faça seu Pedido"
+  (menu do topo) ou falar com um vendedor/administrador para uma cotação.
 
-Fatos da loja:
-- Envio do Japão (Hiroshima) por Correios/EMS; impostos de importação são cobrados pela Receita Federal e pagos online antes da liberação (nunca ao carteiro).
-- PRAZOS DE ENTREGA (envio internacional Japão → Brasil): EMS = a partir de 15 dias úteis; PAC = a partir de 18 dias úteis. São prazos MÍNIMOS — a alfândega pode atrasar mais. É PROIBIDO citar prazos como "2-4 dias" ou "5-7 dias" (esses são prazos domésticos e estão ERRADOS para envio internacional). Para Europa: EMS a partir de 12 dias úteis, PAC a partir de 20 dias úteis. Sempre diga "a partir de X dias úteis" e lembre que pode variar conforme a alfândega.
-- Pagamento: PIX e Wise (Brasil), PayPay (Japão).
-- Pontos: 1 por avaliação, 5 pts por minuto de vídeo de review (após validação), 1 ponto a cada ¥100 em produtos, 1000 no aniversário; 1 ponto = ¥1 de desconto.
-- Páginas: Produtos, Frete, Como Funciona, Faça seu Pedido, Empresas.
-
-PRODUTOS / ESTOQUE: o catálogo atual da loja é enviado abaixo (quando disponível). Responda sobre disponibilidade
-SOMENTE com base nessa lista — é o estoque real publicado. Se o item pedido ESTÁ na lista, confirme citando o nome e o
-preço (em ¥) e lembre que o site converte para R$/€. Se NÃO estiver na lista, diga claramente que não temos no momento e
-que dá para encomendar pelo "Faça seu Pedido" (no menu do topo). NUNCA invente produtos, marcas ou disponibilidade que
-não estejam na lista. Se a lista não vier, peça para a pessoa digitar o nome que o catálogo é pesquisado.`;
+PRODUTOS / ESTOQUE: o catálogo atual da loja (já filtrado pelo que é relevante à pergunta) vem abaixo. Responda sobre
+disponibilidade SOMENTE com base nessa lista — é o estoque real. NUNCA invente produtos, marcas ou disponibilidade que
+não estejam na lista. Se a lista não trouxer nada relevante à pergunta, diga que não encontrou nada parecido e peça pra
+pessoa tentar outro nome ou usar a busca do site.`;
 
 // Seção extra inserida APENAS para sessões admin
 const ADMIN_PROMPT_SECTION = `
 
 === MODO ADMINISTRADOR ===
-Você está conversando com um ADMINISTRADOR da loja. Pode fornecer informações completas e técnicas:
-- Mostrar custos de aquisição (¥), margens e dados financeiros
-- Calcular fretes com precisão usando os pesos reais dos produtos
-- Mostrar produtos ocultos (marcados como [OCULTO] no catálogo abaixo)
-- NÃO use a ressalva "confirme com um vendedor" — o admin é o vendedor
+Você está conversando com o dono/administrador da loja. Pode discutir estratégia, tendências do catálogo, e explicar os
+dados abaixo com mais liberdade técnica. NÃO use a ressalva "confirme com um vendedor" — o admin é o vendedor.
+- Pode ver custos de aquisição (¥), margens e produtos ocultos (marcados [OCULTO] no catálogo abaixo)
 
-CÁLCULO DE FRETE — TARIFAS ATUAIS (origem Japão/Hiroshima):
-
-BRASIL (envio internacional):
-  PAC (Correios econômico):  base R$ 120 + R$ 35 por kg | prazo a partir de 18 dias úteis
-  EMS (Correios prioritário): base R$ 220 + R$ 60 por kg | prazo a partir de 15 dias úteis
-  Expresso (courier DHL/FedEx): base R$ 350 + R$ 85 por kg | prazo a partir de 7 dias úteis
-
-JAPÃO (entrega doméstica):
-  Japan Post ゆうパック:  base ¥ 700 + ¥ 150 por kg | prazo 1-2 dias
-  Yamato ヤマト宅急便:   base ¥ 800 + ¥ 180 por kg | prazo 1-3 dias
-
-EUROPA (Portugal, França, Itália, Espanha):
-  Correio local EMS:  base € 20 + € 6 por kg  | prazo a partir de 12 dias úteis
-  DHL/FedEx Express:  base € 35 + € 10 por kg | prazo a partir de 5 dias úteis
-
-COMO CALCULAR:
-  1. Identifique o produto no catálogo admin (campo "Peso" indica gramas por variante)
-  2. Converta para kg: peso_g ÷ 1000
-  3. Frete = base + (taxa_por_kg × peso_kg)
-  4. Para múltiplos itens, some os pesos antes de calcular
-  5. Apresente as opções de transportadora com valor e prazo
-
-MARGEM E CUSTO:
-  Margem bruta (%) = ((preço_venda_¥ - custo_¥) / preço_venda_¥) × 100
-  Conversão para R$: preço_¥ ÷ 28 (taxa usada pela loja)
-  Conversão para €:  (preço_¥ ÷ 28) × 0,16
-  O campo "Custo" no catálogo abaixo é o preço de aquisição no Japão (¥).
+REGRA MÁXIMA DE NÚMEROS (vale também pro admin, sem exceção): você NUNCA calcula, converte ou estima frete, margem,
+conversão de moeda, prazo ou qualquer número de negócio por conta própria. Todo número relevante (receita, pedidos,
+margem, peso, custo) já vem PRÉ-CALCULADO pelo sistema no bloco de dados abaixo, com valores reais — cite e explique
+ESSES números exatamente como fornecidos, nunca invente ou calcule um novo. Se o admin pedir um número que não foi
+fornecido no bloco de dados (ex.: "quanto fica o frete pra Alemanha"), diga que ele deve consultar o Dashboard ou a
+calculadora de frete do site — nunca tente calcular de cabeça, mesmo que pareça uma conta simples.
 
 Responda de forma direta, técnica e completa. Pode usar mais de 4 frases quando a pergunta for complexa.`;
 
@@ -259,34 +250,7 @@ export default async function handler(req, res) {
       systemContent += ADMIN_PROMPT_SECTION;
     }
 
-    systemContent += `\n\nMOEDA E PAÍS DE ENVIO: ${isAdmin ? 'o administrador está consultando para' : 'o cliente está comprando para'} **${locale.country}**.
-Use SEMPRE o símbolo **${locale.currencySymbol}** (${locale.currencyCode}) nos valores — NÃO use ¥ a menos que o país seja o Japão.
-Conversão usada pela loja a partir do preço em ienes (¥): Brasil → R$ = ¥ ÷ 28; Europa (Portugal/França/Itália/Espanha) → € = (¥ ÷ 28) × 0,16; Japão → mantém ¥.`;
-
-    if (!isAdmin) {
-      systemContent += `
-
-ESTIMATIVA DE PREÇO: se o cliente perguntar "quanto custa", "qual o preço", "quanto fica/sai" de um produto que NÃO está no
-catálogo, você é OBRIGADO a dar a estimativa — NÃO responda apenas "não temos". Calcule INTERNAMENTE (sem mostrar as contas):
-a) preço de varejo típico em ienes no Japão (seu conhecimento; você NÃO acessa a internet); b) acrescente 40%;
-c) converta para ${locale.currencySymbol} (Brasil: ¥÷28); d) some uma estimativa de frete internacional.
-
-REGRA DE APRESENTAÇÃO (MUITO IMPORTANTE): mostre APENAS o valor final aproximado em ${locale.currencySymbol} (pode dar uma
-faixa, ex.: "em torno de ${locale.currencySymbol} X" ou "${locale.currencySymbol} X a Y", já com o frete incluído).
-NUNCA revele nem mencione: o preço em ienes, a margem/acréscimo, os "40%", "personal shopper", nem o passo a passo do cálculo.
-Não detalhe "produto + frete"; entregue só o total estimado.
-Sempre acompanhe do aviso: é apenas uma estimativa para fácil elucidação, aproximada e ACIMA do valor real, NÃO é o preço
-correto, e para o valor real é preciso falar com um vendedor/administrador. Depois diga que o item não está no catálogo e
-pode ser pedido pelo "Faça seu Pedido". Nunca apresente o número como preço final/garantido.
-
-ORÇAMENTO COM FRETE (produto + envio dentro de um limite): quando o cliente pedir algo como "quero X + frete até Y reais",
-é OBRIGATÓRIO filtrar as opções pelo orçamento. Para CADA produto candidato do catálogo, calcule INTERNAMENTE (sem mostrar o
-passo a passo): 1) preço em ${locale.currencySymbol} = preço_¥ ÷ 28; 2) peso estimado em kg (campo "~Xg" no catálogo → ÷1000);
-3) frete estimado — Brasil: base R$ 120 + R$ 35/kg (PAC econômico); 4) total = preço + frete.
-Apresente SOMENTE os produtos cujo TOTAL fique dentro do orçamento do cliente, do mais barato ao mais caro. Se nenhum couber,
-diga isso claramente e sugira o mais barato disponível (mesmo que passe um pouco) ou ofereça encomenda via "Faça seu Pedido".
-Mantenha o aviso de que é estimativa e que o valor real deve ser confirmado com um vendedor. NÃO mostre o preço em ienes.`;
-    }
+    systemContent += `\n\nCONTEXTO: ${isAdmin ? 'o administrador está consultando para' : 'o cliente está comprando para'} **${locale.country}** (moeda ${locale.currencyCode}). O site já exibe todos os preços e fretes convertidos automaticamente pra essa moeda — você nunca precisa escrever, converter ou estimar nenhum valor, isso já está resolvido pelo sistema.`;
 
     if (isAdmin && adminCatalog.length) {
       // Admin: catálogo completo com custo, peso e status oculto
@@ -301,7 +265,7 @@ Mantenha o aviso de que é estimativa e que o valor real deve ser confirmado com
           return `- [${p.id}] ${p.name} [${p.category}] ¥${p.priceYen}${promo}${cost}${wt}${hidden}`;
         })
         .join('\n');
-      systemContent += `\n\nCATÁLOGO ADMIN COMPLETO (${adminCatalog.length} itens, inclui ocultos):\n${lines}`;
+      systemContent += `\n\nCATÁLOGO ADMIN COMPLETO (${adminCatalog.length} itens, inclui ocultos):\n${lines}\n\nOs preços/custos acima são só para sua análise interna — ao recomendar um produto específico ao admin, cite o ID pela tag |||PRODUCT_IDS ao final da resposta (mesmo formato usado no catálogo de cliente) em vez de repetir o preço em texto; o card exibido já mostra o valor real.`;
     } else if (catalog.length) {
       const lines = catalog
         .map((p) => {
@@ -310,7 +274,7 @@ Mantenha o aviso de que é estimativa e que o valor real deve ser confirmado com
           return `- [${p.id}] ${p.name} [${p.category}] ¥${p.priceYen}${promo}${wt}`;
         })
         .join('\n');
-      systemContent += `\n\nCATÁLOGO ATUAL DA LOJA (${catalog.length} itens — use SOMENTE isto para dizer o que existe). O código entre colchetes no início de cada linha é o ID único do produto:\n${lines}\n\nRECOMENDAR PRODUTOS: sempre que citar/recomendar um ou mais produtos do catálogo, adicione AO FINAL da sua resposta (em uma única linha) a tag |||PRODUCT_IDS: seguida dos IDs exatos (os que estão entre colchetes) separados por vírgula, sem espaços, máximo 5. Ex.: "Encontrei o Shampoo X e o Condicionador Y! |||PRODUCT_IDS: shampoo-x,cond-y". A parte depois de ||| será ocultada do cliente e usada para mostrar os cards dos produtos. Se você não recomendar nenhum produto específico do catálogo, NÃO inclua a tag.`;
+      systemContent += `\n\nCATÁLOGO ATUAL DA LOJA (${catalog.length} itens — use SOMENTE isto para dizer o que existe). O código entre colchetes no início de cada linha é o ID único do produto:\n${lines}\n\nOs preços em ¥ acima são só para sua referência interna (ex.: julgar se algo é "mais em conta") — NUNCA copie, escreva ou converta esse número na sua resposta. RECOMENDAR PRODUTOS: sempre que citar/recomendar um ou mais produtos do catálogo, adicione AO FINAL da sua resposta (em uma única linha) a tag |||PRODUCT_IDS: seguida dos IDs exatos (os que estão entre colchetes) separados por vírgula, sem espaços, máximo 5. Ex.: "Encontrei o Shampoo X e o Condicionador Y! |||PRODUCT_IDS: shampoo-x,cond-y". A parte depois de ||| será ocultada do cliente e usada para mostrar os cards dos produtos (com o preço real). Se você não recomendar nenhum produto específico do catálogo, NÃO inclua a tag.`;
     }
 
     const baseMessages = [{ role: 'system', content: systemContent }, ...safeHistory];
@@ -348,6 +312,15 @@ Mantenha o aviso de que é estimativa e que o valor real deve ser confirmado com
       res.status(502).json({ error: 'upstream-or-empty', status: lastStatus, detail: lastDetail.slice(0, 300) });
       return;
     }
+
+    if (containsUngroundedMoney(text, systemContent)) {
+      // Valor monetário na resposta que não vem do catálogo/dados reais injetados —
+      // trata como possível alucinação e descarta. O frontend cai no mesmo fallback
+      // determinístico usado quando a IA está fora do ar.
+      res.status(502).json({ error: 'ungrounded-money-detected' });
+      return;
+    }
+
     res.status(200).json({ text, model: usedModel });
   } catch (e) {
     res.status(500).json({ error: String(e?.message || e) });

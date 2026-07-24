@@ -1,99 +1,94 @@
-import React, { useEffect, useState } from 'react';
-import { orderService } from '@/services/orderService';
-import { toYen } from '@/utils/currency';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Tag, TrendingDown, ShoppingBag, Percent } from 'lucide-react';
+import { z } from 'zod';
+import { Button } from '@/components/ui/button';
+import { authenticatedFetch } from '@/services/authenticatedFetch';
 
-interface CouponRow {
-  orderNumber: string;
-  orderDate: string;
-  customerEmail: string;
-  couponCode: string;
-  couponDiscount: number;   // valor na moeda do pedido
-  currency: string;
-  discountYen: number;      // convertido para ¥
-  grandTotalYen: number;    // valor total do pedido em ¥
-  isAffiliate: boolean;
-  affiliateCode: string;
-}
+const couponRowSchema = z.object({
+  id: z.string(),
+  orderNumber: z.string(),
+  orderDate: z.string(),
+  customerEmail: z.string(),
+  couponCode: z.string(),
+  couponDiscount: z.number(),
+  currency: z.string(),
+  discountYen: z.number(),
+  grandTotalYen: z.number(),
+  isAffiliate: z.boolean(),
+  affiliateCode: z.string(),
+});
+
+const couponPageSchema = z.object({
+  items: z.array(couponRowSchema),
+  hasMore: z.boolean(),
+  nextCursor: z.string().nullable(),
+});
+
+type CouponRow = z.infer<typeof couponRowSchema>;
 
 const CouponUsageReport: React.FC = () => {
   const [rows, setRows] = useState<CouponRow[]>([]);
+  const [cursor, setCursor] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [error, setError] = useState('');
   const [filterCode, setFilterCode] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'coupon' | 'affiliate'>('all');
 
-  useEffect(() => {
-    load();
-  }, []);
-
-  const load = async () => {
-    setLoading(true);
-    const orders = await orderService.getAllOrdersAsync();
-    const result: CouponRow[] = [];
-
-    for (const o of orders) {
-      if (o.status === 'cancelled') continue;
-      const discount = (o as any).couponDiscount || 0;
-      const code = (o as any).couponCode || '';
-      const affCode = (o as any).affiliateCode || '';
-      if (!discount && !code && !affCode) continue;
-
-      const cur = (o as any).currency || 'BRL';
-      // Derivar taxa implícita do pedido para converter desconto para ¥
-      const grandTotalYen = (o as any).grandTotalYen || 0;
-      const totalBrl = o.totalPrice || o.totalAmount || 0;
-      let discountYen = 0;
-      if (discount > 0) {
-        if (cur === 'JPY') {
-          discountYen = Math.round(discount);
-        } else if (grandTotalYen > 0 && totalBrl > 0) {
-          const rate = grandTotalYen / totalBrl;
-          discountYen = Math.round(discount * rate);
-        } else {
-          discountYen = toYen(discount, cur);
-        }
-      }
-
-      result.push({
-        orderNumber: o.orderNumber || (o as any).id || '',
-        orderDate: (o as any).orderDate || (o as any).date || '',
-        customerEmail: (o as any).customerEmail || '',
-        couponCode: code,
-        couponDiscount: discount,
-        currency: cur,
-        discountYen,
-        grandTotalYen,
-        isAffiliate: !!affCode,
-        affiliateCode: affCode,
+  const fetchPage = useCallback(async (pageCursor: string | null, reset: boolean) => {
+    reset ? setLoading(true) : setLoadingMore(true);
+    setError('');
+    try {
+      const params = new URLSearchParams({ limit: '25', type: filterType });
+      if (filterCode.trim()) params.set('code', filterCode.trim());
+      if (pageCursor) params.set('cursor', pageCursor);
+      const response = await authenticatedFetch(`/api/admin-coupon-usage?${params.toString()}`);
+      if (!response.ok) throw new Error('coupon_usage_request_failed');
+      const page = couponPageSchema.parse(await response.json());
+      setRows((current) => {
+        if (reset) return page.items;
+        const known = new Set(current.map((row) => row.id));
+        return [...current, ...page.items.filter((row) => !known.has(row.id))];
       });
+      setCursor(page.nextCursor);
+      setHasMore(page.hasMore);
+    } catch {
+      if (reset) {
+        setRows([]);
+        setCursor(null);
+        setHasMore(false);
+      }
+      setError('Não foi possível carregar o relatório.');
+    } finally {
+      reset ? setLoading(false) : setLoadingMore(false);
     }
+  }, [filterCode, filterType]);
 
-    result.sort((a, b) => (b.orderDate > a.orderDate ? 1 : -1));
-    setRows(result);
-    setLoading(false);
-  };
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      void fetchPage(null, true);
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [fetchPage]);
 
-  const filtered = rows.filter(r => {
-    if (filterType === 'coupon' && r.isAffiliate) return false;
-    if (filterType === 'affiliate' && !r.isAffiliate) return false;
-    if (filterCode && !r.couponCode.toLowerCase().includes(filterCode.toLowerCase()) && !r.affiliateCode.toLowerCase().includes(filterCode.toLowerCase())) return false;
-    return true;
-  });
-
-  const totalDiscountYen = filtered.reduce((s, r) => s + r.discountYen, 0);
+  const filtered = rows;
+  const totalDiscountYen = filtered.reduce((sum, row) => sum + row.discountYen, 0);
   const totalOrders = filtered.length;
 
   const byCode: Record<string, { count: number; totalYen: number; isAffiliate: boolean }> = {};
-  filtered.forEach(r => {
-    const key = r.affiliateCode || r.couponCode || '(sem código)';
-    if (!byCode[key]) byCode[key] = { count: 0, totalYen: 0, isAffiliate: r.isAffiliate };
-    byCode[key].count++;
-    byCode[key].totalYen += r.discountYen;
+  filtered.forEach((row) => {
+    const key = row.affiliateCode || row.couponCode || '(sem código)';
+    if (!byCode[key]) byCode[key] = { count: 0, totalYen: 0, isAffiliate: row.isAffiliate };
+    byCode[key].count += 1;
+    byCode[key].totalYen += row.discountYen;
   });
-  const topCodes = Object.entries(byCode).sort((a, b) => b[1].totalYen - a[1].totalYen);
+  const topCodes = Object.entries(byCode).sort((left, right) => right[1].totalYen - left[1].totalYen);
 
-  const fmt = (v: number, cur: string) =>
-    cur === 'JPY' ? `¥${v.toLocaleString()}` : `R$${v.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+  const fmt = (value: number, currency: string) =>
+    currency === 'JPY'
+      ? `¥${value.toLocaleString()}`
+      : `R$${value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
 
   return (
     <div className="space-y-6">
@@ -160,6 +155,9 @@ const CouponUsageReport: React.FC = () => {
           onChange={e => setFilterCode(e.target.value)}
         />
       </div>
+      <p className="text-xs text-muted-foreground">
+        Totais calculados sobre {filtered.length} resultado{filtered.length === 1 ? '' : 's'} carregado{filtered.length === 1 ? '' : 's'}.
+      </p>
 
       {/* Tabela */}
       {loading ? (
@@ -182,8 +180,8 @@ const CouponUsageReport: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {filtered.map((r, i) => (
-                  <tr key={i} className="hover:bg-muted/30 transition-colors">
+                {filtered.map((r) => (
+                  <tr key={r.id} className="hover:bg-muted/30 transition-colors">
                     <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{r.orderNumber.slice(-8)}</td>
                     <td className="px-4 py-3 text-xs text-muted-foreground">
                       {r.orderDate ? new Date(r.orderDate).toLocaleDateString('pt-BR') : '—'}
@@ -217,6 +215,19 @@ const CouponUsageReport: React.FC = () => {
               </tfoot>
             </table>
           </div>
+        </div>
+      )}
+      {error && <p className="text-center text-sm text-destructive">{error}</p>}
+      {hasMore && (
+        <div className="flex justify-center">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => void fetchPage(cursor, false)}
+            disabled={loadingMore || !cursor}
+          >
+            {loadingMore ? 'Carregando...' : 'Carregar mais resultados'}
+          </Button>
         </div>
       )}
     </div>

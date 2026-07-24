@@ -11,6 +11,7 @@ import { usePagination } from '@/hooks/usePagination';
 import Pagination from '@/components/Pagination';
 import { minEffectiveYen } from '@/utils/pricing';
 import { categoryService, DEFAULT_CATEGORIES, type ProductCategory } from '@/services/categoryService';
+import ItemListJsonLd from '@/components/ItemListJsonLd';
 
 const normalize = (s: string) =>
   (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
@@ -286,7 +287,11 @@ const Products: React.FC = () => {
               {/* Toolbar: Sort */}
               <div className="mb-6 flex items-center justify-between">
                 <p className="text-sm text-muted-foreground">
-                  {total} {total !== 1 ? t('productsPage.products_plural') : t('productsPage.products')}
+                  {loading ? (
+                    <span className="inline-block h-4 w-24 rounded bg-secondary animate-pulse align-middle" />
+                  ) : (
+                    <>{total} {total !== 1 ? t('productsPage.products_plural') : t('productsPage.products')}</>
+                  )}
                 </p>
                 <div className="flex items-center gap-2">
                   <label htmlFor="sort" className="text-sm font-semibold text-muted-foreground">
@@ -320,6 +325,7 @@ const Products: React.FC = () => {
                 </div>
               ) : (
                 <>
+                  <ItemListJsonLd products={pageItems} />
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 md:gap-4">
                     {pageItems.map((product) => (
                       <CompactProductCard key={product.id} product={product} />

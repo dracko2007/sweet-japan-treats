@@ -1,5 +1,5 @@
 /**
- * 🏮 Sweet Japan Treats - WhatsApp Automation Service
+ * 🏮 Japan Express - WhatsApp Automation Service
  * ====================================================
  * Servidor Node.js que conecta ao WhatsApp Web via QR Code
  * e permite enviar mensagens automáticas pelo ERP.
@@ -110,7 +110,7 @@ client.on('message', (msg) => {
 
 // Root route (friendly confirmation check)
 app.get('/', (req, res) => {
-    res.send('🏮 Sweet Japan Treats - Servidor WhatsApp está online e rodando! 🚀');
+    res.send('🏮 Japan Express - Servidor WhatsApp está online e rodando! 🚀');
 });
 
 // Status
@@ -231,8 +231,8 @@ app.post('/api/send-order-notification', async (req, res) => {
     
     if (type === 'new_order') {
         // ===== COMPRA FINALIZADA =====
-        message = `🏮 *Sweet Japan Treats*\n\n`;
-        message += `Olá ${customerName}! 🍮\n\n`;
+        message = `🏮 *Japan Express*\n\n`;
+        message += `Olá ${customerName}! 📦\n\n`;
         message += `Seu pedido *${orderNumber}* foi recebido com sucesso! ✅\n\n`;
         message += `📦 *Itens do pedido:*\n`;
         if (items && items.length > 0) {
@@ -267,34 +267,34 @@ app.post('/api/send-order-notification', async (req, res) => {
         message += `2. Prepararemos seu pedido com carinho\n`;
         message += `3. Enviaremos o código de rastreio\n\n`;
         message += `Obrigada pela compra! 💛\n`;
-        message += `_Sweet Japan Treats - Doce de Leite Artesanal_ 🍮`;
+        message += `_Japan Express_`;
         
     } else if (type === 'status_update') {
         
         if (req.body.status === 'processing') {
             // ===== PROCESSANDO =====
-            message = `🏮 *Sweet Japan Treats*\n\n`;
+            message = `🏮 *Japan Express*\n\n`;
             message += `Olá ${customerName}! 👋\n\n`;
             message += `Ótima notícia! Seu pedido *${orderNumber}* está sendo preparado! 🔄\n\n`;
-            message += `🍫 Nossos doces estão sendo feitos com muito carinho e ingredientes frescos.\n\n`;
+            message += `📦 Seu pedido está sendo preparado com todo cuidado.\n\n`;
             message += `⏳ Em breve você receberá o código de rastreio para acompanhar a entrega.\n\n`;
             message += `Qualquer dúvida, estamos à disposição! 😊\n`;
-            message += `_Sweet Japan Treats - Doce de Leite Artesanal_ 🍮`;
+            message += `_Japan Express_`;
             
         } else if (req.body.status === 'confirmed') {
             // ===== PAGAMENTO CONFIRMADO =====
-            message = `🏮 *Sweet Japan Treats*\n\n`;
+            message = `🏮 *Japan Express*\n\n`;
             message += `Olá ${customerName}! 👋\n\n`;
             message += `✅ *Pagamento confirmado!*\n\n`;
             message += `Seu pedido *${orderNumber}* teve o pagamento confirmado com sucesso!\n\n`;
             message += `Já vamos começar a preparar seus doces com todo carinho! 🍫✨\n\n`;
             message += `Fique de olho, em breve enviaremos atualizações!\n\n`;
             message += `Obrigada! 💛\n`;
-            message += `_Sweet Japan Treats - Doce de Leite Artesanal_ 🍮`;
+            message += `_Japan Express_`;
             
         } else if (req.body.status === 'shipped') {
             // ===== ENVIADO + RASTREIO =====
-            message = `🏮 *Sweet Japan Treats*\n\n`;
+            message = `🏮 *Japan Express*\n\n`;
             message += `Olá ${customerName}! 👋\n\n`;
             message += `🚚 *Seu pedido foi enviado!*\n\n`;
             message += `Pedido *${orderNumber}* saiu para entrega!\n\n`;
@@ -312,30 +312,30 @@ app.post('/api/send-order-notification', async (req, res) => {
             if (req.body.carrier) {
                 message += `🏢 *Transportadora:* ${req.body.carrier}\n\n`;
             }
-            message += `📬 Logo logo seus doces estarão aí! Bom apetite! 🍮\n\n`;
-            message += `_Sweet Japan Treats - Doce de Leite Artesanal_`;
+            message += `📬 Seu pedido está a caminho!\n\n`;
+            message += `_Japan Express_`;
             
         } else if (req.body.status === 'delivered') {
             // ===== ENTREGUE + AGRADECIMENTO =====
-            message = `🏮 *Sweet Japan Treats*\n\n`;
+            message = `🏮 *Japan Express*\n\n`;
             message += `Olá ${customerName}! 👋\n\n`;
             message += `📬 *Pedido entregue!*\n\n`;
             message += `Seu pedido *${orderNumber}* foi entregue com sucesso! 🎉\n\n`;
-            message += `Esperamos que você aproveite muito nossos doces! 🍮✨\n\n`;
+            message += `Esperamos que você aproveite muito seu pedido! ✨\n\n`;
             message += `💛 *Ficamos muito felizes em tê-lo(a) como cliente!*\n\n`;
             message += `Se puder, nos conte o que achou! Sua opinião é muito importante para nós. ⭐\n\n`;
-            message += `🔄 Para fazer um novo pedido, acesse:\nhttps://sweet-japan-treats.vercel.app\n\n`;
+            message += `🔄 Para fazer um novo pedido, acesse:\nhttps://japanexpress-store.com\n\n`;
             message += `*Muito obrigada pela confiança!* 🙏💛\n`;
-            message += `_Sweet Japan Treats - Doce de Leite Artesanal_ 🍮`;
+            message += `_Japan Express_`;
             
         } else if (req.body.status === 'cancelled') {
             // ===== CANCELADO =====
-            message = `🏮 *Sweet Japan Treats*\n\n`;
+            message = `🏮 *Japan Express*\n\n`;
             message += `Olá ${customerName},\n\n`;
             message += `Informamos que o pedido *${orderNumber}* foi cancelado.\n\n`;
             message += `Se houver alguma dúvida ou se precisar de ajuda, estamos à disposição.\n\n`;
             message += `Esperamos vê-lo(a) novamente em breve! 💛\n`;
-            message += `_Sweet Japan Treats - Doce de Leite Artesanal_ 🍮`;
+            message += `_Japan Express_`;
             
         } else {
             // ===== OUTROS STATUS =====
@@ -344,24 +344,24 @@ app.post('/api/send-order-notification', async (req, res) => {
             };
             const statusMsg = statusLabels[req.body.status] || `Status: ${req.body.status}`;
             
-            message = `🏮 *Sweet Japan Treats*\n\n`;
+            message = `🏮 *Japan Express*\n\n`;
             message += `Olá ${customerName}!\n\n`;
             message += `Atualização do pedido *${orderNumber}*:\n`;
             message += `${statusMsg}\n\n`;
             message += `Qualquer dúvida, fale conosco!\n`;
-            message += `_Sweet Japan Treats_ 🍮`;
+            message += `_Japan Express_`;
         }
         
     } else if (type === 'birthday') {
-        message = `🏮 *Sweet Japan Treats*\n\n`;
+        message = `🏮 *Japan Express*\n\n`;
         message += `🎂 Feliz Aniversário, ${customerName}! 🎉\n\n`;
         message += `Para comemorar, temos um presente especial para você!\n\n`;
         if (req.body.couponCode) {
             message += `🎟️ Use o cupom *${req.body.couponCode}* e ganhe desconto na sua próxima compra!\n\n`;
         }
-        message += `Acesse: https://sweet-japan-treats.vercel.app\n\n`;
-        message += `Parabéns! 💛🍮\n`;
-        message += `_Sweet Japan Treats - Doce de Leite Artesanal_`;
+        message += `Acesse: https://japanexpress-store.com\n\n`;
+        message += `Parabéns! 💛\n`;
+        message += `_Japan Express_`;
         
     } else if (type === 'new_order_store') {
         // ===== NOTIFICAÇÃO PARA A LOJA (Paula) =====
@@ -472,7 +472,7 @@ app.post('/api/restart', async (req, res) => {
 const PORT = process.env.PORT || 3001;
 
 app.listen(PORT, () => {
-    console.log(`\n🏮 Sweet Japan Treats - WhatsApp Service`);
+    console.log(`\n🏮 Japan Express - WhatsApp Service`);
     console.log(`📡 API rodando em: http://localhost:${PORT}`);
     console.log(`📱 Iniciando conexão WhatsApp...\n`);
     

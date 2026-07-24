@@ -40,11 +40,11 @@ import CN23Modal from '@/components/admin/CN23Modal';
 import PromoNotificationModal from '@/components/admin/PromoNotificationModal';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { orderService } from '@/services/orderService';
+import type { OrderPageCursor } from '@/services/firebaseSyncService';
 import { customerService } from '@/services/customerService';
 import { requireAdminPassword } from '@/utils/adminGuard';
 import { negotiationService } from '@/services/negotiationService';
-import { usePagination } from '@/hooks/usePagination';
-import Pagination from '@/components/Pagination';
+import { COMPANY_PROFILE } from '@/config/companyProfile';
 
 const isDev = import.meta.env.DEV;
 const devLog = isDev ? console.log.bind(console) : () => {};
@@ -71,6 +71,9 @@ const Admin: React.FC = () => {
   const { toast } = useToast();
   const [allOrders, setAllOrders] = useState<any[]>([]);
   const [ordersLoading, setOrdersLoading] = useState(true);
+  const [ordersCursor, setOrdersCursor] = useState<OrderPageCursor | null>(null);
+  const [ordersHasMore, setOrdersHasMore] = useState(false);
+  const [ordersLoadingMore, setOrdersLoadingMore] = useState(false);
   const [customerCount, setCustomerCount] = useState(0);
   const [newCustomers, setNewCustomers] = useState(0);
   const [isTesting, setIsTesting] = useState(false);
@@ -82,8 +85,7 @@ const Admin: React.FC = () => {
   const [pendingNegotiationsCount, setPendingNegotiationsCount] = useState(0);
   const { settings, saveSettings } = useSiteSettings();
 
-  // Paginação da lista de pedidos (10 por página)
-  const ordersPagination = usePagination(allOrders, 10);
+  // A lista cresce em páginas reais do Firestore; nenhum carregamento integral é feito no navegador.
 
   // Admin email - apenas Paula pode acessar
   const ADMIN_EMAIL = 'dracko2007@gmail.com';
@@ -130,10 +132,34 @@ const Admin: React.FC = () => {
     });
   }, []);
 
-  const loadOrders = async () => {
-    const orders = await orderService.getAllOrdersAsync();
-    setAllOrders(orders);
-    setOrdersLoading(false);
+  const loadOrders = async (append = false) => {
+    if (append && (!ordersHasMore || ordersLoadingMore)) return;
+
+    append ? setOrdersLoadingMore(true) : setOrdersLoading(true);
+    try {
+      const page = await orderService.getOrdersPage(20, append ? ordersCursor : null);
+      setAllOrders((current) => {
+        if (!append) return page.items;
+        const known = new Set(current.map((order) => order.orderNumber || order.id));
+        return [...current, ...page.items.filter((order) => !known.has(order.orderNumber || order.id))];
+      });
+      setOrdersCursor(page.nextCursor);
+      setOrdersHasMore(page.hasMore);
+    } catch (error) {
+      devError('[ADMIN] Falha ao carregar pedidos:', error);
+      if (!append) {
+        setAllOrders([]);
+        setOrdersCursor(null);
+        setOrdersHasMore(false);
+      }
+      toast({
+        title: 'Erro ao carregar pedidos',
+        description: 'Não foi possível consultar o Firestore. Tente novamente.',
+        variant: 'destructive',
+      });
+    } finally {
+      append ? setOrdersLoadingMore(false) : setOrdersLoading(false);
+    }
   };
 
   const loadCustomers = async () => {
@@ -177,7 +203,6 @@ const Admin: React.FC = () => {
     // Confirma pagamento E muda status para 'confirmed' (etapa 1)
     const success = await orderService.confirmPayment(orderNumber, user.email);
     if (success) {
-      await orderService.updateOrderStatus(orderNumber, 'confirmed');
       toast({
         title: "✅ Pagamento confirmado!",
         description: `Pedido ${orderNumber} marcado como pago e pronto para processar.`,
@@ -330,11 +355,11 @@ const Admin: React.FC = () => {
           formData: {
             name: 'Test User',
             email: ADMIN_EMAIL,
-            phone: '070-1367-1679',
-            postalCode: '518-0225',
-            prefecture: 'Mie',
-            city: 'Iga',
-            address: 'Test Address',
+            phone: COMPANY_PROFILE.whatsapp.domestic,
+            postalCode: COMPANY_PROFILE.fulfillmentOrigin.postalCode,
+            prefecture: COMPANY_PROFILE.fulfillmentOrigin.prefecture,
+            city: COMPANY_PROFILE.fulfillmentOrigin.city,
+            address: COMPANY_PROFILE.fulfillmentOrigin.addressLine1,
             building: ''
           },
           items: [],
@@ -608,11 +633,10 @@ _This is an automated test message_
           <div class="row">
             <div class="box">
               <h3>📤 REMETENTE (ご依頼主)</h3>
-              <p class="strong">Paula Shiokawa</p>
-              <p>〒518-0225</p>
-              <p>三重県 伊賀市</p>
-              <p>桐ヶ丘 5-292</p>
-              <p>📞 070-1367-1679</p>
+              <p class="strong">${COMPANY_PROFILE.contactName}</p>
+              <p>〒${COMPANY_PROFILE.fulfillmentOrigin.postalCode}</p>
+              <p>${COMPANY_PROFILE.fulfillmentOrigin.formattedJa.replace(`〒${COMPANY_PROFILE.fulfillmentOrigin.postalCode} `, '')}</p>
+              <p>📞 ${COMPANY_PROFILE.whatsapp.domestic}</p>
             </div>
             
             <div class="box">
@@ -656,7 +680,7 @@ _This is an automated test message_
   const tabGroups: { title: string; items: AdminTabItem[] }[] = [
     { title: 'Visão geral', items: [{ id: 'dashboard', label: 'Dashboard', icon: BarChart3 }] },
     { title: 'Vendas', items: [
-      { id: 'orders', label: 'Pedidos', icon: Package, badge: pendingOrdersCount },
+      { id: 'orders', label: 'Pedidos', icon: Package, badge: ordersHasMore ? undefined : pendingOrdersCount },
       { id: 'negotiations', label: 'Negociações', icon: Handshake, badge: pendingNegotiationsCount || 0 },
       { id: 'customers', label: 'Clientes', icon: Users, badge: newCustomers },
       { id: 'affiliates', label: 'Afiliados', icon: Megaphone },
@@ -826,7 +850,7 @@ _This is an automated test message_
               <div className="bg-card rounded-2xl border border-border p-6">
                 <div className="flex items-center gap-3 mb-2">
                   <ShoppingBag className="w-6 h-6 text-primary" />
-                  <h3 className="font-semibold text-lg">Total de Pedidos</h3>
+                  <h3 className="font-semibold text-lg">Pedidos carregados</h3>
                 </div>
                 <p className="text-3xl font-bold">{allOrders.length}</p>
               </div>
@@ -834,7 +858,7 @@ _This is an automated test message_
               <div className="bg-card rounded-2xl border border-border p-6">
                 <div className="flex items-center gap-3 mb-2">
                   <Package className="w-6 h-6 text-yellow-600" />
-                  <h3 className="font-semibold text-lg">Pendentes</h3>
+                  <h3 className="font-semibold text-lg">Pendentes carregados</h3>
                 </div>
                 <p className="text-3xl font-bold text-yellow-600">
                   {allOrders.filter(o => o.status === 'pending').length}
@@ -844,7 +868,7 @@ _This is an automated test message_
               <div className="bg-card rounded-2xl border border-border p-6">
                 <div className="flex items-center gap-3 mb-2">
                   <Calendar className="w-6 h-6 text-green-600" />
-                  <h3 className="font-semibold text-lg">Hoje</h3>
+                  <h3 className="font-semibold text-lg">Hoje (carregados)</h3>
                 </div>
                 <p className="text-3xl font-bold text-green-600">
                   {allOrders.filter(o => {
@@ -873,8 +897,8 @@ _This is an automated test message_
                   <p className="text-muted-foreground">Nenhum pedido encontrado</p>
                 </div>
               ) : (
-                ordersPagination.pageItems.map((order, index) => (
-                  <div key={index} className="bg-card rounded-2xl border border-border p-6 hover:shadow-lg transition-shadow">
+                allOrders.map((order, index) => (
+                  <div key={order.orderNumber || order.id} className="bg-card rounded-2xl border border-border p-6 hover:shadow-lg transition-shadow">
                     <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 mb-4">
                       <div className="flex-1">
                         <div className="flex items-center gap-3 mb-2">
@@ -1132,16 +1156,17 @@ _This is an automated test message_
                 ))
               )}
 
-              {allOrders.length > 0 && (
-                <Pagination
-                  page={ordersPagination.page}
-                  totalPages={ordersPagination.totalPages}
-                  onPageChange={ordersPagination.setPage}
-                  rangeStart={ordersPagination.rangeStart}
-                  rangeEnd={ordersPagination.rangeEnd}
-                  total={ordersPagination.total}
-                  className="pt-4"
-                />
+              {allOrders.length > 0 && ordersHasMore && (
+                <div className="flex justify-center pt-4">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => void loadOrders(true)}
+                    disabled={ordersLoadingMore}
+                  >
+                    {ordersLoadingMore ? 'Carregando...' : 'Carregar mais pedidos'}
+                  </Button>
+                </div>
               )}
             </div>
             </>

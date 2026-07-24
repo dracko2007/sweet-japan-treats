@@ -29,6 +29,7 @@ import { psFeeWaiver, PS_FEE_WAIVER_EVENT } from '@/utils/psFeeWaiver';
 import { productEnglishName } from '@/utils/productName';
 import { isValidEmail, isValidCPF, isValidPhone, isNonEmpty, maskPhone, runValidations, FieldErrors } from '@/utils/validation';
 import { calcImportTax } from '@/utils/taxRules';
+import { trackBeginCheckout } from '@/lib/analytics';
 
 const isDev = import.meta.env.DEV;
 const devLog = isDev ? console.log.bind(console) : () => {};
@@ -38,6 +39,24 @@ const devError = isDev ? console.error.bind(console) : () => {};
 
 const Checkout: React.FC = () => {
   const { items, totalPrice } = useCart();
+  const hasTrackedBeginCheckout = useRef(false);
+
+  // Dispara begin_checkout (GA4 + Meta Pixel) uma única vez ao montar a página,
+  // apenas se o carrinho não estiver vazio.
+  useEffect(() => {
+    if (hasTrackedBeginCheckout.current || items.length === 0) return;
+    hasTrackedBeginCheckout.current = true;
+    trackBeginCheckout(
+      'JPY',
+      totalPrice,
+      items.map((i) => ({
+        item_id: i.product.id,
+        item_name: i.product.name,
+        quantity: i.quantity,
+        item_category: i.product.category,
+      })),
+    );
+  }, []);
   const { user, isAuthenticated, authReady } = useUser();
   const navigate = useNavigate();
   const location = useLocation();
@@ -443,7 +462,6 @@ const Checkout: React.FC = () => {
     }
     setNegSubmitting(true);
     try {
-      const autoApprove = negModalType === 'ps_fee' && requestedYen <= 300 * psFeeQty;
       // Freeze the exchange rate at this exact moment so approved ¥ → R$ never drifts
       const rates = getRates();
       const frozenRate = currency === 'EUR' ? rates.EUR : currency === 'USD' ? rates.USD : currency === 'JPY' ? 1 : rates.BRL;
@@ -487,24 +505,18 @@ const Checkout: React.FC = () => {
         numUnits: totalQty,
         requestedDiscountYen: requestedYen,
         clientNote: negNote || '',
-        approvedDiscountYen: autoApprove ? requestedYen : null,
+        approvedDiscountYen: null,
         adminNote: '',
-        status: autoApprove ? 'auto_approved' : 'pending',
-        autoApproved: autoApprove,
-        approvedBy: autoApprove ? 'auto' : '',
-        approvedAt: autoApprove ? new Date().toISOString() : null,
-        clientNotified: autoApprove,
+        status: 'pending',
+        autoApproved: false,
+        approvedBy: '',
+        approvedAt: null,
+        clientNotified: false,
         clientSeen: false,
       });
       setActiveNegId(neg.id);
       setActiveNeg(neg);
-      if (autoApprove) {
-        if (negModalType === 'ps_fee') setPsFeeDiscountYen(requestedYen);
-        else setShippingDiscountYen(requestedYen);
-        toast({ title: '✅ Desconto aprovado automaticamente!', description: `Taxa PS reduzida em ¥${requestedYen.toLocaleString()}` });
-      } else {
-        toast({ title: '📩 Solicitação enviada!', description: 'A vendedora irá analisar e responder em breve.' });
-      }
+      toast({ title: '📩 Solicitação enviada!', description: 'A vendedora irá analisar e responder em breve.' });
       setNegModalType(null);
       setNegRequest('');
       setNegNote('');

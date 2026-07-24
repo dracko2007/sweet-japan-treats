@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Printer, FileText, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { getRates } from '@/services/fxService';
+import { COMPANY_PROFILE } from '@/config/companyProfile';
 
 interface CN23Item {
   description: string;
@@ -18,11 +19,11 @@ interface CN23ModalProps {
 }
 
 const DEFAULT_SENDER = {
-  name: 'Paula Shiokawa / Japan Express',
-  address: 'Kirigaoka 5-292, Iga-shi, Mie-ken 518-0225',
-  country: 'Japan',
-  phone: '+81 70-1367-1679',
-  email: 'contato@japanexpress-store.com',
+  name: `${COMPANY_PROFILE.contactName} / ${COMPANY_PROFILE.brand}`,
+  address: COMPANY_PROFILE.fulfillmentOrigin.formatted,
+  country: COMPANY_PROFILE.fulfillmentOrigin.country,
+  phone: COMPANY_PROFILE.whatsapp.international,
+  email: COMPANY_PROFILE.email,
 };
 
 // Basic JP→EN product category hints

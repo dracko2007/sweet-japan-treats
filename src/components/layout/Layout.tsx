@@ -1,10 +1,15 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { useLocation } from 'react-router-dom';
 import Header from './Header';
 import Footer from './Footer';
 import AdminPreviewBar from './AdminPreviewBar';
-import KimiClawAssistant from '../KimiClawAssistant';
 import { useBirthdayBonus } from '@/hooks/useBirthdayBonus';
+import OrganizationJsonLd from '@/components/OrganizationJsonLd';
+
+// Widget não-crítico (chat flutuante): carregado sob demanda para manter o
+// chunk compartilhado (Layout) leve. Ausência momentânea do botão não afeta
+// o conteúdo principal da página — fallback null é apropriado aqui.
+const KimiClawAssistant = lazy(() => import('../KimiClawAssistant'));
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -16,6 +21,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   useBirthdayBonus(); // concede 1000 pts no aniversário
   return (
     <div className="min-h-screen flex flex-col w-full max-w-full overflow-x-clip">
+      <OrganizationJsonLd />
       <Header />
       {/* Cliente mobile: barra de confiança (~28px) + topo (80px) = 108px.
           Desktop também inclui a navegação (~32px), totalizando ~140px.
@@ -24,7 +30,11 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         {children}
       </main>
       <Footer />
-      {!isAdminPage && <KimiClawAssistant />}
+      {!isAdminPage && (
+        <Suspense fallback={null}>
+          <KimiClawAssistant />
+        </Suspense>
+      )}
       <AdminPreviewBar />
     </div>
   );

@@ -49,7 +49,7 @@ export const addAddressHintsSync = (text: string): string => {
   // Separate complete city names from generic suffixes
   const cityNames: { [key: string]: string } = {
     // Cities
-    '伊賀市': 'Iga-shi',
+    '福山市': 'Fukuyama-shi',
     '名古屋市': 'Nagoya-shi',
     '大阪市': 'Osaka-shi',
     '東京都': 'Tokyo-to',
@@ -60,8 +60,6 @@ export const addAddressHintsSync = (text: string): string => {
     '福岡市': 'Fukuoka-shi',
     '仙台市': 'Sendai-shi',
     // Common districts/neighborhoods
-    '桐ケ丘': 'Kirigaoka',
-    '桐ヶ丘': 'Kirigaoka',
     '千代田区': 'Chiyoda-ku',
     '中央区': 'Chuo-ku',
     '港区': 'Minato-ku',

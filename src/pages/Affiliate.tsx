@@ -275,24 +275,6 @@ const AffiliatePage: React.FC = () => {
 
             <div className="p-6 space-y-5 max-h-[70vh] overflow-y-auto">
 
-              {/* Vídeo do YouTube (quando tiver) */}
-              {(() => {
-                // URL do vídeo explicativo — troque pelo link real quando gravar
-                const videoUrl = '';
-                if (!videoUrl) return null;
-                const m = videoUrl.match(/(?:youtube\.com\/(?:watch\?v=|shorts\/)|youtu\.be\/)([\w-]{11})/);
-                if (!m) return null;
-                return (
-                  <div className="relative w-full aspect-video rounded-xl overflow-hidden border border-border">
-                    <iframe
-                      src={`https://www.youtube.com/embed/${m[1]}?autoplay=1`}
-                      className="absolute inset-0 w-full h-full"
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                      allowFullScreen
-                    />
-                  </div>
-                );
-              })()}
 
               {/* Como funciona */}
               <div className="bg-secondary/40 rounded-xl p-4 text-sm space-y-2">

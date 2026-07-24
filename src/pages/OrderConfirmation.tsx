@@ -2,7 +2,7 @@ import { safeStorage } from '@/utils/storage';
 import React, { useEffect, useState } from 'react';
 import { useLanguage } from '@/context/LanguageContext';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { CheckCircle, Home, Mail, Printer, Copy, AlertCircle, Smartphone, CreditCard, FileText, Landmark, Wallet, ExternalLink } from 'lucide-react';
+import { CheckCircle, Home, Mail, Printer, Copy, AlertCircle, Smartphone, CreditCard, FileText, Landmark, Wallet, ExternalLink, Gift } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -10,17 +10,22 @@ import { QRCodeSVG } from 'qrcode.react';
 import { formatPrice } from '@/utils/currency';
 import { paymentSettingsService } from '@/services/paymentSettingsService';
 import { buildPixPayload } from '@/utils/pixPayload';
+import { trackPurchase } from '@/lib/analytics';
+import { useUser } from '@/context/UserContext';
+import { referralService } from '@/services/referralService';
 
 const OrderConfirmation: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
   const { t } = useLanguage();
+  const { user } = useUser();
   const order = location.state?.order;
   const isGuest = !!location.state?.isGuest;
   const [showGuestModal, setShowGuestModal] = useState(isGuest);
 
   const [copied, setCopied] = useState(false);
+  const [referralCopied, setReferralCopied] = useState(false);
   const [wiseLink, setWiseLink] = useState('');
   const [pixSettings, setPixSettings] = useState({ pixKey: '', pixReceiverName: 'Japan Express', pixCity: 'Sao Paulo' });
 
@@ -37,6 +42,26 @@ const OrderConfirmation: React.FC = () => {
       navigate('/', { replace: true });
     }
   }, [order, navigate]);
+
+  // Dispara purchase (GA4 + Meta Pixel) uma única vez por pedido — a guarda por
+  // sessionStorage evita recontar a mesma compra em reload/voltar a esta página.
+  useEffect(() => {
+    if (!order) return;
+    const guardKey = `analytics_purchase_${order.id}`;
+    if (sessionStorage.getItem(guardKey)) return;
+    sessionStorage.setItem(guardKey, '1');
+    trackPurchase(
+      order.id,
+      order.currency,
+      order.total,
+      (order.items || []).map((item: { productId: string; productName: string; quantity: number; price: number; unitYen: number }) => ({
+        item_id: item.productId,
+        item_name: item.productName,
+        quantity: item.quantity,
+        price: item.price,
+      })),
+    );
+  }, [order]);
 
   if (!order) return null;
 
@@ -68,6 +93,16 @@ const OrderConfirmation: React.FC = () => {
     setTimeout(() => setCopied(false), 3000);
   };
 
+  const copyReferralLink = () => {
+    if (!user?.id) return;
+    navigator.clipboard.writeText(referralService.getReferralLink(user.id));
+    setReferralCopied(true);
+    toast({
+      title: t('orderConfirmation.referral.copied'),
+    });
+    setTimeout(() => setReferralCopied(false), 3000);
+  };
+
 
   const handlePrint = () => {
     window.print();
@@ -96,6 +131,29 @@ const OrderConfirmation: React.FC = () => {
                   : t('order.thanks')}
               </p>
             </div>
+
+            {/* Referral CTA — só para cliente logado (não-guest); guest não tem
+                userId estável para gerar link de indicação. */}
+            {!isGuest && user?.id && (
+              <div className="mb-8 print:hidden bg-gradient-to-r from-pink-50 to-amber-50 border border-pink-200 rounded-2xl p-5 flex flex-col sm:flex-row items-center gap-4">
+                <div className="w-12 h-12 rounded-full bg-pink-100 flex items-center justify-center shrink-0">
+                  <Gift className="w-6 h-6 text-pink-600" />
+                </div>
+                <div className="flex-1 text-center sm:text-left">
+                  <p className="font-display font-bold text-gray-900">{t('orderConfirmation.referral.title')}</p>
+                  <p className="text-sm text-muted-foreground">{t('orderConfirmation.referral.description')}</p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="shrink-0 gap-2"
+                  onClick={copyReferralLink}
+                >
+                  {referralCopied ? <CheckCircle className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
+                  {t('orderConfirmation.referral.copyButton')}
+                </Button>
+              </div>
+            )}
 
             {/* PAYMENT SCREENS */}
 
@@ -267,7 +325,7 @@ const OrderConfirmation: React.FC = () => {
                   </div>
                   <h3 className="font-sans font-bold text-lg text-green-800">Transação de Cartão Aprovada!</h3>
                   <p className="text-xs text-green-700 max-w-sm mx-auto leading-relaxed">
-                    Seu pagamento foi confirmado com sucesso. O pedido foi enviado para separação no porto logístico de Tóquio.
+                    Seu pagamento foi confirmado com sucesso. O pedido foi enviado para separação no centro logístico de Hiroshima.
                   </p>
                   <button
                     onClick={() => navigate('/rastrear')}

@@ -207,7 +207,7 @@ const CouponManager: React.FC = () => {
                   expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
                   isUsed: false,
                 };
-                couponService.create({ code: 'TESTE20', type: 'percent', discountPercent: 20, description: 'Cupom de teste', isActive: true, targetType: 'all', expiryDate: profileCoupon.expiresAt });
+                couponService.create({ code: 'TESTE20', type: 'percent', discount: 0, discountPercent: 20, description: 'Cupom de teste', isActive: true, targetType: 'all', expiryDate: profileCoupon.expiresAt });
                 // Adiciona imediatamente ao perfil do admin logado (sem precisar de reload)
                 addCoupon(profileCoupon as any);
                 const res = await firebaseSyncService.grantCouponToAllUsers(profileCoupon);

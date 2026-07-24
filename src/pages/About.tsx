@@ -2,6 +2,7 @@ import React from 'react';
 import { Heart, Star, Users, Award, MessageCircle, MapPin, Mail, Phone } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import { useLanguage } from '@/context/LanguageContext';
+import { COMPANY_PROFILE } from '@/config/companyProfile';
 
 const About: React.FC = () => {
   const { t } = useLanguage();
@@ -32,7 +33,7 @@ const About: React.FC = () => {
                 </div>
                 <div className="absolute -bottom-5 -left-5 bg-card rounded-2xl shadow-card px-4 py-3 flex items-center gap-2">
                   <MapPin className="w-4 h-4 text-primary shrink-0" />
-                  <span className="text-sm font-semibold text-foreground">Fukuyama, Hiroshima 🇯🇵</span>
+                  <span className="text-sm font-semibold text-foreground">{COMPANY_PROFILE.fulfillmentOrigin.shortPt} 🇯🇵</span>
                 </div>
               </div>
             </div>
@@ -101,11 +102,11 @@ const About: React.FC = () => {
               </div>
               <h3 className="font-semibold text-foreground">{t('aboutPage.contact.addressLabel')}</h3>
               <p className="text-sm text-muted-foreground leading-relaxed">
-                〒720 広島県福山市<br />駅家町下山守257-18 🇯🇵
+                {COMPANY_PROFILE.fulfillmentOrigin.formatted} 🇯🇵
               </p>
             </div>
             <a
-              href="https://wa.me/817013671679"
+              href={`https://wa.me/${COMPANY_PROFILE.whatsapp.digits}`}
               target="_blank"
               rel="noopener noreferrer"
               className="flex flex-col items-center gap-3 p-6 rounded-2xl border border-border bg-card text-center hover:border-green-500/50 hover:bg-green-50 dark:hover:bg-green-950/20 transition-colors group"
@@ -114,17 +115,17 @@ const About: React.FC = () => {
                 <MessageCircle className="w-6 h-6 text-green-600" />
               </div>
               <h3 className="font-semibold text-foreground">{t('aboutPage.contact.whatsappLabel')}</h3>
-              <p className="text-sm text-muted-foreground">+81 70-1367-1679</p>
+              <p className="text-sm text-muted-foreground">{COMPANY_PROFILE.whatsapp.international}</p>
             </a>
             <a
-              href="mailto:contato@japanexpress-store.com"
+              href={`mailto:${COMPANY_PROFILE.email}`}
               className="flex flex-col items-center gap-3 p-6 rounded-2xl border border-border bg-card text-center hover:border-primary/50 hover:bg-primary/5 transition-colors group"
             >
               <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
                 <Mail className="w-6 h-6 text-primary" />
               </div>
               <h3 className="font-semibold text-foreground">{t('aboutPage.contact.emailLabel')}</h3>
-              <p className="text-sm text-muted-foreground break-all">contato@japanexpress-store.com</p>
+              <p className="text-sm text-muted-foreground break-all">{COMPANY_PROFILE.email}</p>
             </a>
           </div>
         </div>

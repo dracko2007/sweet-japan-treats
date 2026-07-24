@@ -45,7 +45,7 @@ const AdminAccessManager: React.FC = () => {
 
   const add = async () => {
     if (!name.trim()) { toast({ title: 'Informe o nome de usuário do admin', variant: 'destructive' }); return; }
-    if (password.length < 4) { toast({ title: 'Senha muito curta', description: 'Mínimo 4 caracteres.', variant: 'destructive' }); return; }
+    if (password.length < 8) { toast({ title: 'Senha muito curta', description: 'Mínimo 8 caracteres.', variant: 'destructive' }); return; }
     if (!(await requireAdminPassword(`adicionar o admin ${name}`))) return;
     setSaving(true);
     const res = await adminService.addAdmin(name, password, role, user?.name || '');

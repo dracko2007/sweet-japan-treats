@@ -12,8 +12,9 @@ import { askQwen, qwenEnabled, QwenMsg, AdminCatalogItem } from '@/services/qwen
 import { productEnglishName } from '@/utils/productName';
 import { effectiveYen } from '@/utils/pricing';
 import { catalogShippingYen } from '@/utils/catalogShipping';
+import { getELightRate, getAirParcelRate, getEmsRate, countryToZone } from '@/utils/japanPostRates';
 import { convertYen as fxConvert } from '@/services/fxService';
-import { orderService } from '@/services/orderService';
+import { authenticatedFetch } from '@/services/authenticatedFetch';
 import { toast } from 'sonner';
 
 interface ShippingOption {
@@ -71,6 +72,9 @@ const KimiClawAssistant: React.FC = () => {
   const [isTyping, setIsTyping] = useState(false);
   const [currentSteps, setCurrentSteps] = useState<string[]>([]);
   const [showAttentionBadge, setShowAttentionBadge] = useState(true);
+  const fabButtonRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const wasOpenRef = useRef(false);
   // Pedidos cujo consentimento já foi respondido (esconde os botões Sim/Não)
   const [respondedOrders, setRespondedOrders] = useState<string[]>([]);
 
@@ -155,11 +159,21 @@ const KimiClawAssistant: React.FC = () => {
     };
   }, [messages, isTyping, isOpen, inputValue, clearConversation]);
 
-  // Hide attention badge when chat is opened
+  // Hide attention badge when chat is opened; gerencia foco e tecla Escape
+  // para acessibilidade por teclado (WCAG 2.1.1 / 2.1.2).
   useEffect(() => {
     if (isOpen) {
       setShowAttentionBadge(false);
+      wasOpenRef.current = true;
+      panelRef.current?.focus();
+      const onKeyDown = (e: KeyboardEvent) => {
+        if (e.key === 'Escape') setIsOpen(false);
+      };
+      document.addEventListener('keydown', onKeyDown);
+      return () => document.removeEventListener('keydown', onKeyDown);
     }
+    if (wasOpenRef.current) fabButtonRef.current?.focus();
+    wasOpenRef.current = false;
   }, [isOpen]);
 
   // Listen to order confirmation page lands (mostra a mensagem só uma vez por pedido)
@@ -240,19 +254,22 @@ const KimiClawAssistant: React.FC = () => {
       .map((t) => t.trim())
       .filter((t) => t.length >= 2 && !STOP_WORDS.has(t));
 
-  // Search for products based on query (pontua por palavra → bem mais tolerante)
-  const searchProducts = (query: string, opts?: { requireStrong?: boolean }): Product[] => {
+  // Pontua produtos por relevância à query (pontua por palavra → bem mais tolerante).
+  // Base reutilizada tanto pela busca determinística (searchProducts) quanto pelo
+  // filtro de catálogo relevante mandado pra IA (relevantCatalogForAI) — mesma
+  // lógica de match em ambos os casos, sem duplicar.
+  const categoryAliases: Record<string, string[]> = {
+    'doces': ['doce', 'snack', 'chocolate', 'candy', 'sweet', 'お菓子', 'okashi', 'kitkat', 'kit kat', 'pocky', 'jagariko', 'calbee', 'nestle', 'meiji', 'glico'],
+    'cosmeticos': ['cosmetico', 'skincare', 'protetor', 'creme', 'mascara', 'skin', 'lotion', 'コスメ', '化粧品', 'biore', 'hada', 'dhc', 'shiseido'],
+    'acessorios': ['acessorio', 'figura', 'boneco', 'figure', 'anime', 'plush', 'アクセサリー', 'グッズ', 'luffy', 'naruto', 'demon', 'pokemon'],
+    'papelaria': ['caneta', 'caderno', 'pen', 'notebook', 'paper', 'notepad', '文房具', 'sakura', 'tombow', 'kokuyo', 'pilot', 'zebra'],
+  };
+
+  const scoreProducts = (query: string): { product: Product; score: number; strong: number }[] => {
     const tokens = tokenize(query);
     if (tokens.length === 0) return [];
 
-    const categoryAliases: Record<string, string[]> = {
-      'doces': ['doce', 'snack', 'chocolate', 'candy', 'sweet', 'お菓子', 'okashi', 'kitkat', 'kit kat', 'pocky', 'jagariko', 'calbee', 'nestle', 'meiji', 'glico'],
-      'cosmeticos': ['cosmetico', 'skincare', 'protetor', 'creme', 'mascara', 'skin', 'lotion', 'コスメ', '化粧品', 'biore', 'hada', 'dhc', 'shiseido'],
-      'acessorios': ['acessorio', 'figura', 'boneco', 'figure', 'anime', 'plush', 'アクセサリー', 'グッズ', 'luffy', 'naruto', 'demon', 'pokemon'],
-      'papelaria': ['caneta', 'caderno', 'pen', 'notebook', 'paper', 'notepad', '文房具', 'sakura', 'tombow', 'kokuyo', 'pilot', 'zebra'],
-    };
-
-    const scored = products.map((product) => {
+    return products.map((product) => {
       let score = 0;
       let strong = 0; // só nome/id/categoria/marca/sabor (sinal forte de produto)
       const nId = normalizeText(product.id);
@@ -274,13 +291,26 @@ const KimiClawAssistant: React.FC = () => {
       });
 
       return { product, score, strong };
-    });
+    }).sort((a, b) => b.score - a.score);
+  };
 
-    return scored
+  // Search for products based on query (pontua por palavra → bem mais tolerante)
+  const searchProducts = (query: string, opts?: { requireStrong?: boolean }): Product[] =>
+    scoreProducts(query)
       .filter((item) => (opts?.requireStrong ? item.strong > 0 : item.score > 0))
-      .sort((a, b) => b.score - a.score)
       .slice(0, 5)
       .map((item) => item.product);
+
+  // Catálogo relevante pra mandar como contexto pra IA — reusa o MESMO scoring da
+  // busca determinística, mas com limite maior (contexto da IA, não cards visuais)
+  // e SEM exigir score > 0: se a pergunta é genérica/conversacional (sem termo de
+  // produto), manda uma amostra ampla do catálogo em vez de nada, senão a IA fica
+  // sem contexto nenhum pra responder "o que vocês vendem" etc.
+  const relevantCatalogForAI = (query: string, limit = 30): Product[] => {
+    const scored = scoreProducts(query);
+    const withScore = scored.filter((item) => item.score > 0);
+    if (withScore.length > 0) return withScore.slice(0, limit).map((item) => item.product);
+    return products.filter((p) => !p.hidden).slice(0, limit);
   };
 
   // Detecta intenção de navegar por CATEGORIA ("quais doces tem", "me mostra cosméticos")
@@ -319,7 +349,14 @@ const KimiClawAssistant: React.FC = () => {
     return true;
   };
 
-  // Calculate shipping options for a given country and weight
+  // Frete REAL por país e peso — mesma tabela do Japan Post usada no Checkout,
+  // no feed do Google e no orçamento (getELightRate/getAirParcelRate/getEmsRate).
+  // Antes esta função inventava fórmula linear (base + R$/kg) com nomes de
+  // transportadora que não existem no sistema real ("PAC", "Prioritário") — dava
+  // até 5,6x o valor real do frete. Japão doméstico retorna [] de propósito: o
+  // preço real depende da província exata de entrega (zona 1-4 de Hiroshima) e
+  // essa informação não é coletada aqui — o chamador orienta a usar a calculadora
+  // real em vez de mostrar um valor chutado.
   const calculateShipping = (country: string, weightKg: number): ShippingOption[] => {
     const normalizedCountry = normalizeText(country);
 
@@ -332,40 +369,71 @@ const KimiClawAssistant: React.FC = () => {
     else if (normalizedCountry.includes('italia') || normalizedCountry.includes('italy') || normalizedCountry.includes('it')) detectedCountry = 'Itália';
     else if (normalizedCountry.includes('espanha') || normalizedCountry.includes('spain') || normalizedCountry.includes('es')) detectedCountry = 'Espanha';
 
+    if (detectedCountry === 'Japão') return [];
+
+    const zone = countryToZone(detectedCountry);
+    const currency: 'BRL' | 'EUR' = ['Portugal', 'França', 'Itália', 'Espanha'].includes(detectedCountry) ? 'EUR' : 'BRL';
+    const weightG = Math.max(100, Math.round(weightKg * 1000));
+    const daysByZone: Record<number, { light: string; air: string; ems: string }> = {
+      1: { light: '6-10', air: '4-7', ems: '2-4' },
+      2: { light: '7-12', air: '5-9', ems: '3-5' },
+      3: { light: '7-14', air: '6-10', ems: '4-7' },
+      4: { light: '7-14', air: '6-10', ems: '3-6' },
+      5: { light: '20-40', air: '10-15', ems: '18' },
+    };
+    const zd = daysByZone[zone] || daysByZone[5];
     const options: ShippingOption[] = [];
 
-    if (detectedCountry === 'Brasil') {
-      options.push(
-        { carrier: 'PAC', basePrice: 120, ratePerKg: 35, currency: 'BRL', daysEstimate: '5-7' },
-        { carrier: 'EMS (Express)', basePrice: 220, ratePerKg: 60, currency: 'BRL', daysEstimate: '2-4' },
-        { carrier: 'Prioritário', basePrice: 350, ratePerKg: 85, currency: 'BRL', daysEstimate: '1-3' }
-      );
-    } else if (detectedCountry === 'Japão') {
-      options.push(
-        { carrier: 'Japan Post (ゆうパック)', basePrice: 700, ratePerKg: 150, currency: 'JPY', daysEstimate: '1-2' },
-        { carrier: 'Yamato (ヤマト)', basePrice: 800, ratePerKg: 180, currency: 'JPY', daysEstimate: '1-3' }
-      );
+    if (weightG <= 2000) {
+      const eLightYen = getELightRate(weightG, zone);
+      if (eLightYen) {
+        options.push({
+          carrier: 'Japan Post E-Light (国際eパケットライト)',
+          basePrice: Math.round(fxConvert(eLightYen, currency)),
+          ratePerKg: 0,
+          currency,
+          daysEstimate: zd.light,
+        });
+      }
     } else {
-      // Europe
-      options.push(
-        { carrier: 'Local Post', basePrice: 20, ratePerKg: 6, currency: 'EUR', daysEstimate: '5-7' },
-        { carrier: 'Express EMS', basePrice: 35, ratePerKg: 10, currency: 'EUR', daysEstimate: '2-4' }
-      );
+      const airYen = getAirParcelRate(weightG, zone);
+      if (airYen) {
+        options.push({
+          carrier: 'Japan Post Kozutsumi Air (国際小包航空便)',
+          basePrice: Math.round(fxConvert(airYen, currency)),
+          ratePerKg: 0,
+          currency,
+          daysEstimate: zd.air,
+        });
+      }
     }
 
-    return options.map(opt => ({
-      ...opt,
-      basePrice: Math.round(opt.basePrice + opt.ratePerKg * weightKg)
-    }));
+    const emsYen = getEmsRate(weightG, zone);
+    if (emsYen) {
+      options.push({
+        carrier: 'Japan Post EMS · via DHL',
+        basePrice: Math.round(fxConvert(emsYen, currency)),
+        ratePerKg: 0,
+        currency,
+        daysEstimate: zd.ems,
+      });
+    }
+
+    return options;
   };
 
-  const addKimiMessageWithTyping = async (text: string, agentSteps?: string[], delayMs = 1500) => {
+  // Atraso da resposta: hoje é 100% lógica local instantânea (sem chamada de IA
+  // real desde que qwenEnabled()===false), então o atraso é só ritmo de UX, não
+  // espera de rede. Valores reduzidos (eram 1500ms base + 800ms/passo — quase 4s
+  // num fluxo de 3 passos) mantêm a animação de "passos do agente" visível sem
+  // travar a conversa artificialmente.
+  const addKimiMessageWithTyping = async (text: string, agentSteps?: string[], delayMs = 400) => {
     setIsTyping(true);
     if (agentSteps) {
       // Step-by-step animation for agent execution
       for (let i = 0; i < agentSteps.length; i++) {
         setCurrentSteps(prev => [...prev, agentSteps[i]]);
-        await new Promise(resolve => setTimeout(resolve, 800));
+        await new Promise(resolve => setTimeout(resolve, 350));
       }
     }
     await new Promise(resolve => setTimeout(resolve, delayMs));
@@ -382,7 +450,11 @@ const KimiClawAssistant: React.FC = () => {
     ]);
   };
 
-  // Pergunta à IA (Groq) com o histórico recente + catálogo. Admin recebe catálogo completo com pesos/custos.
+  // Pergunta à IA com o histórico recente + catálogo PRÉ-FILTRADO por relevância à
+  // pergunta (não os primeiros N do array — os mais relevantes de verdade, mesmo
+  // scoring usado na busca determinística). Admin recebe um recorte maior, com
+  // custo/peso/status oculto. A IA nunca recebe nem calcula frete/orçamento —
+  // isso é 100% determinístico em outro lugar deste arquivo.
   const aiAnswer = async (userText: string): Promise<string | null> => {
     if (!qwenEnabled()) return null;
     const history: QwenMsg[] = messages
@@ -394,9 +466,8 @@ const KimiClawAssistant: React.FC = () => {
     const symbol = code === 'JPY' ? '¥' : code === 'EUR' ? '€' : 'R$';
     const locale = { country: selectedCountry, currencyCode: code, currencySymbol: symbol };
 
-    // Catálogo público (produtos visíveis) — enviado sempre.
-    // Inclui peso estimado (g) para a IA poder calcular frete e filtrar por orçamento.
-    const catalog = products
+    const relevant = relevantCatalogForAI(userText, isAdmin ? 60 : 30);
+    const catalog = relevant
       .filter((p) => !p.hidden)
       .map((p) => {
         const wt = p.weightGrams || (WEIGHT_BY_CATEGORY[p.category] || DEFAULT_WEIGHT).small;
@@ -404,8 +475,8 @@ const KimiClawAssistant: React.FC = () => {
       });
 
     if (isAdmin) {
-      // Admin recebe TODOS os produtos (incluindo ocultos), com custo e peso estimado
-      const adminCatalog: AdminCatalogItem[] = products.map((p) => {
+      // Admin recebe o mesmo recorte relevante, mas incluindo ocultos/custo/peso real
+      const adminCatalog: AdminCatalogItem[] = relevant.map((p) => {
         const wt = WEIGHT_BY_CATEGORY[p.category] || DEFAULT_WEIGHT;
         return {
           id: p.id,
@@ -458,6 +529,18 @@ const KimiClawAssistant: React.FC = () => {
 
       const country = shippingData.country || selectedCountry || 'Brasil';
       const results = calculateShipping(country, weight);
+
+      if (country === 'Japão' && results.length === 0) {
+        await addKimiMessageWithTyping(
+          language === 'pt'
+            ? 'Frete dentro do Japão depende da província exata de entrega — não dá pra calcular sem esse dado aqui no chat. 📍 Veja o valor exato preenchendo o endereço na página de **Frete** ou no **Carrinho → Finalizar**, ou fale com um vendedor no WhatsApp **+81 70-1367-1679**.'
+            : language === 'ja'
+              ? '日本国内の送料は配達先の都道府県によって変わるため、チャットだけでは正確な金額を計算できません。📍 正確な金額は配送ページかカートの手続きで住所を入力すると表示されます。'
+              : "Shipping within Japan depends on the exact delivery prefecture — I can't calculate it here in chat. 📍 See the exact cost on the **Shipping** page or at **Cart → Checkout**, or ask a seller on WhatsApp **+81 70-1367-1679**."
+        );
+        setShippingData({});
+        return;
+      }
 
       setMessages(prev => [
         ...prev,
@@ -824,7 +907,7 @@ const KimiClawAssistant: React.FC = () => {
       return;
     }
 
-    // 7A. ADMIN: queries financeiras/dashboard → dados reais do orderService
+    // 7A. ADMIN: queries financeiras/dashboard → dados reais via API segura (/api/admin-dashboard)
     if (isAdmin && (
       query.includes('faturamento') || query.includes('faturou') || query.includes('faturei') ||
       query.includes('receita') || query.includes('vendas') || query.includes('vendeu') ||
@@ -833,27 +916,38 @@ const KimiClawAssistant: React.FC = () => {
       query.includes('métricas') || query.includes('metricas') || query.includes('relatório') || query.includes('relatorio') ||
       (query.includes('pedidos') && (query.includes('quantos') || query.includes('total') || query.includes('mes')))
     )) {
-      const stats = orderService.getStatistics();
-      const monthName = new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
-      const fmt = (v: number) => `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-      const pct = stats.revenueLastMonth > 0
-        ? ((stats.revenueThisMonth - stats.revenueLastMonth) / stats.revenueLastMonth * 100).toFixed(1)
-        : null;
-      const trend = pct !== null ? (Number(pct) >= 0 ? `📈 +${pct}%` : `📉 ${pct}%`) + ' vs mês passado' : '';
+      try {
+        const res = await authenticatedFetch('/api/admin-dashboard');
+        if (!res.ok) throw new Error(`status ${res.status}`);
+        const dashboard = await res.json();
+        const stats = dashboard.stats;
+        const monthName = new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+        const fmt = (v: number) => `¥${Math.round(v).toLocaleString()}`;
+        const pct = stats.revenueLastMonth > 0
+          ? ((stats.revenueThisMonth - stats.revenueLastMonth) / stats.revenueLastMonth * 100).toFixed(1)
+          : null;
+        const trend = pct !== null ? (Number(pct) >= 0 ? `📈 +${pct}%` : `📉 ${pct}%`) + ' vs mês passado' : '';
 
-      const response =
-        `📊 **Dashboard — ${monthName}**\n\n` +
-        `**Este mês:** ${stats.ordersThisMonth} pedido${stats.ordersThisMonth !== 1 ? 's' : ''} · ${fmt(stats.revenueThisMonth)} ${trend}\n` +
-        `**Mês passado:** ${stats.ordersLastMonth} pedido${stats.ordersLastMonth !== 1 ? 's' : ''} · ${fmt(stats.revenueLastMonth)}\n` +
-        `**Total histórico:** ${stats.totalOrders} pedidos · ${fmt(stats.totalRevenue)}\n\n` +
-        `**Status dos pedidos:**\n` +
-        `• ⏳ Pendentes: ${stats.pendingOrders}\n` +
-        `• 🚚 Enviados: ${stats.shippedOrders}\n` +
-        `• ✅ Entregues: ${stats.deliveredOrders}\n` +
-        (stats.cancelledOrders > 0 ? `• ❌ Cancelados: ${stats.cancelledOrders}\n` : '') +
-        `\nAcesse o painel **/admin** para detalhes completos de cada pedido.`;
+        const response =
+          `📊 **Dashboard — ${monthName}**\n\n` +
+          `**Este mês:** ${stats.ordersThisMonth} pedido${stats.ordersThisMonth !== 1 ? 's' : ''} · ${fmt(stats.revenueThisMonth)} ${trend}\n` +
+          `**Mês passado:** ${stats.ordersLastMonth} pedido${stats.ordersLastMonth !== 1 ? 's' : ''} · ${fmt(stats.revenueLastMonth)}\n` +
+          `**Total histórico:** ${stats.totalOrders} pedidos · ${fmt(stats.totalRevenue)}\n\n` +
+          `**Status dos pedidos:**\n` +
+          `• ⏳ Pendentes: ${stats.pendingOrders}\n` +
+          `• 🚚 Enviados: ${stats.shippedOrders}\n` +
+          `• ✅ Entregues: ${stats.deliveredOrders}\n` +
+          (stats.cancelledOrders > 0 ? `• ❌ Cancelados: ${stats.cancelledOrders}\n` : '') +
+          `\nAcesse o painel **/admin** para detalhes completos de cada pedido.`;
 
-      await addKimiMessageWithTyping(response, ['📊 Consultando pedidos...']);
+        await addKimiMessageWithTyping(response, ['📊 Consultando pedidos...']);
+      } catch (e) {
+        console.error('[KimiClaw] admin-dashboard fetch falhou:', e);
+        await addKimiMessageWithTyping(
+          'Não consegui buscar os dados do dashboard agora. Tente novamente ou acesse o painel **/admin** diretamente.',
+          ['📊 Consultando pedidos...']
+        );
+      }
       return;
     }
 
@@ -876,6 +970,10 @@ const KimiClawAssistant: React.FC = () => {
         else detectedCountry = selectedCountry || 'Brasil';
 
         const results = calculateShipping(detectedCountry, weightKg);
+        if (detectedCountry === 'Japão' && results.length === 0) {
+          await addKimiMessageWithTyping(`📦 **${prod.name}** — frete doméstico no Japão depende da província exata de entrega (zona 1-4 a partir de Hiroshima). Calcule o valor exato preenchendo o endereço no Checkout.`);
+          return;
+        }
         setMessages((prev) => [
           ...prev,
           {
@@ -912,6 +1010,16 @@ const KimiClawAssistant: React.FC = () => {
       // If both country and weight are detected, show result immediately
       if (detectedCountry && weight > 0) {
         const results = calculateShipping(detectedCountry, weight);
+        if (detectedCountry === 'Japão' && results.length === 0) {
+          await addKimiMessageWithTyping(
+            language === 'pt'
+              ? 'Frete dentro do Japão depende da província exata de entrega — não dá pra calcular sem esse dado aqui no chat. 📍 Veja o valor exato preenchendo o endereço na página de **Frete** ou no **Carrinho → Finalizar**.'
+              : language === 'ja'
+                ? '日本国内の送料は配達先の都道府県によって変わるため、チャットだけでは正確な金額を計算できません。📍 配送ページかカートの手続きで住所を入力すると正確な金額が表示されます。'
+                : "Shipping within Japan depends on the exact delivery prefecture — I can't calculate it here. 📍 See the exact cost on the **Shipping** page or at **Cart → Checkout**."
+          );
+          return;
+        }
         setMessages(prev => [
           ...prev,
           {
@@ -971,9 +1079,12 @@ const KimiClawAssistant: React.FC = () => {
       return;
     }
 
-    // 9.5 IA resolve TUDO (busca de produtos, orçamentos, perguntas) — tem o catálogo
-    // completo no contexto e decide SOZINHA quais produtos recomendar. Isso elimina o bug
-    // da busca por palavra-chave (ex.: "kit" casando com KitKat em vez do kit de shampoo).
+    // 9.5 IA conversacional — só chega aqui quando NENHUM skill determinístico bateu
+    // acima (busca, carrinho, orçamento, frete, categoria, cupom já tentaram e
+    // falharam). A IA nunca recebe nem calcula preço/frete — só entende a pergunta,
+    // conversa, e recomenda produtos do catálogo real citando o ID (tag
+    // |||PRODUCT_IDS), nunca escrevendo valores. Ver api/kimiclaw.js para as
+    // garantias contra alucinação de preço.
     if (qwenEnabled()) {
       setIsTyping(true);
       const ai = await aiAnswer(text);
@@ -990,9 +1101,6 @@ const KimiClawAssistant: React.FC = () => {
           const ids = idsPart.split(',').map((s) => s.trim()).filter(Boolean).slice(0, 5);
           recommendedProducts = products.filter((p) => ids.includes(p.id));
         }
-        setIsTyping(true);
-        await new Promise((resolve) => setTimeout(resolve, 1200));
-        setIsTyping(false);
         setMessages((prev) => [
           ...prev,
           {
@@ -1118,7 +1226,7 @@ const KimiClawAssistant: React.FC = () => {
         <div className="absolute bottom-16 right-2 bg-gradient-to-r from-primary to-accent text-white text-xs px-3 py-1.5 rounded-full shadow-elevated whitespace-nowrap animate-float border border-white/20 select-none">
           <span className="flex items-center gap-1.5 font-medium">
             <Sparkles className="w-3.5 h-3.5 text-yellow-300 animate-pulse" />
-            {language === 'pt' ? 'Experimente o KimiClaw!' : 'Try KimiClaw!'}
+            {t('kimiclaw.tryMe')}
           </span>
           <div className="absolute -bottom-1 right-5 w-2 h-2 bg-accent rotate-45 border-r border-b border-white/10" />
         </div>
@@ -1127,8 +1235,13 @@ const KimiClawAssistant: React.FC = () => {
       {/* FLOATING ACTION BUTTON */}
       {!isOpen && (
         <button
+          ref={fabButtonRef}
           onClick={() => setIsOpen(true)}
-          className="w-14 h-14 rounded-full bg-gradient-to-tr from-primary via-accent to-primary text-white flex items-center justify-center shadow-elevated hover:shadow-[0_8px_30px_rgb(249,115,22,0.4)] transition-all duration-300 transform hover:scale-105 border border-white/20 group relative overflow-hidden"
+          aria-label={t('kimiclaw.title')}
+          aria-haspopup="dialog"
+          aria-expanded={false}
+          aria-controls="kimiclaw-panel"
+          className="w-14 h-14 rounded-full bg-gradient-to-tr from-primary via-accent to-primary text-white flex items-center justify-center shadow-elevated hover:shadow-[0_8px_30px_rgb(249,115,22,0.4)] transition-all duration-300 transform hover:scale-105 border border-white/20 group relative overflow-hidden focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
         >
           <ClawIcon className="w-7 h-7 text-white transform group-hover:rotate-12 transition-transform duration-300" />
           <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-green-500 rounded-full border border-white animate-ping" />
@@ -1138,7 +1251,15 @@ const KimiClawAssistant: React.FC = () => {
 
       {/* CHAT WINDOW CONTAINER */}
       {isOpen && (
-        <div className="w-[calc(100vw-2rem)] sm:w-[390px] max-w-[390px] h-[550px] max-h-[85vh] rounded-2xl border border-white/20 shadow-elevated bg-white/80 dark:bg-zinc-950/80 backdrop-blur-xl flex flex-col overflow-hidden animate-fade-up">
+        <div
+          id="kimiclaw-panel"
+          ref={panelRef}
+          role="dialog"
+          aria-modal="false"
+          aria-label={t('kimiclaw.title')}
+          tabIndex={-1}
+          className="w-[calc(100vw-2rem)] sm:w-[390px] max-w-[390px] h-[550px] max-h-[85vh] rounded-2xl border border-white/20 shadow-elevated bg-white/80 dark:bg-zinc-950/80 backdrop-blur-xl flex flex-col overflow-hidden animate-fade-up focus:outline-none"
+        >
           {/* HEADER */}
           <div className="p-4 bg-gradient-to-r from-primary/10 via-accent/5 to-transparent border-b border-border flex items-center justify-between">
             <div className="flex items-center gap-2.5">
@@ -1167,7 +1288,8 @@ const KimiClawAssistant: React.FC = () => {
             </div>
             <button
               onClick={() => setIsOpen(false)}
-              className="p-1.5 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+              aria-label={t('kimiclaw.close')}
+              className="p-1.5 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
             >
               <X className="w-4 h-4" />
             </button>

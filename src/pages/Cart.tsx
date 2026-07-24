@@ -539,7 +539,7 @@ const Cart: React.FC = () => {
                   <p className="text-center text-xs text-muted-foreground">
                     {selectedCountry === 'Japão'
                       ? '🏠 Envio direto de Hiroshima - Frete rápido e seguro.'
-                      : '✈️ Despachado de Tóquio com entrega expressa pelos Correios.'
+                      : '✈️ Despachado de Hiroshima com entrega expressa pelos Correios.'
                     }
                   </p>
                   <button

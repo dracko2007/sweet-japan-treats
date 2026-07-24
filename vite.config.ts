@@ -1,7 +1,6 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
-import { componentTagger } from "lovable-tagger";
 import { VitePWA } from "vite-plugin-pwa";
 
 export default defineConfig(({ mode }) => ({
@@ -16,7 +15,6 @@ export default defineConfig(({ mode }) => ({
   },
   plugins: [
     react(),
-    mode === "development" && componentTagger(),
     VitePWA({
       registerType: "autoUpdate",
       injectRegister: null, // registro feito manualmente em main.tsx (controle do reload)
@@ -102,11 +100,18 @@ export default defineConfig(({ mode }) => ({
       output: {
         // Divide bibliotecas pesadas em chunks separados (melhor cache entre
         // deploys e download paralelo). As páginas já são lazy via React.lazy.
-        manualChunks: {
-          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
-          firebase: ['firebase/app', 'firebase/firestore', 'firebase/auth', 'firebase/analytics', 'firebase/storage'],
-          recharts: ['recharts'],
-          query: ['@tanstack/react-query'],
+        manualChunks(id) {
+          const moduleId = id.includes('\\') ? id.replaceAll('\\', '/') : id;
+          if (!moduleId.includes('/node_modules/')) return undefined;
+          if (/\/node_modules\/(?:react|react-dom|react-router|react-router-dom)\//.test(moduleId)) return 'react-vendor';
+          if (/\/node_modules\/(?:firebase\/firestore|@firebase\/firestore(?:-compat)?|@firebase\/webchannel-wrapper)\//.test(moduleId)) return 'firebase-firestore';
+          if (/\/node_modules\/(?:firebase\/auth|@firebase\/auth(?:-compat)?)\//.test(moduleId)) return 'firebase-auth';
+          if (/\/node_modules\/(?:firebase\/storage|@firebase\/storage(?:-compat)?)\//.test(moduleId)) return 'firebase-storage';
+          if (/\/node_modules\/(?:firebase\/analytics|@firebase\/analytics(?:-compat)?)\//.test(moduleId)) return 'firebase-analytics';
+          if (moduleId.includes('/node_modules/firebase/') || moduleId.includes('/node_modules/@firebase/')) return 'firebase-core';
+          if (moduleId.includes('/node_modules/recharts/')) return 'recharts';
+          if (moduleId.includes('/node_modules/@tanstack/react-query/')) return 'query';
+          return undefined;
         },
       },
     },

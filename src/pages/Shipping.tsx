@@ -632,7 +632,7 @@ const Shipping: React.FC = () => {
                         <span className="text-green-600">€ 0.00</span>
                       </div>
                       <p className="text-[10px] pl-2 border-l-2 border-border">
-                        You pay only the product price and shipping from Tokyo on our site.
+                        You pay only the product price and shipping from Hiroshima on our site.
                       </p>
 
                       <div className="flex justify-between font-bold text-foreground">

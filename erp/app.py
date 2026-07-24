@@ -1,5 +1,5 @@
 """
-🏮 Sweet Japan Treats - Sistema de Gestão (ERP)
+🏮 Japan Express - Sistema de Gestão (ERP)
 ================================================
 Sistema profissional de gestão de vendas, estoque, 
 despesas e clientes integrado ao Firebase.
@@ -18,6 +18,7 @@ from collections import defaultdict
 import json
 import io
 import requests as http_requests
+from pathlib import Path
 
 from firebase_service import (
     get_firebase_db,
@@ -31,11 +32,15 @@ from firebase_service import (
     get_whatsapp_api_url, save_whatsapp_api_url,
 )
 
+COMPANY_PROFILE_PATH = Path(__file__).resolve().parents[1] / "shared" / "company-profile.json"
+with COMPANY_PROFILE_PATH.open(encoding="utf-8") as profile_file:
+    COMPANY_PROFILE = json.load(profile_file)
+
 # =====================================================
 # CONFIGURAÇÃO DA PÁGINA
 # =====================================================
 st.set_page_config(
-    page_title="Sweet Japan Treats - ERP",
+    page_title="Japan Express - ERP",
     page_icon="🏮",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -161,7 +166,7 @@ db = get_firebase_db()
 # SIDEBAR - NAVEGAÇÃO
 # =====================================================
 with st.sidebar:
-    st.markdown("### 🏮 Sweet Japan Treats")
+    st.markdown("### 🏮 Japan Express")
     st.markdown("**Sistema de Gestão**")
     st.markdown("---")
     
@@ -191,7 +196,7 @@ with st.sidebar:
     st.markdown("---")
     st.markdown("##### 🔗 Links Rápidos")
     st.markdown("[Firebase Console](https://console.firebase.google.com/project/localstorage-98492)")
-    st.markdown("[Site (Vercel)](https://sweet-japan-treats.vercel.app)")
+    st.markdown("[Site](https://japanexpress-store.com)")
     
     st.markdown("---")
     
@@ -228,15 +233,6 @@ with st.sidebar:
 # =====================================================
 # HELPERS
 # =====================================================
-
-PRODUCT_CATEGORIES = {
-    'artesanal': ['Doce de Leite Cremoso', 'Doce de Leite de Coco', 'Doce de Leite de Amendoim'],
-    'premium': ['Doce de Leite de Café', 'Doce de Leite de Amêndoas', 'Doce de Leite de Matcha', 'Doce de Leite de Chocolate'],
-}
-
-ALL_PRODUCTS = []
-for cat_products in PRODUCT_CATEGORIES.values():
-    ALL_PRODUCTS.extend(cat_products)
 
 
 def parse_order_date(order):
@@ -285,15 +281,12 @@ def orders_to_dataframe(orders):
         
         for item in items:
             product_name = item['name']
-            category = 'premium' if product_name in PRODUCT_CATEGORIES.get('premium', []) else 'artesanal'
-            
             rows.append({
                 'orderNumber': o.get('orderNumber', 'N/A'),
                 'date': dt,
                 'month': dt.strftime('%Y-%m'),
                 'monthLabel': dt.strftime('%b/%Y'),
                 'product': product_name,
-                'category': category,
                 'size': item['size'],
                 'quantity': item['quantity'],
                 'unitPrice': item['price'],
@@ -336,7 +329,7 @@ if menu == "📊 Dashboard":
     st.markdown("""
     <div class="main-header">
         <h1>📊 Dashboard - Visão Geral</h1>
-        <p>Resumo do desempenho do Sweet Japan Treats em tempo real</p>
+        <p>Resumo do desempenho do Japan Express em tempo real</p>
     </div>
     """, unsafe_allow_html=True)
     
@@ -424,7 +417,7 @@ if menu == "📊 Dashboard":
         st.plotly_chart(fig_monthly, use_container_width=True)
     
     with col_right:
-        st.subheader("🍬 Vendas por Produto")
+        st.subheader("🛍️ Vendas por Produto")
         by_product = df.groupby('product').agg(
             revenue=('itemTotal', 'sum'),
             qty=('quantity', 'sum'),
@@ -442,20 +435,19 @@ if menu == "📊 Dashboard":
     col_left2, col_right2 = st.columns(2)
     
     with col_left2:
-        st.subheader("📦 Artesanal vs Premium")
-        by_cat = df.groupby('category').agg(
+        st.subheader("💳 Vendas por Forma de Pagamento")
+        by_payment = df.groupby('paymentMethod').agg(
             revenue=('itemTotal', 'sum'),
             qty=('quantity', 'sum'),
         ).reset_index()
-        
-        fig_cat = px.bar(
-            by_cat, x='category', y='revenue',
-            color='category',
-            color_discrete_map={'artesanal': '#ff8a65', 'premium': '#7e57c2'},
+
+        fig_payment = px.bar(
+            by_payment, x='paymentMethod', y='revenue',
+            color='paymentMethod',
             text_auto=True,
         )
-        fig_cat.update_layout(height=350, showlegend=False, margin=dict(t=20, b=20))
-        st.plotly_chart(fig_cat, use_container_width=True)
+        fig_payment.update_layout(height=350, showlegend=False, margin=dict(t=20, b=20))
+        st.plotly_chart(fig_payment, use_container_width=True)
     
     with col_right2:
         st.subheader("📏 Vendas por Tamanho")
@@ -505,7 +497,7 @@ elif menu == "💰 Vendas Detalhadas":
     
     # Filtros
     st.subheader("🔍 Filtros")
-    col_f1, col_f2, col_f3 = st.columns(3)
+    col_f1, col_f2 = st.columns(2)
     
     with col_f1:
         months_available = sorted(df['monthLabel'].unique())
@@ -515,15 +507,11 @@ elif menu == "💰 Vendas Detalhadas":
         products_available = sorted(df['product'].unique())
         selected_products = st.multiselect("Produto", products_available, default=products_available)
     
-    with col_f3:
-        categories_available = sorted(df['category'].unique())
-        selected_categories = st.multiselect("Categoria", categories_available, default=categories_available)
     
     # Aplicar filtros
     df_filtered = df[
         (df['monthLabel'].isin(selected_months)) &
-        (df['product'].isin(selected_products)) &
-        (df['category'].isin(selected_categories))
+        (df['product'].isin(selected_products))
     ]
     
     if df_filtered.empty:
@@ -569,7 +557,7 @@ elif menu == "💰 Vendas Detalhadas":
     st.download_button(
         label="⬇️ Baixar Excel",
         data=buffer.getvalue(),
-        file_name=f"vendas_sweet_japan_{datetime.now().strftime('%Y%m%d')}.xlsx",
+        file_name=f"vendas_japan_express_{datetime.now().strftime('%Y%m%d')}.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
 
@@ -581,7 +569,7 @@ elif menu == "💸 Despesas":
     st.markdown("""
     <div class="main-header">
         <h1>💸 Controle de Despesas</h1>
-        <p>Registre custos com ingredientes, potes, adesivos e outros insumos</p>
+        <p>Registre custos com produtos, embalagens e outros insumos</p>
     </div>
     """, unsafe_allow_html=True)
     
@@ -597,8 +585,8 @@ elif menu == "💸 Despesas":
             
             with col1:
                 expense_type = st.selectbox("Tipo de Despesa", [
-                    "🥛 Ingredientes",
-                    "🫙 Potes / Embalagens",
+                    "📦 Produtos / Mercadoria",
+                    "📮 Embalagens",
                     "🏷️ Adesivos / Etiquetas",
                     "📦 Material de Envio",
                     "🚚 Frete / Transporte",
@@ -609,7 +597,7 @@ elif menu == "💸 Despesas":
                     "🔧 Equipamentos",
                     "💼 Outros",
                 ])
-                description = st.text_input("Descrição", placeholder="Ex: Leite condensado 10 latas")
+                description = st.text_input("Descrição", placeholder="Ex: Reposição de estoque - cosméticos")
             
             with col2:
                 expense_value = st.number_input("Valor (¥)", min_value=0.0, format="%.0f", step=100.0)
@@ -711,12 +699,12 @@ elif menu == "📋 Ficha Técnica":
             col1, col2, col3 = st.columns(3)
             
             with col1:
-                supply_name = st.text_input("Nome do Insumo", placeholder="Ex: Leite Condensado")
+                supply_name = st.text_input("Nome do Insumo", placeholder="Ex: Caixa de papelão")
                 supply_category = st.selectbox("Categoria", [
-                    "Ingrediente",
-                    "Embalagem (Pote)",
+                    "Matéria-prima",
+                    "Embalagem",
                     "Adesivo / Etiqueta",
-                    "Tampa / Lacre",
+                    "Fita adesiva",
                     "Saco / Sacola",
                     "Caixa de Envio",
                     "Outros",
@@ -785,10 +773,10 @@ elif menu == "📋 Ficha Técnica":
         else:
             product_name = st.text_input(
                 "Nome do Produto",
-                placeholder="Ex: Doce de Leite Cremoso 280g",
+                placeholder="Ex: Máscara Capilar Fino 280g",
             )
             
-            product_size = st.selectbox("Tamanho", ["280g (small)", "800g (large)"])
+            product_size = st.selectbox("Tamanho", ["Pequeno (small)", "Grande (large)"])
             
             st.markdown("#### Selecione os insumos usados:")
             
@@ -927,7 +915,7 @@ elif menu == "📦 Estoque":
                     "Material de Envio",
                     "Outros",
                 ])
-                item_name = st.text_input("Nome do Item", placeholder="Ex: Doce de Leite Cremoso 280g")
+                item_name = st.text_input("Nome do Item", placeholder="Ex: Máscara Capilar Fino 280g")
                 movement_type = st.selectbox("Tipo de Movimentação", ["Entrada", "Saída", "Ajuste de Inventário"])
             
             with col2:
@@ -1030,7 +1018,7 @@ elif menu == "👥 Clientes (CRM)":
     st.markdown("""
     <div class="main-header">
         <h1>👥 CRM - Gestão de Clientes</h1>
-        <p>Clientes sincronizados automaticamente do site Sweet Japan Treats</p>
+        <p>Clientes sincronizados automaticamente do site Japan Express</p>
     </div>
     """, unsafe_allow_html=True)
     
@@ -2044,11 +2032,27 @@ elif menu == "🏷️ Etiquetas de Envio":
     st.subheader("📮 Dados do Remetente")
     col_s1, col_s2 = st.columns(2)
     with col_s1:
-        sender_name = st.text_input("Nome do Remetente", value="Paula Shiokawa - Sweet Japan Treats", key="sender_name")
-        sender_postal = st.text_input("CEP (〒)", value="518-0225", key="sender_postal")
+        sender_name = st.text_input(
+            "Nome do Remetente",
+            value=f"{COMPANY_PROFILE['contactName']} / {COMPANY_PROFILE['brand']}",
+            key="sender_name",
+        )
+        sender_postal = st.text_input(
+            "CEP (〒)",
+            value=COMPANY_PROFILE["fulfillmentOrigin"]["postalCode"],
+            key="sender_postal",
+        )
     with col_s2:
-        sender_address = st.text_input("Endereço", value="Mie-ken Iga-shi Kirigaoka 5-292", key="sender_addr")
-        sender_phone = st.text_input("Telefone", value="070-1367-1679", key="sender_phone")
+        sender_address = st.text_input(
+            "Endereço",
+            value=COMPANY_PROFILE["fulfillmentOrigin"]["formatted"],
+            key="sender_addr",
+        )
+        sender_phone = st.text_input(
+            "Telefone",
+            value=COMPANY_PROFILE["whatsapp"]["domestic"],
+            key="sender_phone",
+        )
     
     st.markdown("---")
     
@@ -2128,7 +2132,7 @@ elif menu == "🏷️ Etiquetas de Envio":
             </div>
             
             <div style="display:flex; justify-content:space-between; margin-top:12px; font-size:11px; color:#999;">
-                <span>🏮 Sweet Japan Treats</span>
+                <span>🏮 Japan Express</span>
                 <span>{parse_order_date(sel_order).strftime('%d/%m/%Y')}</span>
             </div>
         </div>
@@ -2183,7 +2187,7 @@ elif menu == "🏷️ Etiquetas de Envio":
         <strong>内容品 / Conteúdo:</strong> {items_text}
     </div>
     <div class="header" style="margin-top:12px;">
-        <span>🏮 Sweet Japan Treats</span>
+        <span>🏮 Japan Express</span>
         <span>{parse_order_date(sel_order).strftime('%d/%m/%Y')}</span>
     </div>
 </div>
@@ -2762,7 +2766,7 @@ elif menu == "📱 WhatsApp":
                     
                     else:  # Mensagem Personalizada
                         custom_msg = st.text_area("Mensagem", height=150, 
-                            value=f"🏮 *Sweet Japan Treats*\n\nOlá {sel_order.get('customerName', '')}!\n\n")
+                            value=f"🏮 *Japan Express*\n\nOlá {sel_order.get('customerName', '')}!\n\n")
                         if st.button("📤 Enviar Mensagem", type="primary", use_container_width=True):
                             try:
                                 resp = http_requests.post(f"{WHATSAPP_API}/api/send", json={
@@ -2788,9 +2792,9 @@ elif menu == "📱 WhatsApp":
         templates = [
             {
                 'name': '🆕 Novo Pedido',
-                'message': """🏮 *Sweet Japan Treats*
+                'message': """🏮 *Japan Express*
 
-Olá {nome}! 🍮
+Olá {nome}! 📦
 
 Seu pedido *{numero}* foi recebido com sucesso!
 
@@ -2798,26 +2802,26 @@ Seu pedido *{numero}* foi recebido com sucesso!
 {itens}
 
 💰 *Total:* ¥{total}
-
 Obrigada pela compra! 💛
-_Sweet Japan Treats - Doce de Leite Artesanal_"""
+
+_Japan Express_"""
             },
             {
                 'name': '✅ Pagamento Confirmado',
-                'message': """🏮 *Sweet Japan Treats*
+                'message': """🏮 *Japan Express*
 
 Olá {nome}!
 
 ✅ Pagamento do pedido *{numero}* confirmado!
 
-Seu pedido está sendo preparado com carinho. 🍮
+Seu pedido está sendo preparado com cuidado. 📦
 Em breve enviaremos o código de rastreamento.
 
-_Sweet Japan Treats_"""
+_Japan Express_"""
             },
             {
                 'name': '🚚 Pedido Enviado',
-                'message': """🏮 *Sweet Japan Treats*
+                'message': """🏮 *Japan Express*
 
 Olá {nome}!
 
@@ -2828,37 +2832,37 @@ Olá {nome}!
 
 Previsão de entrega: 2-3 dias úteis.
 
-_Sweet Japan Treats_"""
+_Japan Express_"""
             },
             {
                 'name': '🎂 Aniversário',
-                'message': """🏮 *Sweet Japan Treats*
+                'message': """🏮 *Japan Express*
 
 🎂 Feliz Aniversário, {nome}! 🎉
 
 Para comemorar seu dia especial, temos um presente:
 
 🎟️ Use o cupom *{cupom}* e ganhe desconto na sua próxima compra!
+Parabéns! 💛
 
-Parabéns! 💛🍮
-_Sweet Japan Treats_"""
+_Japan Express_"""
             },
             {
                 'name': '💌 Pós-Venda',
-                'message': """🏮 *Sweet Japan Treats*
+                'message': """🏮 *Japan Express*
 
 Olá {nome}!
 
 Tudo bem? 😊
 
-Queria saber se você gostou do doce de leite! 🍮
+Queria saber se você gostou do seu pedido! 📦
 
 Se tiver qualquer feedback, adoraríamos ouvir.
 E quando quiser fazer um novo pedido, é só acessar nosso site:
-🌐 sweet-japan-treats.vercel.app
-
+🌐 japanexpress-store.com
 Obrigada! 💛
-_Sweet Japan Treats_"""
+
+_Japan Express_"""
             },
         ]
         

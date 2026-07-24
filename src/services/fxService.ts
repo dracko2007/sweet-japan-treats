@@ -32,9 +32,9 @@ export const getRates = (): Rates => _rates;
 export const getRateSource = () => _source;
 
 function rateFor(currency: string): number {
+  if (currency === 'BRL') return _rates.BRL;
   if (currency === 'EUR') return _rates.EUR;
-  if (currency === 'USD') return _rates.USD;
-  return _rates.BRL; // BRL ou desconhecido
+  return _rates.USD;
 }
 
 /** Converte BRL/EUR/USD de volta para ¥, desfazendo o mesmo cushion aplicado em convertYen. */

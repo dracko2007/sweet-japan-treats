@@ -52,9 +52,9 @@ const FeaturedProducts: React.FC = () => {
   );
 
   const tabs = [
-    { id: 'vistos' as TabId, label: 'Mais Vistos', icon: Eye, items: vistos },
-    ...(vendidos.length > 0 ? [{ id: 'vendidos' as TabId, label: 'Mais Vendidos', icon: TrendingUp, items: vendidos }] : []),
-    ...(ofertas.length > 0 ? [{ id: 'ofertas' as TabId, label: 'Ofertas', icon: Zap, items: ofertas }] : []),
+    { id: 'vistos' as TabId, label: t('featured.tab.vistos'), icon: Eye, items: vistos },
+    ...(vendidos.length > 0 ? [{ id: 'vendidos' as TabId, label: t('featured.tab.vendidos'), icon: TrendingUp, items: vendidos }] : []),
+    ...(ofertas.length > 0 ? [{ id: 'ofertas' as TabId, label: t('featured.tab.ofertas'), icon: Zap, items: ofertas }] : []),
   ];
 
   const activeTab = tabs.find(t => t.id === tab) || tabs[0];

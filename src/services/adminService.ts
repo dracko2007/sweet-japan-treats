@@ -1,13 +1,8 @@
-// Administradores: login por e-mail (super-admin) ou NOME+senha (sub-admins no Firestore).
-// Nível 1: vê/gerencia (sem deletar, sem financeiro, sem add admin).
-// Nível 2: + deletar (sem financeiro/admin).  Nível 3: completo.
-import { db, firebaseConfig } from '@/config/firebase';
-import { collection, doc, getDoc, getDocs, setDoc, deleteDoc } from 'firebase/firestore';
-import { ensureAdminAuth } from '@/utils/adminAuth';
+import { firebaseConfig } from '@/config/firebase';
 import { ADMIN_EMAIL } from '@/config/admin';
+import { authenticatedFetch } from '@/services/authenticatedFetch';
 
 const isDev = import.meta.env.DEV;
-const devLog = isDev ? console.log.bind(console) : () => {};
 const devWarn = isDev ? console.warn.bind(console) : () => {};
 const devError = isDev ? console.error.bind(console) : () => {};
 
@@ -21,15 +16,45 @@ export interface AdminEntry {
   addedBy?: string;
 }
 
-const COL = 'admins';
-const slug = (s: string) =>
-  s.normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase().replace(/\s+/g, ' ');
+export interface AdminSession extends AdminEntry {
+  // Presente apenas para sub-admins (login via API server-side com custom
+  // token). Ausente para o super-admin: o client autentica direto no
+  // Identity Toolkit e depois faz signInWithEmailAndPassword de verdade —
+  // sem depender de nenhuma função serverless (funciona em `vite dev` puro).
+  customToken?: string;
+}
+
+interface ErrorPayload {
+  error?: string;
+}
+
+function adminEntry(value: unknown): AdminEntry | null {
+  if (!value || typeof value !== 'object') return null;
+  const record = value as Record<string, unknown>;
+  const role = Number(record.role);
+  if (typeof record.username !== 'string' || typeof record.name !== 'string' || ![1, 2, 3].includes(role)) {
+    return null;
+  }
+  return {
+    username: record.username,
+    name: record.name,
+    role: role as AdminRole,
+    addedAt: typeof record.addedAt === 'string' ? record.addedAt : undefined,
+    addedBy: typeof record.addedBy === 'string' ? record.addedBy : undefined,
+  };
+}
+
+async function errorCode(response: Response): Promise<string> {
+  const payload = await response.json().catch(() => ({})) as ErrorPayload;
+  return payload.error || 'request_failed';
+}
 
 export const adminService = {
-  async authenticate(identifier: string, password: string): Promise<AdminEntry | null> {
-    // Super-admin: verifica via REST API (não dispara onAuthStateChanged do SDK,
-    // evitando race condition onde o listener sobrescreve o estado admin).
-    // UserContext.login() chama signInWithEmailAndPassword DEPOIS de salvar o estado.
+  async authenticate(identifier: string, password: string): Promise<AdminSession | null> {
+    // Super-admin: valida a senha direto no Identity Toolkit do Firebase (REST
+    // pública, sem depender de nenhuma API serverless). Não dispara
+    // onAuthStateChanged do SDK aqui — UserContext.login() faz o signIn de
+    // verdade DEPOIS de salvar o estado local, evitando corrida.
     if (identifier.toLowerCase() === ADMIN_EMAIL.toLowerCase()) {
       try {
         const res = await fetch(
@@ -38,80 +63,93 @@ export const adminService = {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email: ADMIN_EMAIL, password, returnSecureToken: true }),
-          }
+          },
         );
         if (!res.ok) return null;
         return { username: ADMIN_EMAIL, name: 'Administrador', role: 3 };
-      } catch {
+      } catch (error) {
+        devWarn('[admin] authenticate (super-admin) falhou:', error);
         return null;
       }
     }
-    // Sub-admins: login por nome/usuário com senha no Firestore
-    if (!db) return null;
-    const id = slug(identifier);
+
+    // Sub-admins: nunca mais lê Firestore/senha no client — passa pela API
+    // server-side (custom token via Admin SDK).
     try {
-      const snap = await getDoc(doc(db, COL, id));
-      if (snap.exists()) {
-        const d = snap.data() as any;
-        if (d.password === password) return { username: id, name: d.name || identifier, role: d.role };
-      }
-    } catch (e) {
-      devWarn('[admin] authenticate falhou:', e);
+      const response = await fetch('/api/admin-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ identifier, password }),
+      });
+      if (!response.ok) return null;
+      const payload = await response.json() as { customToken?: unknown; admin?: unknown };
+      const entry = adminEntry(payload.admin);
+      if (!entry || typeof payload.customToken !== 'string' || !payload.customToken) return null;
+      return { ...entry, customToken: payload.customToken };
+    } catch (error) {
+      devWarn('[admin] authenticate falhou:', error);
+      return null;
     }
-    return null;
   },
 
   async getAdmins(): Promise<AdminEntry[]> {
-    const list: AdminEntry[] = [{ username: ADMIN_EMAIL, name: 'Administrador', role: 3, addedBy: 'sistema' }];
-    if (!db) return list;
+    const superAdmin: AdminEntry = {
+      username: ADMIN_EMAIL,
+      name: 'Administrador',
+      role: 3,
+      addedBy: 'sistema',
+    };
     try {
-      await ensureAdminAuth();
-      const snap = await getDocs(collection(db, COL));
-      snap.forEach((d) => {
-        const data = d.data() as any;
-        list.push({ username: d.id, name: data.name, role: data.role, addedAt: data.addedAt, addedBy: data.addedBy });
-      });
-    } catch (e) {
-      devWarn('[admin] getAdmins falhou:', e);
+      const response = await authenticatedFetch('/api/admin-users');
+      if (!response.ok) throw new Error(await errorCode(response));
+      const payload = await response.json() as { admins?: unknown };
+      const remote = Array.isArray(payload.admins)
+        ? payload.admins.map(adminEntry).filter((entry): entry is AdminEntry => entry !== null)
+        : [];
+      const withoutDuplicateSuper = remote.filter(
+        (entry) => entry.username.toLowerCase() !== ADMIN_EMAIL.toLowerCase(),
+      );
+      return [superAdmin, ...withoutDuplicateSuper]
+        .sort((left, right) => right.role - left.role || left.name.localeCompare(right.name));
+    } catch (error) {
+      devWarn('[admin] getAdmins falhou:', error);
+      return [superAdmin];
     }
-    return list.sort((a, b) => b.role - a.role || a.name.localeCompare(b.name));
   },
 
-  async addAdmin(name: string, password: string, role: AdminRole, addedBy?: string): Promise<{ ok: boolean; error?: string }> {
-    if (!db) return { ok: false, error: 'Firebase indisponível' };
-    const id = slug(name);
-    if (!id) return { ok: false, error: 'Nome inválido' };
-    if (!password || password.length < 8) return { ok: false, error: 'Senha muito curta (mín. 8 caracteres)' };
+  async addAdmin(
+    name: string,
+    password: string,
+    role: AdminRole,
+    addedBy?: string,
+  ): Promise<{ ok: boolean; error?: string }> {
     try {
-      await ensureAdminAuth();
-      await setDoc(doc(db, COL, id), {
-        name: name.trim(),
-        password,
-        role,
-        addedAt: new Date().toISOString(),
-        addedBy: addedBy || '',
+      const response = await authenticatedFetch('/api/admin-users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, password, role, addedBy: addedBy || '' }),
       });
-      return { ok: true };
-    } catch (e: any) {
-      devError('[admin] addAdmin falhou:', e);
-      return { ok: false, error: e?.message };
+      return response.ok ? { ok: true } : { ok: false, error: await errorCode(response) };
+    } catch (error) {
+      devError('[admin] addAdmin falhou:', error);
+      return { ok: false, error: 'request_failed' };
     }
   },
 
   async removeAdmin(username: string): Promise<boolean> {
-    if (!db) return false;
-    if (username.toLowerCase() === ADMIN_EMAIL.toLowerCase()) return false;
-    const id = slug(username);
     try {
-      await ensureAdminAuth();
-      await deleteDoc(doc(db, COL, id));
-      return true;
-    } catch (e) {
-      devError('[admin] removeAdmin falhou:', e);
+      const response = await authenticatedFetch('/api/admin-users', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username }),
+      });
+      return response.ok;
+    } catch (error) {
+      devError('[admin] removeAdmin falhou:', error);
       return false;
     }
   },
 
-  isSuper: (username?: string) =>
+  isSuper: (username?: string): boolean =>
     !!username && username.toLowerCase() === ADMIN_EMAIL.toLowerCase(),
 };

@@ -13,7 +13,6 @@
 import { db } from '@/config/firebase';
 import { ADMIN_EMAIL, ADMIN_USER_ID } from '@/config/admin';
 import {
-  doc, setDoc, increment,
   collection, query, orderBy, limit, getDocs,
 } from 'firebase/firestore';
 
@@ -76,8 +75,20 @@ async function getGeoInfo(): Promise<GeoInfo | null> {
   }
 }
 
-function todayKey(): string {
-  return new Date().toISOString().slice(0, 10); // 'YYYY-MM-DD'
+
+type AnalyticsEvent =
+  | { type: 'visit'; countryCode?: string; city?: string }
+  | { type: 'page'; slug: string; label: string }
+  | { type: 'product'; productId: string; productName: string };
+
+async function postAnalytics(event: AnalyticsEvent): Promise<void> {
+  const response = await fetch('/api/analytics', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(event),
+    keepalive: true,
+  });
+  if (!response.ok) throw new Error('analytics_request_failed');
 }
 
 export const visitorService = {
@@ -87,27 +98,21 @@ export const visitorService = {
    * Não rastreia visitas do admin.
    */
   async trackVisit(): Promise<void> {
-    if (!db) return;
+    // A gravação ocorre pela API com rate limit e Admin SDK; não depende do SDK cliente.
     // Não rastreia visitas do admin
     if (isAdminLoggedIn()) return;
     // Só rastreia uma vez por sessão (não por página)
     if (sessionStorage.getItem(SESSION_KEY)) return;
     sessionStorage.setItem(SESSION_KEY, '1');
 
-    const geo = await getGeoInfo();
-    const dateKey = todayKey();
-    const ref = doc(db, 'analytics_daily', dateKey);
-
     try {
-      // setDoc com merge + increment cria o doc/campo se não existir, SEM precisar
-      // de getDoc (visitante comum não tem permissão de leitura na regra do Firestore).
-      // Objetos aninhados com merge:true fazem incremento parcial em countries/cities.
-      await setDoc(ref, {
-        date: dateKey,
-        total: increment(1),
-        ...(geo ? { countries: { [geo.countryCode]: increment(1) } } : {}),
-        ...(geo && geo.city ? { cities: { [geo.city]: increment(1) } } : {}),
-      }, { merge: true });
+    const geo = await getGeoInfo();
+
+      await postAnalytics({
+        type: 'visit',
+        countryCode: geo?.countryCode,
+        city: geo?.city,
+      });
     } catch (e) {
       console.warn('[visitor] trackVisit falhou:', e);
     }
@@ -134,15 +139,13 @@ export const visitorService = {
    * Chamado no router a cada mudança de rota.
    */
   async trackPage(pathname: string): Promise<void> {
-    if (!db) return;
+    // A API aceita eventos mesmo quando o SDK cliente do Firestore está indisponível.
     // Ignora rotas de admin e autenticação, e não rastreia o admin
     if (pathname.startsWith('/admin') || pathname.startsWith('/login') || isAdminLoggedIn()) return;
     try {
       const slug = pathname.startsWith('/produto/') ? '/produto/:id' : pathname;
       const label = PAGE_LABELS[slug] || slug;
-      const ref = doc(db, 'analytics_pages', slug.replace(/\//g, '_').replace(/^_/, '') || 'home');
-      // setDoc+merge+increment cria se não existir, sem precisar de getDoc (sem permissão de leitura)
-      await setDoc(ref, { slug, label, views: increment(1), updatedAt: new Date().toISOString() }, { merge: true });
+      await postAnalytics({ type: 'page', slug, label });
     } catch { /* silencioso */ }
   },
 
@@ -151,17 +154,11 @@ export const visitorService = {
    * Chamado na página /produto/:id.
    */
   async trackProduct(productId: string, productName: string): Promise<void> {
-    if (!db) return;
+    // A API aceita eventos mesmo quando o SDK cliente do Firestore está indisponível.
     // Não rastreia visualizações do admin
     if (isAdminLoggedIn()) return;
     try {
-      const ref = doc(db, 'analytics_products', productId);
-      await setDoc(ref, {
-        productId,
-        productName,
-        views: increment(1),
-        updatedAt: new Date().toISOString(),
-      }, { merge: true });
+      await postAnalytics({ type: 'product', productId, productName });
     } catch { /* silencioso */ }
   },
 

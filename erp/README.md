@@ -1,6 +1,6 @@
-# 🏮 Sweet Japan Treats — Sistema de Gestão (ERP)
+# 🏮 Japan Express — Sistema de Gestão (ERP)
 
-Sistema profissional de gestão de vendas, estoque, despesas e clientes integrado ao Firebase do site Sweet Japan Treats.
+Sistema profissional de gestão de vendas, estoque, despesas e clientes integrado ao Firebase do site Japan Express.
 
 ## 📦 Instalação
 

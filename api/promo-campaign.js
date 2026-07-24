@@ -1,0 +1,149 @@
+import { randomBytes } from 'node:crypto';
+import { requireAdmin } from './_lib/auth.js';
+import { adminDb } from './_lib/firebase-admin.js';
+import {
+  assertExactKeys,
+  handleCors,
+  HttpError,
+  normalizeEmail,
+  optionalText,
+  parseJsonObject,
+  requiredText,
+  sendError,
+} from './_lib/http.js';
+import { escapeHtml, sendMail, siteOrigin, wrapEmail } from './_lib/mailer.js';
+import { sendPush } from './_lib/push.js';
+import { enforceRateLimit } from './_lib/rate-limit.js';
+
+const MECHANICS = new Set(['none', 'discount', 'bogo', 'bogo_other', 'points', 'coupon']);
+const CHANNELS = new Set(['email', 'app', 'both']);
+
+function integer(value, min, max) {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < min || parsed > max) throw new HttpError(400, 'invalid_request');
+  return parsed;
+}
+
+function cleanCampaign(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new HttpError(400, 'invalid_request');
+  assertExactKeys(raw, ['mechanic', 'productId', 'giftProductId', 'couponCode', 'discountPct', 'keepProductDiscount', 'points', 'expiresInDays']);
+  const mechanic = requiredText(raw.mechanic, { max: 20 });
+  if (!MECHANICS.has(mechanic)) throw new HttpError(400, 'invalid_request');
+  return {
+    mechanic,
+    productId: optionalText(raw.productId, { max: 120 }),
+    giftProductId: optionalText(raw.giftProductId, { max: 120 }),
+    couponCode: optionalText(raw.couponCode, { max: 40 }).toUpperCase(),
+    discountPct: mechanic === 'discount' ? integer(raw.discountPct, 1, 90) : 0,
+    keepProductDiscount: raw.keepProductDiscount === true,
+    points: mechanic === 'points' ? integer(raw.points, 1, 100000) : 0,
+    expiresInDays: raw.expiresInDays === undefined ? 30 : integer(raw.expiresInDays, 1, 90),
+  };
+}
+
+function offerFor(campaign, product, giftProduct) {
+  const productName = String(product?.name || 'produto selecionado');
+  if (campaign.mechanic === 'discount') return { badge: `-${campaign.discountPct}%`, tagline: `${campaign.discountPct}% de desconto`, description: `Aproveite ${productName} com ${campaign.discountPct}% de desconto.` };
+  if (campaign.mechanic === 'bogo') return { badge: 'COMPRE 1 GANHE 1', tagline: 'Compre 1 e ganhe 1', description: `Compre ${productName} e leve duas unidades.` };
+  if (campaign.mechanic === 'bogo_other') return { badge: 'COMPRE E GANHE', tagline: 'Compre e ganhe outro produto', description: `Compre ${productName} e ganhe ${String(giftProduct?.name || 'outro produto')}.` };
+  if (campaign.mechanic === 'points') return { badge: `+${campaign.points} PONTOS`, tagline: 'Compre e ganhe pontos', description: `Compre ${productName} e ganhe ${campaign.points} pontos.` };
+  if (campaign.mechanic === 'coupon') return { badge: `CUPOM ${campaign.couponCode}`, tagline: 'Compre e ganhe um cupom', description: `Compre ${productName} e receba o cupom ${campaign.couponCode} para a proxima compra.` };
+  return { badge: 'OFERTA', tagline: 'Oferta especial', description: `Confira ${productName}.` };
+}
+
+function promoEmail({ subject, headline, extraMessage, ctaLabel, offer, product, url }) {
+  const image = product?.thumbnail || product?.image;
+  const imageHtml = image ? `<img src="${escapeHtml(image)}" alt="${escapeHtml(product.name)}" style="width:100%;max-height:320px;object-fit:contain">` : '';
+  return {
+    subject,
+    html: wrapEmail(`<h2>${escapeHtml(headline)}</h2>${imageHtml}<h3>${escapeHtml(product?.name || '')}</h3><div style="background:#fff7ed;border:1px solid #fdba74;border-radius:10px;padding:14px"><strong>${escapeHtml(offer.badge)}</strong><br>${escapeHtml(offer.tagline)}<p>${escapeHtml(offer.description)}</p></div><p>${escapeHtml(extraMessage)}</p><p style="text-align:center"><a href="${escapeHtml(url)}" style="display:inline-block;background:#ec4899;color:#fff;text-decoration:none;padding:14px 28px;border-radius:10px;font-weight:bold">${escapeHtml(ctaLabel)}</a></p>`),
+  };
+}
+
+export default async function handler(req, res) {
+  if (!handleCors(req, res, { methods: ['POST'] })) return;
+
+  try {
+    const admin = await requireAdmin(req);
+    await enforceRateLimit(req, { scope: 'promo-campaign', limit: 10, windowMs: 60 * 60 * 1000, identity: admin.uid });
+    const body = parseJsonObject(req.body);
+    assertExactKeys(body, ['campaign', 'recipients', 'channel', 'subject', 'headline', 'extraMessage', 'ctaLabel', 'cancelHomePromotion']);
+    const campaign = cleanCampaign(body.campaign);
+    const channel = requiredText(body.channel, { max: 10 });
+    if (!CHANNELS.has(channel)) throw new HttpError(400, 'invalid_request');
+    if (!Array.isArray(body.recipients) || body.recipients.length < 1 || body.recipients.length > 500) throw new HttpError(400, 'invalid_recipients');
+    const recipients = [...new Set(body.recipients.map(normalizeEmail))];
+    const subject = requiredText(body.subject, { max: 140 });
+    const headline = requiredText(body.headline, { max: 160 });
+    const extraMessage = requiredText(body.extraMessage, { max: 600 });
+    const ctaLabel = requiredText(body.ctaLabel, { max: 80 });
+
+    const db = adminDb();
+    const productSnap = campaign.productId ? await db.collection('products').doc(campaign.productId).get() : null;
+    if (campaign.productId && !productSnap?.exists) throw new HttpError(400, 'invalid_product');
+    const product = productSnap?.data() || null;
+    let giftProduct = null;
+    if (campaign.mechanic === 'bogo_other') {
+      if (!campaign.giftProductId) throw new HttpError(400, 'invalid_gift_product');
+      const giftSnap = await db.collection('products').doc(campaign.giftProductId).get();
+      if (!giftSnap.exists) throw new HttpError(400, 'invalid_gift_product');
+      giftProduct = giftSnap.data();
+    }
+    if (campaign.mechanic === 'coupon' && !campaign.couponCode) throw new HttpError(400, 'invalid_coupon');
+
+    const code = `PROMO-${randomBytes(3).toString('hex').toUpperCase()}`;
+    const now = Date.now();
+    const offer = offerFor(campaign, product, giftProduct);
+    const stored = {
+      code,
+      ...campaign,
+      ...offer,
+      productName: product?.name || '',
+      productImage: product?.thumbnail || product?.image || '',
+      createdAt: now,
+      createdBy: admin.uid,
+      expiresAt: now + campaign.expiresInDays * 86400000,
+      active: true,
+      perCpfLimit: 1,
+    };
+    delete stored.expiresInDays;
+
+    const campaignRef = db.collection('promo_campaigns').doc(code.toLowerCase());
+    const feedRef = db.collection('siteContent').doc('promoNotifications');
+    await db.runTransaction(async (transaction) => {
+      const feedSnap = await transaction.get(feedRef);
+      const previous = Array.isArray(feedSnap.data()?.items) ? feedSnap.data().items : [];
+      transaction.create(campaignRef, stored);
+      transaction.set(feedRef, {
+        items: [{ code, ...offer, productId: campaign.productId || '', productName: product?.name || '', productImage: product?.thumbnail || product?.image || '', createdAt: now, expiresAt: stored.expiresAt }, ...previous].slice(0, 10),
+        updatedAt: now,
+      });
+      if (body.cancelHomePromotion === true) transaction.delete(db.collection('siteContent').doc('homePromotion'));
+    });
+
+    const path = campaign.productId ? `/produto/${encodeURIComponent(campaign.productId)}?promo=${encodeURIComponent(code)}` : `/?promo=${encodeURIComponent(code)}`;
+    const url = `${siteOrigin()}${path}`;
+    const results = [];
+    if (channel === 'email' || channel === 'both') {
+      const template = promoEmail({ subject, headline, extraMessage, ctaLabel, offer, product, url });
+      for (const to of recipients) {
+        try {
+          await sendMail({ to, ...template });
+          results.push({ email: to, channel: 'email', ok: true });
+        } catch {
+          results.push({ email: to, channel: 'email', ok: false });
+        }
+      }
+    }
+    let push = null;
+    if (channel === 'app' || channel === 'both') {
+      push = await sendPush({ emails: recipients, title: offer.tagline, body: offer.description, url: path });
+      results.push(...push.results.map((result) => ({ ...result, channel: 'app' })));
+    }
+
+    res.status(200).json({ ok: true, code, results, push });
+  } catch (error) {
+    console.error('[promo-campaign]', error instanceof Error ? error.message : error);
+    sendError(res, error);
+  }
+}

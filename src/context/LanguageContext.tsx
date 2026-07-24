@@ -85,6 +85,23 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
     return () => { controller.abort(); clearTimeout(timer); };
   }, []);
 
+  // Sincroniza idioma/país entre abas abertas: o evento `storage` só dispara
+  // nas OUTRAS abas (nunca na que fez a escrita), então não há risco de loop.
+  useEffect(() => {
+    const handleStorage = (event: StorageEvent) => {
+      if (event.storageArea !== window.localStorage) return;
+      if (event.key === 'preferred-language') {
+        const next = (event.newValue as Language) || 'pt';
+        setLanguageState(next);
+      } else if (event.key === 'sakura_selected_country') {
+        const next = event.newValue || 'Brasil';
+        setSelectedCountryState(next);
+      }
+    };
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
+  }, []);
+
   const setLanguage = useCallback((lang: Language) => {
     setLanguageState(lang);
     safeStorage.setItem('preferred-language', lang);

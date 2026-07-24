@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { ShoppingCart, Menu, X, ChevronDown, UserCircle, Heart, Lock, Package, ShieldCheck as ShieldCheckIcon, Plane, Search } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
@@ -17,6 +17,8 @@ import { useSiteSettings } from '@/hooks/useSiteSettings';
 const Header: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isProductsOpen, setIsProductsOpen] = useState(false);
+  const [isMoreOpen, setIsMoreOpen] = useState(false);
+  const moreRef = useRef<HTMLDivElement>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const { totalItems } = useCart();
@@ -35,25 +37,48 @@ const Header: React.FC = () => {
     (c) => products.some((p) => !p.hidden && p.category === c.id)
   );
 
-  const navItems = [
+  useEffect(() => {
+    if (!isMoreOpen) return;
+    const handleClickOutside = (event: MouseEvent) => {
+      if (moreRef.current && !moreRef.current.contains(event.target as Node)) {
+        setIsMoreOpen(false);
+      }
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setIsMoreOpen(false);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isMoreOpen]);
+
+  // Itens primários: sempre visíveis a partir de md. Secundários: agrupados em
+  // "Mais" entre md e lg (faixa "intermediária" apertada) e inline a partir de lg.
+  const primaryNavItems = [
     { label: t('nav.offers'), href: '/ofertas' },
     ...(settings.vlogEnabled ? [{ label: t('nav.vlog'), href: '/vlog' }] : []),
     { label: t('nav.shipping'), href: '/frete' },
+  ];
+  const secondaryNavItems = [
     { label: t('nav.howItWorks'), href: '/como-funciona' },
     { label: t('nav.customRequest'), href: '/faca-seu-pedido' },
     { label: t('nav.business'), href: '/empresas' },
     { label: t('nav.about'), href: '/sobre' },
   ];
+  const navItems = [...primaryNavItems, ...secondaryNavItems];
 
   const isActive = (path: string) => location.pathname === path || location.pathname.startsWith(path + '/');
   // No painel admin a loja é só em português → esconde o seletor de idioma
   const isAdminPage = location.pathname.startsWith('/admin');
 
   const trustItems = [
-    { icon: Lock,            text: 'SSL Seguro' },
-    { icon: ShieldCheckIcon, text: 'Compra Protegida' },
-    { icon: Package,         text: 'Remessa Conforme' },
-    { icon: Plane,           text: 'Envio direto do Japão 🇯🇵' },
+    { icon: Lock,            text: t('trust.ssl') },
+    { icon: ShieldCheckIcon, text: t('trust.protectedPurchase') },
+    { icon: Package,         text: t('trust.compliantShipping') },
+    { icon: Plane,           text: t('trust.directShipping') },
   ];
 
   const handleSearch = (e: React.FormEvent) => {
@@ -207,16 +232,16 @@ const Header: React.FC = () => {
 
         {/* Navigation Menu — Desktop (hidden no admin) */}
         {!isAdminPage && (
-          <nav className="hidden items-center gap-1 overflow-x-auto border-t border-pink-100/60 pb-2 pt-2 md:flex" aria-label="Navegação principal">
-            <Link to="/produtos" className="rounded-full bg-pink-50 px-3 py-1.5 text-sm font-bold text-pink-600 transition-all hover:-translate-y-0.5 hover:bg-pink-100 whitespace-nowrap">
+          <nav className="hidden items-center gap-1 border-t border-pink-100/60 pb-2 pt-2 md:flex" aria-label="Navegação principal">
+            <Link to="/produtos" className="rounded-full bg-pink-50 px-3 py-1.5 text-sm font-bold text-pink-600 transition-all hover:-translate-y-0.5 hover:bg-pink-100 whitespace-nowrap shrink-0">
               {t('nav.products')}
             </Link>
-            {navItems.map((item) => (
+            {primaryNavItems.map((item) => (
               <Link
                 key={item.label}
                 to={item.href}
                 className={cn(
-                  "text-sm font-medium px-3 py-1.5 rounded-full whitespace-nowrap transition-colors",
+                  "text-sm font-medium px-3 py-1.5 rounded-full whitespace-nowrap transition-colors shrink-0",
                   isActive(item.href)
                     ? "bg-primary/10 text-primary"
                     : "text-muted-foreground hover:bg-secondary/70"
@@ -225,6 +250,64 @@ const Header: React.FC = () => {
                 {item.label}
               </Link>
             ))}
+            {secondaryNavItems.map((item) => (
+              <Link
+                key={item.label}
+                to={item.href}
+                className={cn(
+                  "hidden lg:inline-block text-sm font-medium px-3 py-1.5 rounded-full whitespace-nowrap transition-colors shrink-0",
+                  isActive(item.href)
+                    ? "bg-primary/10 text-primary"
+                    : "text-muted-foreground hover:bg-secondary/70"
+                )}
+              >
+                {item.label}
+              </Link>
+            ))}
+            {/* Faixa intermediária (md–lg): agrupa itens secundários em "Mais" para não apertar a leitura */}
+            <div className="relative shrink-0 lg:hidden" ref={moreRef}>
+              <button
+                type="button"
+                onClick={() => setIsMoreOpen((prev) => !prev)}
+                aria-haspopup="true"
+                aria-expanded={isMoreOpen}
+                aria-controls="header-more-menu"
+                className={cn(
+                  "flex items-center gap-1 text-sm font-medium px-3 py-1.5 rounded-full whitespace-nowrap transition-colors",
+                  secondaryNavItems.some((item) => isActive(item.href))
+                    ? "bg-primary/10 text-primary"
+                    : "text-muted-foreground hover:bg-secondary/70"
+                )}
+              >
+                {t('nav.more') || 'Mais'}
+                <ChevronDown className={cn("w-3.5 h-3.5 transition-transform duration-200", isMoreOpen && "rotate-180")} aria-hidden="true" />
+              </button>
+              {isMoreOpen && (
+                <div
+                  id="header-more-menu"
+                  role="menu"
+                  aria-label={t('nav.more') || 'Mais'}
+                  className="absolute left-0 mt-2 w-48 rounded-xl bg-card border border-border shadow-lg z-50 py-1.5 animate-fade-in"
+                >
+                  {secondaryNavItems.map((item) => (
+                    <Link
+                      key={item.label}
+                      to={item.href}
+                      role="menuitem"
+                      onClick={() => setIsMoreOpen(false)}
+                      className={cn(
+                        "block px-3.5 py-2 text-sm font-medium transition-colors",
+                        isActive(item.href)
+                          ? "bg-primary/10 text-primary"
+                          : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+                      )}
+                    >
+                      {item.label}
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
           </nav>
         )}
 

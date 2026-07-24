@@ -1,8 +1,8 @@
 @echo off
-title Sweet Japan Treats - WhatsApp & ngrok
+title Japan Express - WhatsApp & ngrok
 chcp 65001 > nul
 echo ========================================================
-echo 🏮 Sweet Japan Treats - WhatsApp & ngrok Tunnel
+echo 🏮 Japan Express - WhatsApp & ngrok Tunnel
 echo ========================================================
 echo.
 

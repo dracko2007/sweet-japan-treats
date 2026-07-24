@@ -35,7 +35,19 @@ const devError = isDev ? console.error.bind(console) : () => {};
 
 
 const Profile: React.FC = () => {
-  const { user, isAuthenticated, authReady, coupons, orders, updateProfile, logout, refreshOrders } = useUser();
+  const {
+    user,
+    isAuthenticated,
+    authReady,
+    coupons,
+    orders,
+    ordersHasMore,
+    ordersLoadingMore,
+    loadMoreOrders,
+    updateProfile,
+    logout,
+    refreshOrders,
+  } = useUser();
   const { t, selectedCountry } = useLanguage();
   const { products } = useProducts();
   const { addToCart, clearCart } = useCart();
@@ -148,7 +160,7 @@ const Profile: React.FC = () => {
 
   // Negociações do usuário
   // Refresh orders from localStorage on mount so tracking updates from admin are visible
-  useEffect(() => { refreshOrders(); }, []);
+  useEffect(() => { void refreshOrders(); }, []);
 
   const [negotiations, setNegotiations] = useState<Negotiation[]>([]);
   useEffect(() => {
@@ -1251,6 +1263,18 @@ const Profile: React.FC = () => {
                     </div>
                     );
                   })}
+                  {ordersHasMore && (
+                    <div className="flex justify-center pt-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => void loadMoreOrders()}
+                        disabled={ordersLoadingMore}
+                      >
+                        {ordersLoadingMore ? '...' : t('profile.orders.loadMore')}
+                      </Button>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="text-center py-12">

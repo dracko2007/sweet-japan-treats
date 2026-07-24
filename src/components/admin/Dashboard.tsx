@@ -4,17 +4,18 @@ import {
   BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts';
-import { orderService } from '@/services/orderService';
+import { z } from 'zod';
 import { affiliateService } from '@/services/affiliateService';
+import type { Affiliate, PendingCommission } from '@/services/affiliateService';
+import { authenticatedFetch } from '@/services/authenticatedFetch';
 import { getMarketingExpenses } from '@/components/admin/MarketingManager';
+import type { MarketingExpense } from '@/components/admin/MarketingManager';
 import { getEmployeePayments } from '@/components/admin/EmployeeManager';
-import type { Order, OrderStatistics } from '@/types';
-import { toYen } from '@/utils/currency';
-import { useProducts } from '@/context/ProductsContext';
+import type { EmployeePayment } from '@/components/admin/EmployeeManager';
+import type { OrderStatistics } from '@/types';
 import MaintenanceToggle from '@/components/admin/MaintenanceToggle';
 import ResetOrdersButton from '@/components/admin/ResetOrdersButton';
 import WisePaymentSettings from '@/components/admin/WisePaymentSettings';
-
 interface MonthlyFin {
   month: string;
   orders: number;
@@ -41,6 +42,55 @@ interface FinanceSummary {
   lucroLiquido: number;
 }
 
+interface DashboardPayload {
+  stats: OrderStatistics;
+  finance: Pick<
+    FinanceSummary,
+    'receitaComFrete' | 'receitaSemFrete' | 'receitaProduto' | 'receitaPS'
+    | 'custo' | 'lucro' | 'descontosCupomYen'
+  >;
+  monthlyData: MonthlyFin[];
+  topProducts: { name: string; count: number }[];
+  paymentMethods: { method: string; revenue: number }[];
+}
+
+const statsSchema = z.object({
+  totalOrders: z.number(),
+  pendingOrders: z.number(),
+  shippedOrders: z.number(),
+  deliveredOrders: z.number(),
+  cancelledOrders: z.number(),
+  totalRevenue: z.number(),
+  revenueThisMonth: z.number(),
+  revenueLastMonth: z.number(),
+  ordersThisMonth: z.number(),
+  ordersLastMonth: z.number(),
+});
+
+const dashboardSchema = z.object({
+  ok: z.literal(true),
+  stats: statsSchema,
+  finance: z.object({
+    receitaComFrete: z.number(),
+    receitaSemFrete: z.number(),
+    receitaProduto: z.number(),
+    receitaPS: z.number(),
+    custo: z.number(),
+    lucro: z.number(),
+    descontosCupomYen: z.number(),
+  }),
+  monthlyData: z.array(z.object({
+    month: z.string(),
+    orders: z.number(),
+    receitaComFrete: z.number(),
+    receitaSemFrete: z.number(),
+    custo: z.number(),
+    lucro: z.number(),
+  })),
+  topProducts: z.array(z.object({ name: z.string(), count: z.number() })),
+  paymentMethods: z.array(z.object({ method: z.string(), revenue: z.number() })),
+});
+
 function SectionHeader({ title, open, onToggle }: { title: string; open: boolean; onToggle: () => void }) {
   return (
     <button
@@ -54,17 +104,23 @@ function SectionHeader({ title, open, onToggle }: { title: string; open: boolean
 }
 
 const Dashboard: React.FC = () => {
-  const { products } = useProducts();
   const EMPTY_STATS: OrderStatistics = {
     totalOrders: 0, pendingOrders: 0, shippedOrders: 0, deliveredOrders: 0,
     cancelledOrders: 0, totalRevenue: 0, revenueThisMonth: 0, revenueLastMonth: 0,
     ordersThisMonth: 0, ordersLastMonth: 0,
   };
+  const EMPTY_FINANCE: FinanceSummary = {
+    receitaComFrete: 0, receitaSemFrete: 0, receitaProduto: 0, receitaPS: 0,
+    custo: 0, lucro: 0, comissoesYen: 0, comissoesConfirmYen: 0,
+    marketingBRL: 0, marketingJPY: 0, salariosBRL: 0, salariosJPY: 0,
+    descontosCupomYen: 0, lucroLiquido: 0,
+  };
   const [stats, setStats] = useState<OrderStatistics | null>(null);
-  const [finance, setFinance] = useState<FinanceSummary>({ receitaComFrete: 0, receitaSemFrete: 0, receitaProduto: 0, receitaPS: 0, custo: 0, lucro: 0, comissoesYen: 0, comissoesConfirmYen: 0, marketingBRL: 0, marketingJPY: 0, salariosBRL: 0, salariosJPY: 0, descontosCupomYen: 0, lucroLiquido: 0 });
+  const [finance, setFinance] = useState<FinanceSummary>(EMPTY_FINANCE);
   const [monthlyData, setMonthlyData] = useState<MonthlyFin[]>([]);
   const [topProducts, setTopProducts] = useState<{ name: string; count: number }[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<{ method: string; revenue: number }[]>([]);
+  const [loadError, setLoadError] = useState('');
 
   const [openPedidos, setOpenPedidos] = useState(true);
   const [openFinanceiro, setOpenFinanceiro] = useState(true);
@@ -73,185 +129,79 @@ const Dashboard: React.FC = () => {
 
   const [refreshKey, setRefreshKey] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
-
-  const refresh = useCallback(() => setRefreshKey(k => k + 1), []);
+  const refresh = useCallback(() => setRefreshKey((key) => key + 1), []);
 
   useEffect(() => {
-    loadData();
-  }, [products, refreshKey]);
-
-  // Prefere grandTotalYen (travado na taxa do momento da compra) para consistência com o que o cliente viu.
-  const orderRevYen = (o: Order) =>
-    (o as any).grandTotalYen || toYen(o.totalPrice || o.totalAmount || 0, o.currency);
-
-  const orderShipYen = (o: Order) => {
-    const shipBrl = o.shippingCost ?? o.shipping?.cost ?? 0;
-    if ((o as any).grandTotalYen && (o.totalPrice || o.totalAmount)) {
-      const impliedRate = (o as any).grandTotalYen / (o.totalPrice || o.totalAmount || 1);
-      return Math.round(shipBrl * impliedRate);
-    }
-    return toYen(shipBrl, o.currency);
-  };
-
-  const orderPSYen = (o: Order) => (o as any).psFeeFinalYen || 0;
-
-  const orderCostYen = (o: Order) =>
-    (o.items || []).reduce((sum, it) => {
-      const snap = (it as any).cost;
-      const fromProduct = products.find(
-        (p) => p.id === it.productId || p.name === (it.productName || it.name)
-      )?.cost;
-      const unitCost = snap != null ? snap : fromProduct || 0;
-      return sum + unitCost * (it.quantity || 1);
-    }, 0);
+    void loadData();
+  }, [refreshKey]);
 
   const loadData = async () => {
     setRefreshing(true);
-    const withTimeout = <T,>(p: Promise<T>, ms: number, fallback: T): Promise<T> =>
-      Promise.race([p, new Promise<T>((res) => setTimeout(() => res(fallback), ms))]);
+    setLoadError('');
+    const withTimeout = <T,>(promise: Promise<T>, ms: number, fallback: T): Promise<T> =>
+      Promise.race([promise, new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms))]);
 
-    let orders: Order[] = [];
     try {
-      orders = await withTimeout(orderService.getAllOrdersAsync(), 8_000, []);
-    } catch {
-      orders = [];
-    }
+      const response = await withTimeout<Response | null>(
+        authenticatedFetch('/api/admin-dashboard'),
+        12_000,
+        null,
+      );
+      if (!response?.ok) throw new Error('dashboard_request_failed');
+      // Runtime schema validation establishes the network payload before the domain cast.
+      const dashboard = dashboardSchema.parse(await response.json()) as DashboardPayload;
 
-    // Comissões de afiliados: pendentes (a pagar) + confirmadas (já pagas) — ambas são despesa real
-    let comissoesYen = 0;
-    let comissoesConfirmYen = 0;
-    try {
-      const [pending, allAffiliates] = await Promise.all([
-        withTimeout(affiliateService.getPendingCommissions(), 5_000, []),
-        withTimeout(affiliateService.getAll(), 5_000, []),
+      const pendingPromise: Promise<PendingCommission[]> =
+        withTimeout(affiliateService.getPendingCommissions(), 5_000, []).catch(() => []);
+      const affiliatesPromise: Promise<Affiliate[]> =
+        withTimeout(affiliateService.getAll(), 5_000, []).catch(() => []);
+      const marketingPromise: Promise<MarketingExpense[]> =
+        withTimeout(getMarketingExpenses(), 5_000, []).catch(() => []);
+      const salariesPromise: Promise<EmployeePayment[]> =
+        withTimeout(getEmployeePayments(), 5_000, []).catch(() => []);
+      const [pending, allAffiliates, marketing, salaries] = await Promise.all([
+        pendingPromise,
+        affiliatesPromise,
+        marketingPromise,
+        salariesPromise,
       ]);
-      comissoesYen = pending.reduce((s, p) => s + (p.commissionYen || 0), 0);
-      comissoesConfirmYen = allAffiliates.reduce((s, a) => s + (a.totalEarnings || 0), 0);
-    } catch { /* ignora */ }
 
-    // Gastos de marketing (BRL + JPY convertido)
-    let marketingBRL = 0;
-    let marketingJPY = 0;
-    try {
-      const mkt = await withTimeout(getMarketingExpenses(), 5_000, []);
-      marketingBRL = mkt.filter(e => e.currency === 'BRL').reduce((s, e) => s + e.amount, 0);
-      marketingJPY = mkt.filter(e => e.currency === 'JPY').reduce((s, e) => s + e.amount, 0);
-    } catch { /* ignora */ }
+      const comissoesYen = pending.reduce((sum, item) => sum + (item.commissionYen || 0), 0);
+      const comissoesConfirmYen = allAffiliates.reduce((sum, affiliate) => sum + (affiliate.totalEarnings || 0), 0);
+      const marketingBRL = marketing.filter((item) => item.currency === 'BRL').reduce((sum, item) => sum + item.amount, 0);
+      const marketingJPY = marketing.filter((item) => item.currency === 'JPY').reduce((sum, item) => sum + item.amount, 0);
+      const salariosBRL = salaries.filter((item) => item.currency === 'BRL').reduce((sum, item) => sum + item.amount, 0);
+      const salariosJPY = salaries.filter((item) => item.currency === 'JPY').reduce((sum, item) => sum + item.amount, 0);
+      const totalComissoesYen = comissoesYen + comissoesConfirmYen;
+      const marketingYen = marketingJPY + Math.round(marketingBRL * 28);
+      const salariosYen = salariosJPY + Math.round(salariosBRL * 28);
+      const lucroLiquido = dashboard.finance.receitaProduto
+        + dashboard.finance.receitaPS
+        - dashboard.finance.custo
+        - totalComissoesYen
+        - marketingYen
+        - salariosYen;
 
-    // Salários de funcionários
-    let salariosBRL = 0;
-    let salariosJPY = 0;
-    try {
-      const pays = await withTimeout(getEmployeePayments(), 5_000, []);
-      salariosBRL = pays.filter(p => p.currency === 'BRL').reduce((s, p) => s + p.amount, 0);
-      salariosJPY = pays.filter(p => p.currency === 'JPY').reduce((s, p) => s + p.amount, 0);
-    } catch { /* ignora */ }
-
-    // Descontos de cupons — informativo, não afeta lucro
-    let descontosCupomYen = 0;
-    try {
-      const allOrds = orders.filter(o => o.status !== 'cancelled');
-      descontosCupomYen = allOrds.reduce((s, o) => {
-        const disc = (o as any).couponDiscount || 0;
-        if (!disc) return s;
-        const cur = (o as any).currency || 'BRL';
-        const grandTotalYen = (o as any).grandTotalYen || 0;
-        const totalBrl = o.totalPrice || o.totalAmount || 0;
-        let discYen = 0;
-        if (cur === 'JPY') {
-          discYen = Math.round(disc);
-        } else if (grandTotalYen > 0 && totalBrl > 0) {
-          discYen = Math.round(disc * (grandTotalYen / totalBrl));
-        } else {
-          discYen = toYen(disc, cur);
-        }
-        return s + discYen;
-      }, 0);
-    } catch { /* ignora */ }
-
-    const statistics = orderService.getStatistics(orders);
-    const active = orders.filter((o) => o.status !== 'cancelled');
-
-    let receitaComFrete = 0;
-    let receitaSemFrete = 0;
-    let receitaPS = 0;
-    let custo = 0;
-    active.forEach((o) => {
-      const rev = orderRevYen(o);
-      const ship = orderShipYen(o);
-      const ps = orderPSYen(o);
-      receitaComFrete += rev;
-      receitaSemFrete += Math.max(rev - ship, 0);
-      receitaPS += ps;
-      custo += orderCostYen(o);
-    });
-    const receitaProduto = Math.max(receitaSemFrete - receitaPS, 0);
-    const lucro = receitaProduto - custo;
-    // Lucro Líquido: receita produto + PS − custo − afiliados (pendentes+confirmados) − marketing − salários
-    const receitaTotal = receitaProduto + receitaPS;
-    const YEN_PER_BRL = 28; // fallback ¥28/BRL
-    const totalComissoesYen = comissoesYen + comissoesConfirmYen;
-    const marketingYen = marketingJPY + Math.round(marketingBRL * YEN_PER_BRL);
-    const salariosYen = salariosJPY + Math.round(salariosBRL * YEN_PER_BRL);
-    const lucroLiquido = receitaTotal - custo - totalComissoesYen - marketingYen - salariosYen;
-
-    const now = new Date();
-    const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const inRange = (o: Order, from: Date, to?: Date) => {
-      const d = new Date(o.orderDate || o.date || 0);
-      return d >= from && (!to || d < to);
-    };
-    const revenueThisMonth = active.filter((o) => inRange(o, thisMonth)).reduce((s, o) => s + orderRevYen(o), 0);
-    const revenueLastMonth = active.filter((o) => inRange(o, lastMonth, thisMonth)).reduce((s, o) => s + orderRevYen(o), 0);
-
-    const monthly: MonthlyFin[] = [];
-    for (let i = 5; i >= 0; i--) {
-      const mStart = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const mEnd = new Date(now.getFullYear(), now.getMonth() - i + 1, 1);
-      const mOrders = active.filter((o) => inRange(o, mStart, mEnd));
-      const cf = mOrders.reduce((s, o) => s + orderRevYen(o), 0);
-      const sf = mOrders.reduce((s, o) => s + Math.max(orderRevYen(o) - orderShipYen(o), 0), 0);
-      const ct = mOrders.reduce((s, o) => s + orderCostYen(o), 0);
-      monthly.push({
-        month: mStart.toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' }),
-        orders: mOrders.length,
-        receitaComFrete: cf,
-        receitaSemFrete: sf,
-        custo: ct,
-        lucro: sf - ct,
+      setStats(dashboard.stats);
+      setFinance({
+        ...dashboard.finance,
+        comissoesYen,
+        comissoesConfirmYen,
+        marketingBRL,
+        marketingJPY,
+        salariosBRL,
+        salariosJPY,
+        lucroLiquido,
       });
+      setMonthlyData(dashboard.monthlyData);
+      setTopProducts(dashboard.topProducts);
+      setPaymentMethods(dashboard.paymentMethods);
+    } catch {
+      setStats((current) => current || EMPTY_STATS);
+      setLoadError('Não foi possível atualizar os dados consolidados.');
+    } finally {
+      setRefreshing(false);
     }
-
-    const productCount: Record<string, number> = {};
-    orders.forEach((order) => {
-      (order.items || []).forEach((item) => {
-        productCount[item.productName] = (productCount[item.productName] || 0) + (item.quantity || 1);
-      });
-    });
-    const top5 = Object.entries(productCount)
-      .map(([name, count]) => ({ name, count: count as number }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 5);
-
-    const byMethod: Record<string, number> = {};
-    active.forEach((order) => {
-      const method = order.paymentMethod === 'paypay' ? 'PayPay'
-        : order.paymentMethod === 'pix' ? 'PIX'
-        : order.paymentMethod === 'wise' ? 'Wise'
-        : order.paymentMethod === 'yucho' ? 'Yucho'
-        : order.paymentMethod === 'card' ? 'Cartão'
-        : 'Outro';
-      byMethod[method] = (byMethod[method] || 0) + orderRevYen(order);
-    });
-    const payment = Object.entries(byMethod).map(([method, revenue]) => ({ method, revenue: revenue as number }));
-
-    setStats({ ...statistics, totalRevenue: receitaComFrete, revenueThisMonth, revenueLastMonth });
-    setFinance({ receitaComFrete, receitaSemFrete, receitaProduto, receitaPS, custo, lucro, comissoesYen, comissoesConfirmYen, marketingBRL, marketingJPY, salariosBRL, salariosJPY, descontosCupomYen, lucroLiquido });
-    setMonthlyData(monthly);
-    setTopProducts(top5);
-    setPaymentMethods(payment);
-    setRefreshing(false);
   };
 
   if (!stats) {
@@ -291,6 +241,11 @@ const Dashboard: React.FC = () => {
 
   return (
     <div className="space-y-4">
+      {loadError && (
+        <p className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          {loadError}
+        </p>
+      )}
 
       {/* ── Configurações ── */}
       <div className="flex items-center gap-2">

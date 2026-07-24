@@ -27,6 +27,7 @@ import StockUrgency from '@/components/products/StockUrgency';
 import { recentlyViewed } from '@/utils/recentlyViewed';
 import { promoCampaignService } from '@/services/promoCampaignService';
 import { safeStorage } from '@/utils/storage';
+import { trackViewItem } from '@/lib/analytics';
 
 const ProductDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -85,6 +86,12 @@ const ProductDetail: React.FC = () => {
   useEffect(() => {
     if (product) {
       registrarEvento('viu_produto', product.id, product.category);
+      trackViewItem({
+        item_id: product.id,
+        item_name: product.name,
+        item_category: product.category,
+        price: baseYen(product),
+      }, 'JPY');
       const vs = getVariants(product);
       if (vs.length && !vs.some((v) => v.id === selectedSize)) setSelectedSize(vs[0].id);
       // Rastreia visualização no painel de visitantes

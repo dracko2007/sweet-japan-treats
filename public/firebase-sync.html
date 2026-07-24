@@ -144,7 +144,7 @@
                 addLog('✅ Authentication conectado!', '#0f0');
                 
                 // Check localStorage data
-                const usersData = localStorage.getItem('sweet-japan-users');
+                const usersData = localStorage.getItem('japan-express-users');
                 if (usersData) {
                     const users = JSON.parse(usersData);
                     const userCount = Object.keys(users).length;
@@ -166,7 +166,7 @@
                 addLog('🔄 Iniciando migração de dados...');
                 showStatus('🔄 Migrando dados...', 'info');
                 
-                const usersData = localStorage.getItem('sweet-japan-users');
+                const usersData = localStorage.getItem('japan-express-users');
                 if (!usersData) {
                     addLog('⚠️ Nenhum dado para migrar', '#fa0');
                     showStatus('⚠️ Nenhum dado encontrado no localStorage', 'warning');

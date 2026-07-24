@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { ShoppingCart, X, ArrowRight } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
 import { useUser } from '@/context/UserContext';
+import { useLanguage } from '@/context/LanguageContext';
 import { cartAbandonmentService } from '@/services/cartAbandonmentService';
 
 const DISMISS_KEY = 'cart_recovery_dismissed_at';
@@ -16,6 +17,7 @@ const CartRecoveryBanner: React.FC = () => {
   const navigate = useNavigate();
   const { items } = useCart();
   const { user } = useUser();
+  const { t } = useLanguage();
   const [abandoned, setAbandoned] = useState<{ itemCount: number; items: Array<{ name: string }> } | null>(null);
   const [visible, setVisible] = useState(false);
 
@@ -52,14 +54,18 @@ const CartRecoveryBanner: React.FC = () => {
       <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border-2 border-pink-400 overflow-hidden">
         <button
           onClick={dismiss}
-          aria-label="Fechar"
+          aria-label={t('cartRecovery.close')}
           className="absolute right-2 top-2 p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 z-10"
         >
           <X className="w-4 h-4" />
         </button>
         <div className="bg-gradient-to-r from-pink-600 to-amber-500 px-4 py-3 text-white flex items-center gap-2">
           <ShoppingCart className="w-5 h-5" />
-          <p className="font-bold text-sm">Você deixou {abandoned.itemCount} {abandoned.itemCount === 1 ? 'item' : 'itens'} no carrinho! 🛒</p>
+          <p className="font-bold text-sm">
+            {t('cartRecovery.title')
+              .replace('{count}', String(abandoned.itemCount))
+              .replace('{itemLabel}', t(abandoned.itemCount === 1 ? 'cartRecovery.item' : 'cartRecovery.items'))}
+          </p>
         </div>
         <div className="p-4">
           <div className="space-y-1 mb-3">
@@ -69,14 +75,14 @@ const CartRecoveryBanner: React.FC = () => {
               </p>
             ))}
             {abandoned.itemCount > 3 && (
-              <p className="text-xs text-muted-foreground">e mais {abandoned.itemCount - 3}...</p>
+              <p className="text-xs text-muted-foreground">{t('cartRecovery.andMore').replace('{count}', String(abandoned.itemCount - 3))}</p>
             )}
           </div>
           <button
             onClick={goToCart}
             className="w-full bg-gradient-to-r from-pink-600 to-amber-500 text-white font-bold py-2.5 rounded-xl hover:opacity-90 transition-opacity flex items-center justify-center gap-2 text-sm"
           >
-            Voltar ao meu carrinho <ArrowRight className="w-4 h-4" />
+            {t('cartRecovery.cta')} <ArrowRight className="w-4 h-4" />
           </button>
         </div>
       </div>

@@ -1,10 +1,9 @@
 // Pedidos personalizados ("Faça seu Pedido") — encomendas de produtos que não
 // estão no catálogo. Cliente envia (mesmo sem login); admin lê e responde.
 import { db } from '@/config/firebase';
-import {
-  collection, doc, getDocs, setDoc, deleteDoc, updateDoc, query, orderBy,
-} from 'firebase/firestore';
+import { doc, collection, getDocs, deleteDoc, updateDoc, query, orderBy } from 'firebase/firestore';
 import { ensureAdminAuth } from '@/utils/adminAuth';
+import { submitPublicForm } from '@/services/publicSubmissionService';
 
 const isDev = import.meta.env.DEV;
 const devLog = isDev ? console.log.bind(console) : () => {};
@@ -28,21 +27,12 @@ export interface CustomRequest {
 const COL = 'custom_requests';
 
 export const customRequestService = {
-  async create(data: Omit<CustomRequest, 'id' | 'status' | 'createdAt'>): Promise<boolean> {
-    if (!db) return false;
-    try {
-      const id = `req-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-      await setDoc(doc(db, COL, id), {
-        ...data,
-        id,
-        status: 'new',
-        createdAt: new Date().toISOString(),
-      });
-      return true;
-    } catch (e) {
-      devError('[customRequest] create falhou:', e);
-      return false;
-    }
+  async create(
+    data: Omit<CustomRequest, 'id' | 'status' | 'createdAt' | 'adminNote'>,
+  ): Promise<boolean> {
+    const result = await submitPublicForm('custom_request', data);
+    if (!result.ok) devError('[customRequest] create falhou:', result.error);
+    return result.ok;
   },
 
   async getAll(): Promise<CustomRequest[]> {

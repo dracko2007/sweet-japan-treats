@@ -16,10 +16,12 @@ export interface AdminCatalogItem extends CatalogItem {
 
 export interface Locale { country: string; currencyCode: string; currencySymbol: string; }
 
-// KimiClaw agora é 100% determinístico (regras + catálogo real + tabela de frete real).
-// A IA foi DESLIGADA: qwenEnabled() retorna false → askQwen() nunca é chamado, o
-// endpoint /api/kimiclaw fica sem uso e o chat responde só pelas regras no frontend.
-export const qwenEnabled = (): boolean => false;
+// KimiClaw: skills determinísticos (busca, carrinho, orçamento, frete, cupom, admin)
+// continuam 100% por regras — a IA nunca calcula preço/frete/número de negócio,
+// só entra pra conversa/recomendação quando nenhum skill determinístico bate.
+// Ver api/kimiclaw.js (SYSTEM_PROMPT + containsUngroundedMoney) para as garantias
+// contra alucinação de preço.
+export const qwenEnabled = (): boolean => true;
 
 export interface AskQwenOptions {
   isAdmin?: boolean;

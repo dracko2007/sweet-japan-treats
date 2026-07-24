@@ -1,51 +1,81 @@
 import { safeStorage } from '@/utils/storage';
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { Search, Package, Truck, CheckCircle, XCircle } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
+import { useLanguage } from '@/context/LanguageContext';
 import { cn } from '@/lib/utils';
-import { firebaseSyncService } from '@/services/firebaseSyncService';
 import { db } from '@/config/firebase';
 import { doc, getDoc } from 'firebase/firestore';
 import { formatPrice } from '@/utils/currency';
 
 const isDev = import.meta.env.DEV;
-const devLog = isDev ? console.log.bind(console) : () => {};
-const devWarn = isDev ? console.warn.bind(console) : () => {};
 const devError = isDev ? console.error.bind(console) : () => {};
 
+type OrderStatusValue = 'pending' | 'processing' | 'confirmed' | 'shipped' | 'delivered' | 'cancelled';
 
 interface OrderStatus {
-  status: 'pending' | 'processing' | 'confirmed' | 'shipped' | 'delivered' | 'cancelled';
-  label: string;
+  status: OrderStatusValue;
+  labelKey: string;
   icon: React.ReactNode;
-  color: string;
-  date?: string;
+}
+
+interface TrackedOrderItem {
+  productName: string;
+  size: string;
+  quantity: number;
+  price: number;
+}
+
+interface TrackedOrder {
+  id?: string;
+  orderNumber: string;
+  date: string;
+  status: OrderStatusValue;
+  totalAmount: number;
+  currency?: string;
+  paymentMethod: string;
+  items: TrackedOrderItem[];
+  shippingAddress: {
+    name: string;
+    postalCode: string;
+    prefecture: string;
+    city: string;
+    address: string;
+    building?: string;
+  };
 }
 
 const TrackOrder: React.FC = () => {
   const [orderNumber, setOrderNumber] = useState('');
-  const [searchedOrder, setSearchedOrder] = useState<any>(null);
+  const [searchedOrder, setSearchedOrder] = useState<TrackedOrder | null>(null);
   const [isSearching, setIsSearching] = useState(false);
   const { toast } = useToast();
-  const navigate = useNavigate();
+  const { t, language } = useLanguage();
 
   const statusFlow: OrderStatus[] = [
-    { status: 'pending', label: 'Pendente', icon: <Package className="w-6 h-6" />, color: 'text-yellow-500' },
-    { status: 'processing', label: 'Processando', icon: <Package className="w-6 h-6" />, color: 'text-blue-500' },
-    { status: 'confirmed', label: 'Confirmado', icon: <CheckCircle className="w-6 h-6" />, color: 'text-green-500' },
-    { status: 'shipped', label: 'Enviado', icon: <Truck className="w-6 h-6" />, color: 'text-purple-500' },
-    { status: 'delivered', label: 'Entregue', icon: <CheckCircle className="w-6 h-6" />, color: 'text-green-500' },
+    { status: 'pending', labelKey: 'trackOrder.status.pending', icon: <Package className="w-6 h-6" /> },
+    { status: 'processing', labelKey: 'trackOrder.status.processing', icon: <Package className="w-6 h-6" /> },
+    { status: 'confirmed', labelKey: 'trackOrder.status.confirmed', icon: <CheckCircle className="w-6 h-6" /> },
+    { status: 'shipped', labelKey: 'trackOrder.status.shipped', icon: <Truck className="w-6 h-6" /> },
+    { status: 'delivered', labelKey: 'trackOrder.status.delivered', icon: <CheckCircle className="w-6 h-6" /> },
   ];
+
+  const dateLocale = language === 'pt' ? 'pt-BR' : language === 'ja' ? 'ja-JP' : 'en-US';
+
+  const paymentLabel = (method: string): string => {
+    if (method === 'bank') return t('trackOrder.payment.bank');
+    if (method === 'paypay') return t('trackOrder.payment.paypay');
+    return t('trackOrder.payment.card');
+  };
 
   const handleSearch = async () => {
     if (!orderNumber.trim()) {
       toast({
-        title: 'Erro',
-        description: 'Digite um número de pedido',
+        title: t('trackOrder.error.title'),
+        description: t('trackOrder.error.empty'),
         variant: 'destructive'
       });
       return;
@@ -55,13 +85,13 @@ const TrackOrder: React.FC = () => {
 
     // 1. Buscar no safeStorage (usuários locais)
     const usersData = safeStorage.getItem('japan-express-users');
-    let order = null;
-    
+    let order: TrackedOrder | null = null;
+
     if (usersData) {
       const users = JSON.parse(usersData);
       for (const email of Object.keys(users)) {
         const userOrders = users[email]?.orders || [];
-        const found = userOrders.find((o: any) => o.orderNumber === orderNumber.toUpperCase());
+        const found = userOrders.find((o: TrackedOrder) => o.orderNumber === orderNumber.toUpperCase());
         if (found) {
           order = found;
           break;
@@ -76,7 +106,7 @@ const TrackOrder: React.FC = () => {
         .map(key => safeStorage.getItem(key))
         .filter(Boolean)
         .flatMap(data => JSON.parse(data as string));
-      order = allLocalOrders.find((o: any) => o.orderNumber === orderNumber.toUpperCase());
+      order = allLocalOrders.find((o: TrackedOrder) => o.orderNumber === orderNumber.toUpperCase()) || null;
     }
 
     // 2. Se não encontrou localmente, busca direta no Firestore pelo ID do pedido
@@ -84,7 +114,7 @@ const TrackOrder: React.FC = () => {
     if (!order && db) {
       try {
         const snap = await getDoc(doc(db, 'orders', orderNumber.toUpperCase()));
-        if (snap.exists()) order = { id: snap.id, ...snap.data() };
+        if (snap.exists()) order = { id: snap.id, ...snap.data() } as TrackedOrder;
       } catch (err) {
         devError('Error searching Firestore:', err);
       }
@@ -94,8 +124,8 @@ const TrackOrder: React.FC = () => {
 
     if (!order) {
       toast({
-        title: 'Pedido não encontrado',
-        description: 'Verifique o número e tente novamente',
+        title: t('trackOrder.notFound.title'),
+        description: t('trackOrder.notFound.desc'),
         variant: 'destructive'
       });
       return;
@@ -114,10 +144,10 @@ const TrackOrder: React.FC = () => {
         <div className="container mx-auto px-4">
           <div className="text-center max-w-2xl mx-auto">
             <h1 className="font-display text-4xl lg:text-5xl font-bold text-foreground mb-4">
-              Rastrear Pedido
+              {t('trackOrder.title')}
             </h1>
             <p className="text-muted-foreground text-lg">
-              Digite o número do seu pedido para acompanhar o status
+              {t('trackOrder.subtitle')}
             </p>
           </div>
         </div>
@@ -129,15 +159,15 @@ const TrackOrder: React.FC = () => {
           <div className="bg-card rounded-2xl border border-border p-8 mb-8">
             <div className="flex gap-3">
               <Input
-                placeholder="Ex: DL-12345678"
+                placeholder={t('trackOrder.placeholder')}
                 value={orderNumber}
                 onChange={(e) => setOrderNumber(e.target.value.toUpperCase())}
-                onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
                 className="flex-1 text-lg"
               />
               <Button onClick={handleSearch} size="lg" disabled={isSearching}>
                 <Search className="w-5 h-5 mr-2" />
-                {isSearching ? 'Buscando...' : 'Rastrear'}
+                {isSearching ? t('trackOrder.searching') : t('trackOrder.searchBtn')}
               </Button>
             </div>
           </div>
@@ -150,24 +180,24 @@ const TrackOrder: React.FC = () => {
                 <div className="flex items-start justify-between mb-6">
                   <div>
                     <h2 className="font-display text-2xl font-bold mb-2">
-                      Pedido {searchedOrder.orderNumber}
+                      {t('trackOrder.order')} {searchedOrder.orderNumber}
                     </h2>
                     <p className="text-muted-foreground">
-                      Realizado em {new Date(searchedOrder.date).toLocaleDateString('pt-BR')}
+                      {t('trackOrder.placedOn')} {new Date(searchedOrder.date).toLocaleDateString(dateLocale)}
                     </p>
                   </div>
                   <div className="text-right">
                     <p className="text-3xl font-bold text-primary">
                       {formatPrice(searchedOrder.totalAmount, searchedOrder.currency || 'BRL')}
                     </p>
-                    <p className="text-sm text-muted-foreground">{searchedOrder.paymentMethod === 'bank' ? 'Depósito' : searchedOrder.paymentMethod === 'paypay' ? 'PayPay' : 'Cartão/Pix'}</p>
+                    <p className="text-sm text-muted-foreground">{paymentLabel(searchedOrder.paymentMethod)}</p>
                   </div>
                 </div>
 
                 {/* Timeline */}
                 <div className="relative">
                   <div className="absolute top-8 left-8 h-full w-0.5 bg-border"></div>
-                  
+
                   {statusFlow.map((step, index) => {
                     const currentIndex = getStatusIndex(searchedOrder.status);
                     const isCompleted = index <= currentIndex;
@@ -190,13 +220,13 @@ const TrackOrder: React.FC = () => {
                             "font-semibold text-lg mb-1",
                             isCompleted && !isCancelled ? 'text-foreground' : 'text-muted-foreground'
                           )}>
-                            {step.label}
+                            {t(step.labelKey)}
                           </h3>
                           {isCurrent && (
-                            <p className="text-sm text-blue-600 font-medium">Status atual</p>
+                            <p className="text-sm text-blue-600 font-medium">{t('trackOrder.status.current')}</p>
                           )}
                           {isCompleted && index < currentIndex && (
-                            <p className="text-sm text-green-600">✓ Concluído</p>
+                            <p className="text-sm text-green-600">{t('trackOrder.status.completed')}</p>
                           )}
                         </div>
                       </div>
@@ -210,8 +240,8 @@ const TrackOrder: React.FC = () => {
                         <XCircle className="w-6 h-6" />
                       </div>
                       <div className="flex-1 pt-3">
-                        <h3 className="font-semibold text-lg mb-1 text-red-600">Cancelado</h3>
-                        <p className="text-sm text-muted-foreground">O pedido foi cancelado</p>
+                        <h3 className="font-semibold text-lg mb-1 text-red-600">{t('trackOrder.status.cancelled')}</h3>
+                        <p className="text-sm text-muted-foreground">{t('trackOrder.status.cancelledDesc')}</p>
                       </div>
                     </div>
                   )}
@@ -220,9 +250,9 @@ const TrackOrder: React.FC = () => {
 
               {/* Products */}
               <div className="bg-card rounded-2xl border border-border p-8">
-                <h3 className="font-semibold text-lg mb-4">Produtos</h3>
+                <h3 className="font-semibold text-lg mb-4">{t('trackOrder.products')}</h3>
                 <div className="space-y-3">
-                  {searchedOrder.items.map((item: any, index: number) => (
+                  {searchedOrder.items.map((item, index) => (
                     <div key={index} className="flex justify-between items-center py-3 border-b last:border-0">
                       <div>
                         <p className="font-medium">{item.productName}</p>
@@ -236,7 +266,7 @@ const TrackOrder: React.FC = () => {
 
               {/* Shipping Address */}
               <div className="bg-card rounded-2xl border border-border p-8">
-                <h3 className="font-semibold text-lg mb-4">Endereço de Entrega</h3>
+                <h3 className="font-semibold text-lg mb-4">{t('trackOrder.shippingAddress')}</h3>
                 <p className="text-foreground">
                   {searchedOrder.shippingAddress.name}<br />
                   〒{searchedOrder.shippingAddress.postalCode}<br />
@@ -252,7 +282,7 @@ const TrackOrder: React.FC = () => {
             <div className="text-center py-16">
               <Package className="w-16 h-16 text-muted-foreground mx-auto mb-4 opacity-50" />
               <p className="text-muted-foreground">
-                Digite um número de pedido para rastrear
+                {t('trackOrder.emptyState')}
               </p>
             </div>
           )}

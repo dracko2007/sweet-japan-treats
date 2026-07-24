@@ -1,13 +1,14 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { safeStorage } from '@/utils/storage';
 import { firebaseSyncService } from '@/services/firebaseSyncService';
-import type { SocialProvider } from '@/services/firebaseSyncService';
+import type { OrderPageCursor, SocialProvider } from '@/services/firebaseSyncService';
 import { firebaseConfigReady, allowLocalOnly, auth } from '@/config/firebase';
-import { signInWithEmailAndPassword } from 'firebase/auth';
+import { signInWithCustomToken, signInWithEmailAndPassword } from 'firebase/auth';
 import type { ConfirmationResult, RecaptchaVerifier } from 'firebase/auth';
 import { ADMIN_EMAIL, ADMIN_USER_ID, isAdminEmail } from '@/config/admin';
 import { adminService } from '@/services/adminService';
 import { referralService } from '@/services/referralService';
+import { trackSignUp, trackLogin } from '@/lib/analytics';
 
 const isDev = import.meta.env.DEV;
 const devLog = isDev ? console.log.bind(console) : () => {};
@@ -111,6 +112,9 @@ interface UserContextType {
   setLoginAs: (mode: 'admin' | 'user') => void;
   coupons: Coupon[];
   orders: Order[];
+  ordersHasMore: boolean;
+  ordersLoadingMore: boolean;
+  loadMoreOrders: () => Promise<void>;
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string; code?: string; needsVerification?: boolean }>;
   loginWithGoogle: () => Promise<{ success: boolean; error?: string }>;
   loginWithProvider: (provider: SocialProvider) => Promise<{ success: boolean; error?: string }>;
@@ -126,7 +130,7 @@ interface UserContextType {
   validateProfileCoupon: (code: string, orderTotalYen?: number) => { valid: boolean; coupon?: Coupon; error?: string };
   addOrder: (order: Omit<Order, 'id' | 'date'> & { orderNumber?: string }) => Promise<void> | void;
   clearOrderHistory: () => void;
-  refreshOrders: () => void;
+  refreshOrders: () => Promise<void>;
   sendPasswordReset: (email: string) => Promise<{ success: boolean; error?: string }>;
   resendVerificationEmail: () => Promise<boolean>;
 }
@@ -149,6 +153,9 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [ordersCursor, setOrdersCursor] = useState<OrderPageCursor | null>(null);
+  const [ordersHasMore, setOrdersHasMore] = useState(false);
+  const [ordersLoadingMore, setOrdersLoadingMore] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authReady, setAuthReady] = useState(false);
   // Modo da sessão para contas admin: 'admin' (painel) ou 'user' (cliente).
@@ -178,6 +185,9 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     setIsAuthenticated(false);
     setCoupons([]);
     setOrders([]);
+    setOrdersCursor(null);
+    setOrdersHasMore(false);
+    setOrdersLoadingMore(false);
     setLoginAsState(null);
     safeStorage.removeItem('user');
     safeStorage.removeItem('loginAs');
@@ -331,34 +341,42 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     );
   };
 
-  const refreshOrders = () => {
+  const refreshOrders = async (): Promise<void> => {
     if (!user) return;
-    const fresh = getUserOrders(user.id, user.email).map(fixTrackingUrl);
-    setOrders(fresh);
+    const localOrders = getUserOrders(user.id, user.email).map(fixTrackingUrl);
+    setOrders(localOrders);
+
+    try {
+      const page = await loadOrdersFromFirestore(user.id, user.email);
+      setOrders(mergeOrders(localOrders, page.items));
+      setOrdersCursor(page.nextCursor);
+      setOrdersHasMore(page.hasMore);
+    } catch (error) {
+      devWarn('⚠️ [SYNC] Could not refresh orders from Firestore:', error);
+      setOrdersCursor(null);
+      setOrdersHasMore(false);
+    }
+  };
+
+  const loadMoreOrders = async (): Promise<void> => {
+    if (!user || !ordersHasMore || !ordersCursor || ordersLoadingMore) return;
+    setOrdersLoadingMore(true);
+    try {
+      const page = await loadOrdersFromFirestore(user.id, user.email, ordersCursor);
+      setOrders((current) => mergeOrders(current, page.items));
+      setOrdersCursor(page.nextCursor);
+      setOrdersHasMore(page.hasMore);
+    } catch (error) {
+      devWarn('⚠️ [SYNC] Could not load the next orders page:', error);
+    } finally {
+      setOrdersLoadingMore(false);
+    }
   };
 
   const saveUserOrders = (userId: string, orders: Order[]) => {
     safeStorage.setItem(`orders_${userId}`, JSON.stringify(orders));
   };
 
-  // Helper: sync local orders to Firestore for a user
-  const syncLocalOrdersToFirestore = async (userId: string, email: string, localOrders: Order[]) => {
-    if (localOrders.length === 0) return;
-    devLog(`🔄 [SYNC] Syncing ${localOrders.length} local orders to Firestore for ${email}...`);
-    for (const order of localOrders) {
-      try {
-        await firebaseSyncService.syncOrderToFirestore(userId, {
-          ...order,
-          orderDate: order.date,
-          totalPrice: order.totalAmount,
-          customerEmail: email,
-        });
-      } catch (err) {
-        devWarn('⚠️ [SYNC] Failed to sync order:', order.orderNumber, err);
-      }
-    }
-    devLog('✅ [SYNC] Local orders synced to Firestore');
-  };
 
   // Helper: fix old tracking URLs to use the correct format (direct results)
   const fixTrackingUrl = (order: any): any => {
@@ -394,31 +412,53 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     return order;
   };
 
-  // Helper: load orders from Firestore for a user
-  const loadOrdersFromFirestore = async (userId: string, userEmail?: string): Promise<Order[]> => {
+  interface LoadedOrdersPage {
+    items: Order[];
+    nextCursor: OrderPageCursor | null;
+    hasMore: boolean;
+  }
+
+  // Helper: load one bounded Firestore page for a user.
+  const loadOrdersFromFirestore = async (
+    userId: string,
+    userEmail?: string,
+    cursor: OrderPageCursor | null = null
+  ): Promise<LoadedOrdersPage> => {
+    const page = await firebaseSyncService.getOrdersFromFirestore(userId, userEmail, 20, cursor);
+    const items = page.items.map((order) => {
+      const mapped = {
+        id: order.id || order.orderNumber,
+        orderNumber: order.orderNumber || order.id,
+        date: order.orderDate || order.date || order.syncedAt,
+        items: order.items || [],
+        totalAmount: order.totalAmount || order.totalPrice || 0,
+        paymentMethod: order.paymentMethod || '',
+        status: order.status || 'pending',
+        shippingAddress: order.shippingAddress || {},
+        ...(order.trackingNumber && { trackingNumber: order.trackingNumber }),
+        ...(order.trackingUrl && { trackingUrl: order.trackingUrl }),
+        ...(order.carrier && { carrier: order.carrier }),
+        ...(order.shipping && { shipping: order.shipping }),
+      };
+      return fixTrackingUrl(mapped);
+    }) as Order[];
+
+    return {
+      items,
+      nextCursor: page.nextCursor,
+      hasMore: page.hasMore,
+    };
+  };
+
+  const loadInitialOrdersFromFirestore = async (
+    userId: string,
+    userEmail?: string
+  ): Promise<LoadedOrdersPage> => {
     try {
-      const firestoreOrders = await firebaseSyncService.getOrdersFromFirestore(userId, userEmail);
-      return firestoreOrders.map((o: any) => {
-        const mapped = {
-          id: o.id || o.orderNumber,
-          orderNumber: o.orderNumber || o.id,
-          date: o.orderDate || o.date || o.syncedAt,
-          items: o.items || [],
-          totalAmount: o.totalAmount || o.totalPrice || 0,
-          paymentMethod: o.paymentMethod || '',
-          status: o.status || 'pending',
-          shippingAddress: o.shippingAddress || {},
-          ...(o.trackingNumber && { trackingNumber: o.trackingNumber }),
-          ...(o.trackingUrl && { trackingUrl: o.trackingUrl }),
-          ...(o.carrier && { carrier: o.carrier }),
-          ...(o.shipping && { shipping: o.shipping }),
-        };
-        // Fix old tracking URLs to use correct format
-        return fixTrackingUrl(mapped);
-      }) as Order[];
-    } catch (err) {
-      devWarn('⚠️ [SYNC] Could not load orders from Firestore:', err);
-      return [];
+      return await loadOrdersFromFirestore(userId, userEmail);
+    } catch (error) {
+      devWarn('⚠️ [SYNC] Initial order page unavailable; keeping local history:', error);
+      return { items: [], nextCursor: null, hasMore: false };
     }
   };
 
@@ -521,21 +561,13 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
           const localOrders = getUserOrders(mergedUser.id, mergedUser.email);
           const userCoupons = resolveUserCoupons(mergedUser);
           
-          // Load Firestore orders
-          const firestoreOrders = await loadOrdersFromFirestore(firebaseUser.uid, mergedUser.email);
-          
-          // Merge and set
-          const allOrders = mergeOrders(localOrders, firestoreOrders);
+          // Load the first bounded Firestore page and merge local history.
+          const firestorePage = await loadInitialOrdersFromFirestore(firebaseUser.uid, mergedUser.email);
+          const allOrders = mergeOrders(localOrders, firestorePage.items);
           setCoupons(userCoupons);
           setOrders(allOrders);
-          
-          // Sync any local-only orders UP to Firestore
-          const localOnlyOrders = localOrders.filter(
-            lo => !firestoreOrders.some(fo => fo.orderNumber === lo.orderNumber)
-          );
-          if (localOnlyOrders.length > 0) {
-            syncLocalOrdersToFirestore(firebaseUser.uid, (firestoreUser as any).email, localOnlyOrders);
-          }
+          setOrdersCursor(firestorePage.nextCursor);
+          setOrdersHasMore(firestorePage.hasMore);
           
           safeStorage.setItem('user', JSON.stringify(stripSensitive(mergedUser)));
         }
@@ -616,18 +648,17 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     const normalizedEmail = normalizeEmail(email);
     // 1) LOGIN DE ADMIN por usuário/nome ("Administrador" ou nome cadastrado) + senha.
     //    Separado dos e-mails de cliente — não mistura com a conta de cliente.
-    const admin = await adminService.authenticate(email, password);
-    if (admin) {
+    const adminSession = await adminService.authenticate(email, password);
+    if (adminSession) {
       const adminUser: UserProfile = {
         id: ADMIN_USER_ID,
-        name: admin.name,
+        name: adminSession.name,
         email: ADMIN_EMAIL,
         phone: '',
-        adminRole: admin.role,
+        adminRole: adminSession.role,
         address: { postalCode: '', prefecture: '', city: '', address: '' },
         createdAt: new Date().toISOString(),
       };
-
       setUser(adminUser);
       setIsAuthenticated(true);
       setCoupons([]);
@@ -639,12 +670,16 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       // já encontra o admin no localStorage e retorna cedo.
       if (auth) {
         try {
-          await signInWithEmailAndPassword(auth, ADMIN_EMAIL, password);
+          if (adminSession.customToken) {
+            await signInWithCustomToken(auth, adminSession.customToken);
+          } else {
+            await signInWithEmailAndPassword(auth, ADMIN_EMAIL, password);
+          }
         } catch (err) {
-          devWarn('⚠️ Admin verificado via REST, mas signIn do SDK falhou:', err);
+          devWarn('⚠️ Admin verificado, mas signIn do SDK falhou:', err);
         }
       }
-      devLog(`✅ Admin "${admin.name}" (nível ${admin.role}) logado`);
+      devLog(`✅ Admin "${adminSession.name}" (nível ${adminSession.role}) logado`);
       return { success: true };
     }
     
@@ -725,26 +760,21 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
         setUser(userData as UserProfile);
         setIsAuthenticated(true);
         
-        // Load and merge orders
+        // Load and merge the first bounded Firestore page.
         const localOrders = getUserOrders(userData.id, (userData as any).email || normalizedEmail);
-        const firestoreOrders = await loadOrdersFromFirestore(firebaseUser.uid, (userData as any).email || normalizedEmail);
-        const allOrders = mergeOrders(localOrders, firestoreOrders);
-        
+        const firestorePage = await loadInitialOrdersFromFirestore(firebaseUser.uid, (userData as any).email || normalizedEmail);
+        const allOrders = mergeOrders(localOrders, firestorePage.items);
+
         const userCoupons = resolveUserCoupons(userData as UserProfile);
         setCoupons(userCoupons);
         setOrders(allOrders);
-
-        // Sync local-only orders UP to Firestore
-        const localOnlyOrders = localOrders.filter(
-          lo => !firestoreOrders.some(fo => fo.orderNumber === lo.orderNumber)
-        );
-        if (localOnlyOrders.length > 0) {
-          syncLocalOrdersToFirestore(firebaseUser.uid, (userData as any).email, localOnlyOrders);
-        }
+        setOrdersCursor(firestorePage.nextCursor);
+        setOrdersHasMore(firestorePage.hasMore);
         
         safeStorage.setItem('user', JSON.stringify(stripSensitive(userData as UserProfile)));
 
         devLog('✅ User logged in successfully via Firebase:', { email: userData.email, id: userData.id });
+        trackLogin('email');
         return { success: true };
       }
     } catch (error: any) {
@@ -921,6 +951,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       await firebaseSyncService.logoutUser();
 
       devLog('✅ [REGISTER] Cadastro concluído (sync nuvem:', syncResult, ')');
+      trackSignUp('email');
       return { success: true, verificationEmailSent: verificationSent };
     } catch (error) {
       devError('❌ [DEBUG] Error registering user:', error);
@@ -1046,6 +1077,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       // Usuário já existe → fazer login
       await hydrateSessionFromFirebaseUser(fbUser);
       devLog(`✅ [SOCIAL LOGIN] Sucesso (${key})`);
+      trackLogin(key);
       return { success: true };
     } catch (error) {
       devError(`❌ [SOCIAL LOGIN] Falhou (${key}):`, error);
@@ -1325,6 +1357,9 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     setLoginAs,
     coupons,
     orders,
+    ordersHasMore,
+    ordersLoadingMore,
+    loadMoreOrders,
     login,
     loginWithGoogle,
     loginWithProvider,

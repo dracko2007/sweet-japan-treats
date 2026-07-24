@@ -6,6 +6,9 @@ import { useGSAP } from '@gsap/react';
 import { ArrowRight, ArrowDown, PlaneTakeoff, ShoppingBag } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getLenis } from '@/lib/smoothScroll';
+import { useLanguage } from '@/context/LanguageContext';
+import { formatPrice, getCurrencyByCountry } from '@/utils/currency';
+import { convertYen } from '@/services/fxService';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -13,10 +16,10 @@ gsap.registerPlugin(ScrollTrigger);
 interface ShelfProduct {
   id: string;
   brand: string;
-  name: string;
+  nameKey: string;
   nameJa: string;
-  description: string;
-  price: string;
+  descriptionKey: string;
+  priceYen: number;
   image: string;
   bgKanji: string;
   accent: string;
@@ -32,80 +35,38 @@ const PRODUCTS: ShelfProduct[] = [
   {
     id: 'fino-mask',
     brand: 'Fino · Premium Touch',
-    name: 'Hair Mask',
+    nameKey: 'cinematicHero.products.finoMask.name',
     nameJa: 'ヘアマスク',
-    description:
-      'Máscara de tratamento intensivo que hidrata profundamente e repara fios danificados por química e calor.',
-    price: '¥1.440',
+    descriptionKey: 'cinematicHero.products.finoMask.description',
+    priceYen: 1440,
     image: '/cinematic/fino-hair-mask.jpg',
     bgKanji: '髪',
     accent: '#a16207',
-    link: '/produtos/cosmeticos',
+    link: '/produto/fino-mask',
   },
   {
     id: 'honey-melty',
     brand: '&honey · Melty Moist',
-    name: 'Shampoo + Tratamento',
+    nameKey: 'cinematicHero.products.honeyMelty.name',
     nameJa: 'シャンプー ＆ トリートメント',
-    description:
-      'Shampoo e condicionador com mel, óleos botânicos e ácido hialurônico. Hidratação intensa do conteúdo ao refil.',
-    price: '¥5.400',
+    descriptionKey: 'cinematicHero.products.honeyMelty.description',
+    priceYen: 5400,
     image: '/cinematic/honey-melty.jpg',
     bgKanji: '蜜',
     accent: '#db7c2c',
-    link: '/produtos/cosmeticos',
-  },
-  {
-    id: 'fino-oil',
-    brand: 'Fino · Premium Touch',
-    name: 'Hair Oil',
-    nameJa: 'ヘアオイル',
-    description:
-      'Óleo capilar que nutre, controla o frizz e traz brilho intenso sem pesar os fios.',
-    price: '¥2.340',
-    image: '/cinematic/fino-hair-oil.jpg',
-    bgKanji: '油',
-    accent: '#a16207',
-    link: '/produtos/cosmeticos',
-  },
-  {
-    id: 'honey-pixie',
-    brand: '&honey · Pixie Moist',
-    name: 'Silky Hair Oil',
-    nameJa: 'ヘアオイル',
-    description:
-      'Óleo leve com mel e ácido hialurônico para fios sedosos, alinhados e com movimento natural.',
-    price: '¥3.200',
-    image: '/cinematic/honey-pixie-oil.jpg',
-    bgKanji: '蜂',
-    accent: '#db7c2c',
-    link: '/produtos/cosmeticos',
+    link: '/produto/honey-melty',
   },
   {
     id: 'fino-kit',
     brand: 'Fino · Kit',
-    name: 'Shampoo + Condicionador',
+    nameKey: 'cinematicHero.products.finoKit.name',
     nameJa: 'デイリーケア',
-    description:
-      'Rotina diária com sérum de beleza para cabelos macios, brilhantes e saudáveis todos os dias.',
-    price: '¥6.000',
+    descriptionKey: 'cinematicHero.products.finoKit.description',
+    priceYen: 6000,
     image: '/cinematic/fino-kit.jpg',
     bgKanji: '髪',
     accent: '#a16207',
-    link: '/produtos/cosmeticos',
-  },
-  {
-    id: 'honey-milky',
-    brand: '&honey · Milky Precious',
-    name: 'Repair Hair Pack',
-    nameJa: 'ヘアパック',
-    description:
-      'Máscara com mel e leite para reparação profunda, redução de frizz e maciez duradoura.',
-    price: '¥2.400',
-    image: '/cinematic/honey-milky-pack.jpg',
-    bgKanji: '蜜',
-    accent: '#db7c2c',
-    link: '/produtos/cosmeticos',
+    link: '/produto/fino-kit',
   },
 ];
 
@@ -172,6 +133,8 @@ const prefersReducedMotion = () =>
 const CinematicHeroShelf: React.FC<CinematicHeroShelfProps> = ({
   introVariant = 'original',
 }) => {
+  const { language, t, selectedCountry } = useLanguage();
+  const currency = getCurrencyByCountry(selectedCountry);
   const introVideo = INTRO_VIDEOS[introVariant];
   const sectionRef = useRef<HTMLElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
@@ -204,10 +167,19 @@ const CinematicHeroShelf: React.FC<CinematicHeroShelfProps> = ({
   };
 
   const reduced = prefersReducedMotion();
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener('resize', check, { passive: true });
+    return () => window.removeEventListener('resize', check);
+  }, []);
+  // Mobile usa layout vertical simples (sem pin GSAP) para reduzir rolagem.
+  const simplified = reduced || isMobile;
 
   useGSAP(
     () => {
-      if (reduced) return;
+      if (simplified) return;
       const track = trackRef.current;
       const section = sectionRef.current;
       if (!track || !section) return;
@@ -384,7 +356,7 @@ const CinematicHeroShelf: React.FC<CinematicHeroShelfProps> = ({
       key="intro"
       className={cn(
         'cinematic-panel relative flex w-screen shrink-0 items-center justify-center overflow-hidden px-4 md:px-6',
-        reduced ? 'min-h-[53dvh] md:min-h-screen' : 'h-full',
+        simplified ? 'min-h-[53dvh] md:min-h-screen' : 'h-full',
       )}
     >
       {/* Sem `loop`: ao terminar, a imagem final fica em cena e o recomeço
@@ -464,19 +436,20 @@ const CinematicHeroShelf: React.FC<CinematicHeroShelfProps> = ({
         )}
       >
         <p className="cinematic-reveal font-jp mb-2 text-[10px] uppercase tracking-[0.35em] text-pink-200/90 md:mb-5 md:text-xs md:tracking-[0.5em]">
-          日本の美容 · Curadoria
+          {t('cinematicHero.intro.eyebrow')}
         </p>
         <h1 className="cinematic-reveal mb-3 font-display text-3xl font-light leading-[1.05] tracking-tight text-white drop-shadow-[0_2px_16px_rgba(0,0,0,0.5)] sm:text-4xl md:mb-6 md:text-7xl">
-          Beleza <span className="font-jp italic text-pink-300">Japonesa</span>
+          {t('cinematicHero.intro.title.1')}{language === 'ja' ? '' : ' '}
+          <span className="font-jp italic text-pink-300">{t('cinematicHero.intro.title.highlight')}</span>
           <br />
-          em cada detalhe
+          {t('cinematicHero.intro.title.2')}
         </h1>
         <p className="cinematic-reveal mb-4 max-w-sm text-xs leading-relaxed text-white/80 drop-shadow line-clamp-3 md:mb-10 md:max-w-md md:text-lg md:line-clamp-none">
-          Os melhores cosméticos, papelaria, acessórios e doces direto do Japão para você, com frete seguro. Veja a aba "Como Funciona" e entenda todo o processo, do pedido à entrega.
+          {t('cinematicHero.intro.description')}
         </p>
         <div className="cinematic-reveal flex items-center gap-2 text-[10px] uppercase tracking-[0.22em] text-white/70 md:text-xs md:tracking-[0.3em]">
           <ArrowDown className="cinematic-bob h-3 w-3" />
-          <span>Role para começar</span>
+          <span>{t('cinematicHero.intro.scroll')}</span>
         </div>
       </div>
     </div>
@@ -487,7 +460,7 @@ const CinematicHeroShelf: React.FC<CinematicHeroShelfProps> = ({
       key={p.id}
       className={cn(
         'cinematic-panel relative flex w-screen shrink-0 items-center overflow-hidden',
-        reduced ? 'min-h-[53dvh] md:min-h-screen' : 'h-full',
+        simplified ? 'min-h-[53dvh] md:min-h-screen' : 'h-full',
       )}
     >
       <div
@@ -509,7 +482,7 @@ const CinematicHeroShelf: React.FC<CinematicHeroShelfProps> = ({
         <div className="cinematic-reveal flex flex-1 justify-center">
           <img
             src={p.image}
-            alt={`${p.brand} ${p.name}`}
+            alt={`${p.brand} ${t(p.nameKey)}`}
             loading="lazy"
             className="cinematic-product-img h-[18vh] max-h-[165px] w-auto object-contain md:h-[58vh] md:max-h-[440px]"
           />
@@ -525,21 +498,25 @@ const CinematicHeroShelf: React.FC<CinematicHeroShelfProps> = ({
             </span>
           </div>
           <h2 className="cinematic-reveal mb-1 font-display text-2xl font-light leading-tight text-pink-950 md:mb-3 md:text-5xl">
-            {p.name}
+            {t(p.nameKey)}
           </h2>
-          <p className="cinematic-reveal font-jp mb-2 text-sm text-pink-700/70 md:mb-5 md:text-lg">
-            {p.nameJa}
-          </p>
+          {language !== 'ja' && (
+            <p className="cinematic-reveal font-jp mb-2 text-sm text-pink-700/70 md:mb-5 md:text-lg">
+              {p.nameJa}
+            </p>
+          )}
           <p className="cinematic-reveal mb-3 text-xs leading-relaxed text-pink-950/60 line-clamp-2 md:mb-7 md:text-base md:line-clamp-none">
-            {p.description}
+            {t(p.descriptionKey)}
           </p>
           <div className="cinematic-reveal flex items-center gap-4 md:gap-6">
-            <span className="font-display text-xl text-pink-950 md:text-2xl">{p.price}</span>
+            <span className="font-display text-xl text-pink-950 md:text-2xl">
+              {formatPrice(convertYen(p.priceYen, currency), currency)}
+            </span>
             <Link
               to={p.link}
               className="group inline-flex items-center gap-2 text-xs font-medium text-pink-700 transition-colors hover:text-pink-900 md:text-sm"
             >
-              Ver produto
+              {t('featured.details')}
               <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
             </Link>
           </div>
@@ -553,7 +530,7 @@ const CinematicHeroShelf: React.FC<CinematicHeroShelfProps> = ({
       key="outro"
       className={cn(
         'cinematic-panel relative flex w-screen shrink-0 items-center justify-center overflow-hidden px-4 md:px-6',
-        reduced ? 'min-h-[53dvh] md:min-h-screen' : 'h-full',
+        simplified ? 'min-h-[53dvh] md:min-h-screen' : 'h-full',
       )}
     >
       <div className="cinematic-kanji font-jp pointer-events-none absolute bottom-[6%] left-[8%] select-none text-[42vmin] leading-none">
@@ -562,26 +539,25 @@ const CinematicHeroShelf: React.FC<CinematicHeroShelfProps> = ({
       <div className="relative z-10 flex max-w-xl flex-col items-center text-center">
         <ShoppingBag className="cinematic-reveal mb-3 h-7 w-7 text-pink-600 md:mb-6 md:h-10 md:w-10" />
         <h2 className="cinematic-reveal mb-3 font-display text-3xl font-light leading-tight text-pink-950 md:mb-5 md:text-6xl">
-          Explore a coleção
+          {t('cinematicHero.outro.title.1')}
           <br />
-          completa
+          {t('cinematicHero.outro.title.2')}
         </h2>
         <p className="cinematic-reveal mb-4 max-w-xs text-sm text-pink-950/60 md:mb-9 md:max-w-sm md:text-base">
-          Cosméticos originais importados do Japão, com envio rápido e seguro
-          para todo o Brasil.
+          {t('cinematicHero.outro.description')}
         </p>
         <div className="cinematic-reveal flex flex-col gap-3 sm:flex-row">
           <Link
             to="/produtos/cosmeticos"
             className="inline-flex items-center justify-center gap-2 rounded-full bg-pink-600 px-6 py-2.5 text-xs font-medium text-white transition-colors hover:bg-pink-700 md:px-8 md:py-3 md:text-sm"
           >
-            Ver cosméticos <ArrowRight className="h-4 w-4" />
+            {t('cinematicHero.outro.cta.products')} <ArrowRight className="h-4 w-4" />
           </Link>
           <Link
             to="/faca-seu-pedido"
             className="inline-flex items-center justify-center gap-2 rounded-full border border-pink-300 px-6 py-2.5 text-xs font-medium text-pink-700 transition-colors hover:bg-pink-50 md:px-8 md:py-3 md:text-sm"
           >
-            Fazer meu pedido
+            {t('cinematicHero.outro.cta.order')}
           </Link>
         </div>
       </div>
@@ -595,14 +571,14 @@ const CinematicHeroShelf: React.FC<CinematicHeroShelfProps> = ({
         'relative w-full overflow-hidden bg-gradient-to-b from-pink-50 via-white to-pink-50/40',
         // No smartphone, ocupa 53% da tela. Desktop preserva a experiência
         // cinematográfica em viewport completo.
-        reduced
+        simplified
           ? ''
           : 'h-[53dvh] min-h-[390px] max-h-[480px] md:h-[calc(100dvh-var(--shelf-top,0px))] md:min-h-0 md:max-h-none',
       )}
-      aria-label="Vitrine cinematográfica de cosméticos japoneses"
+      aria-label={t('cinematicHero.ariaLabel')}
     >
       {/* Superfície da prateleira — persiste enquanto os produtos deslizam */}
-      {!reduced && (
+      {!simplified && (
         <>
           <div className="cinematic-shelf-glow" aria-hidden />
           <div
@@ -616,7 +592,7 @@ const CinematicHeroShelf: React.FC<CinematicHeroShelfProps> = ({
       )}
 
       {/* Barra superior */}
-      {!reduced && (
+      {!simplified && (
         <div className="absolute left-0 right-0 top-0 z-30 flex items-center justify-end px-4 py-3 md:px-12 md:py-5">
           <div className="flex items-center gap-4 md:gap-6">
             <span
@@ -630,7 +606,7 @@ const CinematicHeroShelf: React.FC<CinematicHeroShelfProps> = ({
               onClick={handleSkip}
               className="text-[10px] uppercase tracking-[0.2em] text-white/70 mix-blend-difference transition-opacity hover:opacity-100 md:text-xs md:tracking-[0.25em]"
             >
-              Pular ↓
+              {t('cinematicHero.skip')}
             </button>
           </div>
         </div>
@@ -639,7 +615,7 @@ const CinematicHeroShelf: React.FC<CinematicHeroShelfProps> = ({
       {/* Track horizontal (pin & scrub via GSAP) */}
       <div
         ref={trackRef}
-        className={cn('will-change-transform', reduced ? 'flex flex-col' : 'flex h-full')}
+        className={cn('will-change-transform', simplified ? 'flex flex-col' : 'flex h-full')}
       >
         {renderIntro()}
         {PRODUCTS.map(renderProductPanel)}
@@ -647,7 +623,7 @@ const CinematicHeroShelf: React.FC<CinematicHeroShelfProps> = ({
       </div>
 
       {/* Barra de progresso + dica inferior */}
-      {!reduced && (
+      {!simplified && (
         <>
           <div className="absolute bottom-0 left-0 right-0 z-30 h-[2px] bg-pink-900/10">
             <div
@@ -658,7 +634,7 @@ const CinematicHeroShelf: React.FC<CinematicHeroShelfProps> = ({
           </div>
           <div className="absolute bottom-6 left-1/2 z-30 hidden -translate-x-1/2 items-center gap-2 text-xs uppercase tracking-[0.3em] text-white/70 mix-blend-difference md:flex">
             <ArrowDown className="cinematic-bob h-3 w-3" />
-            <span>Role para explorar a prateleira</span>
+            <span>{t('cinematicHero.scrollHint')}</span>
           </div>
         </>
       )}

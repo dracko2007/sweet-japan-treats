@@ -6,10 +6,8 @@ import { useProducts } from '@/context/ProductsContext';
 import { Product } from '@/types';
 import { ActivePromo, PROMO_TYPES } from '@/types/promotion';
 import { db } from '@/config/firebase';
-import { collection, getDocs, doc, getDoc, deleteDoc } from 'firebase/firestore';
-import { ensureAdminAuth } from '@/utils/adminAuth';
-import { promoCampaignService } from '@/services/promoCampaignService';
-import type { PromoCampaign } from '@/types/promoCampaign';
+import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
+import { authenticatedFetch } from '@/services/authenticatedFetch';
 
 const STORE_URL = 'https://japanexpress-store.com';
 
@@ -291,111 +289,63 @@ const PromoNotificationModal: React.FC<Props> = ({ onClose }) => {
 </html>`;
 
   const sendPromo = async () => {
-    if (targets.length === 0) { alert('Selecione ao menos um cliente.'); return; }
+    if (targets.length === 0) {
+      alert('Selecione ao menos um cliente.');
+      return;
+    }
+
+    const cancelHomePromotion = conflictActive && conflictChoice === 'cancel';
+    if (
+      cancelHomePromotion
+      && !window.confirm(`Isto vai CANCELAR a promoção atual do site ("${homePromo?.productName ?? ''}") antes de enviar. Continuar?`)
+    ) {
+      return;
+    }
 
     setSending(true);
-    // Resolução de conflito: cancelar a promoção ativa do site antes de disparar a nova.
-    if (conflictActive && conflictChoice === 'cancel') {
-      if (!window.confirm(`Isto vai CANCELAR a promoção atual do site ("${homePromo?.productName ?? ''}") antes de enviar. Continuar?`)) {
-        setSending(false);
-        return;
-      }
-      try {
-        await ensureAdminAuth();
-        if (db) await deleteDoc(doc(db, 'siteContent', 'homePromotion'));
-        setHomePromo(null);
-      } catch (e) {
-        alert('Não foi possível cancelar a promoção do site: ' + (e instanceof Error ? e.message : String(e)));
-        setSending(false);
-        return;
-      }
-    }
     setResults([]);
-    // Cria a campanha resgatável por código (1 por disparo) e arma o código no
-    // link do e-mail/push — sem isso, a oferta do e-mail nunca se aplica no carrinho.
-    const promoCode = `PROMO-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
-    const extraDiscount = Math.max(1, Math.min(90, discountPct || 0));
     try {
-      const campaign: PromoCampaign = {
-        code: promoCode,
-        mechanic,
-        productId: selectedProduct?.id,
-        giftProductId: giftProductId || undefined,
-        couponCode: mechanic === 'coupon' ? (couponCode.trim().toUpperCase() || undefined) : undefined,
-        discountPct: mechanic === 'discount' ? extraDiscount : undefined,
-        keepProductDiscount: keepInitialDiscount,
-        points: mechanic === 'points' ? Math.max(1, pointsCount || 0) : undefined,
-        headline,
-        tagline: offer.tagline,
-        description: offer.description,
-        badge: offer.badge,
-        productName: selectedProduct?.name,
-        productImage: selectedProduct?.thumbnail || selectedProduct?.image || undefined,
-        createdAt: Date.now(),
-        expiresAt: Date.now() + 30 * 86400000,
-        active: true,
-        perCpfLimit: 1,
+      const response = await authenticatedFetch('/api/promo-campaign', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          campaign: {
+            mechanic,
+            productId: selectedProduct?.id || '',
+            giftProductId: giftProductId || '',
+            couponCode: mechanic === 'coupon' ? couponCode.trim().toUpperCase() : '',
+            discountPct: Math.max(1, Math.min(90, discountPct || 0)),
+            keepProductDiscount: keepInitialDiscount,
+            points: Math.max(1, pointsCount || 0),
+            expiresInDays: 30,
+          },
+          recipients: targets.map((customer) => customer.email),
+          channel,
+          subject,
+          headline,
+          extraMessage: extraMsg,
+          ctaLabel,
+          cancelHomePromotion,
+        }),
+      });
+      const data = await response.json().catch(() => ({})) as {
+        error?: string;
+        results?: SendResult[];
       };
-      await promoCampaignService.create(campaign);
-    } catch (e) {
-      console.warn('[promo] campanha não criada — e-mail segue sem resgate:', e instanceof Error ? e.message : e);
+      if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
+      setResults(data.results || []);
+      if (cancelHomePromotion) setHomePromo(null);
+      setSent(true);
+    } catch (error) {
+      setResults([{
+        email: '(campanha)',
+        ok: false,
+        channel: channel === 'app' ? 'app' : 'email',
+        error: error instanceof Error ? error.message : String(error),
+      }]);
+    } finally {
+      setSending(false);
     }
-    const ctaUrl = `${productUrl}${productUrl.includes('?') ? '&' : '?'}promo=${promoCode}`;
-    const partial: SendResult[] = [];
-
-    if (channel === 'email' || channel === 'both') {
-      // E-mail vai pelo /api/send-email (Nodemailer + Google Workspace SMTP,
-      // remetente noreply@japanexpress-store.com) — NÃO pelo Resend direto do
-      // navegador. Anti-abuso do endpoint (tipo "promo"): só entrega para
-      // clientes reais (cadastro ou pedido no Firestore) — cobre convidados.
-      for (const r of targets) {
-        try {
-          const res = await fetch('/api/send-email', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ to: r.email, type: 'promo', subject, html: buildHtml(r.name, ctaUrl) }),
-          });
-          const data = await res.json().catch(() => ({})) as { error?: string };
-          partial.push({ email: r.email, ok: res.ok, channel: 'email', error: res.ok ? undefined : (data.error || `HTTP ${res.status}`) });
-        } catch (e) {
-          partial.push({ email: r.email, ok: false, channel: 'email', error: e instanceof Error ? e.message : String(e) });
-        }
-        setResults([...partial]);
-        await new Promise(resolve => setTimeout(resolve, 250));
-      }
-    }
-
-    if (channel === 'app' || channel === 'both') {
-      if (reachableByPush.length === 0) {
-        partial.push({ email: '(nenhum selecionado tem push ativo)', ok: false, channel: 'app' });
-      } else {
-        try {
-          const res = await fetch('/api/send-push', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              emails: reachableByPush.map(c => c.email),
-              title: offer.tagline,
-              body: offer.description,
-              url: ctaUrl,
-            }),
-          });
-          const data = await res.json();
-          if (res.ok && data.ok) {
-            const pushResults = data.results as { email: string; ok: boolean; error?: string }[];
-            for (const r of pushResults) partial.push({ email: r.email, ok: r.ok, channel: 'app', error: r.error });
-          } else {
-            partial.push({ email: '(push)', ok: false, channel: 'app', error: data.error || 'Falha ao enviar' });
-          }
-        } catch (e) {
-          partial.push({ email: '(push)', ok: false, channel: 'app', error: e instanceof Error ? e.message : String(e) });
-        }
-      }
-      setResults([...partial]);
-    }
-
-    setSending(false);
-    setSent(true);
   };
 
   const successCount = results.filter(r => r.ok).length;

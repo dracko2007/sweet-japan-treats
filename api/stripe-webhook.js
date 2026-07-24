@@ -1,0 +1,98 @@
+import Stripe from 'stripe';
+import { adminDb } from './_lib/firebase-admin.js';
+import { fulfillOrder, markFulfillmentReview } from './_lib/fulfillment.js';
+import { getHeader, HttpError, sendError } from './_lib/http.js';
+import { buildOrderEmail, sendMail } from './_lib/mailer.js';
+
+export const config = { api: { bodyParser: false } };
+
+async function rawBody(req) {
+  if (Buffer.isBuffer(req.body)) return req.body;
+  if (typeof req.body === 'string') return Buffer.from(req.body);
+  if (req.body && typeof req.body === 'object') throw new HttpError(400, 'raw_body_required');
+  const chunks = [];
+  for await (const chunk of req) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  return Buffer.concat(chunks);
+}
+
+async function notifyOrder(orderId) {
+  const snap = await adminDb().collection('orders').doc(orderId).get();
+  if (!snap.exists) return;
+  const order = { id: snap.id, ...snap.data() };
+  const ownerTemplate = buildOrderEmail(order);
+  await sendMail({ to: order.customerEmail, ...ownerTemplate }).catch(() => undefined);
+  const storeEmail = process.env.ORDER_NOTIFICATION_EMAIL || process.env.ADMIN_EMAIL;
+  if (storeEmail) {
+    const storeTemplate = buildOrderEmail(order, { store: true });
+    await sendMail({ to: storeEmail, ...storeTemplate }).catch(() => undefined);
+  }
+}
+
+export default async function handler(req, res) {
+  if (req.method !== 'POST') {
+    res.setHeader('Allow', 'POST');
+    res.status(405).json({ error: 'method_not_allowed' });
+    return;
+  }
+
+  const secretKey = process.env.STRIPE_SECRET_KEY;
+  const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
+  if (!secretKey || !endpointSecret) {
+    res.status(503).json({ error: 'stripe_webhook_not_configured' });
+    return;
+  }
+
+  try {
+    const signature = getHeader(req, 'stripe-signature');
+    if (!signature) throw new HttpError(400, 'missing_stripe_signature');
+    const stripe = new Stripe(secretKey);
+    let event;
+    try {
+      event = stripe.webhooks.constructEvent(await rawBody(req), signature, endpointSecret);
+    } catch {
+      throw new HttpError(400, 'invalid_stripe_signature');
+    }
+
+    if (event.type !== 'payment_intent.succeeded') {
+      res.status(200).json({ received: true, ignored: true });
+      return;
+    }
+
+    const intent = event.data.object;
+    const orderId = String(intent.metadata?.orderId || '');
+    if (!orderId) throw new HttpError(400, 'missing_order_metadata');
+    const orderSnap = await adminDb().collection('orders').doc(orderId).get();
+    if (!orderSnap.exists) throw new HttpError(404, 'order_not_found');
+    const order = orderSnap.data();
+    const expectedAmount = order.currency === 'JPY' ? Math.round(order.totalPrice) : Math.round(order.totalPrice * 100);
+    if (
+      order.stripePaymentIntentId !== intent.id
+      || intent.amount_received !== expectedAmount
+      || String(intent.currency).toUpperCase() !== order.currency
+    ) {
+      await markFulfillmentReview(orderId, 'payment_amount_or_currency_mismatch');
+      res.status(200).json({ received: true, review: true });
+      return;
+    }
+
+    try {
+      const result = await fulfillOrder(orderId, {
+        provider: 'stripe',
+        reference: intent.id,
+        confirmedBy: 'stripe-webhook',
+      });
+      if (!result.replay) await notifyOrder(orderId);
+      res.status(200).json({ received: true, replay: result.replay });
+    } catch (error) {
+      if (error instanceof HttpError && error.statusCode === 409) {
+        await markFulfillmentReview(orderId, error.code);
+        res.status(200).json({ received: true, review: true });
+        return;
+      }
+      throw error;
+    }
+  } catch (error) {
+    console.error('[stripe-webhook]', error instanceof Error ? error.message : error);
+    sendError(res, error);
+  }
+}

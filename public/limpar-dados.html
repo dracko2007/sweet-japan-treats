@@ -246,7 +246,7 @@
 
     <script>
         function updateCount() {
-            const users = JSON.parse(localStorage.getItem('sweet-japan-users') || '{}');
+            const users = JSON.parse(localStorage.getItem('japan-express-users') || '{}');
             const userCount = Object.keys(users).length;
             let totalOrders = 0;
             
@@ -278,7 +278,7 @@
         
         function clearUsers() {
             if (confirm('Tem certeza que deseja limpar TODOS OS USUÁRIOS e PEDIDOS?\n\nEsta ação não pode ser desfeita!')) {
-                localStorage.removeItem('sweet-japan-users');
+                localStorage.removeItem('japan-express-users');
                 localStorage.removeItem('user');
                 showStatus('✅ Todos os usuários e pedidos foram removidos!', 'success');
                 updateCount();
@@ -296,7 +296,7 @@
         }
         
         function viewData() {
-            const users = localStorage.getItem('sweet-japan-users');
+            const users = localStorage.getItem('japan-express-users');
             const currentUser = localStorage.getItem('user');
             const cart = localStorage.getItem('cart');
             

@@ -200,7 +200,7 @@ const PromotionManager: React.FC = () => {
       if (active.nextPromo) {
         const next = active.nextPromo;
         const expiresAt = next.durationDays ? Date.now() + next.durationDays * 86400000 : null;
-        const newActive: ActivePromo = { ...next, expiresAt, nextPromo: null };
+        const newActive: ActivePromo = { ...next, soldCount: 0, expiresAt, nextPromo: null };
         await setDoc(doc(db, 'siteContent', 'homePromotion'), newActive);
         setActive(newActive);
         const prazo = expiresAt ? `expira em ${next.durationDays}d` : 'sem prazo';
@@ -220,7 +220,7 @@ const PromotionManager: React.FC = () => {
     try {
       await ensureAdminAuth();
       const expiresAt = next.durationDays ? Date.now() + next.durationDays * 86400000 : null;
-      const newActive: ActivePromo = { ...next, expiresAt, nextPromo: null };
+      const newActive: ActivePromo = { ...next, soldCount: 0, expiresAt, nextPromo: null };
       await setDoc(doc(db, 'siteContent', 'homePromotion'), newActive);
       setActive(newActive);
     } catch { /* silencia */ }

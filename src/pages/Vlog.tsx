@@ -114,10 +114,20 @@ const Vlog: React.FC = () => {
           {featured && (
             <div className="mb-12">
               <div
-                className="relative aspect-video rounded-3xl overflow-hidden bg-cover bg-center shadow-elevated group cursor-pointer border border-border/40"
-                style={{ backgroundImage: `url(${getThumb(featured)})` }}
+                className="relative aspect-video rounded-3xl overflow-hidden bg-secondary/50 shadow-elevated group cursor-pointer border border-border/40"
                 onClick={() => featured?.ytId && setPlayingVideo(featured.ytId)}
               >
+                <img
+                  src={getThumb(featured)}
+                  alt={featured.title}
+                  loading="eager"
+                  className="absolute inset-0 w-full h-full object-cover"
+                  onError={(e) => {
+                    if (!e.currentTarget.src.endsWith('/placeholder.svg')) {
+                      e.currentTarget.src = '/placeholder.svg';
+                    }
+                  }}
+                />
                 <div className="absolute inset-0 bg-black/45 group-hover:bg-black/35 transition-colors duration-300" />
 
                 <div className="absolute inset-0 flex items-center justify-center">
@@ -165,7 +175,9 @@ const Vlog: React.FC = () => {
                     loading="lazy"
                     className="w-full h-full object-cover group-hover:scale-103 transition-transform duration-500"
                     onError={(e) => {
-                      if (video.ytId) e.currentTarget.src = `https://img.youtube.com/vi/${video.ytId}/hqdefault.jpg`;
+                      if (!e.currentTarget.src.endsWith('/placeholder.svg')) {
+                        e.currentTarget.src = '/placeholder.svg';
+                      }
                     }}
                   />
 

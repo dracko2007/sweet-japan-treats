@@ -1,8 +1,9 @@
 // Cotações B2B / atacado (Pessoa Jurídica). Empresa envia (mesmo sem login);
 // admin lê e negocia frete/valores (inclui envio por container).
 import { db } from '@/config/firebase';
-import { collection, doc, getDocs, setDoc, deleteDoc, updateDoc } from 'firebase/firestore';
+import { doc, collection, getDocs, deleteDoc, updateDoc } from 'firebase/firestore';
 import { ensureAdminAuth } from '@/utils/adminAuth';
+import { submitPublicForm } from '@/services/publicSubmissionService';
 
 const isDev = import.meta.env.DEV;
 const devLog = isDev ? console.log.bind(console) : () => {};
@@ -32,15 +33,9 @@ const COL = 'b2b_requests';
 
 export const b2bRequestService = {
   async create(data: Omit<B2BRequest, 'id' | 'status' | 'createdAt'>): Promise<boolean> {
-    if (!db) return false;
-    try {
-      const id = `b2b-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-      await setDoc(doc(db, COL, id), { ...data, id, status: 'new', createdAt: new Date().toISOString() });
-      return true;
-    } catch (e) {
-      devError('[b2b] create falhou:', e);
-      return false;
-    }
+    const result = await submitPublicForm('b2b_request', data);
+    if (!result.ok) devError('[b2b] create falhou:', result.error);
+    return result.ok;
   },
 
   async getAll(): Promise<B2BRequest[]> {

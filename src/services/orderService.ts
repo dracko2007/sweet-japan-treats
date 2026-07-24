@@ -5,8 +5,10 @@ import { safeStorage } from '@/utils/storage';
  */
 
 import { firebaseSyncService } from '@/services/firebaseSyncService';
+import type { OrderPageCursor } from '@/services/firebaseSyncService';
 import { ensureAdminAuth } from '@/utils/adminAuth';
-import type { Order, OrderStatistics, MonthlyDataPoint } from '@/types';
+import type { Order } from '@/types';
+import { authenticatedFetch } from '@/services/authenticatedFetch';
 
 const isDev = import.meta.env.DEV;
 const devLog = isDev ? console.log.bind(console) : () => {};
@@ -19,34 +21,13 @@ export interface OrderStatus {
   updatedBy?: string;
 }
 
-const getLocalOrders = (): any[] => {
-  const users = JSON.parse(safeStorage.getItem('japan-express-users') || '{}');
-  const allOrders: any[] = [];
-
-  Object.keys(users).forEach((email) => {
-    const user = users[email];
-    if (user.orders && user.orders.length > 0) {
-      user.orders.forEach((order: any) => {
-        allOrders.push({
-          ...order,
-          customerEmail: user.email,
-          customerName: user.name,
-        });
-      });
-    }
-  });
-
-  return allOrders.sort((a, b) =>
-    new Date(b.orderDate || b.date).getTime() - new Date(a.orderDate || a.date).getTime()
-  );
-};
+export interface OrdersPage {
+  items: Order[];
+  nextCursor: OrderPageCursor | null;
+  hasMore: boolean;
+}
 
 export const orderService = {
-  // Get all orders from safeStorage (sync, for backward compat)
-  getAllOrders: (): any[] => {
-    return getLocalOrders();
-  },
-
   /**
    * Registra uma VENDA POSTERIOR (manual) — produtos cobrados fora do fluxo
    * normal do site (Wise/PIX direto), mas que devem entrar como receita.
@@ -107,39 +88,23 @@ export const orderService = {
     }
   },
 
-  // Async version that fetches from Firestore + merges with safeStorage
-  getAllOrdersAsync: async (): Promise<Order[]> => {
-    try {
-      const firestoreOrders = await firebaseSyncService.getAllOrdersFromFirestore();
-      const localOrders = getLocalOrders();
-
-      // Merge: Firestore orders take priority, add local-only orders
-      const orderMap = new Map<string, any>();
-
-      firestoreOrders.forEach((order: any) => {
-        const key = order.orderNumber || order.id;
-        orderMap.set(key, {
-          ...order,
-          orderDate: order.orderDate || order.date || order.syncedAt,
-          totalPrice: order.totalPrice || order.totalAmount || 0,
-        });
-      });
-
-      localOrders.forEach((order: any) => {
-        const key = order.orderNumber || order.id;
-        if (!orderMap.has(key)) {
-          orderMap.set(key, order);
-        }
-      });
-
-      return Array.from(orderMap.values()).sort((a, b) =>
-        new Date(b.orderDate || b.date).getTime() - new Date(a.orderDate || a.date).getTime()
-      );
-    } catch (error) {
-      devError('❌ [ORDER SERVICE] Firestore fetch failed, using safeStorage:', error);
-      return getLocalOrders();
-    }
+  /**
+   * Busca uma página limitada e ordenada de pedidos para o painel.
+   * O cursor é produzido pelo serviço Firestore e deve ser tratado como opaco.
+   */
+  getOrdersPage: async (
+    pageSize = 25,
+    cursor: OrderPageCursor | null = null
+  ): Promise<OrdersPage> => {
+    const page = await firebaseSyncService.getOrdersPageFromFirestore(pageSize, cursor);
+    const items: Order[] = page.items.map((order) => ({
+      ...order,
+      orderDate: order.orderDate || order.date || order.syncedAt,
+      totalPrice: order.totalPrice || order.totalAmount || 0,
+    }));
+    return { ...page, items };
   },
+
 
   // Update order status (both Firestore and safeStorage)
   updateOrderStatus: async (orderNumber: string, status: OrderStatus['status']): Promise<boolean> => {
@@ -173,38 +138,24 @@ export const orderService = {
   },
 
   // Confirma pagamento do pedido (marca como recebido pelo admin)
-  confirmPayment: async (orderNumber: string, adminEmail: string): Promise<boolean> => {
-    let updated = false;
-    const now = new Date().toISOString();
-
-    // Update in Firestore
+  // Confirma pagamentos manuais no servidor; a mesma transação idempotente
+  // aplicada pelo webhook Stripe cuida de estoque, promoções e benefícios.
+  confirmPayment: async (orderNumber: string, _adminEmail: string): Promise<boolean> => {
     try {
-      await ensureAdminAuth();
-      await firebaseSyncService.confirmPayment(orderNumber, adminEmail, now);
-      updated = true;
-    } catch (err) {
-      devError('❌ [ORDER] Firestore payment confirmation failed:', err);
-    }
-
-    // Also update in safeStorage
-    const users = JSON.parse(safeStorage.getItem('japan-express-users') || '{}');
-    Object.keys(users).forEach((email) => {
-      const user = users[email];
-      if (user.orders && user.orders.length > 0) {
-        const order = user.orders.find((o: any) => o.orderNumber === orderNumber);
-        if (order) {
-          order.paymentConfirmed = true;
-          order.paymentConfirmedAt = now;
-          order.paymentConfirmedBy = adminEmail;
-          updated = true;
-        }
+      const response = await authenticatedFetch('/api/confirm-manual-payment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId: orderNumber, reference: '' }),
+      });
+      if (!response.ok) {
+        devError('❌ [ORDER] Server payment confirmation failed:', response.status);
+        return false;
       }
-    });
-    if (updated) {
-      safeStorage.setItem('japan-express-users', JSON.stringify(users));
+      return true;
+    } catch (error) {
+      devError('❌ [ORDER] Server payment confirmation failed:', error);
+      return false;
     }
-
-    return updated;
   },
 
   // Exclui o pedido de verdade (localStorage + Firestore)
@@ -349,76 +300,4 @@ export const orderService = {
 
     return updated;
   },
-
-  // Get order by number
-  getOrderByNumber: (orderNumber: string): any | null => {
-    const allOrders = orderService.getAllOrders();
-    return allOrders.find(order => order.orderNumber === orderNumber) || null;
-  },
-
-  // Get statistics (accepts pre-loaded orders)
-  getStatistics: (orders?: Order[]): OrderStatistics => {
-    const allOrders: Order[] = orders || orderService.getAllOrders();
-    const now = new Date();
-    const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-
-    const ordersThisMonth = allOrders.filter(o =>
-      new Date(o.orderDate || o.date) >= thisMonth && o.status !== 'cancelled'
-    );
-    const ordersLastMonth = allOrders.filter(o =>
-      new Date(o.orderDate || o.date) >= lastMonth &&
-      new Date(o.orderDate || o.date) < thisMonth &&
-      o.status !== 'cancelled'
-    );
-
-    const totalRevenue = allOrders
-      .filter(o => o.status !== 'cancelled')
-      .reduce((sum, o) => sum + (o.totalPrice || o.totalAmount || 0), 0);
-    const revenueThisMonth = ordersThisMonth
-      .reduce((sum, o) => sum + (o.totalPrice || o.totalAmount || 0), 0);
-    const revenueLastMonth = ordersLastMonth
-      .reduce((sum, o) => sum + (o.totalPrice || o.totalAmount || 0), 0);
-
-    return {
-      totalOrders: allOrders.filter(o => o.status !== 'cancelled').length,
-      totalRevenue,
-      ordersThisMonth: ordersThisMonth.length,
-      revenueThisMonth,
-      ordersLastMonth: ordersLastMonth.length,
-      revenueLastMonth,
-      pendingOrders: allOrders.filter(o => o.status === 'pending').length,
-      shippedOrders: allOrders.filter(o => o.status === 'shipped').length,
-      deliveredOrders: allOrders.filter(o => o.status === 'delivered').length,
-      cancelledOrders: allOrders.filter(o => o.status === 'cancelled').length,
-    };
-  },
-
-  // Get monthly data for charts (accepts pre-loaded orders)
-  getMonthlyData: (months: number = 6, orders?: Order[]): MonthlyDataPoint[] => {
-    const allOrders: Order[] = orders || orderService.getAllOrders();
-    const data: MonthlyDataPoint[] = [];
-    const now = new Date();
-
-    for (let i = months - 1; i >= 0; i--) {
-      const month = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const nextMonth = new Date(now.getFullYear(), now.getMonth() - i + 1, 1);
-
-      const monthOrders = allOrders.filter(o =>
-        new Date(o.orderDate || o.date) >= month &&
-        new Date(o.orderDate || o.date) < nextMonth &&
-        o.status !== 'cancelled'
-      );
-
-      const revenue = monthOrders.reduce((sum, o) => sum + (o.totalPrice || o.totalAmount || 0), 0);
-
-      data.push({
-        month: month.toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' }),
-        orders: monthOrders.length,
-        revenue,
-      });
-    }
-
-    return data;
-  }
 };

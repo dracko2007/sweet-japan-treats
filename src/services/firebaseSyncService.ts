@@ -15,7 +15,11 @@ import {
   deleteField,
   query,
   where,
-  onSnapshot
+  onSnapshot,
+  orderBy,
+  limit,
+  startAfter,
+  documentId
 } from 'firebase/firestore';
 
 import {
@@ -100,6 +104,52 @@ const sanitizeData = (data: any): any => {
   }
   return data;
 };
+
+export type OrderPageCursor = string;
+
+export interface OrderPage<T = any> {
+  items: T[];
+  nextCursor: OrderPageCursor | null;
+  hasMore: boolean;
+}
+
+interface OrderCursorPosition {
+  orderDate: string;
+  id: string;
+}
+
+interface OrderCursorPayload {
+  positions: Record<string, OrderCursorPosition>;
+}
+
+const encodeOrderCursor = (payload: OrderCursorPayload): OrderPageCursor =>
+  encodeURIComponent(JSON.stringify(payload));
+
+const decodeOrderCursor = (cursor?: OrderPageCursor | null): OrderCursorPayload => {
+  if (!cursor) return { positions: {} };
+  try {
+    const parsed = JSON.parse(decodeURIComponent(cursor));
+    return parsed && typeof parsed.positions === 'object'
+      ? parsed as OrderCursorPayload
+      : { positions: {} };
+  } catch {
+    return { positions: {} };
+  }
+};
+
+const orderDateOf = (order: any): string =>
+  String(order.orderDate || order.date || order.createdAt || order.syncedAt || '');
+
+const compareOrdersDescending = (left: any, right: any): number => {
+  const dateComparison = orderDateOf(right).localeCompare(orderDateOf(left));
+  if (dateComparison !== 0) return dateComparison;
+  return String(right.id || right.orderNumber || '').localeCompare(
+    String(left.id || left.orderNumber || '')
+  );
+};
+
+const normalizedPageSize = (pageSize: number): number =>
+  Math.max(1, Math.min(100, Math.floor(pageSize) || 20));
 
 export const firebaseSyncService = {
   /**
@@ -207,71 +257,130 @@ export const firebaseSyncService = {
   },
 
   /**
-   * Busca todos os pedidos de um usuário
+   * Busca uma página determinística dos pedidos de um usuário.
+   * Cada identidade mantém seu próprio cursor porque um pedido pode corresponder
+   * tanto ao userId quanto ao customerEmail.
    */
-  async getOrdersFromFirestore(userId: string, userEmail?: string) {
+  async getOrdersFromFirestore(
+    userId: string,
+    userEmail?: string,
+    pageSize = 20,
+    cursor?: OrderPageCursor | null
+  ): Promise<OrderPage> {
     try {
       ensureFirebaseReady();
       const ordersRef = collection(db, 'orders');
-      const orderMap = new Map<string, any>();
+      const size = normalizedPageSize(pageSize);
+      const previous = decodeOrderCursor(cursor);
+      const sources = [
+        { key: `userId:${userId}`, field: 'userId', value: String(userId || '').trim() },
+        ...Array.from(new Set(
+          [userEmail, userEmail?.toLowerCase()]
+            .map((email) => String(email || '').trim())
+            .filter(Boolean)
+        )).map((email) => ({
+          key: `customerEmail:${email}`,
+          field: 'customerEmail',
+          value: email,
+        })),
+      ].filter((source) => source.value);
 
-      const addSnapshot = (snapshot: any) => {
-        snapshot.forEach((docSnap: any) => {
-          const data = { id: docSnap.id, ...docSnap.data() };
-          const key = data.orderNumber || data.id || docSnap.id;
-          orderMap.set(key, data);
-        });
-      };
+      const snapshots = await Promise.all(sources.map(async (source) => {
+        const position = previous.positions[source.key];
+        const constraints: any[] = [
+          where(source.field, '==', source.value),
+          orderBy('orderDate', 'desc'),
+          orderBy(documentId(), 'desc'),
+        ];
+        if (position) constraints.push(startAfter(position.orderDate, position.id));
+        constraints.push(limit(size + 1));
 
-      const runOrderQuery = async (field: string, value?: string) => {
-        const cleanValue = String(value || '').trim();
-        if (!cleanValue) return;
-        try {
-          const q = query(ordersRef, where(field, '==', cleanValue));
-          addSnapshot(await getDocs(q));
-        } catch (error) {
-          devWarn(`[FIREBASE] Could not query orders by ${field}:`, error);
+        const snapshot = await getDocs(query(ordersRef, ...constraints));
+        return {
+          source,
+          docs: snapshot.docs.map((document) => ({
+            id: document.id,
+            ...document.data(),
+          })),
+        };
+      }));
+
+      const merged = snapshots
+        .flatMap(({ source, docs }) => docs.map((order) => ({ source, order })))
+        .sort((left, right) => compareOrdersDescending(left.order, right.order));
+      const positions = { ...previous.positions };
+      const items: any[] = [];
+      const seen = new Set<string>();
+      let consumed = 0;
+
+      for (const entry of merged) {
+        const key = String(entry.order.orderNumber || entry.order.id);
+        if (items.length >= size && !seen.has(key)) break;
+        positions[entry.source.key] = {
+          orderDate: orderDateOf(entry.order),
+          id: String(entry.order.id),
+        };
+        consumed += 1;
+        if (!seen.has(key)) {
+          seen.add(key);
+          items.push(entry.order);
         }
-      };
-
-      await runOrderQuery('userId', userId);
-
-      const emailCandidates = Array.from(new Set(
-        [userEmail, userEmail?.toLowerCase()]
-          .map((email) => String(email || '').trim())
-          .filter(Boolean)
-      ));
-      for (const email of emailCandidates) {
-        await runOrderQuery('customerEmail', email);
       }
 
-      return Array.from(orderMap.values());
+      const hasMore = consumed < merged.length
+        || snapshots.some(({ docs }) => docs.length > size);
+      return {
+        items,
+        hasMore,
+        nextCursor: hasMore ? encodeOrderCursor({ positions }) : null,
+      };
     } catch (error) {
       devError('❌ [FIREBASE] Error getting orders:', error);
-      return [];
+      throw error;
     }
   },
 
   /**
-   * Busca TODOS os pedidos (para admin).
-   * TODO: adicionar paginação (limit + startAfter cursor) quando passar de ~500 pedidos.
-   * Cada chamada cobra 1 read/documento no Firestore.
+   * Busca uma página de pedidos para o admin, ordenada por data e id.
    */
-  async getAllOrdersFromFirestore() {
+  async getOrdersPageFromFirestore(
+    pageSize = 25,
+    cursor?: OrderPageCursor | null
+  ): Promise<OrderPage> {
     try {
       ensureFirebaseReady();
-      const ordersRef = collection(db, 'orders');
-      const querySnapshot = await getDocs(ordersRef);
-      
-      const orders: any[] = [];
-      querySnapshot.forEach((doc) => {
-        orders.push({ id: doc.id, ...doc.data() });
-      });
-      
-      return orders;
+      const size = normalizedPageSize(pageSize);
+      const position = decodeOrderCursor(cursor).positions.admin;
+      const constraints: any[] = [
+        orderBy('orderDate', 'desc'),
+        orderBy(documentId(), 'desc'),
+      ];
+      if (position) constraints.push(startAfter(position.orderDate, position.id));
+      constraints.push(limit(size + 1));
+
+      const snapshot = await getDocs(query(collection(db, 'orders'), ...constraints));
+      const documents = snapshot.docs.slice(0, size);
+      const items = documents.map((document) => ({
+        id: document.id,
+        ...document.data(),
+      }));
+      const hasMore = snapshot.docs.length > size;
+      const last = items[items.length - 1];
+
+      return {
+        items,
+        hasMore,
+        nextCursor: hasMore && last
+          ? encodeOrderCursor({
+              positions: {
+                admin: { orderDate: orderDateOf(last), id: String(last.id) },
+              },
+            })
+          : null,
+      };
     } catch (error) {
-      devError('❌ [FIREBASE] Error getting all orders:', error);
-      return [];
+      devError('❌ [FIREBASE] Error getting orders page:', error);
+      throw error;
     }
   },
 

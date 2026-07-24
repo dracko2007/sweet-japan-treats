@@ -7,11 +7,18 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-node_modules
-dist
-dev-dist
-dist-ssr
+# --- OMP context window: isolar o frontend TS (economia de tokens) ---
+# Pastas de build / dependências que o OMP nunca deve varrer.
+node_modules/
+dist/
+dev-dist/
+dist-ssr/
+.next/
+build/
 *.local
+
+# TypeScript incremental build cache
+*.tsbuildinfo
 
 # Environment variables
 .env

@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useCallback, useEffect, use
 import { CartItem, Product } from '@/types';
 import { safeStorage } from '@/utils/storage';
 import { effectiveYen } from '@/utils/pricing';
+import { trackAddToCart } from '@/lib/analytics';
 import { useProducts } from '@/context/ProductsContext';
 
 const CART_STORAGE_KEY = 'sakura_cart';
@@ -141,6 +142,15 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (newQty <= 0) return prev;
       return [...prev, { product, size, quantity: newQty, variantLabel }];
     });
+    // Fora do updater de estado (que o React pode invocar mais de uma vez) —
+    // dispara o evento uma única vez por chamada de addToCart.
+    trackAddToCart({
+      item_id: product.id,
+      item_name: product.name,
+      item_category: product.category,
+      quantity,
+      price: effectiveYen(product, size),
+    }, 'JPY');
   }, []);
 
   const removeFromCart = useCallback((productId: string, size: string) => {

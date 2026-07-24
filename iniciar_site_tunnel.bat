@@ -1,8 +1,8 @@
 @echo off
-title Sweet Japan Treats - Site & ngrok
+title Japan Express - Site & ngrok
 chcp 65001 > nul
 echo ========================================================
-echo 🏮 Sweet Japan Treats - Site & ngrok Tunnel
+echo 🏮 Japan Express - Site & ngrok Tunnel
 echo ========================================================
 echo.
 

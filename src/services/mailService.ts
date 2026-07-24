@@ -1,26 +1,22 @@
-// Client for the serverless /api/send-email endpoint, which sends through
-// the store SMTP account on the server.
+import { authenticatedFetch } from '@/services/authenticatedFetch';
 
-type MailType = 'welcome' | 'verify' | '2fa';
+type AccountMailType = 'welcome' | 'verify';
 
-async function send(payload: { to: string; type: MailType; name?: string; code?: string }) {
+async function send(to: string, type: AccountMailType, name?: string): Promise<boolean> {
   try {
-    const res = await fetch('/api/send-email', {
+    const response = await authenticatedFetch('/api/send-email', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({ to, type, name: name || '' }),
     });
-    return res.ok;
+    return response.ok;
   } catch {
     return false;
   }
 }
 
-export const sendConfirmationEmail = (to: string, name?: string) =>
-  send({ to, type: 'welcome', name });
+export const sendConfirmationEmail = (to: string, name?: string): Promise<boolean> =>
+  send(to, 'welcome', name);
 
-export const sendVerificationEmail = (to: string, name?: string) =>
-  send({ to, type: 'verify', name });
-
-export const send2FACode = (to: string, code: string, name?: string) =>
-  send({ to, type: '2fa', code, name });
+export const sendVerificationEmail = (to: string, name?: string): Promise<boolean> =>
+  send(to, 'verify', name);

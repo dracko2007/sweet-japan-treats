@@ -34,6 +34,8 @@ import { cpfGuardService, normalizeCPF } from '@/services/cpfGuardService';
 import { promoCampaignService } from '@/services/promoCampaignService';
 import { thermalPrintService } from '@/services/thermalPrintService';
 import StripeCardForm from '@/components/checkout/StripeCardForm';
+import { prepareCheckout, type AuthoritativeCheckoutOrder, type CheckoutPaymentMethod } from '@/services/checkoutService';
+import { getCountryConfig } from '@/data/worldCountries';
 import { db } from '@/config/firebase';
 import { doc, getDoc, setDoc, updateDoc, increment } from 'firebase/firestore';
 
@@ -80,9 +82,12 @@ const OrderReview: React.FC = () => {
     yuchoKigo: '', yuchoNumber: '', yuchoName: '', contactPhone: '',
   });
 
-  // Modal de pagamento — aberto antes de salvar o pedido
+  // O pedido é criado no servidor antes de abrir o modal. Nenhuma mutação
+  // financeira depende do navegador.
   const [paymentModal, setPaymentModal] = useState(false);
-  const [pendingOrder, setPendingOrder] = useState<any>(null);
+  const [pendingOrder, setPendingOrder] = useState<AuthoritativeCheckoutOrder | null>(null);
+  const [stripeClientSecret, setStripeClientSecret] = useState('');
+  const [orderCreating, setOrderCreating] = useState(false);
   const [pixCopied, setPixCopied] = useState(false);
 
   useEffect(() => {
@@ -247,433 +252,89 @@ const OrderReview: React.FC = () => {
 
   // Passo 1: monta os dados do pedido e abre o modal de pagamento (sem salvar nada ainda)
   const handleProceedToPayment = async () => {
-    // ── Verificações anti-fraude por CPF ─────────────────────────────────────
-    const cpfRaw = formData.cpf || '';
-    if (cpfRaw) {
-      const customerEmail = String(formData.email || user?.email || '').trim().toLowerCase();
-      const customerName = formData.name || '';
-
-      // 1. Limite de produto por CPF (burla via guest)
-      const productIdsWithLimit = items
-        .filter(i => !i.freeGift && i.product.stock && !i.product.stock.unlimited)
-        .map(i => i.product.id);
-      if (productIdsWithLimit.length > 0) {
-        const limitCheck = await cpfGuardService.checkProductLimit(cpfRaw, productIdsWithLimit);
-        if (limitCheck.blocked) {
-          toast({
-            title: '⚠️ Limite de compra atingido',
-            description: 'Este produto tem limite de 1 unidade por pessoa (CPF). Seu CPF já possui um pedido com este produto.',
-            variant: 'destructive',
-          });
-          cpfGuardService.logFraudAttempt({
-            cpfRaw, attemptType: 'product_limit',
-            productId: productIdsWithLimit[0],
-            customerEmail, customerName,
-          });
-          return;
-        }
-      }
-
-      // 2. Cupom de afiliado genérico só na primeira compra por CPF.
-      //    Cupons vinculados a produto específico (affiliateProductId) são permitidos sempre.
-      if (appliedCoupon?.affiliateCode && !appliedCoupon?.affiliateProductId) {
-        const affCheck = await cpfGuardService.hasUsedAffiliateDiscount(cpfRaw);
-        if (affCheck.used) {
-          toast({
-            title: '🏷️ Cupom de indicação não aplicável',
-            description: 'O desconto de indicação é exclusivo para a primeira compra. Sua compra continuará normalmente sem o desconto de indicação. Cupons de produto específico são sempre válidos!',
-            variant: 'destructive',
-          });
-          cpfGuardService.logFraudAttempt({
-            cpfRaw, attemptType: 'affiliate_reuse',
-            affiliateCode: appliedCoupon.affiliateCode,
-            customerEmail, customerName,
-          });
-          setCouponDiscount(0);
-          setAppliedCoupon(null);
-          return;
-        }
-      }
-      // 3. Campanha promocional (?promo=CODE): 1 resgate por CPF.
-      const promoCode = safeStorage.getItem('promo_applied');
-      if (promoCode && await promoCampaignService.hasUsed(promoCode, cpfRaw)) {
-        toast({ title: '🎟️ Promoção já utilizada', description: 'Esta promoção já foi resgatada com este CPF.', variant: 'destructive' });
-        return;
-      }
-    }
-    // ─────────────────────────────────────────────────────────────────────────
-    const countryPrefix = isJapan ? 'JP' : formData.country === 'Brasil' ? 'BR' : formData.country === 'Portugal' ? 'PT' : formData.country === 'França' ? 'FR' : formData.country === 'Itália' ? 'IT' : 'ES';
-    const orderId = isJapan
+    const iso = getCountryConfig(formData.country)?.iso.toUpperCase() || 'XX';
+    const orderId = formData.country === 'Japão'
       ? `SC-JP-${Math.floor(100000 + Math.random() * 900000)}`
-      : `SE-${countryPrefix}-${Math.floor(100000 + Math.random() * 900000)}`;
-    const trackingPrefix = isJapan ? 'JP' : countryPrefix === 'BR' ? 'NX' : 'EX';
-    const trackingCode = `${trackingPrefix}${Math.floor(100000000 + Math.random() * 900000000)}JP`;
-    const orderCreatedAt = new Date().toISOString();
-    const customerEmail = String(formData.email || user?.email || '').trim().toLowerCase();
+      : `SE-${iso}-${Math.floor(100000 + Math.random() * 900000)}`;
 
-    const mockOrder = {
-      id: orderId,
-      name: formData.name,
-      email: customerEmail,
-      phone: formData.phone,
-      cpf: formData.cpf || '',
-      postalCode: formData.postalCode,
-      prefecture: formData.prefecture,
-      city: formData.city,
-      address: formData.address,
-      building: formData.building,
-      country: formData.country,
-      shippingCarrier: shipping.carrier,
-      shippingCost: finalShippingCost,
-      subtotal: baseTotalPrice,
-      couponCode: appliedCoupon?.code || '',
-      couponDiscount,
-      pixDiscount,
-      federalTax,
-      icmsTax,
-      taxAmount,
-      psFeeYen,
-      psFeeDiscountYen,
-      psFeeFinalYen,
-      psFee: psFeeDisplay,
-      negotiationId: negotiationId || '',
-      pixIofFee,
-      pixBankFee,
-      pixTotalFees,
-      total: finalGrandTotal,
-      grandTotalYen,
-      currency,
-      paymentMethod,
-      status: 'Pendente',
-      trackingCode,
-      date: new Date().toLocaleDateString('pt-BR'),
-      orderCreatedAt,
-      customerEmail,
-      items: items.map(item => {
-        const finalUnitPrice = item.freeGift ? 0 : convertYen(effectiveYen(item.product, item.size));
-        return {
-          id: item.product.id,
-          name: productEnglishName(item.product) + (item.freeGift ? ' 🎁 GRÁTIS' : ''),
-          image: item.product.image,
-          quantity: item.quantity,
-          size: item.variantLabel || (item.size === 'small' ? 'Pequeno' : 'Grande'),
-          price: finalUnitPrice,
-          cost: item.freeGift ? 0 : (item.product.cost || 0),
-        };
-      })
-    };
-
-    setPendingOrder(mockOrder);
-    setPaymentModal(true);
+    setOrderCreating(true);
+    try {
+      const result = await prepareCheckout({
+        orderId,
+        paymentMethod: paymentMethod as CheckoutPaymentMethod,
+        items: items
+          .filter((item) => !item.freeGift)
+          .map((item) => ({
+            productId: item.product.id,
+            variantId: item.size,
+            quantity: item.quantity,
+          })),
+        customer: {
+          name: formData.name,
+          email: String(formData.email || user?.email || '').trim().toLowerCase(),
+          phone: formData.phone || '',
+          cpf: formData.cpf || '',
+        },
+        shippingAddress: {
+          postalCode: formData.postalCode || '',
+          prefecture: formData.prefecture || '',
+          state: formData.state || '',
+          city: formData.city || '',
+          address: formData.address || '',
+          building: formData.building || '',
+          country: formData.country,
+        },
+        shippingCarrier: shipping.carrier,
+        couponCode: appliedCoupon?.code || '',
+        promoCode: safeStorage.getItem('promo_applied') || '',
+        pointsToRedeem: redeemPoints,
+        negotiationId: negotiationId || '',
+      });
+      setPendingOrder(result.order);
+      setStripeClientSecret(result.clientSecret || '');
+      setPaymentModal(true);
+    } catch (error) {
+      toast({
+        title: 'Não foi possível criar o pedido',
+        description: error instanceof Error ? error.message : 'Revise os itens e tente novamente.',
+        variant: 'destructive',
+      });
+    } finally {
+      setOrderCreating(false);
+    }
   };
 
   // Passo 2: usuário confirmou o pagamento — agora salva tudo e navega
+  // O servidor já persistiu o pedido. Este passo apenas encerra a experiência
+  // local; estoque, cupons, pontos e promoções aguardam pagamento confirmado.
   const handleFinalizeOrder = () => {
     if (!pendingOrder) return;
-    const mockOrder = pendingOrder;
-    const orderId = mockOrder.id;
-    const trackingCode = mockOrder.trackingCode;
-    const orderCreatedAt = mockOrder.orderCreatedAt;
-    const customerEmail = mockOrder.customerEmail;
 
-    toast({
-      title: "Processando Pedido...",
-      description: isJapan ? "Preparando seu pedido com o centro de Hiroshima." : `Preparando seus dados com a aduana ${formData.country === 'Brasil' ? 'do Brasil' : 'de destino'}.`,
-    });
-
-    // Save to list of orders in safeStorage (backup local / mesmo dispositivo)
-    // CPF is omitted from the local cache — it lives only in Firestore (LGPD)
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { cpf: _cpf, ...localOrder } = mockOrder;
     if (!isGuest) {
-      const existingOrders = JSON.parse(safeStorage.getItem('sakura_orders') || '[]');
-      // Remove any previous entry with the same orderNumber to avoid stale duplicates
-      const deduped = existingOrders.filter((o: any) => o.orderNumber !== orderId && o.id !== orderId);
-      safeStorage.setItem('sakura_orders', JSON.stringify([localOrder, ...deduped]));
+      const existingOrders = JSON.parse(safeStorage.getItem('sakura_orders') || '[]') as AuthoritativeCheckoutOrder[];
+      const deduped = existingOrders.filter((order) => order.orderNumber !== pendingOrder.orderNumber);
+      safeStorage.setItem('sakura_orders', JSON.stringify([pendingOrder, ...deduped]));
     }
-
-    // ⭐ GRAVA NO FIRESTORE — sem isto o pedido só fica no navegador do comprador
-    // e o admin (em outro dispositivo) NUNCA vê. Formato exato que o painel espera:
-    // shippingAddress aninhado, items[].productName, orderNumber, totalPrice, status 'pending'.
-    const firestoreOrder = {
-      orderNumber: orderId,
-      id: orderId,
-      customerName: formData.name,
-      customerEmail,
-      status: 'pending',
-      orderDate: orderCreatedAt,
-      date: mockOrder.date,
-      totalPrice: finalGrandTotal,
-      total: finalGrandTotal,
-      totalAmount: finalGrandTotal,
-      grandTotalYen,
-      currency,
-      paymentMethod,
-      trackingCode,
-      couponCode: appliedCoupon?.code || '',
-      couponDiscount,
-      pixDiscount,
-      taxAmount,
-      shippingCarrier: shipping.carrier,
-      shippingCost: finalShippingCost,
-      shipping: { cost: finalShippingCost, carrier: shipping.carrier, estimatedDays: shipping.estimatedDays },
-      affiliateCode: appliedCoupon?.affiliateCode || '',
-      affiliateProductId: appliedCoupon?.affiliateProductId || '',
-      psFeeFinalYen,
-      cpf: normalizeCPF(formData.cpf || ''),
-      customerType: isGuest ? 'guest' : 'registered',
-      shippingAddress: {
-        name: formData.name,
-        phone: formData.phone || '',
-        email: customerEmail,
-        postalCode: formData.postalCode || '',
-        prefecture: formData.prefecture || '',
-        city: formData.city || '',
-        address: formData.address || '',
-        building: formData.building || '',
-        country: formData.country,
-      },
-      items: mockOrder.items.map((it) => ({
-        productId: it.id,
-        productName: it.name,
-        name: it.name,
-        image: it.image,
-        quantity: it.quantity,
-        size: it.size,
-        price: it.price,
-        cost: it.cost || 0,
-      })),
-    };
-
-    // Guest orders: save to Firestore for admin visibility but not to user profile
-    if (user && !isGuest) {
-      void addOrder(firestoreOrder as any);
+    if (pendingOrder.paymentMethod !== 'card') {
+      void emailServiceSimple.sendOrderConfirmation({ orderNumber: pendingOrder.orderNumber });
     }
+    void thermalPrintService.printOrder(pendingOrder);
 
-    // Decrementa estoque via API server-side, depois recarrega produtos para
-    // refletir o Sold Out imediatamente na loja sem precisar de um reload manual.
-    const stockItems = items.filter(i => !i.freeGift && i.product.stock && !i.product.stock.unlimited);
-    if (stockItems.length > 0) {
-      Promise.all(
-        stockItems.map(item =>
-          fetch('/api/decrement-stock', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ productId: item.product.id, qty: item.quantity }),
-          }).catch(() => {})
-        )
-      ).then(() => refreshProducts()).catch(() => {});
-    }
-
-    // Comissão de afiliado — calculada aqui para ser capturada no closure
-    const affiliateNetYen = appliedCoupon?.affiliateCode
-      ? Math.round(
-          items.reduce((sum, item) => {
-            if (item.freeGift) return sum;
-            return sum + effectiveYen(item.product, item.size) * item.quantity;
-          }, 0) * (1 - (appliedCoupon.discountType === 'percentage' ? appliedCoupon.discount / 100 : 0))
-        )
-      : 0;
-
-    // Todas as escritas ao Firestore que precisam de auth ficam aqui.
-    // Para guests, só executam APÓS signInAnonymously completar.
-    const doFirestoreWrites = () => {
-      firebaseSyncService
-        .syncOrderToFirestore(user?.id || customerEmail || 'guest', firestoreOrder)
-        .then((ok) => devLog(ok ? '✅ Pedido salvo no Firestore' : '⚠️ Falha ao salvar pedido'))
-        .catch((e) => devError('❌ Erro ao salvar pedido:', e));
-
-      if (appliedCoupon?.affiliateCode && affiliateNetYen > 0) {
-        import('@/services/affiliateService').then(({ affiliateService }) => {
-          affiliateService.addPendingCommission({
-            affiliateCode: appliedCoupon.affiliateCode,
-            netYen: affiliateNetYen,
-            orderId,
-            buyerEmail: customerEmail,
-          });
-        });
-        safeStorage.removeItem('affiliate_ref');
-        safeStorage.removeItem('affiliate_ref_product');
-      }
-
-      // Registra no índice de CPF: produtos comprados e (se genérico) afiliado usado
-      const cpfRaw = formData.cpf || '';
-      if (cpfRaw) {
-        const purchasedProductIds = items
-          .filter(i => !i.freeGift && i.product.stock && !i.product.stock.unlimited)
-          .map(i => i.product.id);
-        // Só marca o affiliateCode no índice se for cupom GENÉRICO (sem affiliateProductId).
-        // Cupons vinculados a produto específico podem ser reutilizados pelo mesmo CPF.
-        const affiliateCodeToRegister = (appliedCoupon?.affiliateCode && !appliedCoupon?.affiliateProductId)
-          ? appliedCoupon.affiliateCode
-          : undefined;
-        cpfGuardService.registerOrder({
-          cpfRaw,
-          productIds: purchasedProductIds,
-          affiliateCode: affiliateCodeToRegister,
-        });
-      }
-    };
-
-    if (isGuest) {
-      // Guest has no Firebase Auth session — Firestore rules require request.auth != null.
-      // Signing in anonymously gives a valid token without creating a real account.
-      Promise.all([
-        import('firebase/auth'),
-        import('@/config/firebase'),
-      ]).then(([{ signInAnonymously }, { auth }]) => {
-        if (!auth) { doFirestoreWrites(); return; }
-        signInAnonymously(auth).catch(() => {}).finally(() => doFirestoreWrites());
-      }).catch(() => doFirestoreWrites());
-    } else {
-      doFirestoreWrites();
-    }
-
-    if (!appliedCoupon?.affiliateCode && appliedCoupon?.code) {
-      // Cupom pessoal → consome (uso único, some do perfil)
-      if (!isGuest) {
-        consumeCouponByCode(appliedCoupon.code);
-      }
-    }
-
-    // 🎁 Pontos de fidelidade: deduz o resgate e credita o ganho pelo gasto.
-    if (user && !isGuest) {
-      const net = earnedPoints - redeemPoints;
-      if (net !== 0) addPoints(net);
-      if (redeemPoints > 0 || earnedPoints > 0) {
-        toast({
-          title: '🎁 Pontos atualizados',
-          description: [
-            redeemPoints > 0 ? `-${redeemPoints} usados como desconto` : '',
-            earnedPoints > 0 ? `+${earnedPoints} ganhos nesta compra` : '',
-          ].filter(Boolean).join(' · '),
-        });
-      }
-    }
-
-    // 🎟️ Campanha promocional (e-mail/push): credita pontos, concede cupom de
-    // próxima compra e registra o uso por CPF (anti-abuso). Limpa o resgate.
-    const appliedPromoCode = safeStorage.getItem('promo_applied');
-    if (appliedPromoCode) {
-      const custEmail = String(formData.email || user?.email || '').trim().toLowerCase();
-      promoCampaignService.validate(appliedPromoCode).then((vres) => {
-        const camp = vres.campaign;
-        if (camp?.mechanic === 'points' && (camp.points || 0) > 0) {
-          if (!isGuest && user) {
-            addPoints(camp.points || 0);
-            toast({ title: '🎁 Pontos da promoção', description: `+${camp.points} pontos creditados!` });
-          } else if (custEmail) {
-            firebaseSyncService.addPointsToUserByEmail(custEmail, camp.points || 0).catch(() => {});
-          }
-        }
-        if (camp?.mechanic === 'coupon' && camp.couponCode && !isGuest && user) {
-          addCoupon({
-            id: `promo-${camp.code}`,
-            code: camp.couponCode,
-            description: `Cupom promocional ${camp.couponCode}`,
-            discount: 10,
-            discountType: 'percentage',
-            expiresAt: new Date(Date.now() + 30 * 86400000).toISOString(),
-            isUsed: false,
-          });
-          toast({ title: '🎟️ Cupom resgatado', description: `${camp.couponCode} disponível em Meus Cupons para a próxima compra!` });
-        }
-      });
-      void promoCampaignService.recordUsage(appliedPromoCode, formData.cpf || '', custEmail, orderId);
-      safeStorage.removeItem('promo_applied');
-      safeStorage.removeItem('pending_promo');
-      safeStorage.removeItem('pending_promo_gift');
-      safeStorage.removeItem('pending_promo_points');
-      safeStorage.removeItem('promo_full_price');
-    }
-
-    // Track referral progress (only when purchase is in BRL)
-    if (user?.id && currency === 'BRL') {
-      referralService.onPurchaseCompleted(user.id, finalGrandTotal).catch(() => {});
-    }
-
-    // Registra itens promocionais comprados (só agora, após pedido confirmado)
-    const promoItems = items.filter(i => !i.freeGift && i.product.id.endsWith('_promo'));
-    promoItems.forEach(item => {
-      const productId = item.product.id.replace(/_promo$/, '');
-      const key = `promo_bought_${productId}`;
-      try {
-        const raw = localStorage.getItem(key);
-        let current = 0;
-        if (raw) { try { current = JSON.parse(raw).count ?? 0; } catch { current = parseInt(raw) || 0; } }
-        localStorage.setItem(key, JSON.stringify({ count: current + item.quantity, setAt: Date.now() }));
-      } catch { /* localStorage indisponível */ }
-    });
-    // Incrementa soldCount; se atingir maxProducts ativa a próxima promoção
-    if (db && promoItems.length > 0) {
-      const totalPromoQty = promoItems.reduce((s, i) => s + i.quantity, 0);
-      void (async () => {
-        try {
-          const ref = doc(db, 'siteContent', 'homePromotion');
-          const snap = await getDoc(ref);
-          if (!snap.exists()) return;
-          const promo = snap.data() as { soldCount?: number; maxProducts?: number | null; nextPromo?: any; expiresAt?: number | null };
-          const newSoldCount = (promo.soldCount ?? 0) + totalPromoQty;
-          const esgotou = promo.maxProducts != null && newSoldCount >= promo.maxProducts;
-
-          if (esgotou) {
-            // Quantidade esgotada — avança para a próxima promoção ou remove
-            if (promo.nextPromo) {
-              const next = promo.nextPromo;
-              const nextExpiresAt = next.durationDays ? Date.now() + next.durationDays * 86400000 : null;
-              await setDoc(ref, { ...next, expiresAt: nextExpiresAt, soldCount: 0, nextPromo: null });
-            } else {
-              await updateDoc(ref, { soldCount: newSoldCount });
-              // Marca esgotado — a UI já trata isSoldOut
-            }
-          } else {
-            await updateDoc(ref, { soldCount: increment(totalPromoQty) });
-          }
-        } catch { /* silencioso */ }
-      })();
-    }
-
-    // Clear cart upon final purchase order creation
     clearCart();
     safeStorage.removeItem('redeem_points');
+    safeStorage.removeItem('promo_applied');
+    safeStorage.removeItem('pending_promo');
+    safeStorage.removeItem('pending_promo_gift');
+    safeStorage.removeItem('pending_promo_points');
+    safeStorage.removeItem('promo_full_price');
     localStorage.removeItem('activeNegId');
-    psFeeWaiver.clear(); // consome a isenção da oferta de saída (já aplicada neste pedido)
-    if (negotiationId) {
-      negotiationService.markUsed(negotiationId, orderId).catch(() => {});
-    }
+    psFeeWaiver.clear();
 
-    // E-mail automático de confirmação (fire-and-forget — não trava a navegação)
-    void emailServiceSimple.sendOrderConfirmation({
-      formData: {
-        name: formData.name,
-        email: customerEmail,
-        phone: formData.phone || '',
-        postalCode: formData.postalCode || '',
-        prefecture: formData.prefecture || formData.state || '',
-        city: formData.city || '',
-        address: formData.address || '',
-        building: formData.building || '',
-      },
-      items: mockOrder.items.map((it: any) => ({
-        name: it.name,
-        quantity: it.quantity,
-        price: it.price,
-        size: it.size,
-      })),
-      totalPrice: finalGrandTotal,
-      orderNumber: orderId,
-      paymentMethod,
-    });
-
-    // Impressão térmica silenciosa (não bloqueia o fluxo)
-    void thermalPrintService.printOrder(mockOrder);
-
-    // Navigate to confirmation page
     navigate('/order-confirmation', {
       state: {
-        order: mockOrder,
+        order: pendingOrder,
         isGuest,
-      }
+      },
     });
   };
 
@@ -719,7 +380,7 @@ const OrderReview: React.FC = () => {
                   <Package className="w-5 h-5 text-primary" />
                 </div>
                 <h2 className="font-sans text-xl font-bold text-foreground">
-                  {isJapan ? 'Produtos Selecionados (Entrega no Japão)' : 'Produtos Selecionados (Tóquio Hub)'}
+                  {isJapan ? 'Produtos Selecionados (Entrega no Japão)' : 'Produtos Selecionados (Centro de Hiroshima)'}
                 </h2>
               </div>
 
@@ -870,7 +531,7 @@ const OrderReview: React.FC = () => {
                   </div>
 
                   <div className="text-[10px] text-gray-400 text-right">
-                    {isJapan ? 'Envio doméstico seguro de Hiroshima Prefecture.' : `Voo internacional Tóquio para ${formData.country}.`} Entrega estimada: {shipping.estimatedDays} dias úteis
+                    {isJapan ? 'Envio doméstico seguro de Hiroshima Prefecture.' : `Envio internacional de Hiroshima para ${formData.country}.`} Entrega estimada: {shipping.estimatedDays} dias úteis
                   </div>
 
                   {psFeeYen > 0 && (
@@ -1313,10 +974,11 @@ const OrderReview: React.FC = () => {
 
                       <Button
                         onClick={handleProceedToPayment}
+                        disabled={orderCreating}
                         className="w-full btn-primary rounded-xl py-5 text-base font-bold"
                       >
                         <CheckCircle className="w-5 h-5 mr-2" />
-                        Confirmar e Pagar
+                        {orderCreating ? 'Criando pedido seguro...' : 'Confirmar e Pagar'}
                         <ArrowRight className="w-5 h-5 ml-2" />
                       </Button>
 
@@ -1489,18 +1151,8 @@ const OrderReview: React.FC = () => {
                       <CreditCard className="w-5 h-5" /> PAGAMENTO COM CARTÃO
                     </div>
                     <StripeCardForm
-                      orderId={pendingOrder.id}
-                      amount={Number(pendingOrder.total) || 0}
-                      currency={pendingOrder.currency}
-                      email={pendingOrder.email}
-                      customerName={pendingOrder.name}
-                      itemCount={items.reduce((s, i) => s + i.quantity, 0)}
-                      onSuccess={() => {
-                        // Cartão já foi cobrado com sucesso pelo Stripe — diferente de
-                        // PIX/Wise, que ficam 'Pendente' até o comprovante ser enviado.
-                        pendingOrder.status = 'Pago';
-                        handleFinalizeOrder();
-                      }}
+                      clientSecret={stripeClientSecret}
+                      onSuccess={handleFinalizeOrder}
                     />
                   </div>
                 )}

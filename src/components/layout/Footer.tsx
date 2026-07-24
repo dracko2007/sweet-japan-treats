@@ -2,14 +2,15 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Instagram, Facebook, Mail, MapPin, MessageCircle, Smartphone, Twitter } from 'lucide-react';
 import { usePWAInstall } from '@/hooks/usePWAInstall';
+import { COMPANY_PROFILE } from '@/config/companyProfile';
 
-const WHATSAPP_NUMBER = '817013671679'; // +81 70-1367-1679
+const WHATSAPP_NUMBER = COMPANY_PROFILE.whatsapp.digits;
 const INSTAGRAM_URL = 'https://www.instagram.com/japan_express_official/';
 const FACEBOOK_URL = 'https://www.facebook.com/japanexpressoficial';
 const TIKTOK_URL = 'https://www.tiktok.com/@japanexpressoficial';
 const X_URL = 'https://x.com/japanexpress_of';
 const WHATSAPP_LINK = `https://wa.me/${WHATSAPP_NUMBER}`;
-const CONTACT_EMAIL = 'contato@japanexpress-store.com';
+const CONTACT_EMAIL = COMPANY_PROFILE.email;
 import { useLanguage } from '@/context/LanguageContext';
 import JapanExpressLogo from '@/components/JapanExpressLogo';
 
@@ -157,7 +158,7 @@ const Footer: React.FC = () => {
               <div className="flex items-start gap-2">
                 <MapPin className="w-4 h-4 mt-0.5 text-primary" />
                 <span className="text-sm text-accent-foreground/80">
-                  広島県福山市駅家町下山守257-18
+                  {isJapan ? COMPANY_PROFILE.fulfillmentOrigin.formattedJa : COMPANY_PROFILE.fulfillmentOrigin.formatted}
                 </span>
               </div>
               <a href={`mailto:${CONTACT_EMAIL}`} className="flex items-start gap-2 group">
@@ -169,7 +170,7 @@ const Footer: React.FC = () => {
               <a href={WHATSAPP_LINK} target="_blank" rel="noopener noreferrer" className="flex items-start gap-2 group">
                 <MessageCircle className="w-4 h-4 mt-0.5 text-green-400" />
                 <span className="text-sm text-accent-foreground/80 group-hover:text-accent-foreground transition-colors">
-                  WhatsApp: +81 70-1367-1679
+                  WhatsApp: {COMPANY_PROFILE.whatsapp.international}
                 </span>
               </a>
             </div>

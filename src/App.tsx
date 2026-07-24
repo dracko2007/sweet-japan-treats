@@ -9,7 +9,8 @@ import { CartProvider } from "@/context/CartContext";
 import { UserProvider } from "@/context/UserContext";
 import { LanguageProvider } from "@/context/LanguageContext";
 import { ProductsProvider } from "@/context/ProductsContext";
-import { firebaseConfigReady, firebaseConfigSource, app } from "@/config/firebase";
+import { firebaseConfigReady, firebaseConfigSource } from "@/config/firebase";
+import { initAnalytics, trackPageview } from "@/lib/analytics";
 import { useCookieConsent } from "@/hooks/useCookieConsent";
 import { useMaintenanceMode } from "@/hooks/useMaintenanceMode";
 import { ADMIN_EMAIL, ADMIN_USER_ID } from "@/config/admin";
@@ -25,6 +26,7 @@ import CartAbandonmentTracker from "./components/CartAbandonmentTracker";
 import CartRecoveryBanner from "./components/CartRecoveryBanner";
 import AnimatedPlaneLogo from "./components/AnimatedPlaneLogo";
 import MaintenancePage from "./pages/Maintenance";
+import RouteLoader from "./components/RouteLoader";
 
 // Code splitting: cada página carregada apenas quando necessária
 const Index            = lazy(() => import("./pages/Index"));
@@ -63,19 +65,18 @@ const queryClient = new QueryClient({
   },
 });
 
-// Analytics do Google só carrega após consentimento.
-// A contagem de visitas (anônima, agregada, sem dados pessoais) roda para
-// TODOS os visitantes — não depende do banner de cookies.
+// Analytics de conversão (GA4 + Meta Pixel) só carrega após consentimento —
+// ver src/lib/analytics.ts. A contagem de visitas interna (anônima, agregada,
+// sem dados pessoais, usada só no dashboard admin) roda para TODOS os
+// visitantes — não depende do banner de cookies.
 const AnalyticsLoader: React.FC = () => {
   const { consent } = useCookieConsent();
   const location = useLocation();
 
-  // Google Analytics — só com consentimento explícito
+  // GA4 (Firebase Analytics) + Meta Pixel — só com consentimento explícito.
   useEffect(() => {
-    if (consent !== 'accepted' || !app) return;
-    import('firebase/analytics').then(({ getAnalytics }) => {
-      try { getAnalytics(app!); } catch { /* já inicializado */ }
-    });
+    if (consent !== 'accepted') return;
+    initAnalytics();
   }, [consent]);
 
   // Contagem de visitas + país/cidade — para todos (estatística agregada anônima)
@@ -85,11 +86,12 @@ const AnalyticsLoader: React.FC = () => {
     });
   }, []);
 
-  // Rastreia visualização de página a cada mudança de rota
+  // Rastreia visualização de página a cada mudança de rota (interno + GA4/Meta)
   useEffect(() => {
     import('@/services/visitorService').then(({ visitorService }) => {
       visitorService.trackPage(location.pathname).catch(() => {});
     });
+    trackPageview(location.pathname);
   }, [location.pathname]);
 
   return null;
@@ -164,7 +166,7 @@ const FullApp: React.FC = () => (
           <ScrollToTop />
           <SmoothScroll>
           <ErrorBoundary>
-            <Suspense fallback={null}>
+            <Suspense fallback={<RouteLoader />}>
               <Routes>
                 <Route path="/" element={<Index />} />
                 <Route path="/produtos" element={<Products />} />

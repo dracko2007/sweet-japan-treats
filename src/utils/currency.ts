@@ -2,8 +2,6 @@ import { yenFromConverted } from '@/services/fxService';
 import { roundYen } from '@/utils/pricing';
 import { getCountryConfig } from '@/data/worldCountries';
 
-export const BRL_TO_JPY_RATE = 28;
-export const BRL_TO_EUR_RATE = 0.16;
 
 // Desfaz o RATE_CUSHION aplicado em convertYen para mostrar o ¥ real do produto.
 const yenRefFromBrl = (brl: number): number => yenFromConverted(brl, 'BRL');
@@ -17,9 +15,11 @@ const yenRefFromUsd = (usd: number): number => yenFromConverted(usd, 'USD');
  */
 export const toYen = (amount: number, currency?: string): number => {
   if (!amount) return 0;
-  if (currency === 'BRL') return Math.round(amount * BRL_TO_JPY_RATE);
-  if (currency === 'EUR') return Math.round((amount / BRL_TO_EUR_RATE) * BRL_TO_JPY_RATE);
-  return Math.round(amount); // JPY ou desconhecido
+  const normalized = String(currency || 'JPY').toUpperCase();
+  if (normalized === 'JPY' || !['BRL', 'EUR', 'USD'].includes(normalized)) {
+    return Math.round(amount);
+  }
+  return roundYen(yenFromConverted(amount, normalized));
 };
 
 /**
@@ -58,32 +58,6 @@ export const getCurrencyByCountry = (country: string): 'BRL' | 'JPY' | 'EUR' | '
   if (country === 'Japão') return 'JPY';
   if (country === 'Estados Unidos') return 'USD';
   if (['Portugal', 'França', 'Itália', 'Espanha'].includes(country)) return 'EUR';
-  return 'BRL';
+  return 'USD';
 };
 
-/**
- * Converts BRL value to country specific value
- */
-export const convertBrlToCountry = (priceInBrl: number, country: string): number => {
-  if (country === 'Japão') {
-    return priceInBrl * BRL_TO_JPY_RATE;
-  }
-  if (['Portugal', 'França', 'Itália', 'Espanha'].includes(country)) {
-    return priceInBrl * BRL_TO_EUR_RATE;
-  }
-  return priceInBrl;
-};
-
-/**
- * Converts a price from BRL to JPY using a fixed conversion rate.
- */
-export const convertBrlToJpy = (priceInBrl: number): number => {
-  return priceInBrl * BRL_TO_JPY_RATE;
-};
-
-/**
- * Converts a price from JPY to BRL using a fixed conversion rate.
- */
-export const convertJpyToBrl = (priceInJpy: number): number => {
-  return priceInJpy / BRL_TO_JPY_RATE;
-};

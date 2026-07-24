@@ -18,6 +18,7 @@ import {
   runTransaction,
 } from 'firebase/firestore';
 import { ensureAdminAuth } from '@/utils/adminAuth';
+import { submitPublicForm } from '@/services/publicSubmissionService';
 
 const isDev = import.meta.env.DEV;
 const devLog = isDev ? console.log.bind(console) : () => {};
@@ -152,22 +153,10 @@ export const affiliateService = {
 
   /** Cliente solicita virar afiliado (1 por e-mail). */
   async requestAffiliate(name: string, email: string, message?: string): Promise<{ ok: boolean; error?: string }> {
-    if (!db) return { ok: false, error: 'Indisponível' };
-    const id = email.trim().toLowerCase();
-    if (!id) return { ok: false, error: 'E-mail inválido' };
-    try {
-      await setDoc(doc(db, REQ_COL, id), {
-        email: id,
-        name: name || '',
-        status: 'pending',
-        requestedAt: new Date().toISOString(),
-        message: message || '',
-      });
-      return { ok: true };
-    } catch (e: any) {
-      devWarn('requestAffiliate falhou:', e);
-      return { ok: false, error: e?.message };
-    }
+    const result = await submitPublicForm('affiliate_request', { name, email, message });
+    return result.ok
+      ? { ok: true }
+      : { ok: false, error: result.error === 'already_requested' ? 'Solicitação já enviada.' : 'Não foi possível enviar a solicitação.' };
   },
 
   /** Status da solicitação de um cliente (ou null). */
@@ -226,7 +215,11 @@ export const affiliateService = {
   },
 
   /** Cria ou atualiza um afiliado (admin). */
-  async save(input: Omit<Affiliate, 'totalOrders' | 'totalRevenue' | 'totalEarnings' | 'createdAt'> & {
+  async save(input: Omit<
+    Affiliate,
+    'totalOrders' | 'totalRevenue' | 'totalEarnings' | 'createdAt'
+    | 'tier' | 'currentMonthRevenue' | 'currentMonthKey' | 'tierUpdatedAt'
+  > & {
     createdAt?: string;
     totalOrders?: number;
     totalRevenue?: number;

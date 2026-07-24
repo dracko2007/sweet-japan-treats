@@ -62,11 +62,12 @@ class CartAbandonmentService {
           ...snapshot,
           abandonedAt: snapshot.abandonedAt,
           updatedAt: serverTimestamp(),
-          // Rearma o lembrete: o cron (api/cart-recovery) só envia para docs com
-          // reminderSent === false. Sem este campo, a query never casa e nada é enviado.
-          // Como abandonedAt volta a "agora" a cada atualização, o e-mail só dispara
-          // quando o carrinho ficar realmente parado (>90min).
-          reminderSent: false,
+          // Rearma o ciclo de lembretes: o cron (api/cart-recovery) usa
+          // reminderStage (0 = nenhum lembrete enviado, 1/2/3 = último estágio
+          // já enviado nos 3 toques de recuperação) para decidir o próximo envio.
+          // Como abandonedAt volta a "agora" a cada atualização, os e-mails só
+          // disparam quando o carrinho ficar realmente parado (90min/24h/72h).
+          reminderStage: 0,
         }, { merge: true });
       } catch {
         /* silencioso — o localStorage já garante a recuperação client-side */

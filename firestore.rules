@@ -2,265 +2,347 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
 
-    // Admin verificado pelo UID registrado na coleção /admins — não por email hardcoded.
-    // Fallback: email do super-admin (Firebase Auth) para o primeiro acesso.
-    function isAdmin() {
-      return request.auth != null && (
-        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
-        || request.auth.token.email == 'dracko2007@gmail.com'
+    function owns(userId) {
+      return signedIn() && request.auth.uid == userId;
+    }
+
+    function tokenEmail() {
+      return request.auth.token.get('email', '');
+    }
+
+    function hasAdminClaim() {
+      return signedIn() && (
+        request.auth.token.get('admin', false) == true
+        || request.auth.token.get('role', '') == 'admin'
+        || request.auth.token.get('adminRole', '') == 'admin'
+        || request.auth.token.get('adminRole', 0) in [1, 2, 3]
       );
     }
 
-    // ---------- Clientes ----------
+    function hasActiveAdminRecord() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+        && get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.get('active', false) == true;
+    }
+
+    function isBootstrapAdmin() {
+      return signedIn()
+        && request.auth.token.get('email_verified', false) == true
+        && tokenEmail() == 'dracko2007@gmail.com';
+    }
+
+    function isAdmin() {
+      return hasAdminClaim() || hasActiveAdminRecord() || isBootstrapAdmin();
+    }
+
+    function validText(value, minSize, maxSize) {
+      return value is string && value.size() >= minSize && value.size() <= maxSize;
+    }
+
+    function validOptionalText(data, key, maxSize) {
+      return !data.keys().hasAny([key])
+        || (data[key] is string && data[key].size() <= maxSize);
+    }
+
+    function validAddress(address) {
+      return address is map
+        && address.keys().hasAll(['postalCode', 'prefecture', 'city', 'address'])
+        && address.keys().hasOnly(['postalCode', 'prefecture', 'city', 'address', 'building'])
+        && validText(address.postalCode, 0, 30)
+        && validText(address.prefecture, 0, 100)
+        && validText(address.city, 0, 100)
+        && validText(address.address, 0, 300)
+        && validOptionalText(address, 'building', 120);
+    }
+
+    function validWelcomeCoupons(data) {
+      return !data.keys().hasAny(['coupons'])
+        || (data.coupons is list && (
+          data.coupons.size() == 0
+          || (data.coupons.size() == 1
+            && data.coupons[0] is map
+            && data.coupons[0].keys().hasOnly([
+              'id', 'code', 'description', 'discount', 'discountType', 'expiresAt',
+              'isUsed', 'freeShipping', 'affiliateCode', 'affiliateProductId', 'minOrderValue'
+            ])
+            && data.coupons[0].code == 'BEMVINDO10'
+            && data.coupons[0].discount == 10
+            && data.coupons[0].discountType == 'percentage'
+            && data.coupons[0].isUsed == false)
+        ));
+    }
+
+    function validUserCreate(userId, data) {
+      return owns(userId)
+        && data.keys().hasAll(['id', 'name', 'email', 'phone', 'address', 'createdAt'])
+        && data.keys().hasOnly([
+          'id', 'name', 'email', 'phone', 'birthdate', 'personType', 'cpf', 'cnpj',
+          'razaoSocial', 'document', 'gender', 'whatsappMarketing', 'pushEnabled',
+          'address', 'createdAt', 'coupons', 'points', 'birthdayBonusYear',
+          'lastSyncAt', 'referredBy', 'referredTotalBrl', 'referralRewardPaid',
+          'socialFollows'
+        ])
+        && data.id == userId
+        && data.email == tokenEmail()
+        && validText(data.name, 1, 120)
+        && validText(data.email, 3, 254)
+        && validText(data.phone, 0, 40)
+        && validAddress(data.address)
+        && data.get('points', 0) == 0
+        && data.get('birthdayBonusYear', 0) == 0
+        && data.get('referredTotalBrl', 0) == 0
+        && data.get('referralRewardPaid', false) == false
+        && validWelcomeCoupons(data);
+    }
+
+    function validUserUpdate(userId) {
+      return owns(userId)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'name', 'phone', 'birthdate', 'personType', 'cpf', 'cnpj', 'razaoSocial',
+          'document', 'gender', 'whatsappMarketing', 'pushEnabled', 'address',
+          'lastSyncAt', 'socialFollows', 'referredBy'
+        ])
+        && request.resource.data.id == resource.data.id
+        && request.resource.data.email == resource.data.email
+        && validText(request.resource.data.name, 1, 120)
+        && validText(request.resource.data.phone, 0, 40)
+        && validAddress(request.resource.data.address)
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['referredBy'])
+          || (!resource.data.keys().hasAny(['referredBy'])
+            && validText(request.resource.data.referredBy, 1, 128)));
+    }
+
+    function ownsByEmail(data, field) {
+      return signedIn() && data[field] == tokenEmail();
+    }
+
+    function validCartSnapshot(data) {
+      return data.keys().hasAll([
+          'items', 'totalYen', 'itemCount', 'abandonedAt', 'updatedAt', 'reminderSent'
+        ])
+        && data.keys().hasOnly([
+          'items', 'totalYen', 'itemCount', 'abandonedAt', 'updatedAt', 'reminderSent',
+          'reminderSentAt', 'reminderClaimId', 'reminderClaimedAt'
+        ])
+        && data.items is list
+        && data.items.size() > 0
+        && data.items.size() <= 100
+        && data.totalYen is number
+        && data.totalYen >= 0
+        && data.itemCount is int
+        && data.itemCount > 0
+        && data.reminderSent == false;
+    }
+
     match /users/{userId} {
-      allow read: if isAdmin() || (request.auth != null && userId == request.auth.uid);
-      allow create: if request.auth != null && userId == request.auth.uid;
-      allow update: if isAdmin() || (request.auth != null && userId == request.auth.uid);
+      allow read: if isAdmin() || owns(userId);
+      allow create: if validUserCreate(userId, request.resource.data);
+      allow update: if isAdmin() || validUserUpdate(userId);
       allow delete: if isAdmin();
     }
 
-    // ---------- Pedidos ----------
     match /orders/{orderId} {
       allow read: if isAdmin()
-        || (request.auth != null && resource.data.userId == request.auth.uid)
-        || (request.auth != null && resource.data.customerEmail == request.auth.token.email);
-
-      // Admin pode criar pedidos manualmente (vendas posteriores) com qualquer status.
-      // Caso contrário: usuário autenticado OU convidado (guest) com campos mínimos e status pending.
-      allow create: if isAdmin()
-        || ((request.auth != null || request.resource.data.get('customerType', '') == 'guest')
-        && request.resource.data.status == 'pending'
-        && request.resource.data.keys().hasAll(['totalAmount', 'items', 'customerEmail'])
-        && request.resource.data.totalAmount > 0
-        && request.resource.data.items.size() > 0
-        && request.resource.data.customerEmail is string
-        && request.resource.data.customerEmail.size() > 3);
-
-      allow update: if isAdmin()
-        || (request.auth != null
-            && resource.data.customerEmail == request.auth.token.email
-            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])
-            && request.resource.data.status == 'delivered');
-      allow delete: if isAdmin();
+        || (signedIn() && resource.data.get('userId', '') == request.auth.uid)
+        || ownsByEmail(resource.data, 'customerEmail');
+      allow create, update, delete: if isAdmin();
     }
 
-    // ---------- Produtos ----------
     match /products/{productId} {
       allow read: if true;
-      allow write, delete: if isAdmin();
+      allow create, update, delete: if isAdmin();
     }
 
-    // ---------- Conteúdo do site (home) ----------
     match /siteContent/{docId} {
       allow read: if true;
-      allow write, delete: if isAdmin();
+      allow create, update, delete: if isAdmin();
     }
 
-    // ---------- Cupons ----------
-    // Leitura restrita: apenas admin ou usuário autenticado pode ver cupons.
-    // Cupons públicos expõem códigos e descontos para qualquer pessoa.
     match /coupons/{couponId} {
-      allow read: if isAdmin() || request.auth != null;
-      allow write, delete: if isAdmin();
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
     }
 
     match /coupon_usage/{usageId} {
-      allow read: if isAdmin()
-        || (request.auth != null && resource.data.userId == request.auth.uid);
-      allow create: if request.auth != null;
-      allow update, delete: if isAdmin();
+      allow read, create, update, delete: if isAdmin();
     }
 
-    // ---------- Eventos de navegação ----------
-    match /eventos/{eventoId} {
-      allow create: if request.auth != null
-                    && request.resource.data.usuarioId == request.auth.uid;
-      allow read: if (request.auth != null
-                    && resource.data.usuarioId == request.auth.uid)
-                    || isAdmin();
+    match /eventos/{eventId} {
+      allow create: if signedIn()
+        && request.resource.data.get('usuarioId', '') == request.auth.uid
+        && request.resource.data.keys().hasAll(['usuarioId'])
+        && request.resource.data.keys().size() <= 12;
+      allow read: if isAdmin()
+        || (signedIn() && resource.data.get('usuarioId', '') == request.auth.uid);
       allow update: if false;
       allow delete: if isAdmin();
     }
 
-    // ---------- Afiliados / Influencers ----------
-    // get (por código) é público: necessário para validar cupons de afiliado no checkout.
-    // list é restrito: impede enumerar todos os afiliados e expor ownerEmail em massa.
     match /affiliates/{code} {
       allow get: if true;
-      allow list: if isAdmin();
-      allow create, delete: if isAdmin();
-      allow update: if isAdmin()
-        || (request.auth != null && resource.data.ownerEmail == request.auth.token.email);
+      allow list, create, update, delete: if isAdmin();
     }
 
-    // Comissões pendentes — exige auth para evitar fraude por bots
     match /affiliate_pending/{id} {
-      allow create: if request.auth != null
-        && request.resource.data.status == 'pending';
-      allow read, update, delete: if isAdmin()
-        || (request.auth != null && resource.data.buyerEmail == request.auth.token.email)
-        || (request.auth != null && resource.data.ownerEmail == request.auth.token.email);
-    }
-
-    // Solicitações para virar afiliado — validação mínima evita spam de bots
-    match /affiliate_requests/{id} {
-      allow create: if request.resource.data.keys().hasAll(['email', 'name'])
-        && request.resource.data.email is string
-        && request.resource.data.email.size() > 3
-        && request.resource.data.name is string
-        && request.resource.data.name.size() > 1;
       allow read: if isAdmin()
-        || (request.auth != null && resource.data.email == request.auth.token.email);
-      allow update, delete: if isAdmin();
+        || ownsByEmail(resource.data, 'buyerEmail')
+        || ownsByEmail(resource.data, 'ownerEmail');
+      allow create, update, delete: if isAdmin();
     }
 
-    // ---------- Tentativas de fraude (log para o admin) ----------
+    match /affiliate_requests/{id} {
+      allow read: if isAdmin() || ownsByEmail(resource.data, 'email');
+      allow create, update, delete: if isAdmin();
+    }
+
     match /fraud_attempts/{id} {
-      allow create: if request.auth != null;  // qualquer auth (inclusive anônimo) pode criar
-      allow read, update, delete: if isAdmin();
+      allow read, create, update, delete: if isAdmin();
     }
 
-    // ---------- Índice anti-fraude de CPF ----------
-    // Cada documento tem id = CPF (só dígitos) e campos:
-    //   productIds: string[]  — produtos já comprados com esse CPF
-    //   affiliateCodes: string[] — códigos de afiliado já usados
-    // Gravado no momento do pedido (server-side via create order flow).
-    // Leitura pública permite verificar antes de finalizar sem expor dados pessoais.
     match /cpf_index/{cpf} {
-      allow read: if true;   // leitura pública — o doc só tem arrays de IDs, não dados pessoais
-      allow write: if request.auth != null;  // qualquer auth (incluindo anônimo) pode gravar
+      allow read, create, update, delete: if isAdmin();
     }
 
-    // ---------- Gastos de Marketing ----------
     match /marketing_expenses/{id} {
-      allow read, write, delete: if isAdmin();
+      allow read, create, update, delete: if isAdmin();
     }
 
-    // ---------- Funcionários ----------
     match /employees/{id} {
-      allow read, write, delete: if isAdmin();
+      allow read, create, update, delete: if isAdmin();
     }
 
     match /employee_payments/{id} {
-      allow read, write, delete: if isAdmin();
+      allow read, create, update, delete: if isAdmin();
     }
 
-    // ---------- Administradores ----------
-    // 'get' individual necessário antes da autenticação Firebase (login por username).
-    // 'list' restrito para evitar enumeração em massa.
     match /admins/{adminId} {
-      allow get: if true;
-      allow list: if isAdmin();
-      allow write: if isAdmin();
+      allow read, create, update, delete: if isAdmin();
     }
 
-    // ---------- Settings (manutenção, config) ----------
     match /settings/{docId} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow create, update, delete: if isAdmin();
     }
 
-    // ---------- Analytics de visitantes ----------
-    // Qualquer visitante (sem auth) pode criar/incrementar os contadores.
-    // Leitura e deleção apenas pelo admin.
     match /analytics_daily/{dateKey} {
-      allow create, update: if true;
-      allow read, delete: if isAdmin();
+      allow read, create, update, delete: if isAdmin();
     }
+
     match /analytics_pages/{pageId} {
-      allow create, update: if true;
-      allow read, delete: if isAdmin();
+      allow read, create, update, delete: if isAdmin();
     }
+
     match /analytics_products/{productId} {
-      allow create, update: if true;
-      allow read, delete: if isAdmin();
+      allow read, create, update, delete: if isAdmin();
     }
 
-    // ---------- Pedidos personalizados ----------
-    match /custom_requests/{reqId} {
-      allow create: if request.resource.data.status == 'new';
-      allow read, update, delete: if isAdmin();
+    match /custom_requests/{requestId} {
+      allow read, create, update, delete: if isAdmin();
     }
 
-    // ---------- Cotações B2B ----------
-    match /b2b_requests/{reqId} {
-      allow create: if request.resource.data.status == 'new';
-      allow read, update, delete: if isAdmin();
+    match /b2b_requests/{requestId} {
+      allow read, create, update, delete: if isAdmin();
     }
 
-    // ---------- Vídeos de review ----------
     match /video_reviews/{id} {
-      allow create: if request.resource.data.status == 'pending';
+      allow create: if signedIn()
+        && request.resource.data.keys().hasAll([
+          'id', 'userId', 'userName', 'userEmail', 'productId', 'productName',
+          'videoUrl', 'status', 'submittedAt'
+        ])
+        && request.resource.data.keys().hasOnly([
+          'id', 'userId', 'userName', 'userEmail', 'productId', 'productName',
+          'videoUrl', 'status', 'submittedAt', 'minutes', 'pointsAwarded'
+        ])
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.userEmail == tokenEmail()
+        && request.resource.data.status == 'pending'
+        && request.resource.data.get('minutes', 0) == 0
+        && request.resource.data.get('pointsAwarded', 0) == 0
+        && validText(request.resource.data.productId, 1, 160)
+        && validText(request.resource.data.videoUrl, 1, 1000);
       allow read: if isAdmin()
-        || (request.auth != null && resource.data.userId == request.auth.uid)
-        || (request.auth != null && resource.data.userEmail == request.auth.token.email);
+        || (signedIn() && resource.data.get('userId', '') == request.auth.uid)
+        || ownsByEmail(resource.data, 'userEmail');
       allow update, delete: if isAdmin();
     }
 
-    // ---------- Negociações ----------
-    match /negotiations/{negId} {
-      // Criação: usuário autenticado + dono da negociação (por UID ou email)
-      allow create: if request.auth != null
-        && (request.resource.data.userId == request.auth.uid
-            || request.resource.data.userEmail == request.auth.token.email);
-      // Leitura: admin vê tudo; cliente vê as próprias (por UID ou email)
+    match /negotiations/{negotiationId} {
+      allow create: if signedIn()
+        && request.resource.data.get('userId', '') == request.auth.uid
+        && request.resource.data.get('userEmail', '') == tokenEmail()
+        && request.resource.data.get('status', '') == 'pending'
+        && request.resource.data.get('autoApproved', true) == false
+        && request.resource.data.get('approvedDiscountYen', 0) == null
+        && request.resource.data.get('approvedBy', '') == ''
+        && request.resource.data.get('approvedAt', 0) == null
+        && request.resource.data.get('resolvedAt', 0) == null
+        && request.resource.data.requestedDiscountYen is number
+        && request.resource.data.originalAmountYen is number
+        && request.resource.data.requestedDiscountYen > 0
+        && request.resource.data.requestedDiscountYen < request.resource.data.originalAmountYen
+        && request.resource.data.cartItems is list
+        && request.resource.data.cartItems.size() > 0
+        && request.resource.data.cartItems.size() <= 100;
       allow read: if isAdmin()
-        || (request.auth != null
-            && (resource.data.userId == request.auth.uid
-                || resource.data.userEmail == request.auth.token.email));
-      // Atualização: admin pode tudo; cliente só pode marcar como visto ou expirar
+        || (signedIn() && resource.data.get('userId', '') == request.auth.uid)
+        || ownsByEmail(resource.data, 'userEmail');
       allow update: if isAdmin()
-        || (request.auth != null
-            && (resource.data.userId == request.auth.uid
-                || resource.data.userEmail == request.auth.token.email)
-            && request.resource.data.diff(resource.data).affectedKeys()
-               .hasOnly(['clientSeen', 'status', 'resolvedAt', 'clientNotified', 'usedInOrderId']));
+        || (signedIn()
+          && resource.data.get('userId', '') == request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['clientSeen'])
+          && request.resource.data.clientSeen == true);
       allow delete: if isAdmin();
     }
 
-    // ---------- Newsletter / Leads (captura de e-mail) ----------
-    // Criação pública (visitante anônimo captura o e-mail no exit-intent).
-    // Leitura/deleção restritas ao admin.
     match /newsletter/{leadId} {
-      allow create: if true;
-      allow read, update, delete: if isAdmin();
+      allow read, create, update, delete: if isAdmin();
     }
 
-    // ---------- Carrinhos abandonados ----------
-    // Usuário autenticado registra/recupera o próprio carrinho (por UID).
-    // Admin vê tudo. Atualização automática (merge) e deleção ao converter.
-    match /abandoned_carts/{cartId} {
-      allow read: if isAdmin() || (request.auth != null && cartId == request.auth.uid);
-      allow create, update: if request.auth != null && cartId == request.auth.uid;
-      allow delete: if isAdmin() || (request.auth != null && cartId == request.auth.uid);
+    match /abandoned_carts/{userId} {
+      allow read: if isAdmin() || owns(userId);
+      allow create: if owns(userId)
+        && validCartSnapshot(request.resource.data)
+        && request.resource.data.keys().hasOnly([
+          'items', 'totalYen', 'itemCount', 'abandonedAt', 'updatedAt', 'reminderSent'
+        ]);
+      allow update: if owns(userId)
+        && validCartSnapshot(request.resource.data)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'items', 'totalYen', 'itemCount', 'abandonedAt', 'updatedAt', 'reminderSent'
+        ]);
+      allow delete: if isAdmin() || owns(userId);
     }
 
-    // ---------- Inscrições de notificação push (Web Push / VAPID) ----------
-    // Cliente autenticado cria/atualiza a própria inscrição (endpoint+keys do
-    // navegador); admin lê para montar a lista de quem tem push ativo e envia
-    // via /api/send-push (Admin SDK, sem passar pelas regras do client).
-    match /push_subscriptions/{subId} {
+    match /push_subscriptions/{subscriptionId} {
       allow read: if isAdmin();
-      allow create, update: if request.auth != null
-        && request.resource.data.customerEmail == request.auth.token.email;
-      allow delete: if isAdmin()
-        || (request.auth != null && resource.data.customerEmail == request.auth.token.email);
+      allow create, update: if signedIn()
+        && request.resource.data.keys().hasAll([
+          'endpoint', 'keys', 'customerEmail', 'customerName', 'userAgent', 'updatedAt'
+        ])
+        && request.resource.data.keys().hasOnly([
+          'endpoint', 'keys', 'customerEmail', 'customerName', 'userAgent', 'updatedAt'
+        ])
+        && request.resource.data.customerEmail == tokenEmail()
+        && validText(request.resource.data.endpoint, 10, 2048)
+        && request.resource.data.keys is map
+        && request.resource.data.keys.keys().hasOnly(['p256dh', 'auth'])
+        && validText(request.resource.data.keys.p256dh, 1, 1024)
+        && validText(request.resource.data.keys.auth, 1, 1024);
+      allow delete: if isAdmin() || ownsByEmail(resource.data, 'customerEmail');
     }
 
-
-    // ---------- Campanhas promocionais (notificação por e-mail/push) ----------
-    // Leitura pública por código (get): qualquer visitante resgata a oferta.
-    // O doc só guarda parâmetros da oferta (sem dados sensíveis). Só admin cria.
     match /promo_campaigns/{campaignId} {
       allow get: if true;
       allow list, create, update, delete: if isAdmin();
     }
-    // Uso por CPF (anti-abuso: 1 resgate por CPF). Criação pública (id = code_cpf),
-    // get público — sem list para não permitir enumeração de quem usou.
+
     match /promo_usage/{usageId} {
-      allow get, create: if true;
-      allow list, update, delete: if isAdmin();
+      allow read, create, update, delete: if isAdmin();
     }
   }
 }
