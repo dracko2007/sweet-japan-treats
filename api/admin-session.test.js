@@ -22,7 +22,7 @@ vi.mock('./_lib/rate-limit.js', () => ({
   enforceRateLimit: vi.fn(),
 }));
 
-import adminSessionHandler from './admin-session.js';
+import { handleSession as adminSessionHandler } from './admin.js';
 
 function mockReq(method, body, headers = {}) {
   return {

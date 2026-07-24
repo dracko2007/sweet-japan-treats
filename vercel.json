@@ -29,6 +29,17 @@
     { "source": "/feed-eu.xml", "destination": "/api/feed?region=eu&format=xml" },
     { "source": "/feed-us.xml", "destination": "/api/feed?region=us&format=xml" },
     { "source": "/feed.json", "destination": "/api/feed?region=br&format=json" },
+    { "source": "/api/admin-dashboard", "destination": "/api/admin?action=dashboard" },
+    { "source": "/api/admin-coupon-usage", "destination": "/api/admin?action=coupon-usage" },
+    { "source": "/api/admin-session", "destination": "/api/admin?action=session" },
+    { "source": "/api/admin-users", "destination": "/api/admin?action=users" },
+    { "source": "/api/create-order", "destination": "/api/orders?action=create" },
+    { "source": "/api/confirm-manual-payment", "destination": "/api/orders?action=confirm-manual-payment" },
+    { "source": "/api/send-email", "destination": "/api/notify?action=email" },
+    { "source": "/api/send-push", "destination": "/api/notify?action=push" },
+    { "source": "/api/promo-campaign", "destination": "/api/notify?action=promo-campaign" },
+    { "source": "/api/public-submission", "destination": "/api/public-forms?action=submission" },
+    { "source": "/api/analytics", "destination": "/api/public-forms?action=analytics" },
     {
       "source": "/((?!api/).*)",
       "destination": "/index.html"

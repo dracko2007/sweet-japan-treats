@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import adminDashboard from './admin-dashboard.js';
-import adminCouponUsage from './admin-coupon-usage.js';
+import { handleDashboard as adminDashboard, handleCouponUsage as adminCouponUsage } from './admin.js';
 import {
   buildDashboardAnalytics,
   couponRow,

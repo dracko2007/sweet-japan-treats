@@ -1,8 +1,9 @@
 import { randomInt } from 'node:crypto';
 import Stripe from 'stripe';
-import { requireUser } from './_lib/auth.js';
+import { requireAdmin, requireUser } from './_lib/auth.js';
 import { buildQuote } from './_lib/commerce.js';
 import { adminDb } from './_lib/firebase-admin.js';
+import { fulfillOrder } from './_lib/fulfillment.js';
 import { getFxRates } from './_lib/fx.js';
 import {
   assertExactKeys,
@@ -14,6 +15,7 @@ import {
   requiredText,
   sendError,
 } from './_lib/http.js';
+import { buildOrderEmail, sendMail } from './_lib/mailer.js';
 import { enforceRateLimit } from './_lib/rate-limit.js';
 
 const PAYMENT_METHODS = new Set(['card', 'pix', 'bank', 'paypay', 'yucho', 'wise']);
@@ -169,7 +171,7 @@ async function stripeIntent(order) {
   }, { idempotencyKey: `payment-intent:${order.orderNumber}` });
 }
 
-export default async function handler(req, res) {
+async function handleCreate(req, res) {
   if (!handleCors(req, res, { methods: ['POST'] })) return;
 
   try {
@@ -332,3 +334,48 @@ export default async function handler(req, res) {
     sendError(res, error);
   }
 }
+
+async function handleConfirmManualPayment(req, res) {
+  if (!handleCors(req, res, { methods: ['POST'] })) return;
+
+  try {
+    const admin = await requireAdmin(req);
+    await enforceRateLimit(req, { scope: 'confirm-manual-payment', limit: 100, windowMs: 60 * 60 * 1000, identity: admin.uid });
+    const body = parseJsonObject(req.body);
+    assertExactKeys(body, ['orderId', 'reference']);
+    const orderId = requiredText(body.orderId, { max: 80, pattern: /^[A-Za-z0-9_-]+$/ });
+    const suppliedReference = optionalText(body.reference, { max: 120 });
+    const orderRef = adminDb().collection('orders').doc(orderId);
+    const snap = await orderRef.get();
+    if (!snap.exists) throw new HttpError(404, 'order_not_found');
+    const order = { id: snap.id, ...snap.data() };
+    if (order.paymentMethod === 'card') throw new HttpError(409, 'stripe_orders_require_webhook');
+    const reference = suppliedReference || `${order.paymentMethod}:${orderId}`;
+    const result = await fulfillOrder(orderId, {
+      provider: 'manual',
+      reference,
+      confirmedBy: String(admin.email || admin.uid),
+    });
+
+    if (!result.replay) {
+      const refreshed = await orderRef.get();
+      const fulfilled = { id: refreshed.id, ...refreshed.data() };
+      await sendMail({ to: fulfilled.customerEmail, ...buildOrderEmail(fulfilled) }).catch(() => undefined);
+      const storeEmail = process.env.ORDER_NOTIFICATION_EMAIL || process.env.ADMIN_EMAIL;
+      if (storeEmail) await sendMail({ to: storeEmail, ...buildOrderEmail(fulfilled, { store: true }) }).catch(() => undefined);
+    }
+    res.status(200).json({ ok: true, replay: result.replay });
+  } catch (error) {
+    console.error('[confirm-manual-payment]', error instanceof Error ? error.message : error);
+    sendError(res, error);
+  }
+}
+
+export default async function handler(req, res) {
+  const { action } = req.query;
+  if (action === 'create') return handleCreate(req, res);
+  if (action === 'confirm-manual-payment') return handleConfirmManualPayment(req, res);
+  return res.status(400).json({ error: 'invalid_action' });
+}
+
+export { handleCreate, handleConfirmManualPayment };
