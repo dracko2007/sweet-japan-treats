@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { handleConfirmManualPayment as confirmManualPayment, handleCreate as createOrder } from './orders.js';
-import cartRecovery from './cart-recovery.js';
-import { handlePromoCampaign as promoCampaign, handleEmail as sendEmail, handlePush as sendPush } from './notify.js';
-import { requireUser } from './_lib/auth.js';
+import { handleConfirmManualPayment as confirmManualPayment, handleCreate as createOrder } from '../orders.js';
+import cartRecovery from '../cart-recovery.js';
+import { handlePromoCampaign as promoCampaign, handleEmail as sendEmail, handlePush as sendPush } from '../notify.js';
+import { requireUser } from './auth.js';
 
 function response() {
   return {

@@ -13,16 +13,16 @@ const mocks = vi.hoisted(() => ({
   },
 }));
 
-vi.mock('./_lib/firebase-admin.js', () => ({
+vi.mock('./firebase-admin.js', () => ({
   adminAuth: () => mocks.adminAuth,
   adminDb: () => mocks.adminDb,
 }));
 
-vi.mock('./_lib/rate-limit.js', () => ({
+vi.mock('./rate-limit.js', () => ({
   enforceRateLimit: vi.fn(),
 }));
 
-import { handleSession as adminSessionHandler } from './admin.js';
+import { handleSession as adminSessionHandler } from '../admin.js';
 
 function mockReq(method, body, headers = {}) {
   return {

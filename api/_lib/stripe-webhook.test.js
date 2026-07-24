@@ -7,15 +7,15 @@ const mocks = vi.hoisted(() => ({
   sendMail: vi.fn(),
 }));
 
-vi.mock('./_lib/fulfillment.js', () => ({
+vi.mock('./fulfillment.js', () => ({
   fulfillOrder: mocks.fulfillOrder,
   markFulfillmentReview: mocks.markFulfillmentReview,
 }));
-vi.mock('./_lib/mailer.js', () => ({
+vi.mock('./mailer.js', () => ({
   buildOrderEmail: () => ({ subject: 'Order', html: '<p>Order</p>' }),
   sendMail: mocks.sendMail,
 }));
-vi.mock('./_lib/firebase-admin.js', () => ({
+vi.mock('./firebase-admin.js', () => ({
   adminDb: () => ({
     collection: () => ({
       doc: () => ({
@@ -35,7 +35,7 @@ vi.mock('./_lib/firebase-admin.js', () => ({
   }),
 }));
 
-const { default: webhook } = await import('./stripe-webhook.js');
+const { default: webhook } = await import('../stripe-webhook.js');
 
 function response() {
   return {

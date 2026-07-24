@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { handleDashboard as adminDashboard, handleCouponUsage as adminCouponUsage } from './admin.js';
+import { handleDashboard as adminDashboard, handleCouponUsage as adminCouponUsage } from '../admin.js';
 import {
   buildDashboardAnalytics,
   couponRow,
   matchesCouponFilters,
   orderRevenueYen,
-} from './_lib/order-analytics.js';
+} from './order-analytics.js';
 
 function response() {
   return {
