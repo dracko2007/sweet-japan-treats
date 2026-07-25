@@ -38,7 +38,7 @@ const AnimatedPlaneLogo: React.FC<AnimatedPlaneLogoProps> = ({
       muted
       loop
       playsInline
-      preload="auto"
+      preload="none"
       aria-hidden="true"
       className={`absolute inset-0 h-full w-full object-cover motion-reduce:hidden ${imageClassName}`}
     />

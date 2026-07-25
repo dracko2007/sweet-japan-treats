@@ -12,6 +12,7 @@ import { formatPrice, getCurrencyByCountry } from '@/utils/currency';
 import { effectiveYen, baseYen, hasDiscount, getVariants } from '@/utils/pricing';
 import { convertYen as fxConvert } from '@/services/fxService';
 import { productEnglishName } from '@/utils/productName';
+import { cdnVideo } from '@/services/cloudinaryService';
 
 interface CompactProductCardProps {
   product: Product;
@@ -95,11 +96,14 @@ const CompactProductCard: React.FC<CompactProductCardProps> = ({ product }) => {
         onMouseLeave={() => setIsHovered(false)}
       >
         {product.video && product.videoCover ? (
-          /* Vídeo é a capa — toca direto, sem precisar de hover. Poster cobre até o vídeo carregar. */
+          /* Vídeo é a capa — toca direto, sem precisar de hover. Poster cobre
+             até o vídeo carregar. Passa por `cdnVideo`: o card tem ~300px, mas
+             o arquivo original tem 2,4 MB e era baixado inteiro na home. */
           <video
             key={product.video}
-            src={product.video}
+            src={cdnVideo(product.video, 480)}
             poster={product.thumbnail || product.image}
+            preload="none"
             autoPlay
             loop
             muted
@@ -119,7 +123,7 @@ const CompactProductCard: React.FC<CompactProductCardProps> = ({ product }) => {
             {isHovered && (
               <video
                 key={product.video}
-                src={product.video}
+                src={cdnVideo(product.video, 480)}
                 autoPlay
                 loop
                 muted

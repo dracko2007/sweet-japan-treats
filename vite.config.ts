@@ -109,7 +109,12 @@ export default defineConfig(({ mode }) => ({
           if (/\/node_modules\/(?:firebase\/storage|@firebase\/storage(?:-compat)?)\//.test(moduleId)) return 'firebase-storage';
           if (/\/node_modules\/(?:firebase\/analytics|@firebase\/analytics(?:-compat)?)\//.test(moduleId)) return 'firebase-analytics';
           if (moduleId.includes('/node_modules/firebase/') || moduleId.includes('/node_modules/@firebase/')) return 'firebase-core';
-          if (moduleId.includes('/node_modules/recharts/')) return 'recharts';
+          // `recharts` NÃO entra aqui de propósito. Todo manual chunk vira um
+          // `<link rel="modulepreload">` no index.html, ou seja, é baixado com
+          // prioridade alta em TODA visita — inclusive na home, no celular.
+          // São 101 KB de biblioteca de gráficos usada só no painel admin.
+          // Deixando fora, ela viaja dentro do chunk lazy do Admin e só desce
+          // quando o administrador abre o dashboard.
           if (moduleId.includes('/node_modules/@tanstack/react-query/')) return 'query';
           return undefined;
         },

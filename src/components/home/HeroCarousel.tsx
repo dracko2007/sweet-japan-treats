@@ -206,6 +206,9 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({
                     <div className="hero-orbit hero-orbit-reverse absolute h-[66%] max-h-[330px] aspect-square rounded-full border border-fuchsia-300/40" aria-hidden="true" />
                     <div className="hero-media-card relative z-[2] h-[82%] max-h-[390px] w-[84%] max-w-[500px] overflow-hidden rounded-[1.75rem] border border-white/90 bg-white/80 p-2 shadow-2xl shadow-pink-900/15 backdrop-blur-xl">
                       <div className="relative h-full w-full overflow-hidden rounded-[1.35rem] bg-gradient-to-br from-pink-100 via-white to-fuchsia-100">
+                        {/* `metadata`: o slide ativo já monta na abertura da
+                            home, e `auto` puxaria o vídeo inteiro junto com o
+                            resto da página. O `poster` cobre o primeiro frame. */}
                         {isActive && slide.videoSrc ? (
                           <video
                             src={slide.videoSrc}
@@ -213,7 +216,7 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({
                             muted
                             loop
                             playsInline
-                            preload="auto"
+                            preload="metadata"
                             poster={slide.image}
                             className="h-full w-full object-cover"
                           />
@@ -276,7 +279,7 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({
                           muted
                           loop
                           playsInline
-                          preload="auto"
+                          preload="metadata"
                           poster={slide.image}
                           className="hero-product-media h-full w-full object-contain"
                         />

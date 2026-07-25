@@ -360,7 +360,13 @@ const CinematicHeroShelf: React.FC<CinematicHeroShelfProps> = ({
       )}
     >
       {/* Sem `loop`: ao terminar, a imagem final fica em cena e o recomeço
-          acontece após a pausa configurada para esta versão. */}
+          acontece após a pausa configurada para esta versão.
+
+          `preload="metadata"` e não `auto`: este vídeo tem ~2 MB e o `auto`
+          manda o navegador baixá-lo INTEIRO na abertura da home, disputando
+          banda com o JS, as fontes e o Firestore. No 4G do celular é isso que
+          faz a página parecer travada. O `poster` pinta na hora e o vídeo entra
+          em streaming progressivo — o autoplay continua funcionando igual. */}
       <video
         ref={introVideoRef}
         className="pointer-events-none absolute inset-0 h-full w-full object-cover"
@@ -369,7 +375,7 @@ const CinematicHeroShelf: React.FC<CinematicHeroShelfProps> = ({
         autoPlay
         muted
         playsInline
-        preload="auto"
+        preload="metadata"
         onTimeUpdate={handleIntroTimeUpdate}
         onEnded={handleIntroEnded}
         aria-hidden

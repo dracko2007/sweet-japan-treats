@@ -279,7 +279,7 @@ const AppDownloadSection: React.FC = () => {
                       muted
                       loop
                       playsInline
-                      preload="auto"
+                      preload="none"
                       aria-label="Hero transition da Japan Express"
                       className="h-full w-full object-cover motion-reduce:hidden"
                     />

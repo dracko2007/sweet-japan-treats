@@ -95,6 +95,32 @@ export function cdnOriginal(url?: string): string {
   return `${url.slice(0, at + marker.length)}${asset}`;
 }
 
+/**
+ * Perfil de entrega para VÍDEO. Segue a mesma ideia do `cdnImage`, mas com
+ * outro alvo: vídeo de vitrine é decorativo e roda num card pequeno, então o
+ * que importa é peso, não fidelidade.
+ *
+ * Medido no vídeo de produto da home (2026-07-25):
+ *   original                        2454 KB
+ *   q_auto                          1165 KB
+ *   q_auto:eco,w_720,c_limit         510 KB  ← escolhido, −79%
+ *
+ * O card do carrossel tem no máximo ~580px, então 720px já cobre retina.
+ * `c_limit` nunca faz upscale; `vc_auto` deixa o Cloudinary escolher o codec
+ * (H.265/VP9 onde o navegador aceita). No celular esses ~2 MB a menos são a
+ * diferença entre a home abrir e a home parecer travada.
+ */
+export function cdnVideo(url?: string, width = 720): string {
+  if (!url || !url.includes('res.cloudinary.com')) return url ?? '';
+  const marker = '/upload/';
+  const at = url.indexOf(marker);
+  if (at === -1) return url;
+
+  const tail = url.slice(at + marker.length);
+  const asset = tail.match(/^(?:.+?\/)?(v\d+\/.*)$/)?.[1] ?? tail;
+  return `${url.slice(0, at + marker.length)}q_auto:eco,vc_auto,c_limit,w_${width}/${asset}`;
+}
+
 export const cloudinaryService = {
   isCloudinaryUrl: (s: string) =>
     typeof s === 'string' && s.includes('res.cloudinary.com'),

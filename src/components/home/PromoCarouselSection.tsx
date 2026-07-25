@@ -9,7 +9,7 @@ import { convertYen as fxConvert } from '@/services/fxService';
 import { effectiveYen, baseYen, getVariants } from '@/utils/pricing';
 import { PROMO_TYPES, ActivePromo } from '@/types/promotion';
 import { productEnglishName } from '@/utils/productName';
-import { cdnImage } from '@/services/cloudinaryService';
+import { cdnImage, cdnVideo } from '@/services/cloudinaryService';
 
 // Assets locais do projeto — evita depender de host externo (Unsplash) que pode
 // falhar por CSP/rede em alguns ambientes de preview.
@@ -95,7 +95,7 @@ const PromoCarouselSection: React.FC = () => {
       list.push({
         id: `featured-${p.id}`,
         image: p.gallery?.[0] || p.image || p.thumbnail || STORE_IMAGE,
-        videoSrc: p.videoCover ? p.video : undefined,
+        videoSrc: p.videoCover ? cdnVideo(p.video) : undefined,
         layout: 'split',
         badge: t('featured.badge') || 'Seleção em destaque',
         title: productEnglishName(p),
