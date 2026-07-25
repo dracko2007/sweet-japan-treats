@@ -167,7 +167,14 @@ const CinematicHeroShelf: React.FC<CinematicHeroShelfProps> = ({
   };
 
   const reduced = prefersReducedMotion();
-  const [isMobile, setIsMobile] = useState(false);
+  // Precisa nascer correto já no PRIMEIRO render. Antes começava `false`, e o
+  // `useGSAP` abaixo (que roda uma vez só) via `simplified === false` no celular
+  // e montava a prateleira horizontal: pin de ~2000px de altura e translateX na
+  // track. O `useEffect` corrigia o estado logo depois, o JSX virava coluna
+  // vertical — mas o pin e o transform já criados continuavam lá, presos a uma
+  // track que não existia mais. Dava exatamente o relato do iPhone: a tela anda
+  // para o lado, desce sozinha, e o miolo fica em branco até voltar ao topo.
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 768);
     check();
@@ -336,7 +343,11 @@ const CinematicHeroShelf: React.FC<CinematicHeroShelfProps> = ({
         window.clearTimeout(autoTimer);
       };
     },
-    { scope: sectionRef },
+    // `simplified` nas dependências + `revertOnUpdate`: girar o aparelho pode
+    // cruzar o breakpoint de 768px (iPad/iPhone grande em landscape). Sem isto
+    // o pin e o translateX da versão desktop sobreviveriam à virada para o
+    // layout vertical — o mesmo estado quebrado, só que por outro caminho.
+    { scope: sectionRef, dependencies: [simplified], revertOnUpdate: true },
   );
 
   const handleSkip = () => {
