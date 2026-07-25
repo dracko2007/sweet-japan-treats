@@ -1,5 +1,6 @@
 import { createRoot } from "react-dom/client";
 import { registerSW } from "virtual:pwa-register";
+import { toast } from "sonner";
 import App from "./App.tsx";
 import "./index.css";
 import { migrateLocalStorage } from "./utils/migrate";
@@ -7,13 +8,29 @@ import { isChunkLoadError, recoverFromChunkError } from "./utils/recoverFromChun
 
 migrateLocalStorage();
 
-// Registra o Service Worker e força atualização imediata quando há nova versão.
-// Sem isso o PWA pode ficar "preso" no cache antigo (CSS/layout) mesmo após deploy.
+// Registra o Service Worker. Novo build não recarrega sozinho — pede
+// confirmação por toque.
+//
+// Antes, `onNeedRefresh` chamava `updateSW(true)` direto, que recarrega a
+// página via JS sem gesto nenhum do usuário. Isso rodava até em segundo
+// plano: a checagem de atualização abaixo roda a cada 60s enquanto o app
+// está aberto, então o reload podia disparar no meio da navegação. No PWA
+// standalone do iOS, um `location.reload()` fora de um toque do usuário é
+// o gatilho clássico do bug do WebKit "pinta a tela em branco até rolar" —
+// era exatamente esse sintoma no iPhone. Pedir confirmação resolve as duas
+// coisas: o reload não pega o cliente no meio de nada, e quando acontece é
+// dentro do gesto de toque no botão, que o WebKit repinta direito.
+let avisoMostrado = false;
 const updateSW = registerSW({
   immediate: true,
   onNeedRefresh() {
-    // Nova versão disponível → ativa e recarrega para aplicar o CSS/JS novos
-    updateSW(true);
+    if (avisoMostrado) return;
+    avisoMostrado = true;
+    toast('Nova versão disponível', {
+      description: 'Toque para atualizar e ver as últimas novidades.',
+      duration: Infinity,
+      action: { label: 'Atualizar', onClick: () => updateSW(true) },
+    });
   },
   onRegisteredSW(_swUrl, registration) {
     // Verifica atualização a cada 60s enquanto o app está aberto
