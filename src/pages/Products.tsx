@@ -284,6 +284,34 @@ const Products: React.FC = () => {
 
             {/* Grid de Produtos (80% width) */}
             <div className="lg:col-span-4">
+              {/* Barra de busca. Perdida no redesign do catálogo (cbfdc66): o
+                  estado `query`, o filtro `bySearch` e o botão "Limpar busca"
+                  continuaram no código, só o input sumiu. Fica em largura total
+                  no topo da coluna para aparecer também no mobile/PWA, onde os
+                  filtros ficam atrás de um botão. */}
+              <div className="relative mb-4">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+                <input
+                  type="search"
+                  inputMode="search"
+                  value={query}
+                  onChange={(e) => { setQuery(e.target.value); setPage(1); }}
+                  placeholder={t('productsPage.search')}
+                  aria-label={t('productsPage.search')}
+                  className="w-full pl-9 pr-9 py-2.5 text-sm rounded-full border border-border bg-card text-foreground shadow-sm focus:ring-2 focus:ring-primary focus:outline-none transition"
+                />
+                {query && (
+                  <button
+                    type="button"
+                    onClick={() => { setQuery(''); setPage(1); }}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-secondary text-muted-foreground"
+                    aria-label="Limpar busca"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+
               {/* Toolbar: Sort */}
               <div className="mb-6 flex items-center justify-between">
                 <p className="text-sm text-muted-foreground">
