@@ -34,8 +34,11 @@ const slugify = (s: string) =>
     .slice(0, 40) || `produto-${Date.now()}`;
 
 // Redimensiona e converte para WebP — muito mais leve que JPEG para o mesmo tamanho.
-// maxSize=1920 para galeria (Full HD), 300 para thumbnails de lista.
-function fileToCompressedDataURL(file: File, maxSize = 1920, quality = 0.90): Promise<string> {
+// 2560px/q0.95: o dobro do maior render do site (carrossel, 1400px), o que cobre
+// telas retina. Acima disso paga-se banda por pixel que nenhuma tela mostra.
+// NUNCA faz upscale — uma origem de 600px continua com 600px, e é por isso que
+// a resolução do arquivo de origem é o teto real da qualidade final.
+function fileToCompressedDataURL(file: File, maxSize = 2560, quality = 0.95): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -68,14 +71,16 @@ function fileToCompressedDataURL(file: File, maxSize = 1920, quality = 0.90): Pr
   });
 }
 
-// Thumbnail em HD — mesmo tamanho da galeria para máxima qualidade
+// Thumbnail em HD — 1600px cobre os cards de lista em telas retina.
 function fileToThumbnailDataURL(file: File): Promise<string> {
-  return fileToCompressedDataURL(file, 1200, 0.90);
+  return fileToCompressedDataURL(file, 1600, 0.95);
 }
 
 // Baixa uma imagem por URL e converte para WebP comprimido via canvas.
 // Usada para imagens externas (Yahoo/Rakuten) que chegam em resolução full.
-function urlToCompressedDataURL(url: string, maxSize = 1920, quality = 0.90): Promise<string> {
+// Atenção: se o fornecedor devolver a miniatura em vez da foto grande, o produto
+// nasce com master pequena e nenhuma transformação de entrega recupera detalhe.
+function urlToCompressedDataURL(url: string, maxSize = 2560, quality = 0.95): Promise<string> {
   return new Promise((resolve) => {
     // Timeout de 8s: se CORS ou rede travar, cai no fallback com a URL original
     const timer = setTimeout(() => resolve(url), 8000);
@@ -489,7 +494,7 @@ const ProductManager: React.FC = () => {
         if (cloudinaryService.isCloudinaryUrl(imgStr)) return imgStr;
         let dataUrl = imgStr;
         if (cloudinaryService.isExternalUrl(imgStr)) {
-          dataUrl = await urlToCompressedDataURL(imgStr, 2048, 0.92);
+          dataUrl = await urlToCompressedDataURL(imgStr);
         }
         return cloudinaryService.uploadDataUrl(dataUrl, folder);
       };
@@ -504,8 +509,8 @@ const ProductManager: React.FC = () => {
       if (needNewThumb) {
         const thumbData = await urlToCompressedDataURL(
           cloudinaryService.isDataUrl(rawCover) ? rawCover : coverUrl,
-          1200,
-          0.90
+          1600,
+          0.95
         );
         thumbnailUrl = await cloudinaryService.uploadDataUrl(thumbData, folder);
       }

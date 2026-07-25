@@ -16,6 +16,7 @@ import {
   deleteField,
 } from 'firebase/firestore';
 import { Product } from '@/types';
+import { cdnImage } from '@/services/cloudinaryService';
 import { products as defaultProducts } from '@/data/products';
 import { ensureAdminAuth } from '@/utils/adminAuth';
 
@@ -28,7 +29,7 @@ const devError = isDev ? console.error.bind(console) : () => {};
 const COL = 'products';
 
 // ─── Cache localStorage ────────────────────────────────────────────────────
-const CACHE_KEY = 'jp_products_v3'; // v3: Firestore-only, sem merge com defaultProducts
+const CACHE_KEY = 'jp_products_v4'; // v4: URLs normalizadas para entrega de alta qualidade
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutos
 
 interface ProductCache { products: Product[]; ts: number; }
@@ -81,6 +82,17 @@ interface Overrides {
   deleted: string[];
 }
 
+/** Aplica o perfil de entrega de alta qualidade nas URLs de imagem.
+ *  Roda no ingresso do Firestore para que todos os pontos de render recebam a
+ *  URL certa sem repetir a transformação — inclusive os produtos legados, cuja
+ *  URL gravada ainda carrega o `f_webp,q_auto` (≈75%) do pipeline antigo. */
+const withCdnImages = (p: Product): Product => ({
+  ...p,
+  image: cdnImage(p.image),
+  ...(p.thumbnail ? { thumbnail: cdnImage(p.thumbnail) } : {}),
+  ...(p.gallery ? { gallery: p.gallery.map((g) => cdnImage(g)) } : {}),
+});
+
 export const productService = {
   /** Lê os documentos do Firestore (overrides do admin). */
   async getOverrides(): Promise<Overrides> {
@@ -95,7 +107,7 @@ export const productService = {
           deleted.push(d.id);
           return;
         }
-        items.push({ id: d.id, ...(data as object) } as Product);
+        items.push(withCdnImages({ id: d.id, ...(data as object) } as Product));
       });
       return { items, deleted };
     } catch (e) {

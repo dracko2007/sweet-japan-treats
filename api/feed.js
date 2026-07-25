@@ -128,8 +128,11 @@ function buildCatalog(products, region) {
       const candidates = [p.image, p.thumbnail, ...(p.gallery || [])].filter(Boolean);
       let image = candidates.find(u => typeof u === 'string' && /^https?:\/\//.test(u)) || '';
       if (image.includes('res.cloudinary.com')) {
-        // Força entrega JPG E troca a extensão .webp → .jpg (Google valida pela extensão da URL)
-        image = image.replace(/\/upload\/[^/]*\//, '/upload/f_jpg,q_auto/');
+        // Força entrega JPG E troca a extensão .webp → .jpg (Google valida pela extensão da URL).
+        // O grupo opcional só casa um segmento de transformação (`x_y`), então
+        // versão (`v123`) e pastas ficam intactas — descartá-las geraria uma URL
+        // 404 e o Google derrubaria o produto do feed.
+        image = image.replace(/\/upload\/(?:[a-z]{1,3}_[^/]*\/)?/, '/upload/f_jpg,q_auto:best/');
         image = image.replace(/\.webp(\?.*)?$/i, '.jpg$1');
       }
       if (!image) return null; // sem URL http válida → fora do feed

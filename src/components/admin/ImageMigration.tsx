@@ -3,11 +3,14 @@ import { CheckCircle, CloudUpload, AlertTriangle, RefreshCw, Image as ImageIcon 
 import { Button } from '@/components/ui/button';
 import { useProducts } from '@/context/ProductsContext';
 import { productService } from '@/services/productService';
-import { cloudinaryService } from '@/services/cloudinaryService';
+import { cloudinaryService, cdnOriginal } from '@/services/cloudinaryService';
 import { Product } from '@/types';
 
 const CONCURRENCY = 3;
 
+/** Reduz e converte para WebP. Devolve `''` quando não há nada a ganhar — os
+ *  chamadores tratam `''` como "mantém o original", evitando o re-encode que
+ *  degradava as masters a cada migração repetida. */
 function compressToWebp(src: string, maxSize: number, quality: number): Promise<string> {
   return new Promise((resolve) => {
     const img = new Image();
@@ -16,6 +19,12 @@ function compressToWebp(src: string, maxSize: number, quality: number): Promise<
     img.onload = () => {
       clearTimeout(timer);
       let { width, height } = img;
+      // Já é WebP e cabe no teto: qualquer passagem pelo canvas só perderia
+      // detalhe. Devolve '' para o chamador preservar os bytes originais.
+      if (src.startsWith('data:image/webp') && width <= maxSize && height <= maxSize) {
+        resolve('');
+        return;
+      }
       if (width > height && width > maxSize) { height = Math.round((height * maxSize) / width); width = maxSize; }
       else if (height > maxSize) { width = Math.round((width * maxSize) / height); height = maxSize; }
       const canvas = document.createElement('canvas');
@@ -38,7 +47,7 @@ function needsMigration(p: Product): boolean {
 
 async function uploadImage(dataUrl: string, folder: string): Promise<string> {
   // Comprime antes de enviar (5MB base64 → ~150KB WebP)
-  const compressed = await compressToWebp(dataUrl, 2048, 0.92);
+  const compressed = await compressToWebp(dataUrl, 2560, 0.95);
   return cloudinaryService.uploadDataUrl(compressed || dataUrl, folder);
 }
 
@@ -59,7 +68,7 @@ async function migrateProduct(p: Product): Promise<Product> {
   if (!thumbUrl || thumbUrl.startsWith('data:')) {
     const rawCover = rawGallery[0] || '';
     if (rawCover.startsWith('data:')) {
-      const thumbCompressed = await compressToWebp(rawCover, 1200, 0.90);
+      const thumbCompressed = await compressToWebp(rawCover, 1600, 0.95);
       thumbUrl = await cloudinaryService.uploadDataUrl(thumbCompressed || rawCover, folder);
     } else {
       thumbUrl = coverUrl;
@@ -94,9 +103,9 @@ async function remigrateProductHD(p: Product): Promise<Product> {
   for (const img of rawGallery) {
     if (!img) continue;
     // fetch contorna o bloqueio CORS do canvas.toDataURL()
-    const dataUrl = await fetchAsDataUrl(img);
+    const dataUrl = await fetchAsDataUrl(cdnOriginal(img));
     if (!dataUrl) { galleryUrls.push(img); continue; }
-    const compressed = await compressToWebp(dataUrl, 1920, 0.92);
+    const compressed = await compressToWebp(dataUrl, 2560, 0.95);
     if (!compressed) { galleryUrls.push(img); continue; }
     try {
       const url = await cloudinaryService.uploadDataUrl(compressed, folder);
@@ -110,9 +119,9 @@ async function remigrateProductHD(p: Product): Promise<Product> {
   let thumbUrl = p.thumbnail || '';
   const coverSrc = rawGallery[0] || '';
   if (coverSrc) {
-    const coverData = await fetchAsDataUrl(coverSrc);
+    const coverData = await fetchAsDataUrl(cdnOriginal(coverSrc));
     if (coverData) {
-      const thumbCompressed = await compressToWebp(coverData, 1200, 0.90);
+      const thumbCompressed = await compressToWebp(coverData, 1600, 0.95);
       if (thumbCompressed) {
         try { thumbUrl = await cloudinaryService.uploadDataUrl(thumbCompressed, folder); } catch { thumbUrl = coverUrl; }
       }
@@ -319,10 +328,11 @@ const ImageMigration: React.FC = () => {
         <div className="border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/30 rounded-xl p-5 space-y-3">
           <div>
             <h3 className="font-bold text-blue-800 dark:text-blue-300 flex items-center gap-2">
-              <ImageIcon className="w-4 h-4" /> Re-upload em Full HD (1920px / 92%)
+              <ImageIcon className="w-4 h-4" /> Re-upload em alta qualidade (2560px / 95%)
             </h3>
             <p className="text-xs text-blue-700 dark:text-blue-400 mt-1 leading-relaxed">
-              Re-processa <strong>todas as {productsWithImages.length} imagens</strong> já no Cloudinary, comprimindo para 1920×px WebP com qualidade 92%. Use isso para melhorar imagens que ficaram embaçadas.
+              Re-processa <strong>todas as {productsWithImages.length} imagens</strong> já no Cloudinary, partindo sempre da master original e comprimindo para 2560px WebP com qualidade 95%. Imagens que já estão em WebP dentro do limite são preservadas intactas, sem re-encode.
+              <br />⚠️ Isto NÃO recupera detalhe de fotos que já subiram pequenas — o tamanho do arquivo de origem é o teto. Para essas, re-envie a foto original do fornecedor.
               <br />⚠️ Operação lenta — aprox. {Math.ceil(productsWithImages.length * 5 / 60)} min. Não feche a aba.
             </p>
           </div>

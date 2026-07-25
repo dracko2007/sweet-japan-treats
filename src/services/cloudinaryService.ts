@@ -48,6 +48,53 @@ function compressToDataUrl(dataUrl: string, maxPx = 900, quality = 0.82): Promis
   });
 }
 
+// ─── Entrega ───────────────────────────────────────────────────────────────
+// Perfil único de entrega para toda imagem do site. Medido no acervo atual
+// (master 573x600, 7.3KB) em 2026-07-25:
+//   f_auto      → AVIF/WebP conforme o browser, melhor que WebP fixo.
+//   q_auto:best → topo da escala perceptual: 6626B contra 6426B do `q_auto`
+//                 (+3%). `q_100` custaria 22236B (+246%) sem recuperar detalhe
+//                 que a master não tem — re-encodar um master lossy em q100 só
+//                 preserva o artefato com mais bits.
+//   c_limit     → NUNCA faz upscale. Sem isso, `w_1200` sobre a master de 573px
+//                 devolve 74018B de borrão interpolado (1200x1257).
+const DELIVERY = 'f_auto,q_auto:best,c_limit';
+
+/**
+ * Reescreve qualquer URL Cloudinary para o perfil de entrega de alta qualidade.
+ * Aceita URLs legadas (`/upload/f_webp,q_auto/v123/…`) e limpas (`/upload/v123/…`).
+ * `width` é um teto, nunca um alvo. URLs não-Cloudinary voltam intactas.
+ */
+export function cdnImage(url?: string, width?: number): string {
+  if (!url || !url.includes('res.cloudinary.com')) return url ?? '';
+  const marker = '/upload/';
+  const at = url.indexOf(marker);
+  if (at === -1) return url;
+
+  const tail = url.slice(at + marker.length);
+  // O asset começa no segmento de versão; o que vier antes é transformação
+  // antiga e é descartado. Sem versão, a cauda inteira já é o asset.
+  const asset = tail.match(/^(?:.+?\/)?(v\d+\/.*)$/)?.[1] ?? tail;
+
+  return `${url.slice(0, at + marker.length)}${DELIVERY}${width ? `,w_${width}` : ''}/${asset}`;
+}
+
+/**
+ * Aponta para a master intocada, sem nenhuma transformação de entrega.
+ * Use sempre que for RE-ENVIAR uma imagem: baixar a versão entregue e subir de
+ * volta cria perda de geração acumulada a cada migração.
+ */
+export function cdnOriginal(url?: string): string {
+  if (!url || !url.includes('res.cloudinary.com')) return url ?? '';
+  const marker = '/upload/';
+  const at = url.indexOf(marker);
+  if (at === -1) return url;
+
+  const tail = url.slice(at + marker.length);
+  const asset = tail.match(/^(?:.+?\/)?(v\d+\/.*)$/)?.[1] ?? tail;
+  return `${url.slice(0, at + marker.length)}${asset}`;
+}
+
 export const cloudinaryService = {
   isCloudinaryUrl: (s: string) =>
     typeof s === 'string' && s.includes('res.cloudinary.com'),
@@ -84,7 +131,9 @@ export const cloudinaryService = {
         const response = await fetch(UPLOAD_URL, { method: 'POST', body: form });
         if (response.ok) {
           const data = await response.json();
-          return data.secure_url.replace('/upload/', '/upload/f_webp,q_auto/');
+          // Guarda a master limpa. A qualidade de entrega é decidida por
+          // `cdnImage` no momento do render, não congelada na URL.
+          return data.secure_url as string;
         }
         const err = await response.json().catch(() => ({}));
         console.warn(`Cloudinary indisponível (${response.status}): ${err?.error?.message}. Tentando Firebase Storage.`);

@@ -9,6 +9,7 @@ import { convertYen as fxConvert } from '@/services/fxService';
 import { effectiveYen, baseYen, getVariants } from '@/utils/pricing';
 import { PROMO_TYPES, ActivePromo } from '@/types/promotion';
 import { productEnglishName } from '@/utils/productName';
+import { cdnImage } from '@/services/cloudinaryService';
 
 // Assets locais do projeto — evita depender de host externo (Unsplash) que pode
 // falhar por CSP/rede em alguns ambientes de preview.
@@ -73,7 +74,7 @@ const PromoCarouselSection: React.FC = () => {
     if (promo) {
       list.push({
         id: 'promo',
-        image: promo.productImage.replace('/upload/f_webp,q_auto/', '/upload/f_webp,q_100,w_1400/'),
+        image: cdnImage(promo.productImage, 1400),
         layout: 'split',
         badge: PROMO_TYPES.find(pt => pt.value === promo.type)?.label ?? promo.type,
         title: promo.productName,

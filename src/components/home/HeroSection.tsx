@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { useLanguage } from '@/context/LanguageContext';
 import { db } from '@/config/firebase';
 import { doc, getDoc, collection, getCountFromServer } from 'firebase/firestore';
+import { cdnImage } from '@/services/cloudinaryService';
 
 interface ActivePromo { type: string; productId: string; productName: string; productImage: string; }
 
@@ -126,7 +127,7 @@ const HeroSection: React.FC = () => {
             <Link to={promo ? '/promocao' : '#'} className={`relative aspect-[4/3] rounded-3xl overflow-hidden shadow-elevated border-4 border-white bg-gray-100 block ${promo ? 'cursor-pointer' : 'cursor-default'}`}>
               {promo?.productImage ? (
                 <img
-                  src={promo.productImage.replace('/upload/f_webp,q_auto/', '/upload/f_webp,q_100,w_1200/')}
+                  src={cdnImage(promo.productImage, 1200)}
                   alt={promo.productName}
                   className="w-full h-full object-cover hover:scale-105 transition-transform duration-500"
                 />
