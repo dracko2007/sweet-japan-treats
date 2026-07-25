@@ -48,16 +48,20 @@ export const ProductsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           setProducts(merged);
           setLoading(false);
         } else if (attempt === 0) {
-          // Vazio na 1ª tentativa → Firebase Auth pode não estar pronta ainda, tenta em 3s
-          setTimeout(() => { if (!cancelled) load(1); }, 3000);
+          // Vazio na 1ª tentativa: tenta de novo rápido. Eram 3s fixos aqui, e
+          // no iPhone essa espera era paga quase sempre — a leitura do Firestore
+          // no WebKit costuma falhar na primeira tentativa, então o cliente
+          // encarava 3s de tela vazia antes mesmo da segunda ida à rede.
+          // Produto é leitura pública: não há auth a esperar.
+          setTimeout(() => { if (!cancelled) load(1); }, 600);
         } else {
           setLoading(false);
         }
       } catch {
         if (cancelled) return;
         if (attempt === 0) {
-          // Erro na 1ª tentativa → Firebase Auth pode não estar pronta, tenta em 3s
-          setTimeout(() => { if (!cancelled) load(1); }, 3000);
+          // Mesma razão do ramo acima: sem espera longa às cegas.
+          setTimeout(() => { if (!cancelled) load(1); }, 600);
         } else {
           setLoading(false);
         }

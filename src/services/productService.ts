@@ -45,14 +45,17 @@ function getCache(): Product[] | null {
 }
 
 function setCache(products: Product[]): void {
-  // Não cacheia se houver imagens em base64 — estoura o limite de 5MB do localStorage
-  const hasBase64 = products.some(
-    (p) => p.image?.startsWith('data:') || p.thumbnail?.startsWith('data:') || p.gallery?.some((g) => g?.startsWith('data:'))
-  );
-  if (hasBase64) return;
   try {
-    localStorage.setItem(CACHE_KEY, JSON.stringify({ products, ts: Date.now() } satisfies ProductCache));
-  } catch { /* storage cheio — silencia */ }
+    const payload = JSON.stringify({ products, ts: Date.now() } satisfies ProductCache);
+    // O limite do localStorage fica perto de 5 MB. Antes a guarda era
+    // "tem base64? não cacheia nada" — e bastava UM produto legado com imagem
+    // embutida para desligar o cache do catálogo inteiro. O efeito aparecia só
+    // no iPhone: sem cache, toda visita relia os ~265 documentos do Firestore,
+    // e no WebKit essa leitura é justamente a lenta.
+    // Agora medimos o tamanho real e cacheamos sempre que couber.
+    if (payload.length > 4_000_000) return;
+    localStorage.setItem(CACHE_KEY, payload);
+  } catch { /* quota estourada — segue sem cache */ }
 }
 
 export function invalidateProductCache(): void {
