@@ -58,6 +58,10 @@ const WEIGHT_BY_CATEGORY: Record<string, { small: number; large: number }> = {
 };
 const DEFAULT_WEIGHT = { small: 300, large: 800 };
 
+// Turnos de conversa enviados à IA. 6 estourava rápido: uma recomendação seguida
+// de duas perguntas de acompanhamento já empurrava o produto para fora da janela.
+const AI_HISTORY_TURNS = 12;
+
 const KimiClawAssistant: React.FC = () => {
   const { addToCart, clearCart } = useCart();
   const { language, setLanguage, t, selectedCountry } = useLanguage();
@@ -301,6 +305,28 @@ const KimiClawAssistant: React.FC = () => {
       .slice(0, 5)
       .map((item) => item.product);
 
+  // ── FOCO CONVERSACIONAL ───────────────────────────────────────────────────
+  // Os skills determinísticos resolvem o produto só pelo texto da pergunta atual.
+  // Sem memória, "tenho pele seca" → (recomenda Hada Labo) → "e o frete?" perdia
+  // o produto e o bot voltava a perguntar "qual produto?".
+  // O foco é DERIVADO do histórico — que já é persistido no localStorage — então
+  // sobrevive à troca de página e ao reload sem estado extra para sincronizar.
+  const focusRef = useRef<Product[]>([]);
+  useEffect(() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const shown = messages[i].products;
+      if (shown && shown.length > 0) { focusRef.current = shown; return; }
+    }
+    focusRef.current = [];
+  }, [messages]);
+
+  /** Produtos citados na pergunta atual; se ela não citar nenhum, cai no último
+   *  que o assistente mostrou. Menção explícita sempre vence o foco. */
+  const resolveProducts = (query: string): Product[] => {
+    const explicit = searchProducts(query, { requireStrong: true });
+    return explicit.length > 0 ? explicit : focusRef.current;
+  };
+
   // Catálogo relevante pra mandar como contexto pra IA — reusa o MESMO scoring da
   // busca determinística, mas com limite maior (contexto da IA, não cards visuais)
   // e SEM exigir score > 0: se a pergunta é genérica/conversacional (sem termo de
@@ -458,7 +484,7 @@ const KimiClawAssistant: React.FC = () => {
   const aiAnswer = async (userText: string): Promise<string | null> => {
     if (!qwenEnabled()) return null;
     const history: QwenMsg[] = messages
-      .slice(-6)
+      .slice(-AI_HISTORY_TURNS)
       .map((m) => ({ role: m.sender === 'kimi' ? 'assistant' : 'user', content: m.text } as QwenMsg));
     history.push({ role: 'user', content: userText });
 
@@ -815,12 +841,14 @@ const KimiClawAssistant: React.FC = () => {
         .replace(/\b(o|a|os|as|um|uma|no|ao|de|e|meu|pra|para)\b/g, ' ')
         .trim();
 
-      if (!productName) {
+      // Sem nome na frase ("adiciona no carrinho"), cai no produto em foco —
+      // normalmente o que o assistente acabou de recomendar.
+      if (!productName && focusRef.current.length === 0) {
         await addKimiMessageWithTyping('Qual produto você quer adicionar ao carrinho? Me diga o nome, por exemplo: **"adicionar kit fino no carrinho"**. 🛒');
         return;
       }
 
-      const results = searchProducts(productName, { requireStrong: true });
+      const results = productName ? resolveProducts(productName) : focusRef.current;
 
       if (results.length === 0) {
         await addKimiMessageWithTyping(`Não encontrei **"${productName}"** no catálogo. 😕 Posso buscar por outro nome, ou você pode encomendar pelo **"Faça seu Pedido"** no menu do topo! 📝`);
@@ -951,9 +979,14 @@ const KimiClawAssistant: React.FC = () => {
       return;
     }
 
-    // 7B. ADMIN: frete de produto específico pelo catálogo (com peso real/estimado)
-    if (isAdmin && (query.includes('frete') || query.includes('shipping') || query.includes('envio'))) {
-      const productMatch = searchProducts(query, { requireStrong: true });
+    // 7B. Frete de um produto específico, com peso real/estimado do catálogo.
+    // Vale para cliente e admin: usa o produto citado na pergunta ou, quando ela
+    // não cita nenhum, o que está em foco na conversa.
+    if (query.includes('frete') || query.includes('shipping') || query.includes('envio')) {
+      // Peso explícito ("2kg") é do cliente, não do produto — aí o fluxo genérico
+      // do skill 7 assume, senão o peso do catálogo sobrescreveria o que ele disse.
+      const hasExplicitWeight = /\d+(?:[.,]\d+)?\s*kg/i.test(query);
+      const productMatch = hasExplicitWeight ? [] : resolveProducts(query);
       if (productMatch.length > 0) {
         const prod = productMatch[0];
         const sizeHint = query.includes('grande') || query.includes('large') ? 'large' : 'small';
@@ -984,6 +1017,10 @@ const KimiClawAssistant: React.FC = () => {
             shippingResults: results,
             shippingCountry: detectedCountry,
             shippingWeight: weightKg,
+            // Mantém o foco no produto que acabou de ser respondido: sem isto,
+            // "frete do pocky" → "adiciona no carrinho" adicionaria o produto
+            // anterior. Também mostra o card, que o cliente pode clicar.
+            products: [prod],
           },
         ]);
         return;

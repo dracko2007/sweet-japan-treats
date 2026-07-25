@@ -37,7 +37,7 @@ export async function askQwen(
 ): Promise<string | null> {
   try {
     const body: Record<string, unknown> = {
-      messages: history.slice(-6),
+      messages: history.slice(-12),
       catalog: (catalog || []).slice(0, 120),
       locale,
     };

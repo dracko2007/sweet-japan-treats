@@ -214,8 +214,10 @@ export default async function handler(req, res) {
   try {
     const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
 
-    // Limita histórico e catálogo para controlar uso de tokens
-    const history = Array.isArray(body.messages) ? body.messages.slice(-6) : [];
+    // Limita histórico e catálogo para controlar uso de tokens. 12 turnos (~2k
+    // tokens com o corte de 500 chars por mensagem) mantêm o produto recomendado
+    // dentro da janela por várias perguntas de acompanhamento.
+    const history = Array.isArray(body.messages) ? body.messages.slice(-12) : [];
     const catalog = Array.isArray(body.catalog) ? body.catalog.slice(0, 60) : [];
     const locale = body.locale || { country: 'Brasil', currencyCode: 'BRL', currencySymbol: 'R$' };
 
