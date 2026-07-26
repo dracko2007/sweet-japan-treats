@@ -5,42 +5,57 @@ const devWarn = isDev ? console.warn.bind(console) : () => {};
 
 type AccountMailType = 'welcome' | 'verify' | 'verify-admin';
 
-async function send(to: string, type: AccountMailType, name?: string): Promise<boolean> {
+/** Resultado detalhado do envio — o motivo importa para diagnosticar. */
+export interface MailResult {
+  ok: boolean;
+  /** Código devolvido pelo servidor, ou 'sem_sessao' quando nem chegamos a chamar. */
+  error?: string;
+  status?: number;
+}
+
+async function sendDetailed(to: string, type: AccountMailType, name?: string): Promise<MailResult> {
+  let response: Response;
   try {
-    const response = await authenticatedFetch('/api/send-email', {
+    response = await authenticatedFetch('/api/send-email', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ to, type, name: name || '' }),
     });
-    if (response.ok) return true;
-
-    // O motivo importa e antes era descartado — só voltava `false`, então
-    // ninguém sabia se o problema era credencial de SMTP ausente, permissão ou
-    // o Firebase Admin. Os códigos que o servidor devolve:
-    //   email_not_configured → falta NOREPLY_EMAIL_PASSWORD na Vercel
-    //   forbidden            → o e-mail do pedido não é o da sessão
-    //   internal_error       → normalmente Firebase Admin sem credencial,
-    //                          quebrando generateEmailVerificationLink
-    const detalhe = await response.json().catch(() => ({}));
-    devWarn(`[EMAIL] /api/send-email falhou (${response.status}):`, detalhe?.error || '(sem código)');
-    return false;
   } catch (error) {
-    devWarn('[EMAIL] /api/send-email inacessível:', error);
-    return false;
+    // `authenticatedFetch` lança quando não há sessão Firebase: sem token, a
+    // requisição nem sai. É um estado bem diferente de "o servidor recusou", e
+    // antes os dois viravam o mesmo `false` mudo.
+    devWarn('[EMAIL] /api/send-email não chegou a ser chamado:', error);
+    return { ok: false, error: 'sem_sessao' };
   }
+
+  if (response.ok) return { ok: true };
+
+  // Códigos que o servidor pode devolver:
+  //   unauthorized          → token ausente ou expirado
+  //   forbidden             → o token não é de um admin (ou e-mail não confere)
+  //   email_not_configured  → falta NOREPLY_EMAIL_PASSWORD na Vercel
+  //   email_rejected_by_smtp→ o Gmail recusou o destinatário
+  //   rate_limited          → estourou o limite por hora
+  const corpo = await response.json().catch(() => ({}));
+  const error = String(corpo?.error || 'sem_codigo');
+  devWarn(`[EMAIL] /api/send-email falhou (${response.status}):`, error);
+  return { ok: false, error, status: response.status };
 }
 
-export const sendConfirmationEmail = (to: string, name?: string): Promise<boolean> =>
-  send(to, 'welcome', name);
+export const sendConfirmationEmail = async (to: string, name?: string): Promise<boolean> =>
+  (await sendDetailed(to, 'welcome', name)).ok;
 
-export const sendVerificationEmail = (to: string, name?: string): Promise<boolean> =>
-  send(to, 'verify', name);
+export const sendVerificationEmail = async (to: string, name?: string): Promise<boolean> =>
+  (await sendDetailed(to, 'verify', name)).ok;
 
 /**
  * Reenvia a confirmação para um cliente já cadastrado, autenticando como admin.
  *
  * Não depende da sessão do cliente — que é justamente o que falha no caminho
  * normal e deixa a conta criada sem nenhum e-mail enviado, sem aviso a ninguém.
+ * Devolve o resultado detalhado porque quem clica é o dono da loja: ele precisa
+ * saber SE falhou e POR QUÊ, não só que "não deu".
  */
-export const resendVerificationAsAdmin = (to: string, name?: string): Promise<boolean> =>
-  send(to, 'verify-admin', name);
+export const resendVerificationAsAdmin = (to: string, name?: string): Promise<MailResult> =>
+  sendDetailed(to, 'verify-admin', name);

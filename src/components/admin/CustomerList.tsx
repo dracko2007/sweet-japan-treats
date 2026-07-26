@@ -110,13 +110,27 @@ const CustomerList: React.FC = () => {
   // cliente no navegador dele; quando falha, a conta fica criada sem que o link
   // tenha saído e ninguém percebe. Daqui o envio é autenticado como admin.
   const handleResendVerification = async (email: string, name: string) => {
-    const enviado = await resendVerificationAsAdmin(email, name);
+    await ensureAdminAuth();
+    const r = await resendVerificationAsAdmin(email, name);
+    if (r.ok) {
+      toast({ title: '✅ Confirmação reenviada', description: `Link enviado para ${email}. Peça para conferir também o spam.` });
+      return;
+    }
+    // Cada causa pede uma ação diferente do dono da loja — um "não deu" genérico
+    // deixaria ele sem saber se o problema é a própria sessão, permissão ou o SMTP.
+    const motivos: Record<string, string> = {
+      sem_sessao: 'Sua sessão do Firebase expirou. Saia e entre de novo no painel.',
+      unauthorized: 'Sessão expirada ou sem token. Saia e entre de novo no painel.',
+      forbidden: 'Esta conta não é reconhecida como admin pelo servidor. Confira ADMIN_EMAIL na Vercel e se o e-mail está verificado no Firebase Auth.',
+      email_not_configured: 'Falta a variável NOREPLY_EMAIL_PASSWORD na Vercel.',
+      email_rejected_by_smtp: `O Gmail recusou o endereço ${email}. Confira se está escrito certo.`,
+      rate_limited: 'Limite de envios por hora atingido. Tente daqui a pouco.',
+      firebase_admin_not_configured: 'Firebase Admin sem credencial na Vercel (FIREBASE_SERVICE_ACCOUNT_JSON).',
+    };
     toast({
-      title: enviado ? 'Confirmação reenviada' : 'Não foi possível reenviar',
-      description: enviado
-        ? `Link enviado para ${email}. Peça para conferir também o spam.`
-        : 'O servidor recusou o envio. Verifique os Logs da Vercel por "[send-email]".',
-      variant: enviado ? undefined : 'destructive',
+      title: 'Não foi possível reenviar',
+      description: motivos[r.error || ''] || `Erro do servidor: ${r.error}${r.status ? ` (HTTP ${r.status})` : ''}`,
+      variant: 'destructive',
     });
   };
 
