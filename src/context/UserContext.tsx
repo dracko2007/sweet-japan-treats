@@ -9,6 +9,7 @@ import { ADMIN_EMAIL, ADMIN_USER_ID, isAdminEmail } from '@/config/admin';
 import { adminService } from '@/services/adminService';
 import { referralService } from '@/services/referralService';
 import { trackSignUp, trackLogin } from '@/lib/analytics';
+import { sendVerificationEmail } from '@/services/mailService';
 
 const isDev = import.meta.env.DEV;
 const devLog = isDev ? console.log.bind(console) : () => {};
@@ -630,18 +631,24 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
   const sendVerificationEmailWithFallback = async (email: string, name?: string): Promise<boolean> => {
     const normalizedEmail = normalizeEmail(email);
     try {
-      const mail = await import('@/services/mailService');
-      const sentByStore = await mail.sendVerificationEmail(normalizedEmail, name);
+      const sentByStore = await sendVerificationEmail(normalizedEmail, name);
       if (sentByStore) return true;
+      devWarn('[EMAIL] Store verification email recusado pelo servidor.');
     } catch (error) {
       devWarn('[EMAIL] Store verification email failed:', error);
     }
 
+    // O fallback do Firebase manda o link a partir de noreply@<projeto>.firebaseapp.com,
+    // não do noreply@japanexpress-store.com. Chega, mas com outro remetente.
     const fallbackSent = await firebaseSyncService.resendVerificationEmail();
     if (fallbackSent) {
-      devWarn('[EMAIL] Firebase fallback accepted the verification email, but store email did not.');
+      devWarn('[EMAIL] Enviado pelo fallback do Firebase (remetente firebaseapp.com), não pelo e-mail da loja.');
     }
-    return false;
+    // Antes esta linha era `return false` fixo: quando o e-mail da loja falhava
+    // mas o fallback funcionava, a tela dizia ao cliente que NÃO tinha
+    // conseguido enviar — enquanto o link estava na caixa de entrada dele.
+    // O cliente então ficava esperando um e-mail que julgava não ter sido enviado.
+    return fallbackSent;
   };
 
   const login = async (email: string, password: string): Promise<{ success: boolean; error?: string; code?: string; needsVerification?: boolean }> => {
