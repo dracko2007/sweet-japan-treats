@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Users, ShoppingBag, DollarSign, TrendingUp, Package, Calendar, Mail, Phone, Trash2, AlertTriangle, Gift, X, Sparkles, Megaphone, RefreshCw, Handshake, UserX } from 'lucide-react';
+import { Users, ShoppingBag, DollarSign, TrendingUp, Package, Calendar, Mail, Phone, Trash2, AlertTriangle, Gift, X, Sparkles, Megaphone, RefreshCw, Handshake, UserX, MailCheck } from 'lucide-react';
 import { affiliateService, AffiliateRequest } from '@/services/affiliateService';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -15,6 +15,7 @@ import { requireAdminPassword } from '@/utils/adminGuard';
 import { safeStorage } from '@/utils/storage';
 import { useUser } from '@/context/UserContext';
 import type { Coupon } from '@/context/UserContext';
+import { resendVerificationAsAdmin } from '@/services/mailService';
 
 const CustomerList: React.FC = () => {
   const [customers, setCustomers] = useState<CustomerStats[]>([]);
@@ -103,6 +104,20 @@ const CustomerList: React.FC = () => {
     } finally {
       setGranting(false);
     }
+  };
+
+  // Reenvia a confirmação de e-mail. O envio automático depende da sessão do
+  // cliente no navegador dele; quando falha, a conta fica criada sem que o link
+  // tenha saído e ninguém percebe. Daqui o envio é autenticado como admin.
+  const handleResendVerification = async (email: string, name: string) => {
+    const enviado = await resendVerificationAsAdmin(email, name);
+    toast({
+      title: enviado ? 'Confirmação reenviada' : 'Não foi possível reenviar',
+      description: enviado
+        ? `Link enviado para ${email}. Peça para conferir também o spam.`
+        : 'O servidor recusou o envio. Verifique os Logs da Vercel por "[send-email]".',
+      variant: enviado ? undefined : 'destructive',
+    });
   };
 
   // Conceder/ajustar pontos de fidelidade de um cliente
@@ -563,6 +578,15 @@ const CustomerList: React.FC = () => {
                     >
                       <Sparkles className="w-3 h-3 mr-1" />
                       Dar pontos
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-xs flex-1 text-emerald-700 border-emerald-300 hover:bg-emerald-50"
+                      onClick={() => handleResendVerification(customer.email, customer.name)}
+                    >
+                      <MailCheck className="w-3 h-3 mr-1" />
+                      Reenviar confirmação
                     </Button>
                     <Button
                       size="sm"

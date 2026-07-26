@@ -3,7 +3,7 @@ import { authenticatedFetch } from '@/services/authenticatedFetch';
 const isDev = import.meta.env.DEV;
 const devWarn = isDev ? console.warn.bind(console) : () => {};
 
-type AccountMailType = 'welcome' | 'verify';
+type AccountMailType = 'welcome' | 'verify' | 'verify-admin';
 
 async function send(to: string, type: AccountMailType, name?: string): Promise<boolean> {
   try {
@@ -35,3 +35,12 @@ export const sendConfirmationEmail = (to: string, name?: string): Promise<boolea
 
 export const sendVerificationEmail = (to: string, name?: string): Promise<boolean> =>
   send(to, 'verify', name);
+
+/**
+ * Reenvia a confirmação para um cliente já cadastrado, autenticando como admin.
+ *
+ * Não depende da sessão do cliente — que é justamente o que falha no caminho
+ * normal e deixa a conta criada sem nenhum e-mail enviado, sem aviso a ninguém.
+ */
+export const resendVerificationAsAdmin = (to: string, name?: string): Promise<boolean> =>
+  send(to, 'verify-admin', name);

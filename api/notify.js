@@ -105,6 +105,22 @@ async function handleEmail(req, res) {
       return;
     }
 
+    // Reenvio pelo painel do admin. Existe porque o caminho normal depende da
+    // sessão do próprio cliente estar viva no navegador dele — e quando isso
+    // falha, a conta é criada e NINGUÉM fica sabendo que o link não saiu. Aqui
+    // quem autentica é o admin, então dá para destravar qualquer cliente já
+    // cadastrado sem depender de nada do lado dele.
+    if (type === 'verify-admin') {
+      assertExactKeys(body, ['type', 'to', 'name']);
+      const admin = await requireAdmin(req);
+      await enforceRateLimit(req, { scope: 'email:verify-admin', limit: 60, windowMs: 60 * 60 * 1000, identity: admin.uid });
+      const to = normalizeEmail(body.to);
+      const template = await accountTemplate('verify', to, optionalText(body.name, { max: 100 }));
+      const result = await sendMail({ to, ...template });
+      res.status(200).json({ ok: true, type, ...result });
+      return;
+    }
+
     if (type === 'order') {
       assertExactKeys(body, ['type', 'orderId']);
       const user = await requireUser(req);

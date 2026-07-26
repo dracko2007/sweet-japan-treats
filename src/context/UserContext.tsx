@@ -165,6 +165,14 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     () => (safeStorage.getItem('loginAs') as 'admin' | 'user' | null) || null
   );
   const isRegisteringRef = React.useRef(false);
+  // O listener de auth desloga todo usuário de e-mail/senha não verificado. Só
+  // que o reenvio do link PRECISA da sessão viva: tanto `/api/send-email`
+  // (usa o ID token) quanto o fallback do Firebase (`sendEmailVerification`)
+  // dependem de `auth.currentUser`. No login isso virava corrida — se o
+  // deslogamento chegasse primeiro, os DOIS caminhos falhavam e nenhum e-mail
+  // saía, sem aparecer nem na caixa de Enviados. Esta trava segura o logout
+  // enquanto o envio está em andamento.
+  const enviandoVerificacaoRef = React.useRef(false);
   const setLoginAs = (mode: 'admin' | 'user') => {
     setLoginAsState(mode);
     safeStorage.setItem('loginAs', mode);
@@ -527,7 +535,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
         if (isPasswordUser && !firebaseUser.emailVerified && !isAdminEmail(firebaseUser.email)) {
           devLog('🔥 [FIREBASE] User email not verified, signing out:', firebaseUser.email);
           clearCurrentSession();
-          if (!isRegisteringRef.current) {
+          if (!isRegisteringRef.current && !enviandoVerificacaoRef.current) {
             await firebaseSyncService.logoutUser();
           }
           return;
@@ -630,25 +638,35 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
 
   const sendVerificationEmailWithFallback = async (email: string, name?: string): Promise<boolean> => {
     const normalizedEmail = normalizeEmail(email);
+    // Segura o logout automático do listener enquanto os dois caminhos de envio
+    // rodam — ambos precisam de `auth.currentUser` vivo.
+    enviandoVerificacaoRef.current = true;
     try {
-      const sentByStore = await sendVerificationEmail(normalizedEmail, name);
-      if (sentByStore) return true;
-      devWarn('[EMAIL] Store verification email recusado pelo servidor.');
-    } catch (error) {
-      devWarn('[EMAIL] Store verification email failed:', error);
-    }
+      if (!auth?.currentUser) {
+        devWarn('[EMAIL] Sem sessão Firebase no momento do envio — nenhum caminho consegue mandar o link.');
+      }
+      try {
+        const sentByStore = await sendVerificationEmail(normalizedEmail, name);
+        if (sentByStore) return true;
+        devWarn('[EMAIL] Store verification email recusado pelo servidor.');
+      } catch (error) {
+        devWarn('[EMAIL] Store verification email failed:', error);
+      }
 
-    // O fallback do Firebase manda o link a partir de noreply@<projeto>.firebaseapp.com,
-    // não do noreply@japanexpress-store.com. Chega, mas com outro remetente.
-    const fallbackSent = await firebaseSyncService.resendVerificationEmail();
-    if (fallbackSent) {
-      devWarn('[EMAIL] Enviado pelo fallback do Firebase (remetente firebaseapp.com), não pelo e-mail da loja.');
+      // O fallback do Firebase manda o link a partir de noreply@<projeto>.firebaseapp.com,
+      // não do noreply@japanexpress-store.com. Chega, mas com outro remetente —
+      // e por isso NÃO aparece na caixa de Enviados do Gmail da loja.
+      const fallbackSent = await firebaseSyncService.resendVerificationEmail();
+      if (fallbackSent) {
+        devWarn('[EMAIL] Enviado pelo fallback do Firebase (remetente firebaseapp.com), não pelo e-mail da loja.');
+      }
+      // Antes esta linha era `return false` fixo: quando o e-mail da loja falhava
+      // mas o fallback funcionava, a tela dizia ao cliente que NÃO tinha
+      // conseguido enviar — enquanto o link estava na caixa de entrada dele.
+      return fallbackSent;
+    } finally {
+      enviandoVerificacaoRef.current = false;
     }
-    // Antes esta linha era `return false` fixo: quando o e-mail da loja falhava
-    // mas o fallback funcionava, a tela dizia ao cliente que NÃO tinha
-    // conseguido enviar — enquanto o link estava na caixa de entrada dele.
-    // O cliente então ficava esperando um e-mail que julgava não ter sido enviado.
-    return fallbackSent;
   };
 
   const login = async (email: string, password: string): Promise<{ success: boolean; error?: string; code?: string; needsVerification?: boolean }> => {
