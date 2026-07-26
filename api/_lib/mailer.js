@@ -46,6 +46,16 @@ export async function sendMail({ to, subject, html }) {
     subject,
     html,
   });
+  // O SMTP pode aceitar a conexão e ainda assim recusar o destinatário. Antes
+  // isso passava batido: `sendMail` resolvia, o endpoint respondia 200 e o app
+  // dava a mensagem como enviada — mas nada era entregue, e ninguém ficava
+  // sabendo. Falha silenciosa em e-mail de confirmação trava o cadastro do
+  // cliente sem deixar rastro.
+  const aceitos = Array.isArray(info.accepted) ? info.accepted : [];
+  const recusados = Array.isArray(info.rejected) ? info.rejected : [];
+  if (aceitos.length === 0 || recusados.length > 0) {
+    throw new HttpError(502, 'email_rejected_by_smtp');
+  }
   return { accepted: info.accepted, rejected: info.rejected, messageId: info.messageId };
 }
 
