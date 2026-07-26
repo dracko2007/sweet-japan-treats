@@ -1,6 +1,6 @@
-// Tenta Cloudinary primeiro. Se falhar por limite de banda/quota (4xx),
-// faz fallback para Firebase Storage. Se AMBOS falharem, salva a imagem
-// comprimida em base64 (último recurso) para o produto nunca deixar de salvar.
+// Tenta Cloudinary primeiro. Se falhar por limite de banda/quota (4xx), faz
+// fallback para Firebase Storage. Se AMBOS falharem, LANÇA — nunca grava a
+// imagem dentro do documento do Firestore.
 import { storage } from '@/config/firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
@@ -27,26 +27,6 @@ async function uploadVideoToFirebase(blob: Blob, folder: string): Promise<string
   return getDownloadURL(storageRef);
 }
 
-// Último recurso: comprime a imagem para um data URL pequeno guardado no Firestore.
-function compressToDataUrl(dataUrl: string, maxPx = 900, quality = 0.82): Promise<string> {
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.onload = () => {
-      const scale = Math.min(1, maxPx / Math.max(img.width, img.height));
-      const w = Math.round(img.width * scale);
-      const h = Math.round(img.height * scale);
-      const canvas = document.createElement('canvas');
-      canvas.width = w;
-      canvas.height = h;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return resolve(dataUrl);
-      ctx.drawImage(img, 0, 0, w, h);
-      resolve(canvas.toDataURL('image/jpeg', quality));
-    };
-    img.onerror = () => resolve(dataUrl);
-    img.src = dataUrl;
-  });
-}
 
 // ─── Entrega ───────────────────────────────────────────────────────────────
 // Perfil único de entrega para toda imagem do site. Medido no acervo atual
@@ -141,14 +121,17 @@ export const cloudinaryService = {
     typeof s === 'string' && s.startsWith('data:'),
 
   async uploadDataUrl(dataUrl: string, folder: string): Promise<string> {
+    const motivos: string[] = [];
     let blob: Blob | null = null;
     try {
       const res = await fetch(dataUrl);
       blob = await res.blob();
-    } catch { /* segue para o fallback base64 */ }
+    } catch (e) {
+      motivos.push(`leitura da imagem falhou (${e instanceof Error ? e.message : String(e)})`);
+    }
 
-    // 1) Tenta Cloudinary
     if (blob) {
+      // 1) Cloudinary
       try {
         const form = new FormData();
         form.append('file', blob);
@@ -162,21 +145,29 @@ export const cloudinaryService = {
           return data.secure_url as string;
         }
         const err = await response.json().catch(() => ({}));
-        console.warn(`Cloudinary indisponível (${response.status}): ${err?.error?.message}. Tentando Firebase Storage.`);
+        motivos.push(`Cloudinary ${response.status}: ${err?.error?.message || 'sem detalhe'}`);
       } catch (e) {
-        console.warn('Cloudinary offline, tentando Firebase Storage:', e);
+        motivos.push(`Cloudinary inacessível (${e instanceof Error ? e.message : String(e)})`);
       }
 
       // 2) Fallback: Firebase Storage
       try {
         return await uploadToFirebase(blob, folder);
       } catch (e) {
-        console.warn('Firebase Storage falhou, salvando imagem comprimida no Firestore:', e);
+        motivos.push(`Firebase Storage: ${e instanceof Error ? e.message : String(e)}`);
       }
     }
 
-    // 3) Último recurso: imagem comprimida em base64 (sem rede — sempre funciona)
-    return compressToDataUrl(dataUrl, 900, 0.82);
+    // Aqui existia um terceiro nível que salvava a imagem em base64 dentro do
+    // próprio documento do Firestore, "para o produto nunca deixar de salvar".
+    // A conta chegou em 26/07/2026: 88 produtos haviam acumulado 20,4 MB de
+    // base64 — 98% do catálogo — estourando a banda do Firestore e derrubando
+    // a loja inteira. E como a degradação era silenciosa, ninguém viu crescer.
+    //
+    // Falhar é mais barato: o admin vê o motivo, corrige e reenvia. O banco
+    // não é contaminado, e o botão "testar conexão" volta a dizer a verdade
+    // (antes ele acusava sucesso mesmo com o Cloudinary fora do ar).
+    throw new Error(`Não foi possível enviar a imagem. ${motivos.join(' | ')}`);
   },
 
   async uploadVideoFile(file: File, folder: string): Promise<string> {
