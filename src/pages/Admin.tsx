@@ -94,6 +94,11 @@ const Admin: React.FC = () => {
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
     let lastRefresh = 0;
     const MIN_INTERVAL_MS = 10_000; // no mínimo 10s entre refreshes
+    // 30s com o painel aberto custava ~40 mil leituras/hora e esgotava sozinho
+    // a cota diária do Firestore em pouco mais de UMA HORA — foi o que
+    // derrubou a loja em 26/07/2026. O painel não precisa de tempo real:
+    // trocar de aba já dispara um refresh pelo `visibilitychange`.
+    const POLL_MS = 5 * 60 * 1000;
 
     const refresh = () => {
       const now = Date.now();
@@ -104,13 +109,19 @@ const Admin: React.FC = () => {
     };
 
     const debouncedRefresh = () => {
-      if (debounceTimer) clearTimeout(debounceTimer);
+      clearTimeout(debounceTimer);
       debounceTimer = setTimeout(refresh, 300);
     };
 
     refresh();
 
-    const interval = setInterval(refresh, 30000);
+    // Só consulta com a aba à vista. Antes o intervalo seguia disparando em
+    // segundo plano: uma aba esquecida queimava a cota sem ninguém olhando.
+    const pollVisivel = () => {
+      if (document.visibilityState === 'visible') refresh();
+    };
+
+    const interval = setInterval(pollVisivel, POLL_MS);
 
     const onVisible = () => {
       if (document.visibilityState === 'visible') debouncedRefresh();
@@ -120,7 +131,7 @@ const Admin: React.FC = () => {
 
     return () => {
       clearInterval(interval);
-      if (debounceTimer) clearTimeout(debounceTimer);
+      clearTimeout(debounceTimer);
       document.removeEventListener('visibilitychange', onVisible);
       window.removeEventListener('focus', debouncedRefresh);
     };
@@ -162,10 +173,12 @@ const Admin: React.FC = () => {
     }
   };
 
+  // Só o número aparece aqui (contador + badge de novos). Buscar a lista
+  // completa para depois usar `.length` custava a leitura das coleções `users`
+  // e `orders` inteiras a cada ciclo; a agregação custa ~1 leitura.
   const loadCustomers = async () => {
     try {
-      const list = await customerService.getAllCustomersAsync();
-      const total = list.length;
+      const total = await customerService.getCustomerCount();
       setCustomerCount(total);
       const seenRaw = safeStorage.getItem('admin_seen_customers');
       const seen = seenRaw == null ? null : parseInt(seenRaw, 10);

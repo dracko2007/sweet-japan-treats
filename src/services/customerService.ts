@@ -1,7 +1,7 @@
 import { safeStorage } from '@/utils/storage';
 // Serviço para gerenciar dados de clientes e estatísticas
 import { firebaseSyncService } from '@/services/firebaseSyncService';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getCountFromServer, getDocs } from 'firebase/firestore';
 import { db } from '@/config/firebase';
 import { ensureAdminAuth } from '@/utils/adminAuth';
 import { toYen } from '@/utils/currency';
@@ -157,6 +157,22 @@ export const customerService = {
   getCustomerByEmail(email: string): CustomerStats | null {
     const customers = this.getAllCustomers();
     return customers.find(c => c.email === email) || null;
+  },
+
+  /** Só a CONTAGEM de clientes, sem trazer nenhum documento.
+   *
+   *  O painel exibe apenas um número e o badge de "novos", mas chamava
+   *  `getAllCustomersAsync()` para isso — lendo a coleção `users` E a `orders`
+   *  inteiras, a cada 30 segundos. Com o painel aberto isso consumia dezenas
+   *  de milhares de leituras por hora e esgotava sozinho a cota diária do
+   *  Firestore em pouco mais de uma hora, derrubando a loja inteira.
+   *
+   *  `getCountFromServer` é cobrado como 1 leitura por lote de 1000
+   *  documentos: o mesmo número por ~1 leitura em vez de centenas. */
+  async getCustomerCount(): Promise<number> {
+    if (!db) throw new Error('Firestore not available');
+    const snap = await getCountFromServer(collection(db, 'users'));
+    return snap.data().count;
   },
 
   // Async version: fetches all users from Firestore + merges with safeStorage
