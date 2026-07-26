@@ -1,9 +1,9 @@
 // Serviço de produtos com persistência no Firestore + Firebase Storage para imagens.
 // Os produtos de `data/products.ts` são a base (defaults).
 // O admin pode criar/editar/remover; as mudanças ficam no Firestore (collection "products").
-// Imagens ficam no Cloudinary (CDN) — Firestore guarda só as URLs. Imagem
-// embutida em base64 estoura o cache local e multiplica as leituras do banco.
-// Cache localStorage de 60 min evita re-fetch a cada navegação.
+// Imagens ficam no Cloudinary (CDN) — Firestore guarda só as URLs.
+// O catálogo é cacheado em IndexedDB e sincronizado por delta: depois da
+// primeira visita, só o que mudou é lido do Firestore.
 
 import { db } from '@/config/firebase';
 import {
@@ -15,7 +15,12 @@ import {
   increment,
   serverTimestamp,
   deleteField,
+  query,
+  where,
+  Timestamp,
 } from 'firebase/firestore';
+import type { CatalogSnapshot } from '@/services/catalogCache';
+import { gravarCatalogo, lerCatalogo, limparCatalogo } from '@/services/catalogCache';
 import { Product } from '@/types';
 import { cdnImage } from '@/services/cloudinaryService';
 import { products as defaultProducts } from '@/data/products';
@@ -29,76 +34,46 @@ const devError = isDev ? console.error.bind(console) : () => {};
 
 const COL = 'products';
 
-// ─── Cache localStorage ────────────────────────────────────────────────────
-const CACHE_KEY = 'jp_products_v4'; // v4: URLs normalizadas para entrega de alta qualidade
-// 60 min: cada expiração custa uma releitura dos ~265 documentos do catálogo.
-// Edições do admin não esperam o TTL — `save()`/`remove()` invalidam na hora.
-const CACHE_TTL = 60 * 60 * 1000; // 60 minutos
+// ─── Cache do catálogo (IndexedDB + sincronização por delta) ───────────────
+//
+// Antes: localStorage com teto de ~5 MB. Alguns produtos com imagem em base64
+// estouravam o teto, o cache era descartado em silêncio e TODA navegação
+// relia os ~265 documentos. A cota diária do Firestore acabava com ~37
+// visitantes e a loja inteira caía — foi o que aconteceu em 26/07/2026.
+//
+// Agora: IndexedDB (sem teto prático) + delta. Dentro da janela abaixo nem
+// consultamos o Firestore (0 leituras). Passada a janela, perguntamos apenas
+// "o que mudou desde X?", o que custa ~1 leitura quando nada mudou — contra
+// as ~265 de reler o catálogo.
+const JANELA_VERIFICACAO = 60 * 60 * 1000; // 60 minutos
 
-interface ProductCache { products: Product[]; ts: number; }
+let memoria: CatalogSnapshot | null = null;
+let verificadoEm = 0;
+let precisaVerificar = true;
 
-function getCache(): Product[] | null {
-  try {
-    const raw = localStorage.getItem(CACHE_KEY);
-    if (!raw) return null;
-    const { products, ts } = JSON.parse(raw) as ProductCache;
-    if (Date.now() - ts > CACHE_TTL) return null;
-    return products;
-  } catch { return null; }
-}
-
-const CACHE_MAX_BYTES = 4_000_000;
-
-/** IDs dos produtos cuja imagem ainda está embutida como `data:` URL. */
-function embeddedImageIds(products: Product[]): string[] {
-  const ids: string[] = [];
-  for (const p of products) {
-    const fontes = [p.image, p.thumbnail, ...(p.gallery ?? [])];
-    if (fontes.some((src) => typeof src === 'string' && src.startsWith('data:'))) {
-      ids.push(p.id);
-    }
-  }
-  return ids;
-}
-
-let cacheSkip: { bytes: number; ids: string[] } | null = null;
-
-/** Estado do cache do catálogo. Consumido pelo painel Admin → Imagens para
- *  mostrar por que o cache está desligado, em vez de deixar a loja degradar
- *  sem ninguém perceber. */
-export function productCacheStatus(): { ok: boolean; bytes: number; ids: string[] } {
-  if (!cacheSkip) return { ok: true, bytes: 0, ids: [] };
-  return { ok: false, bytes: cacheSkip.bytes, ids: cacheSkip.ids };
-}
-
-function setCache(products: Product[]): void {
-  try {
-    const payload = JSON.stringify({ products, ts: Date.now() } satisfies ProductCache);
-    // Desistir aqui em silêncio custa caro: sem cache, TODA navegação relê os
-    // ~265 documentos do catálogo. A cota do plano Spark (50 mil leituras/dia)
-    // acaba com ~37 visitantes e o Firestore passa a responder 429 — foi o que
-    // derrubou a loja inteira em 26/07/2026, levando junto o envio de e-mails
-    // (todo endpoint que toca o banco virou 503). O motivo agora fica visível.
-    if (payload.length > CACHE_MAX_BYTES) {
-      cacheSkip = { bytes: payload.length, ids: embeddedImageIds(products) };
-      console.warn(
-        `[catálogo] cache DESLIGADO: ${(payload.length / 1e6).toFixed(1)} MB excede o limite do localStorage. `
-        + `${cacheSkip.ids.length} produto(s) com imagem embutida em base64. `
-        + `Cada visita relerá ${products.length} documentos do Firestore e a cota diária vai acabar. `
-        + 'Corrija em Admin → Imagens.',
-      );
-      return;
-    }
-    cacheSkip = null;
-    localStorage.setItem(CACHE_KEY, payload);
-  } catch {
-    // localStorage cheio ou indisponível (Safari privado) — segue sem cache.
-    cacheSkip = { bytes: 0, ids: [] };
-  }
-}
-
+/** Marca que a próxima leitura deve perguntar ao Firestore o que mudou.
+ *  NÃO descarta o cache: o delta parte do que já existe, então uma edição do
+ *  admin custa a leitura do documento editado, não a do catálogo inteiro. */
 export function invalidateProductCache(): void {
-  try { localStorage.removeItem(CACHE_KEY); } catch {}
+  precisaVerificar = true;
+}
+
+/** Descarta o cache e força recarga completa. Só para recuperação — custa uma
+ *  leitura por documento do catálogo. */
+export async function resetProductCache(): Promise<void> {
+  memoria = null;
+  precisaVerificar = true;
+  verificadoEm = 0;
+  await limparCatalogo();
+}
+
+/** Converte um Timestamp do Firestore em ms. Escritas ainda pendentes chegam
+ *  como `null` (o `serverTimestamp()` só resolve no servidor) — nesse caso
+ *  devolve 0 para não avançar o marcador de sincronismo indevidamente. */
+function instanteMs(valor: unknown): number {
+  const ts = valor as { toMillis?: () => number } | null | undefined;
+  if (ts && typeof ts.toMillis === 'function') return ts.toMillis();
+  return 0;
 }
 // ──────────────────────────────────────────────────────────────────────────
 
@@ -136,66 +111,105 @@ const withCdnImages = (p: Product): Product => ({
 });
 
 export const productService = {
-  /** Lê os documentos do Firestore (overrides do admin). */
-  async getOverrides(): Promise<Overrides> {
+  /** Lê os documentos do Firestore. Com `desdeMs`, traz só o que mudou depois
+   *  daquele instante — é a diferença entre ~265 leituras e ~1 por visita.
+   *
+   *  Usa `>=` e não `>` de propósito: dois documentos podem compartilhar o
+   *  mesmo milissegundo, e `>` perderia o segundo para sempre. O custo é
+   *  reler 1 documento por sincronização; perder uma atualização custaria
+   *  estoque errado na vitrine. */
+  async getOverrides(desdeMs: number | null = null): Promise<Overrides & { maxMs: number }> {
     if (!db) throw new Error('Firebase indisponível');
     try {
-      const snap = await getDocs(collection(db, COL));
+      const alvo = collection(db, COL);
+      const snap = await getDocs(
+        desdeMs === null ? alvo : query(alvo, where('updatedAt', '>=', Timestamp.fromMillis(desdeMs))),
+      );
       const items: Product[] = [];
       const deleted: string[] = [];
+      let maxMs = desdeMs ?? 0;
       snap.forEach((d) => {
         const data = d.data() as Record<string, unknown>;
+        maxMs = Math.max(maxMs, instanteMs(data.updatedAt));
         if (data.__deleted) {
           deleted.push(d.id);
           return;
         }
         items.push(withCdnImages({ id: d.id, ...(data as object) } as Product));
       });
-      return { items, deleted };
+      return { items, deleted, maxMs };
     } catch (e) {
       devWarn('productService.getOverrides falhou:', e);
       throw e;
     }
   },
 
-  /** Lista final: Firestore é fonte de verdade. defaultProducts entram só para IDs
-   *  que o Firestore não tem (evita tela vazia em erros parciais).
-   *  Usa cache de 60 min no localStorage para evitar re-fetch a cada navegação. */
-  async getMerged(forceRefresh = false): Promise<Product[]> {
-    if (!forceRefresh) {
-      const cached = getCache();
-      if (cached) return cached;
-    }
+  /** Sincroniza o cache local com o Firestore e devolve o retrato atual.
+   *  Primeira visita: leitura completa. Depois: só o delta. */
+  async sync(): Promise<CatalogSnapshot | null> {
+    if (!memoria) memoria = await lerCatalogo();
 
-    let items: Product[] = [];
-    let deleted: string[] = [];
-    try {
-      ({ items, deleted } = await this.getOverrides());
-    } catch {
-      // Firestore inacessível (auth não pronta, offline, etc.) — usa defaults como fallback
-      return defaultProducts;
-    }
+    const base = memoria;
+    const { items, deleted, maxMs } = await this.getOverrides(base ? base.syncedAtMs : null);
 
-    // Firestore tem dados → ele é a fonte de verdade
-    // IDs do Firestore sobrepõem defaults; defaults preenchem o que o Firestore não tem
-    if (items.length > 0 || deleted.length > 0) {
-      const map = new Map<string, Product>();
-      // Começa com defaults SEM imagens próprias (só como esqueleto de fallback)
-      for (const p of defaultProducts) {
-        map.set(p.id, { ...p, image: '', gallery: [], thumbnail: undefined });
+    if (!base) {
+      if (!items.length && !deleted.length) return null;
+      memoria = { items, deleted, syncedAtMs: maxMs };
+    } else {
+      // Delta: o que voltou sobrepõe o que havia; o resto permanece intacto.
+      const porId = new Map(base.items.map((p) => [p.id, p]));
+      const removidos = new Set(base.deleted);
+      for (const p of items) {
+        porId.set(p.id, p);
+        removidos.delete(p.id); // produto restaurado deixa de ser tombstone
       }
-      // Firestore sobrepõe (com imagens reais)
-      for (const p of items) map.set(p.id, p);
-      // Remove deletados
-      for (const id of deleted) map.delete(id);
-      const result = Array.from(map.values()).filter((p) => p.image); // só mostra quem tem imagem
-      setCache(result);
-      return result;
+      for (const id of deleted) {
+        porId.delete(id);
+        removidos.add(id);
+      }
+      memoria = {
+        items: Array.from(porId.values()),
+        deleted: Array.from(removidos),
+        syncedAtMs: Math.max(base.syncedAtMs, maxMs),
+      };
     }
 
-    // Firestore vazio (loja nova): usa defaults
-    setCache(defaultProducts);
-    return defaultProducts;
+    verificadoEm = Date.now();
+    precisaVerificar = false;
+    await gravarCatalogo(memoria);
+    return memoria;
+  },
+
+  /** Lista final: Firestore é fonte de verdade. defaultProducts entram só para
+   *  IDs que o Firestore não tem (evita tela vazia em erros parciais).
+   *
+   *  Dentro da janela de verificação não há NENHUMA leitura do Firestore. */
+  async getMerged(forceRefresh = false): Promise<Product[]> {
+    if (!memoria) memoria = await lerCatalogo();
+
+    const dentroDaJanela = Date.now() - verificadoEm < JANELA_VERIFICACAO;
+    const podeServirDoCache = memoria && !forceRefresh && !precisaVerificar && dentroDaJanela;
+
+    if (!podeServirDoCache) {
+      try {
+        await this.sync();
+      } catch {
+        // Firestore inacessível (offline, cota esgotada, auth não pronta).
+        // Servir o cache é melhor que uma vitrine vazia.
+        if (!memoria) return defaultProducts;
+      }
+    }
+
+    if (!memoria) return defaultProducts;
+
+    const map = new Map<string, Product>();
+    // Defaults entram sem imagem própria — só como esqueleto de fallback.
+    for (const p of defaultProducts) {
+      map.set(p.id, { ...p, image: '', gallery: [], thumbnail: undefined });
+    }
+    for (const p of memoria.items) map.set(p.id, p);
+    for (const id of memoria.deleted) map.delete(id);
+    return Array.from(map.values()).filter((p) => p.image);
   },
 
   /** Cria ou atualiza um produto. Invalida o cache local automaticamente. */
@@ -215,13 +229,21 @@ export const productService = {
     invalidateProductCache();
   },
 
-  /** Decrementa o estoque ao confirmar uma venda. No-op se produto não existe ou é ilimitado. */
+  /** Decrementa o estoque ao confirmar uma venda. No-op se produto não existe
+   *  ou é ilimitado.
+   *
+   *  `updatedAt` é obrigatório aqui: a sincronização por delta pergunta ao
+   *  Firestore "o que mudou desde X?". Uma venda que não carimbasse a data
+   *  ficaria invisível para todos os clientes com cache, que continuariam
+   *  vendo o estoque antigo — e a loja venderia o que não tem. */
   async decrementStock(productId: string, qty: number): Promise<void> {
     if (!db || qty <= 0) return;
     try {
       await updateDoc(doc(db, COL, productId), {
         'stock.quantity': increment(-qty),
+        updatedAt: serverTimestamp(),
       });
+      invalidateProductCache();
     } catch {
       // Produto pode não existir no Firestore (default); ignora silenciosamente
     }
