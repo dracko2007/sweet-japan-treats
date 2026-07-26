@@ -17,6 +17,10 @@ const MIN_TIME_ON_PAGE_MS = 6000;
 
 // Funil de checkout = /checkout + /order-review (revisão/pagamento).
 const inFunnel = (p: string): boolean => p.startsWith('/checkout') || p.startsWith('/order-review');
+// Telas de autenticação. Reter aqui é contraproducente: o cliente já está
+// convertendo, e fora do funil a variante é a `guide` — que pediria por popup
+// justamente o e-mail que ele está digitando no formulário atrás dele.
+const AUTH_ROUTES = ['/login', '/cadastro'];
 
 type Variant = 'retention' | 'waiver_warning' | 'ps_offer' | 'guide';
 
@@ -68,6 +72,7 @@ const Shell: React.FC<{ label: string; onClose: () => void; children: React.Reac
  *  - FORA do checkout → a oferta de isenção NUNCA aparece (o cliente ainda pode estar
  *    escolhendo produtos). Só o guia por e-mail (lead) para visitante não logado,
  *    respeitando cooldown de 14 dias.
+ *  - /login e /cadastro → NUNCA aparece: o cliente está no meio do cadastro.
  *
  * Desktop: detecta o mouse saindo pelo topo. Mobile: tempo na página + scroll.
  */
@@ -99,6 +104,7 @@ const ExitIntentPopup: React.FC = () => {
   const resolveVariant = useCallback((): Variant | null => {
     const list = itemsRef.current;
     const path = pathRef.current;
+    if (AUTH_ROUTES.some((rota) => path.startsWith(rota))) return null;
     // Dentro do funil de checkout (cliente já está finalizando).
     if (inFunnel(path)) {
       if (list.length === 0) return null;
