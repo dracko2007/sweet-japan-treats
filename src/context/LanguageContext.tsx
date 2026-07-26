@@ -59,12 +59,16 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 2000);
 
-    // ipapi.co suporta HTTPS gratuitamente (ip-api.com bloqueia mixed-content em HTTPS)
-    fetch('https://ipapi.co/json/', { signal: controller.signal })
+    // Usa o endpoint próprio (`api/geo.js`), que lê os headers de geolocalização
+    // da Vercel. A chamada direta ao ipapi.co era bloqueada pelo CSP em TODA
+    // visita — `connect-src` não o autoriza — então a detecção de país nunca
+    // funcionava em produção e o visitante sempre caía no país padrão.
+    // Mesma origem: sem CSP, sem terceiro, e o endpoint já existia para isto.
+    fetch('/api/geo', { signal: controller.signal })
       .then(r => r.ok ? r.json() : null)
-      .then((data: { country_code?: string } | null) => {
-        if (!data?.country_code) return;
-        const code = data.country_code.toUpperCase();
+      .then((data: { countryCode?: string } | null) => {
+        if (!data?.countryCode) return;
+        const code = data.countryCode.toUpperCase();
 
         if (!hasLang) {
           const lang = ipToLanguage(code);
