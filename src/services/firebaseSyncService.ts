@@ -1,4 +1,5 @@
 import { safeStorage } from '@/utils/storage';
+import { requestPasswordReset } from '@/services/mailService';
 /**
  * Firebase Sync Service
  * Sincroniza safeStorage com Firestore para acesso multi-dispositivo
@@ -612,16 +613,35 @@ export const firebaseSyncService = {
   },
 
   /**
-   * Send password reset email
+   * Envia o e-mail de redefinicao de senha.
+   *
+   * Caminho principal: o mailer da loja, de noreply@japanexpress-store.com, com
+   * o mesmo layout dos demais e-mails e sob o SPF/DKIM do dominio.
+   *
+   * Antes ia direto pelo Firebase, que envia de noreply@<projeto>.firebaseapp.com
+   * com o assunto "Reset your password for <nome do projeto>". Chega, mas de um
+   * remetente que o cliente nao reconhece, sem a marca da loja e sem aparecer na
+   * caixa de Enviados — o que tornava impossivel auditar o que foi enviado.
+   *
+   * O Firebase segue como rede de seguranca: ficar sem redefinir a senha tranca
+   * o cliente para fora da conta, entao um e-mail feio e melhor que nenhum.
    */
   async sendPasswordReset(email: string) {
+    const alvo = email.trim().toLowerCase();
+    const resultado = await requestPasswordReset(alvo);
+    if (resultado.ok) {
+      devLog('📧 [RESET] Enviado pelo mailer da loja para:', alvo);
+      return true;
+    }
+
+    devWarn('[RESET] Mailer da loja falhou (' + resultado.error + '), caindo para o Firebase.');
     try {
       ensureFirebaseReady();
-      await sendPasswordResetEmail(auth, email);
-      devLog('📧 [FIREBASE AUTH] Password reset email sent to:', email);
+      await sendPasswordResetEmail(auth, alvo);
+      devLog('📧 [RESET] Enviado pelo fallback do Firebase (remetente firebaseapp.com).');
       return true;
-    } catch (error: any) {
-      devError('❌ [FIREBASE AUTH] Password reset error:', error);
+    } catch (error) {
+      devError('❌ [RESET] Os dois caminhos falharam:', error);
       throw error;
     }
   },

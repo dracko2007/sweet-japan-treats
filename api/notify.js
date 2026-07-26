@@ -29,6 +29,17 @@ async function accountTemplate(type, to, name) {
       html: wrapEmail(`<p>${salutation}</p><p>Confirme que este e-mail pertence a voce:</p><p><a href="${safeLink}" style="display:inline-block;background:#ec4899;color:#fff;text-decoration:none;padding:12px 18px;border-radius:10px;font-weight:bold">Confirmar meu e-mail</a></p><p style="word-break:break-all">${safeLink}</p><p>Se voce nao criou esta conta, ignore esta mensagem.</p>`),
     };
   }
+  if (type === 'reset') {
+    const link = await adminAuth().generatePasswordResetLink(to, {
+      url: `${siteOrigin()}/login`,
+      handleCodeInApp: false,
+    });
+    const safeLink = escapeHtml(link);
+    return {
+      subject: 'Redefinir sua senha - Japan Express',
+      html: wrapEmail(`<p>${salutation}</p><p>Recebemos um pedido para redefinir a senha da sua conta.</p><p><a href="${safeLink}" style="display:inline-block;background:#ec4899;color:#fff;text-decoration:none;padding:12px 18px;border-radius:10px;font-weight:bold">Criar nova senha</a></p><p style="word-break:break-all">${safeLink}</p><p>O link vale por tempo limitado. Se voce nao pediu isso, ignore esta mensagem: sua senha atual continua valendo.</p>`),
+    };
+  }
   return {
     subject: 'Cadastro recebido - Japan Express',
     html: wrapEmail(`<p>${salutation}</p><p>Seu cadastro foi recebido. Confirme seu e-mail antes de entrar na loja.</p><p><a href="${siteOrigin()}/login">Ir para o login</a></p>`),
@@ -118,6 +129,33 @@ async function handleEmail(req, res) {
       const template = await accountTemplate('verify', to, optionalText(body.name, { max: 100 }));
       const result = await sendMail({ to, ...template });
       res.status(200).json({ ok: true, type, ...result });
+      return;
+    }
+
+    // Recuperacao de senha. Unico tipo que NAO exige sessao — quem esqueceu a
+    // senha nao consegue entrar para provar quem e. Antes isso saia pelo
+    // Firebase, de noreply@<projeto>.firebaseapp.com com o assunto
+    // "Reset your password for <nome do projeto>": remetente desconhecido para
+    // o cliente, fora do dominio autenticado por SPF/DKIM da loja e invisivel
+    // na caixa de Enviados. Agora sai pelo mesmo caminho dos demais.
+    if (type === 'password-reset') {
+      assertExactKeys(body, ['type', 'to']);
+      const to = normalizeEmail(body.to);
+      // Dois limites, porque o endpoint e aberto: por IP trava a varredura de
+      // contas; por e-mail impede encher a caixa de uma vitima especifica.
+      await enforceRateLimit(req, { scope: 'email:password-reset:ip', limit: 10, windowMs: 60 * 60 * 1000 });
+      await enforceRateLimit(req, { scope: 'email:password-reset:conta', limit: 4, windowMs: 60 * 60 * 1000, identity: to });
+      try {
+        const template = await accountTemplate('reset', to);
+        await sendMail({ to, ...template });
+      } catch (error) {
+        // Conta inexistente responde exatamente como um envio bem-sucedido.
+        // Revelar a diferenca transformaria este endpoint numa sonda para
+        // descobrir quais e-mails tem conta na loja. Qualquer OUTRA falha
+        // propaga normalmente, para o cliente poder reagir.
+        if (error?.code !== 'auth/user-not-found') throw error;
+      }
+      res.status(200).json({ ok: true, type });
       return;
     }
 

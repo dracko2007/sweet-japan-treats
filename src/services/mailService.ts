@@ -59,3 +59,34 @@ export const sendVerificationEmail = async (to: string, name?: string): Promise<
  */
 export const resendVerificationAsAdmin = (to: string, name?: string): Promise<MailResult> =>
   sendDetailed(to, 'verify-admin', name);
+
+/**
+ * Pede o e-mail de redefinicao de senha pelo mailer da loja.
+ *
+ * Usa `fetch` puro, e nao `authenticatedFetch`: quem esqueceu a senha nao tem
+ * sessao para assinar a requisicao — a ausencia de token e a premissa do fluxo,
+ * nao um erro. O servidor protege o endpoint por limite de IP e de e-mail.
+ *
+ * Responde igual para conta existente e inexistente, de proposito: a diferenca
+ * revelaria quais e-mails tem cadastro na loja.
+ */
+export async function requestPasswordReset(to: string): Promise<MailResult> {
+  let response: Response;
+  try {
+    response = await fetch('/api/send-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ to, type: 'password-reset' }),
+    });
+  } catch (error) {
+    devWarn('[EMAIL] /api/send-email (reset) nao chegou a ser chamado:', error);
+    return { ok: false, error: 'rede' };
+  }
+
+  if (response.ok) return { ok: true };
+
+  const corpo = await response.json().catch(() => ({}));
+  const error = String(corpo?.error || 'sem_codigo');
+  devWarn(`[EMAIL] reset de senha falhou (${response.status}):`, error);
+  return { ok: false, error, status: response.status };
+}
