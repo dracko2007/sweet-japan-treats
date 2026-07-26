@@ -1,8 +1,9 @@
 // Serviço de produtos com persistência no Firestore + Firebase Storage para imagens.
 // Os produtos de `data/products.ts` são a base (defaults).
 // O admin pode criar/editar/remover; as mudanças ficam no Firestore (collection "products").
-// Imagens ficam no Firebase Storage (CDN Google) — Firestore guarda só as URLs.
-// Cache localStorage de 5 min evita re-fetch a cada navegação.
+// Imagens ficam no Cloudinary (CDN) — Firestore guarda só as URLs. Imagem
+// embutida em base64 estoura o cache local e multiplica as leituras do banco.
+// Cache localStorage de 60 min evita re-fetch a cada navegação.
 
 import { db } from '@/config/firebase';
 import {
@@ -30,7 +31,9 @@ const COL = 'products';
 
 // ─── Cache localStorage ────────────────────────────────────────────────────
 const CACHE_KEY = 'jp_products_v4'; // v4: URLs normalizadas para entrega de alta qualidade
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutos
+// 60 min: cada expiração custa uma releitura dos ~265 documentos do catálogo.
+// Edições do admin não esperam o TTL — `save()`/`remove()` invalidam na hora.
+const CACHE_TTL = 60 * 60 * 1000; // 60 minutos
 
 interface ProductCache { products: Product[]; ts: number; }
 
@@ -44,18 +47,54 @@ function getCache(): Product[] | null {
   } catch { return null; }
 }
 
+const CACHE_MAX_BYTES = 4_000_000;
+
+/** IDs dos produtos cuja imagem ainda está embutida como `data:` URL. */
+function embeddedImageIds(products: Product[]): string[] {
+  const ids: string[] = [];
+  for (const p of products) {
+    const fontes = [p.image, p.thumbnail, ...(p.gallery ?? [])];
+    if (fontes.some((src) => typeof src === 'string' && src.startsWith('data:'))) {
+      ids.push(p.id);
+    }
+  }
+  return ids;
+}
+
+let cacheSkip: { bytes: number; ids: string[] } | null = null;
+
+/** Estado do cache do catálogo. Consumido pelo painel Admin → Imagens para
+ *  mostrar por que o cache está desligado, em vez de deixar a loja degradar
+ *  sem ninguém perceber. */
+export function productCacheStatus(): { ok: boolean; bytes: number; ids: string[] } {
+  if (!cacheSkip) return { ok: true, bytes: 0, ids: [] };
+  return { ok: false, bytes: cacheSkip.bytes, ids: cacheSkip.ids };
+}
+
 function setCache(products: Product[]): void {
   try {
     const payload = JSON.stringify({ products, ts: Date.now() } satisfies ProductCache);
-    // O limite do localStorage fica perto de 5 MB. Antes a guarda era
-    // "tem base64? não cacheia nada" — e bastava UM produto legado com imagem
-    // embutida para desligar o cache do catálogo inteiro. O efeito aparecia só
-    // no iPhone: sem cache, toda visita relia os ~265 documentos do Firestore,
-    // e no WebKit essa leitura é justamente a lenta.
-    // Agora medimos o tamanho real e cacheamos sempre que couber.
-    if (payload.length > 4_000_000) return;
+    // Desistir aqui em silêncio custa caro: sem cache, TODA navegação relê os
+    // ~265 documentos do catálogo. A cota do plano Spark (50 mil leituras/dia)
+    // acaba com ~37 visitantes e o Firestore passa a responder 429 — foi o que
+    // derrubou a loja inteira em 26/07/2026, levando junto o envio de e-mails
+    // (todo endpoint que toca o banco virou 503). O motivo agora fica visível.
+    if (payload.length > CACHE_MAX_BYTES) {
+      cacheSkip = { bytes: payload.length, ids: embeddedImageIds(products) };
+      console.warn(
+        `[catálogo] cache DESLIGADO: ${(payload.length / 1e6).toFixed(1)} MB excede o limite do localStorage. `
+        + `${cacheSkip.ids.length} produto(s) com imagem embutida em base64. `
+        + `Cada visita relerá ${products.length} documentos do Firestore e a cota diária vai acabar. `
+        + 'Corrija em Admin → Imagens.',
+      );
+      return;
+    }
+    cacheSkip = null;
     localStorage.setItem(CACHE_KEY, payload);
-  } catch { /* quota estourada — segue sem cache */ }
+  } catch {
+    // localStorage cheio ou indisponível (Safari privado) — segue sem cache.
+    cacheSkip = { bytes: 0, ids: [] };
+  }
 }
 
 export function invalidateProductCache(): void {
@@ -121,7 +160,7 @@ export const productService = {
 
   /** Lista final: Firestore é fonte de verdade. defaultProducts entram só para IDs
    *  que o Firestore não tem (evita tela vazia em erros parciais).
-   *  Usa cache de 5 min no localStorage para evitar re-fetch a cada navegação. */
+   *  Usa cache de 60 min no localStorage para evitar re-fetch a cada navegação. */
   async getMerged(forceRefresh = false): Promise<Product[]> {
     if (!forceRefresh) {
       const cached = getCache();

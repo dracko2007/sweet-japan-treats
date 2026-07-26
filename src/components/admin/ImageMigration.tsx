@@ -2,7 +2,7 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { CheckCircle, CloudUpload, AlertTriangle, RefreshCw, Image as ImageIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useProducts } from '@/context/ProductsContext';
-import { productService } from '@/services/productService';
+import { productCacheStatus, productService } from '@/services/productService';
 import { cloudinaryService, cdnOriginal } from '@/services/cloudinaryService';
 import { Product } from '@/types';
 
@@ -159,6 +159,8 @@ const ImageMigration: React.FC = () => {
   const toMigrate = products.filter(needsMigration);
   const allMigrated = toMigrate.length === 0;
   const productsWithImages = products.filter(p => p.image || (p.gallery && p.gallery.length > 0));
+  // Lido a cada render: o status muda assim que uma migração religa o cache.
+  const cacheStatus = productCacheStatus();
 
   const runHDRemigration = useCallback(async () => {
     if (productsWithImages.length === 0) return;
@@ -281,6 +283,26 @@ const ImageMigration: React.FC = () => {
           <div>
             <div className="font-semibold text-green-700 dark:text-green-400">Tudo migrado!</div>
             <div className="text-sm text-green-600/80">Todas as imagens estão no CDN Cloudinary.</div>
+          </div>
+        </div>
+      )}
+
+      {/* Por que isto importa: enquanto houver base64, o catálogo estoura o
+          limite do localStorage e o cache é desligado — cada visita relê os
+          ~265 documentos e a cota diária do Firestore acaba. */}
+      {!cacheStatus.ok && (
+        <div className="p-4 rounded-xl bg-orange-50 dark:bg-orange-950/30 border border-orange-200 space-y-1">
+          <div className="flex items-center gap-2 font-semibold text-orange-700">
+            <AlertTriangle className="w-4 h-4 shrink-0" /> Cache do catálogo desligado
+          </div>
+          <div className="text-sm text-orange-700/80">
+            O catálogo ocupa {(cacheStatus.bytes / 1e6).toFixed(1)} MB e não cabe no
+            armazenamento local. Sem cache, <strong>toda visita relê o catálogo inteiro
+            do Firestore</strong> e a cota diária do plano gratuito se esgota — derrubando
+            a loja, o painel e o envio de e-mails.
+          </div>
+          <div className="text-sm text-orange-700/80">
+            Migrar as {cacheStatus.ids.length} imagem(ns) abaixo religa o cache.
           </div>
         </div>
       )}
