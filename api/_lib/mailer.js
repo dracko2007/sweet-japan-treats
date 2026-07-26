@@ -38,12 +38,41 @@ function transporter() {
   });
 }
 
+/**
+ * Versão em texto puro a partir do HTML.
+ *
+ * Mensagem só-HTML é um dos sinais de spam mais citados pelos filtros: e-mail
+ * legítimo quase sempre traz as duas partes (multipart/alternative). O domínio
+ * aqui é novo e ainda sem reputação, e boa parte dos destinatários é
+ * Outlook/Hotmail, que são rigorosos com remetente novo — mandar só HTML joga
+ * contra sem necessidade nenhuma.
+ */
+function htmlParaTexto(html) {
+  return String(html)
+    // Preserva o destino dos links: no texto puro a URL precisa aparecer, senão
+    // o cliente que lê em texto fica sem o link de confirmação.
+    .replace(/<a[^>]+href="([^"]+)"[^>]*>(.*?)<\/a>/gis, '$2: $1')
+    .replace(/<\/(p|div|tr|h[1-6])>/gi, '\n')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\n{3,}/g, '\n\n')
+    .split('\n').map((linha) => linha.trim()).join('\n')
+    .trim();
+}
+
 export async function sendMail({ to, subject, html }) {
   const info = await transporter().sendMail({
     from: `"${BRAND}" <${MAIL_FROM}>`,
     replyTo: MAIL_REPLY_TO,
     to,
     subject,
+    text: htmlParaTexto(html),
     html,
   });
   // O SMTP pode aceitar a conexão e ainda assim recusar o destinatário. Antes

@@ -52,3 +52,31 @@ describe('sendMail', () => {
     expect(sendMailMock).not.toHaveBeenCalled();
   });
 });
+describe('alternativa em texto puro', () => {
+  beforeEach(() => {
+    sendMailMock.mockReset();
+    sendMailMock.mockResolvedValue({ accepted: ['cliente@exemplo.com'], rejected: [], messageId: '<x>' });
+    process.env.NOREPLY_EMAIL_PASSWORD = 'senha-de-teste';
+  });
+
+  it('acompanha o HTML em toda mensagem', async () => {
+    await sendMail({ ...CARTA, html: '<p>Ola, <strong>Maria</strong>.</p>' });
+
+    const enviado = sendMailMock.mock.calls[0][0];
+    expect(enviado.text).toBeTruthy();
+    expect(enviado.html).toBeTruthy();
+    expect(enviado.text).not.toMatch(/<[a-z]/i);
+    expect(enviado.text).toContain('Ola, Maria.');
+  });
+
+  // Sem isto o e-mail de confirmação chega vazio para quem lê em texto puro:
+  // o botão vira uma palavra solta e o link some.
+  it('preserva a URL de confirmação, não só o rótulo do botão', async () => {
+    const link = 'https://japanexpress-store.com/__/auth/action?mode=verifyEmail&oobCode=ABC123';
+    await sendMail({ ...CARTA, html: `<p><a href="${link}">Confirmar meu e-mail</a></p>` });
+
+    const { text } = sendMailMock.mock.calls[0][0];
+    expect(text).toContain(link);
+    expect(text).toContain('Confirmar meu e-mail');
+  });
+});
