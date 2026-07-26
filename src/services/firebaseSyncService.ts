@@ -298,7 +298,10 @@ export const firebaseSyncService = {
         const snapshot = await getDocs(query(ordersRef, ...constraints));
         return {
           source,
-          docs: snapshot.docs.map((document) => ({
+          // Anotado porque o spread de `DocumentData` colapsava para
+          // `{ id: string }`, e o acesso a `orderNumber` mais abaixo não
+          // compilava.
+          docs: snapshot.docs.map((document): Record<string, any> => ({
             id: document.id,
             ...document.data(),
           })),

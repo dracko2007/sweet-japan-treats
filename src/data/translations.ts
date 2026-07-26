@@ -1994,7 +1994,6 @@ export const translations: Record<Language, Record<string, string>> = {
     "aboutPage.value1.title": "本物保証",
     "aboutPage.value1.desc": "日本国内の正規ルート・公式サプライヤーからの本物の製品のみを取り扱っています。",
     "aboutPage.value2.title": "プレミアム品質",
-    "cartRecovery.close": "閉じる",
     "trackOrder.title": "注文を追跡",
     "trackOrder.subtitle": "注文番号を入力してステータスを確認してください",
     "trackOrder.placeholder": "例: SC-JP-123456",

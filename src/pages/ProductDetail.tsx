@@ -86,13 +86,16 @@ const ProductDetail: React.FC = () => {
   useEffect(() => {
     if (product) {
       registrarEvento('viu_produto', product.id, product.category);
+      const vs = getVariants(product);
       trackViewItem({
         item_id: product.id,
         item_name: product.name,
         item_category: product.category,
-        price: baseYen(product),
+        // O evento dispara na abertura, antes de qualquer escolha de tamanho:
+        // o preço rastreado é o da primeira variante. Antes o argumento era
+        // omitido e o mesmo valor saía por acidente, via fallback interno.
+        price: baseYen(product, vs[0]?.id ?? 'small'),
       }, 'JPY');
-      const vs = getVariants(product);
       if (vs.length && !vs.some((v) => v.id === selectedSize)) setSelectedSize(vs[0].id);
       // Rastreia visualização no painel de visitantes
       import('@/services/visitorService').then(({ visitorService }) => {
