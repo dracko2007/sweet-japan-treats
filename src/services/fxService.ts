@@ -1,5 +1,5 @@
-// Cotação cambial ao vivo: converte ¥ → R$/€/$ usando a taxa real da Wise (via
-// serverless /api/wise-rate). Se falhar, cai no open.er-api.com + RATE_CUSHION.
+// Cotação cambial ao vivo: converte ¥ → R$/€/$ via /api/wise-rate, que aplica a
+// mesma cadeia usada para cobrar (Wise → open.er-api → fixo) e informa a origem.
 // Taxa PS (noBuffer=true) nunca tem margem — exibe o ¥ exato.
 import { safeStorage } from '@/utils/storage';
 
@@ -57,11 +57,14 @@ export function convertYen(yen: number, currency: string, noBuffer = false): num
   return Math.round((yen + (noBuffer ? 0 : BUFFER_YEN)) * rate);
 }
 
-/** Busca cotação: tenta /api/wise-rate (taxa real Wise) → fallback open.er-api.com. */
+/** Busca cotação: `/api/wise-rate` (cadeia completa no servidor) → open.er-api.com. */
 export async function loadFxRates(): Promise<Rates> {
   const today = new Date().toISOString().slice(0, 10);
 
-  // 1. Tenta a Wise via serverless (atualiza a cada 10 min no servidor)
+  // 1. Endpoint próprio: mesma cadeia que o servidor usa para cobrar (Wise →
+  //    open.er-api → fixo), cacheada 10 min. Confiamos no `source` que ele
+  //    informa: assumir 'wise' aqui zeraria o cushion de 4% e derrubaria todos
+  //    os preços sempre que a taxa viesse, na verdade, do open.er-api.
   try {
     const res = await fetch('/api/wise-rate');
     if (res.ok) {
@@ -69,10 +72,12 @@ export async function loadFxRates(): Promise<Rates> {
       const brl = Number(data?.JPY_BRL);
       const eur = Number(data?.JPY_EUR);
       const usd = Number(data?.JPY_USD);
-      if (brl > 0 && eur > 0) {
+      const source = data?.source === 'wise' ? 'wise' : 'open-er';
+      // 'fallback' = servidor não alcançou nenhuma cotação viva; tenta direto.
+      if (brl > 0 && eur > 0 && data?.source !== 'fallback') {
         _rates = { BRL: brl, EUR: eur, USD: usd > 0 ? usd : FALLBACK.USD };
-        _source = 'wise';
-        safeStorage.setItem(CACHE_KEY, JSON.stringify({ date: today, rates: _rates, source: 'wise' }));
+        _source = source;
+        safeStorage.setItem(CACHE_KEY, JSON.stringify({ date: today, rates: _rates, source }));
         return _rates;
       }
     }

@@ -1,24 +1,16 @@
-// Proxy serverless para taxa de câmbio da Wise em tempo real.
-// Tenta primeiro o endpoint público da Wise (sem auth).
-// Se WISE_API_TOKEN estiver configurado no Vercel, usa autenticado como fallback.
-// Retorna: { JPY_BRL: number, JPY_EUR: number, JPY_USD: number, source: 'wise', ts: number }
-
-const WISE_API = 'https://api.wise.com/v1/rates';
-const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutos
-
-let _cache = null;
-
-async function fetchWiseRate(source, target, token) {
-  const headers = { 'User-Agent': 'JapanExpress/1.0' };
-  if (token) headers['Authorization'] = `Bearer ${token}`;
-  const res = await fetch(`${WISE_API}?source=${source}&target=${target}`, { headers });
-  if (!res.ok) throw new Error(`Wise ${source}→${target}: HTTP ${res.status}`);
-  const data = await res.json();
-  const arr = Array.isArray(data) ? data : [data];
-  const entry = arr.find(r => r.source === source && r.target === target);
-  if (!entry?.rate) throw new Error(`Rate not found in response`);
-  return entry.rate;
-}
+// Cotação ¥ → BRL/EUR/USD para o cliente, com a MESMA cadeia usada no servidor
+// para calcular pedidos (api/_lib/fx.js): Wise → open.er-api → fallback fixo.
+//
+// Antes este arquivo falava com a Wise por conta própria e devolvia 502 quando
+// ela recusava. A Wise fechou o endpoint público `api.wise.com/v1/rates`: ele
+// responde 401 mesmo sem token (o token sempre foi opcional aqui). Resultado:
+// toda visita fazia uma requisição condenada, esperava o 502 e só então caía
+// no open.er-api — com o console cheio de erro.
+//
+// Devolve `source` para que o cliente aplique o cushion certo: a taxa da Wise
+// já bate com o app (0%), as demais precisam de +4% pela defasagem diária.
+// Se a Wise voltar a funcionar, isto se corrige sozinho — sem mudar código.
+import { getFxRates } from './_lib/fx.js';
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -27,23 +19,12 @@ export default async function handler(req, res) {
 
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
 
-  if (_cache && Date.now() - _cache.ts < CACHE_TTL_MS) {
-    return res.json(_cache);
-  }
-
-  const token = process.env.WISE_API_TOKEN || null; // opcional
-
-  try {
-    const [brl, eur, usd] = await Promise.all([
-      fetchWiseRate('JPY', 'BRL', token),
-      fetchWiseRate('JPY', 'EUR', token),
-      fetchWiseRate('JPY', 'USD', token),
-    ]);
-
-    _cache = { JPY_BRL: brl, JPY_EUR: eur, JPY_USD: usd, source: 'wise', ts: Date.now() };
-    return res.json(_cache);
-  } catch (err) {
-    console.error('[wise-rate] Error:', err.message);
-    return res.status(502).json({ error: err.message });
-  }
+  const rates = await getFxRates();
+  return res.json({
+    JPY_BRL: rates.BRL,
+    JPY_EUR: rates.EUR,
+    JPY_USD: rates.USD,
+    source: rates.source,
+    ts: rates.loadedAt,
+  });
 }
