@@ -182,7 +182,16 @@ async function handleCreate(req, res) {
     const orderId = requiredText(body.orderId, { max: 40, pattern: ORDER_PATTERN });
     const requestedItems = parseItems(body.items);
     const country = requiredText(body.country, { max: 100 });
-    const prefecture = requiredText(body.prefecture, { max: 100 });
+    // `prefecture` é a província japonesa e só existe em endereço do Japão.
+    // Exigi-la sempre rejeitava TODO pedido internacional com
+    // `400 invalid_request`, porque `requiredText` recusa string vazia e o
+    // formulário manda '' quando o país não é o Japão. Como o público da loja
+    // é o Brasil, isso zerava as vendas: 63 visitas ao checkout, 0 pedidos.
+    // Fora do Japão o frete usa `internationalZone(country)` e o imposto usa
+    // `state || prefecture` — nenhum dos dois precisa da província.
+    const prefecture = country === 'Japão'
+      ? requiredText(body.prefecture, { max: 100 })
+      : optionalText(body.prefecture, { max: 100 });
     const state = optionalText(body.state, { max: 100 });
     const carrier = carrierId(body.shippingCarrier);
     const paymentMethod = requiredText(body.paymentMethod, { max: 20 });
