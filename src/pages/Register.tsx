@@ -213,15 +213,15 @@ const Register: React.FC = () => {
               <form onSubmit={handleSubmit} className="space-y-4">
                 {/* Tipo de cadastro: Pessoa Física ou Jurídica */}
                 <div className="space-y-2">
-                  <Label>Tipo de cadastro</Label>
+                  <Label>{t('auth.register.accountType')}</Label>
                   <div className="grid grid-cols-2 gap-2">
                     <button type="button" onClick={() => setFormData((p) => ({ ...p, personType: 'PF' }))}
                       className={`py-2.5 rounded-lg border-2 text-sm font-semibold transition-colors ${formData.personType === 'PF' ? 'border-primary bg-primary/5 text-primary' : 'border-border text-muted-foreground hover:border-gray-300'}`}>
-                      👤 Pessoa Física
+                      👤 {t('auth.register.personal')}
                     </button>
                     <button type="button" onClick={() => setFormData((p) => ({ ...p, personType: 'PJ' }))}
                       className={`py-2.5 rounded-lg border-2 text-sm font-semibold transition-colors ${formData.personType === 'PJ' ? 'border-primary bg-primary/5 text-primary' : 'border-border text-muted-foreground hover:border-gray-300'}`}>
-                      🏢 Empresa (PJ)
+                      🏢 {t('auth.register.company')}
                     </button>
                   </div>
                 </div>
@@ -320,19 +320,19 @@ const Register: React.FC = () => {
                     />
                   </div>
                   <p className="text-[11px] text-muted-foreground">
-                    Selecione o país e digite o número <strong>sem</strong> o código (ex: {dialCode} 912345678).
+                    {t('auth.register.phoneHint').replace('{code}', dialCode)}
                   </p>
                   {errors.phone && <p className="text-xs text-destructive">{errors.phone}</p>}
                 </div>
 
                 {/* Gênero */}
                 <div className="space-y-2">
-                  <Label>Gênero <span className="text-muted-foreground font-normal text-xs">(opcional)</span></Label>
+                  <Label>{t('auth.register.gender')} <span className="text-muted-foreground font-normal text-xs">{t('auth.register.optional')}</span></Label>
                   <div className="grid grid-cols-3 gap-2">
                     {[
-                      { value: 'feminino', label: '♀ Feminino' },
-                      { value: 'masculino', label: '♂ Masculino' },
-                      { value: 'outro', label: '— Prefiro não dizer' },
+                      { value: 'feminino', label: `♀ ${t('auth.register.genderFemale')}` },
+                      { value: 'masculino', label: `♂ ${t('auth.register.genderMale')}` },
+                      { value: 'outro', label: `— ${t('auth.register.genderUndisclosed')}` },
                     ].map(opt => (
                       <button
                         key={opt.value}
@@ -348,23 +348,23 @@ const Register: React.FC = () => {
 
                 {/* Data de aniversário */}
                 <div className="space-y-2">
-                  <Label>Mês de aniversário <span className="text-muted-foreground font-normal text-xs">(opcional — para ofertas especiais)</span></Label>
+                  <Label>{t('auth.register.birthMonth')} <span className="text-muted-foreground font-normal text-xs">{t('auth.register.birthHint')}</span></Label>
                   <div className="flex gap-2">
                     <select
                       value={formData.birthdayMonth}
                       onChange={e => setFormData(p => ({ ...p, birthdayMonth: e.target.value }))}
                       className="flex-1 px-3 py-2 rounded-lg border border-input bg-background text-sm focus:ring-2 focus:ring-primary focus:border-primary"
                     >
-                      <option value="">Mês</option>
-                      {['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'].map((m, i) => (
-                        <option key={i} value={String(i+1).padStart(2,'0')}>{m}</option>
+                      <option value="">{t('auth.register.month')}</option>
+                      {t('auth.register.months').split(',').map((m, i) => (
+                        <option key={i} value={String(i + 1).padStart(2, '0')}>{m}</option>
                       ))}
                     </select>
                     <input
                       type="number"
                       value={formData.birthdayYear}
                       onChange={e => setFormData(p => ({ ...p, birthdayYear: e.target.value }))}
-                      placeholder="Ano"
+                      placeholder={t('auth.register.year')}
                       min={1900}
                       max={new Date().getFullYear()}
                       className="w-24 px-3 py-2 rounded-lg border border-input bg-background text-sm focus:ring-2 focus:ring-primary focus:border-primary"
