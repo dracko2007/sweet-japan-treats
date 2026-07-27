@@ -109,6 +109,105 @@ const REGION_COUNTRIES = {
   ],
 };
 
+// ── Marca do fabricante ──────────────────────────────────────────────────────
+// O Firestore não tem campo `brand`, então a marca sai do nome do produto.
+// Declarar "Japan Express" nos 296 itens faz o Google reprovar por marca
+// incorreta (os produtos são Kewpie, Bioré, Glico) e ainda colide com as outras
+// empresas chamadas "Japan Express" — logística e frete de automóveis.
+//
+// A primeira entrada que casar vence, então a ordem importa: "ReFa" precisa vir
+// antes de "honey" por causa de "ReFa Honey Queen", e "Senka" antes de qualquer
+// coisa da Shiseido. Marcas de uma sigla só (VT, OXY, QY, Kao) usam `\b` para
+// não casar dentro de outra palavra — sem isso "Deoxyribose" viraria OXY.
+const BRANDS = [
+  ['Beauty of Joseon', /beauty of joseon/i],
+  ['The Animal Organics', /the animal organics/i],
+  ['Keana Nadeshiko', /keana nadeshiko/i],
+  ['Nature Republic', /nature republic/i],
+  ['Yum Yum Yum!', /yum yum yum/i],
+  ['Japan Premium', /japan premium/i],
+  ['Black Thunder', /black thunder/i],
+  ['Tokyo Banana', /tokyo banana/i],
+  ['Hada Labo', /hada\s*labo/i],
+  ['Skin Aqua', /skin\s*aqua/i],
+  ['Melano CC', /melano\s*cc/i],
+  ['Dr. Althea', /dr\.?\s*althea/i],
+  ['Baby Star', /baby star/i],
+  ['Gwangcheon', /gwangcheon/i],
+  ['Ito En', /\bito en\b/i],
+  ['ReFa', /\brefa\b/i],
+  ['SKIN1004', /skin\s*1004/i],
+  ['Medicube', /medicube/i],
+  ['Bioré', /bior[eé]/i],
+  ['&honey', /&\s*honey|\bhoney\b/i],
+  ['Glico', /\bglico\b|\bpocky\b|\bpretz\b|\bcaplico\b/i],
+  ['Obagi', /\bobagi\b/i],
+  ['Anessa', /\banessa\b/i],
+  ['Senka', /\bsenka\b/i],
+  ['Naturie', /naturie|hatomugi/i],
+  ['Doggyman', /doggyman/i],
+  ['Elizavecca', /elizavecca/i],
+  ['Cosparade', /cosparade/i],
+  ['Marukome', /marukome/i],
+  ['Marumiya', /marumiya/i],
+  ['Maruchan', /maruchan/i],
+  ['Morinaga', /morinaga/i],
+  ['LuLuLun', /lululun/i],
+  ['Celimax', /celimax/i],
+  ['Kasugai', /kasugai/i],
+  ['House Foods', /\bhouse\b/i],
+  ['lilyeve', /lilyeve/i],
+  ['Tsubaki', /tsubaki/i],
+  ['Umaibo', /umaibo/i],
+  ['TIRTIR', /tirtir/i],
+  ['Calbee', /calbee/i],
+  ['Gatsby', /gatsby/i],
+  ['Eyebon', /eyebon/i],
+  ['Peloty', /peloty/i],
+  ['Ululis', /ululis/i],
+  ['Kewpie', /\bkewpie\b/i],
+  ['KitKat', /kit\s*kat/i],
+  ['PetitQ', /petit\s*q/i],
+  ['Nissin', /\bnissin\b/i],
+  ['Kanro', /\bkanro\b/i],
+  ['Lotte', /\blotte\b/i],
+  ['Meiji', /\bmeiji\b/i],
+  ['Nippn', /\bnippn\b/i],
+  ['Kose', /\bkose\b/i],
+  ['Fino', /\bfino\b/i],
+  ['Ritz', /\britz\b/i],
+  ['CIAO', /\bciao\b/i],
+  ['S&B', /s\s*&\s*b\b/i],
+  ['DHC', /\bdhc\b/i],
+  ['OXY', /\boxy\b/i],
+  ['Kao', /\bkao\b/i],
+  ['8x4', /\b8x4\b/i],
+  ['VT', /\bvt\b/i],
+  ['QY', /\bqy\b/i],
+];
+
+// Sem marca reconhecida, a loja assina o produto. "Store" no fim evita a colisão
+// com as transportadoras homônimas.
+const FALLBACK_BRAND = 'Japan Express Store';
+
+export function detectBrand(name) {
+  const alvo = String(name || '');
+  for (const [marca, padrao] of BRANDS) {
+    if (padrao.test(alvo)) return marca;
+  }
+  return FALLBACK_BRAND;
+}
+
+// google_product_category pela categoria da loja, usando a taxonomia oficial:
+//   469  Saúde e beleza
+//   422  Alimentos, bebidas e tabaco > Alimentos
+//     2  Animais e pet shop > Suprimentos para animais de estimação
+// `doces` recebe 422 (o pai) em vez de 4748 (Doces e chocolates) porque a
+// categoria mistura curry, maionese, ramen e chá — 4748 seria falso para 31 dos
+// 72 itens, e categoria errada é motivo de reprovação.
+export const GOOGLE_CATEGORY = { cosmeticos: 469, doces: 422, pet: 2 };
+const DEFAULT_CATEGORY = 469;
+
 // ── Monta os itens do catálogo ───────────────────────────────────────────────
 function buildCatalog(products, region) {
   const zone = region === 'eu' ? 3 : region === 'us' ? 4 : 5;
@@ -155,7 +254,8 @@ function buildCatalog(products, region) {
         image,
         availability: (p.stock && !p.stock.unlimited && p.stock.quantity === 0) ? 'out_of_stock' : 'in_stock',
         condition: 'new',
-        brand: 'Japan Express',
+        brand: detectBrand(p.name),
+        googleCategory: GOOGLE_CATEGORY[p.category] || DEFAULT_CATEGORY,
         weightG,
         priceYen: productYen,
         shippingYen: shipYen,
@@ -172,7 +272,7 @@ function buildCatalog(products, region) {
 
 // ── Saída XML (Google Merchant RSS 2.0 + namespace g:) ───────────────────────
 // title/description/link usam RSS padrão; campos próprios do Google usam g:
-// google_product_category 469 = Health & Beauty; identifier_exists=no porque
+// google_product_category sai da categoria da loja; identifier_exists=no porque
 // produtos importados não têm GTIN/MPN cadastrado.
 function toXml(items, region) {
   const title = region === 'eu' ? 'Japan Express — Catálogo (Europa)'
@@ -198,7 +298,7 @@ function toXml(items, region) {
       <g:price>${it.priceLocal.toFixed(2)} ${it.currency}</g:price>
       <g:brand>${escapeXml(it.brand)}</g:brand>
       <g:identifier_exists>no</g:identifier_exists>
-      <g:google_product_category>469</g:google_product_category>${shippingBlocks}
+      <g:google_product_category>${it.googleCategory}</g:google_product_category>${shippingBlocks}
       <g:shipping_weight>${(it.weightG / 1000).toFixed(2)} kg</g:shipping_weight>
       <g:custom_label_0>${it.totalLocal.toFixed(2)} ${it.currency}</g:custom_label_0>
     </item>`;
