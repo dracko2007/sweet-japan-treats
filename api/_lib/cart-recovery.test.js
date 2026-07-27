@@ -116,8 +116,12 @@ describe('recuperação de carrinho', () => {
     const c = mocks.set.mock.calls[0][0];
     expect(c.code).toBe('CARRINHO30');
     // "CARRINHO30" é trivial de adivinhar; o que protege é a lista de alvos.
-    expect(c.targetType).toBe('email');
     expect(c.targetEmails).toContain('cliente@exemplo.com');
+    // 'specific' e o unico valor que o servidor reconhece
+    // (api/orders.js:resolveCoupon) e que `checkTargetEligibility` filtra.
+    // Qualquer outra string cai no `return true` final e libera o cupom para
+    // TODO MUNDO — foi exatamente o engano cometido aqui com 'email'.
+    expect(c.targetType).toBe('specific');
   });
 
   it('o prazo acompanha o envio — 24h para finalizar', async () => {

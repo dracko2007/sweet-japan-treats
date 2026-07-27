@@ -28,9 +28,14 @@ const STAGES = [
  *
  * O código é fixo e legível (`CARRINHO30`), como pedido — dá para ditar por
  * telefone ou WhatsApp. O que impede o óbvio ("CARRINHO30" é trivial de
- * adivinhar) é o `targetType: 'email'`: só funciona nas contas que realmente
+ * adivinhar) é o `targetType: 'specific'`: só funciona nas contas que de fato
  * abandonaram um carrinho e receberam o e-mail. A cada envio o endereço entra
- * na lista; quem digitar o código sem estar nela recebe recusa.
+ * em `targetEmails`; quem digitar o código sem estar na lista é recusado por
+ * `api/orders.js:resolveCoupon`.
+ *
+ * O valor 'specific' NÃO é decorativo: `checkTargetEligibility` e o servidor
+ * comparam exatamente essa string, e qualquer outra (já usei 'email' aqui por
+ * engano) cai no `return true` final — liberando o cupom para todo mundo.
  *
  * Vale para o CARRINHO INTEIRO — diferente das campanhas de produto, que o
  * servidor restringe ao `campaign.productId`.
@@ -57,7 +62,7 @@ async function garantirCupom(email, discount, validadeMs) {
     // demais perde o desconto — que é o ponto do "finalize agora".
     expiryDate: new Date(expiraEm).toISOString(),
     isActive: true,
-    targetType: 'email',
+    targetType: 'specific',
     targetEmails: alvos.includes(email) ? alvos : [...alvos, email],
     updatedAt: new Date().toISOString(),
     ...(atual ? {} : { usedCount: 0, createdAt: new Date().toISOString() }),
