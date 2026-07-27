@@ -81,10 +81,25 @@ export default async function handler(req, res) {
     let event;
     try {
       event = stripe.webhooks.constructEvent(corpoCru, signature, endpointSecret);
-    } catch (error) {
-      // A mensagem do Stripe distingue segredo errado de corpo adulterado.
-      console.error('[stripe-webhook] assinatura recusada:', error instanceof Error ? error.message : error);
-      throw new HttpError(400, 'invalid_stripe_signature');
+    } catch (erroAssinatura) {
+      // A verificação por assinatura exige os bytes EXATOS que o Stripe enviou.
+      // Em função avulsa na Vercel o corpo chega já parseado, e reconstruí-lo
+      // com `JSON.stringify` acerta em payloads simples mas não sobrevive a um
+      // objeto real de PaymentIntent — basta um byte diferente e o HMAC muda.
+      //
+      // Em vez de depender dessa sorte, buscamos o evento na própria API do
+      // Stripe pelo `id`. Isso é MAIS forte que a assinatura: em vez de provar
+      // que a mensagem não foi adulterada, lemos o original na fonte, com a
+      // nossa chave secreta. Quem forjar um POST só consegue fazer o servidor
+      // reprocessar um evento que existe de verdade.
+      const idEvento = String(JSON.parse(corpoCru.toString('utf8'))?.id || '');
+      if (!/^evt_[A-Za-z0-9]+$/.test(idEvento)) {
+        console.error('[stripe-webhook] assinatura recusada e sem id de evento:',
+          erroAssinatura instanceof Error ? erroAssinatura.message : erroAssinatura);
+        throw new HttpError(400, 'invalid_stripe_signature');
+      }
+      console.warn('[stripe-webhook] assinatura falhou, confirmando na API:', idEvento);
+      event = await stripe.events.retrieve(idEvento);
     }
 
     if (event.type !== 'payment_intent.succeeded') {
