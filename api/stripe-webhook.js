@@ -46,10 +46,20 @@ export default async function handler(req, res) {
     const signature = getHeader(req, 'stripe-signature');
     if (!signature) throw new HttpError(400, 'missing_stripe_signature');
     const stripe = new Stripe(secretKey);
+
+    // O corpo cru é lido FORA do try da assinatura. Antes ele ficava dentro, e
+    // um `raw_body_required` — que acontece quando a plataforma entrega o corpo
+    // já parseado — era engolido e reportado como `invalid_stripe_signature`.
+    // Os dois problemas devolvem 400, então a causa real ficava invisível e a
+    // investigação ia atrás do segredo errado.
+    const corpoCru = await rawBody(req);
+
     let event;
     try {
-      event = stripe.webhooks.constructEvent(await rawBody(req), signature, endpointSecret);
-    } catch {
+      event = stripe.webhooks.constructEvent(corpoCru, signature, endpointSecret);
+    } catch (error) {
+      // A mensagem do Stripe distingue segredo errado de corpo adulterado.
+      console.error('[stripe-webhook] assinatura recusada:', error instanceof Error ? error.message : error);
       throw new HttpError(400, 'invalid_stripe_signature');
     }
 
