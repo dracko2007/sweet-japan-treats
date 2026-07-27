@@ -1,7 +1,9 @@
 import { randomUUID } from 'node:crypto';
+import { decodeEmail, setOptOut, verifyUnsubscribeToken } from './_lib/email-optout.js';
 import { adminDb } from './_lib/firebase-admin.js';
 import {
   assertExactKeys,
+  escapeHtml,
   handleCors,
   HttpError,
   normalizeEmail,
@@ -10,6 +12,7 @@ import {
   requiredText,
   sendError,
 } from './_lib/http.js';
+import { MAIL_REPLY_TO, siteOrigin, unsubscribeUrl } from './_lib/mailer.js';
 import { enforceRateLimit } from './_lib/rate-limit.js';
 
 const SOURCES = new Set(['exit_intent', 'newsletter_footer', 'guide', 'cart_reminder']);
@@ -242,9 +245,82 @@ async function handleAnalytics(req, res) {
   }
 }
 
+const BOTAO = 'display:inline-block;background:#ec4899;color:#fff;border:0;text-decoration:none;padding:13px 26px;border-radius:10px;font-weight:bold;font-size:15px;cursor:pointer';
+const BOTAO_SECUNDARIO = 'display:inline-block;background:#fff;color:#444;border:1px solid #ddd;text-decoration:none;padding:11px 22px;border-radius:10px;font-weight:600;font-size:14px;cursor:pointer';
+const NOTA = 'font-size:13px;color:#777;margin:18px 0 0';
+
+/** Página completa, sem depender do SPA: o link é aberto de dentro do e-mail. */
+function renderPage(res, status, title, body) {
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('X-Robots-Tag', 'noindex');
+  res.status(status).end(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>${escapeHtml(title)} - Japan Express</title></head><body style="font-family:system-ui,-apple-system,'Segoe UI',Arial,sans-serif;background:#faf7f5;margin:0;padding:40px 16px;color:#333"><div style="max-width:520px;margin:0 auto;background:#fff;border:1px solid #eee;border-radius:14px;overflow:hidden"><div style="background:linear-gradient(135deg,#ec4899,#f59e0b);padding:20px;text-align:center;color:#fff"><h1 style="margin:0;font-size:20px">Japan Express</h1></div><div style="padding:28px;line-height:1.6">${body}</div></div></body></html>`);
+}
+
+/**
+ * Cancelamento de inscrição pelo link do e-mail — sem login, sem app.
+ *
+ * O GET NÃO cancela nada: apenas mostra a confirmação. Antivírus corporativo e
+ * pré-visualização de link (Outlook, Proofpoint, Gmail) abrem TODO GET que
+ * encontram no corpo da mensagem; se o GET já descadastrasse, gente que nunca
+ * clicou sumiria da lista sozinha.
+ *
+ * Quem cancela é o POST — tanto o botão desta página quanto o "One-Click" do
+ * RFC 8058, que é o que o Gmail e o Outlook disparam pelo botão nativo de
+ * cancelar inscrição ao lado do remetente.
+ *
+ * O endereço vem assinado no próprio link (HMAC), então não dá para
+ * descadastrar terceiros mexendo na URL, e não é preciso guardar um token por
+ * envio no banco.
+ */
+async function handleUnsubscribe(req, res) {
+  if (!handleCors(req, res, { methods: ['GET', 'POST'] })) return;
+
+  let email;
+  try {
+    email = decodeEmail(req.query?.e);
+    if (!verifyUnsubscribeToken(email, String(req.query?.t || ''))) throw new HttpError(400, 'invalid_token');
+  } catch (error) {
+    console.error('[unsubscribe]', error instanceof Error ? error.message : error);
+    renderPage(res, error instanceof HttpError ? error.statusCode : 500, 'Link invalido', `<h2 style="margin:0 0 12px;font-size:19px">Link inválido</h2><p>Não foi possível identificar este endereço. O link pode ter sido cortado pelo programa de e-mail ao ser copiado.</p><p>Escreva para <a href="mailto:${MAIL_REPLY_TO}" style="color:#ec4899">${MAIL_REPLY_TO}</a> que cancelamos a inscrição manualmente.</p>`);
+    return;
+  }
+
+  const alvo = escapeHtml(email);
+  const base = escapeHtml(unsubscribeUrl(email));
+  const loja = escapeHtml(siteOrigin());
+
+  if (req.method === 'GET') {
+    renderPage(res, 200, 'Cancelar inscricao', `<h2 style="margin:0 0 12px;font-size:19px">Cancelar inscrição</h2><p>Confirme que <strong>${alvo}</strong> não deve mais receber novidades, promoções e lembretes de carrinho.</p><form method="post" action="${base}" style="margin:22px 0 0"><button type="submit" style="${BOTAO}">Cancelar inscrição</button></form><p style="${NOTA}">Avisos dos pedidos que você já fez — confirmação, pagamento e rastreio — continuam sendo enviados.</p><p style="${NOTA}"><a href="${loja}" style="color:#ec4899">Voltar para a loja</a></p>`);
+    return;
+  }
+
+  const reativar = String(req.query?.a || '') === 'on';
+  try {
+    // Limite largo e por IP: o token já impede descadastrar terceiros, então o
+    // que resta a conter é enxurrada de escrita. Apertar mais seria pior do que
+    // o abuso — recusar um cancelamento legítimo é o que faz o cliente marcar
+    // a loja como spam.
+    await enforceRateLimit(req, { scope: 'unsubscribe', limit: 60, windowMs: 60 * 60 * 1000 });
+    await setOptOut(email, { optedOut: !reativar, source: 'email_link' });
+  } catch (error) {
+    console.error('[unsubscribe]', error instanceof Error ? error.message : error);
+    renderPage(res, error instanceof HttpError ? error.statusCode : 500, 'Nao deu certo', `<h2 style="margin:0 0 12px;font-size:19px">Não foi possível concluir agora</h2><p>Tente de novo em alguns minutos. Se continuar, escreva para <a href="mailto:${MAIL_REPLY_TO}" style="color:#ec4899">${MAIL_REPLY_TO}</a> que resolvemos manualmente.</p>`);
+    return;
+  }
+
+  if (reativar) {
+    renderPage(res, 200, 'Inscricao reativada', `<h2 style="margin:0 0 12px;font-size:19px">Inscrição reativada</h2><p><strong>${alvo}</strong> volta a receber novidades e promoções.</p><p style="${NOTA}"><a href="${loja}" style="color:#ec4899">Voltar para a loja</a></p>`);
+    return;
+  }
+
+  renderPage(res, 200, 'Inscricao cancelada', `<h2 style="margin:0 0 12px;font-size:19px">Pronto, inscrição cancelada</h2><p><strong>${alvo}</strong> não vai mais receber novidades, promoções nem lembretes de carrinho.</p><p style="${NOTA}">Confirmação de pedido e rastreio continuam chegando: são avisos do que você comprou, não divulgação.</p><form method="post" action="${base}&amp;a=on" style="margin:22px 0 0"><button type="submit" style="${BOTAO_SECUNDARIO}">Foi sem querer, voltar a receber</button></form><p style="${NOTA}"><a href="${loja}" style="color:#ec4899">Voltar para a loja</a></p>`);
+}
+
 export default async function handler(req, res) {
   const { action } = req.query;
   if (action === 'submission') return handleSubmission(req, res);
   if (action === 'analytics') return handleAnalytics(req, res);
+  if (action === 'unsubscribe') return handleUnsubscribe(req, res);
   return res.status(400).json({ error: 'invalid_action' });
 }

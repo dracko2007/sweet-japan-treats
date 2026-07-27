@@ -40,6 +40,8 @@
     { "source": "/api/promo-campaign", "destination": "/api/notify?action=promo-campaign" },
     { "source": "/api/public-submission", "destination": "/api/public-forms?action=submission" },
     { "source": "/api/analytics", "destination": "/api/public-forms?action=analytics" },
+    { "source": "/api/unsubscribe", "destination": "/api/public-forms?action=unsubscribe" },
+    { "source": "/api/email-preference", "destination": "/api/notify?action=email-preference" },
     {
       "source": "/((?!api/).*)",
       "destination": "/index.html"

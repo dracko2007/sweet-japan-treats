@@ -97,6 +97,15 @@ export function normalizeEmail(value) {
   return email;
 }
 
+export function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 export function sendError(res, error) {
   const status = error instanceof HttpError ? error.statusCode : 500;
   const code = error instanceof HttpError ? error.code : 'internal_error';

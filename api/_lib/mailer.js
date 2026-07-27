@@ -1,18 +1,10 @@
 import nodemailer from 'nodemailer';
-import { HttpError } from './http.js';
+import { encodeEmail, unsubscribeToken } from './email-optout.js';
+import { escapeHtml, HttpError } from './http.js';
 
 export const MAIL_FROM = 'noreply@japanexpress-store.com';
 export const MAIL_REPLY_TO = 'contato@japanexpress-store.com';
 export const BRAND = 'Japan Express';
-
-export function escapeHtml(value) {
-  return String(value ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
 
 export function siteOrigin() {
   const configured = String(process.env.APP_ORIGIN || 'https://japanexpress-store.com');
@@ -23,8 +15,26 @@ export function siteOrigin() {
   }
 }
 
-export function wrapEmail(inner) {
-  return `<div style="font-family:Arial,Helvetica,sans-serif;max-width:600px;margin:0 auto;background:#fff;border:1px solid #eee;border-radius:14px;overflow:hidden"><div style="background:linear-gradient(135deg,#ec4899,#f59e0b);padding:20px;text-align:center;color:#fff"><h1 style="margin:0;font-size:22px">${BRAND}</h1><p style="margin:4px 0 0;font-size:12px;opacity:.9">Importados do Japao</p></div><div style="padding:24px;color:#333;font-size:15px;line-height:1.6">${inner}</div><div style="padding:14px;text-align:center;font-size:11px;color:#777;border-top:1px solid #eee">${BRAND} · ${MAIL_REPLY_TO} · japanexpress-store.com</div></div>`;
+/**
+ * Link de cancelamento do proprio destinatario. Vale para sempre: e-mail e
+ * lido meses depois, e um link expirado significa cliente sem saida a nao ser
+ * marcar como spam — que e o pior desfecho possivel para o dominio.
+ */
+export function unsubscribeUrl(email) {
+  return `${siteOrigin()}/api/unsubscribe?e=${encodeEmail(email)}&t=${unsubscribeToken(email)}`;
+}
+
+/**
+ * `unsubscribeUrl` so e passado em e-mail de marketing. Confirmacao de pedido,
+ * redefinicao de senha e verificacao de conta sao transacionais: oferecer
+ * "cancelar inscricao" neles promete algo que a loja nao pode cumprir — ela
+ * precisa avisar o cliente sobre o pedido dele de qualquer forma.
+ */
+export function wrapEmail(inner, { unsubscribeUrl: unsubscribe = '' } = {}) {
+  const optOut = unsubscribe
+    ? `<p style="margin:10px 0 0">Voce recebe estas mensagens porque se cadastrou na loja. <a href="${escapeHtml(unsubscribe)}" style="color:#777;text-decoration:underline">Cancelar inscricao</a> para parar de receber.</p>`
+    : '';
+  return `<div style="font-family:Arial,Helvetica,sans-serif;max-width:600px;margin:0 auto;background:#fff;border:1px solid #eee;border-radius:14px;overflow:hidden"><div style="background:linear-gradient(135deg,#ec4899,#f59e0b);padding:20px;text-align:center;color:#fff"><h1 style="margin:0;font-size:22px">${BRAND}</h1><p style="margin:4px 0 0;font-size:12px;opacity:.9">Importados do Japao</p></div><div style="padding:24px;color:#333;font-size:15px;line-height:1.6">${inner}</div><div style="padding:14px;text-align:center;font-size:11px;color:#777;border-top:1px solid #eee">${BRAND} · ${MAIL_REPLY_TO} · japanexpress-store.com${optOut}</div></div>`;
 }
 
 function transporter() {
@@ -66,7 +76,17 @@ function htmlParaTexto(html) {
     .trim();
 }
 
-export async function sendMail({ to, subject, html }) {
+/**
+ * `unsubscribe` e a MESMA URL que vai no corpo. Passar as duas coisas do mesmo
+ * lugar garante que cabecalho e rodape nunca discordem.
+ *
+ * Os cabecalhos RFC 2369/8058 sao o que faz o Gmail e o Outlook mostrarem o
+ * botao nativo "Cancelar inscricao" ao lado do remetente — o caminho que a
+ * maioria das pessoas usa em vez de rolar ate o rodape, e que os dois exigem
+ * de quem envia em volume. `One-Click` promete que um POST na URL basta, sem
+ * tela intermediaria: `api/unsubscribe` cumpre isso.
+ */
+export async function sendMail({ to, subject, html, unsubscribe = '' }) {
   const info = await transporter().sendMail({
     from: `"${BRAND}" <${MAIL_FROM}>`,
     replyTo: MAIL_REPLY_TO,
@@ -74,6 +94,14 @@ export async function sendMail({ to, subject, html }) {
     subject,
     text: htmlParaTexto(html),
     html,
+    ...(unsubscribe
+      ? {
+        headers: {
+          'List-Unsubscribe': `<${unsubscribe}>`,
+          'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+        },
+      }
+      : {}),
   });
   // O SMTP pode aceitar a conexão e ainda assim recusar o destinatário. Antes
   // isso passava batido: `sendMail` resolvia, o endpoint respondia 200 e o app

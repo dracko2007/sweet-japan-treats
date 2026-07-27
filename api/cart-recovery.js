@@ -1,8 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import { requireCronSecret } from './_lib/auth.js';
+import { isOptedOut } from './_lib/email-optout.js';
 import { adminAuth, adminDb } from './_lib/firebase-admin.js';
-import { handleCors, sendError } from './_lib/http.js';
-import { escapeHtml, sendMail, siteOrigin, wrapEmail } from './_lib/mailer.js';
+import { escapeHtml, handleCors, sendError } from './_lib/http.js';
+import { sendMail, siteOrigin, unsubscribeUrl, wrapEmail } from './_lib/mailer.js';
 
 const CLAIM_TTL_MS = 10 * 60 * 1000;
 
@@ -71,7 +72,7 @@ async function garantirCupom(email, discount, validadeMs) {
   return { code, horas: Math.round(validadeMs / 3600000) };
 }
 
-function buildRecoveryEmail(stageDef, name, items, cupom) {
+function buildRecoveryEmail(stageDef, name, items, cupom, unsub) {
   const rows = Array.isArray(items)
     ? items.slice(0, 5).map((item) => `<tr><td style="padding:6px 0;border-bottom:1px solid #eee">${escapeHtml(item.name)}${Number(item.quantity) > 1 ? ` (${Math.floor(Number(item.quantity))}x)` : ''}</td></tr>`).join('')
     : '';
@@ -83,7 +84,7 @@ function buildRecoveryEmail(stageDef, name, items, cupom) {
     // esqueceu a aba aberta e volta sozinho.
     return {
       subject: 'Esqueceu algo no carrinho? - Japan Express',
-      html: wrapEmail(`${greeting}${cta}`),
+      html: wrapEmail(`${greeting}${cta}`, { unsubscribeUrl: unsub }),
     };
   }
 
@@ -96,7 +97,7 @@ function buildRecoveryEmail(stageDef, name, items, cupom) {
     subject: ultimo
       ? `Ultima chance: ${stageDef.discount}% OFF por ${cupom.horas}h - Japan Express`
       : `Finalize e ganhe ${stageDef.discount}% OFF - Japan Express`,
-    html: wrapEmail(`${greeting}${discountBlock}${cta}`),
+    html: wrapEmail(`${greeting}${discountBlock}${cta}`, { unsubscribeUrl: unsub }),
   };
 }
 
@@ -156,12 +157,30 @@ export default async function handler(req, res) {
       try {
         const user = await adminAuth().getUser(document.id);
         if (!user.email) throw new Error('missing_email');
+        // Quem cancelou a inscricao sai da fila de vez: `reminderStage` no topo
+        // tira o carrinho do filtro da consulta. Sem isso o cron reavaliaria o
+        // mesmo documento todo dia so para decidir de novo nao enviar nada.
+        if (await isOptedOut(user.email)) {
+          await document.ref.update({
+            reminderStage: STAGES.length,
+            reminderOptedOut: true,
+            reminderClaimId: null,
+            reminderClaimedAt: null,
+          });
+          skipped += 1;
+          continue;
+        }
         // O cupom nasce antes do envio: se a criação falhar, o e-mail não sai
         // prometendo um código inexistente — o carrinho fica para o próximo cron.
         const cupom = stageDef.discount
           ? await garantirCupom(user.email, stageDef.discount, stageDef.validadeMs)
           : null;
-        await sendMail({ to: user.email, ...buildRecoveryEmail(stageDef, user.displayName || '', data.items, cupom) });
+        const unsub = unsubscribeUrl(user.email);
+        await sendMail({
+          to: user.email,
+          ...buildRecoveryEmail(stageDef, user.displayName || '', data.items, cupom, unsub),
+          unsubscribe: unsub,
+        });
         await document.ref.update({
           reminderStage: stageDef.stage,
           reminderSentAt: Date.now(),

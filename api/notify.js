@@ -1,8 +1,10 @@
 import { randomBytes } from 'node:crypto';
 import { requireAdmin, requireUser } from './_lib/auth.js';
+import { isOptedOut, optedOutAmong, setOptOut } from './_lib/email-optout.js';
 import { adminAuth, adminDb } from './_lib/firebase-admin.js';
 import {
   assertExactKeys,
+  escapeHtml,
   handleCors,
   HttpError,
   normalizeEmail,
@@ -11,7 +13,7 @@ import {
   requiredText,
   sendError,
 } from './_lib/http.js';
-import { buildOrderEmail, escapeHtml, sendMail, siteOrigin, wrapEmail } from './_lib/mailer.js';
+import { buildOrderEmail, sendMail, siteOrigin, unsubscribeUrl, wrapEmail } from './_lib/mailer.js';
 import { sendPush } from './_lib/push.js';
 import { enforceRateLimit } from './_lib/rate-limit.js';
 
@@ -88,12 +90,12 @@ function offerFor(campaign, product, giftProduct) {
   return { badge: 'OFERTA', tagline: 'Oferta especial', description: `Confira ${productName}.` };
 }
 
-function promoEmail({ subject, headline, extraMessage, ctaLabel, offer, product, url }) {
+function promoEmail({ subject, headline, extraMessage, ctaLabel, offer, product, url, unsub }) {
   const image = product?.thumbnail || product?.image;
   const imageHtml = image ? `<img src="${escapeHtml(image)}" alt="${escapeHtml(product.name)}" style="width:100%;max-height:320px;object-fit:contain">` : '';
   return {
     subject,
-    html: wrapEmail(`<h2>${escapeHtml(headline)}</h2>${imageHtml}<h3>${escapeHtml(product?.name || '')}</h3><div style="background:#fff7ed;border:1px solid #fdba74;border-radius:10px;padding:14px"><strong>${escapeHtml(offer.badge)}</strong><br>${escapeHtml(offer.tagline)}<p>${escapeHtml(offer.description)}</p></div><p>${escapeHtml(extraMessage)}</p><p style="text-align:center"><a href="${escapeHtml(url)}" style="display:inline-block;background:#ec4899;color:#fff;text-decoration:none;padding:14px 28px;border-radius:10px;font-weight:bold">${escapeHtml(ctaLabel)}</a></p>`),
+    html: wrapEmail(`<h2>${escapeHtml(headline)}</h2>${imageHtml}<h3>${escapeHtml(product?.name || '')}</h3><div style="background:#fff7ed;border:1px solid #fdba74;border-radius:10px;padding:14px"><strong>${escapeHtml(offer.badge)}</strong><br>${escapeHtml(offer.tagline)}<p>${escapeHtml(offer.description)}</p></div><p>${escapeHtml(extraMessage)}</p><p style="text-align:center"><a href="${escapeHtml(url)}" style="display:inline-block;background:#ec4899;color:#fff;text-decoration:none;padding:14px 28px;border-radius:10px;font-weight:bold">${escapeHtml(ctaLabel)}</a></p>`, { unsubscribeUrl: unsub }),
   };
 }
 
@@ -292,10 +294,20 @@ async function handlePromoCampaign(req, res) {
     const url = `${siteOrigin()}${path}`;
     const results = [];
     if (channel === 'email' || channel === 'both') {
-      const template = promoEmail({ subject, headline, extraMessage, ctaLabel, offer, product, url });
+      // Uma leitura em lote resolve a lista inteira. Antes de existir o
+      // cancelamento por link, esta campanha era o unico caminho que mandava
+      // e-mail para quem nunca pediu nada — e nao havia como parar.
+      const cancelados = await optedOutAmong(recipients);
       for (const to of recipients) {
+        if (cancelados.has(to)) {
+          results.push({ email: to, channel: 'email', ok: false, reason: 'unsubscribed' });
+          continue;
+        }
+        // O link e por destinatario: o template nao pode ser reaproveitado.
+        const unsub = unsubscribeUrl(to);
+        const template = promoEmail({ subject, headline, extraMessage, ctaLabel, offer, product, url, unsub });
         try {
-          await sendMail({ to, ...template });
+          await sendMail({ to, ...template, unsubscribe: unsub });
           results.push({ email: to, channel: 'email', ok: true });
         } catch {
           results.push({ email: to, channel: 'email', ok: false });
@@ -315,12 +327,51 @@ async function handlePromoCampaign(req, res) {
   }
 }
 
+/**
+ * Preferência de e-mail do próprio cliente, usada pelo botão do perfil.
+ *
+ * Existe porque `email_optout` é gravado pelo Admin SDK e o cliente não pode
+ * escrever direto: o ID do documento é um hash do endereço, e as regras do
+ * Firestore não têm como calcular hash para provar que aquele documento é de
+ * quem está pedindo. Aqui quem prova é o token do Firebase.
+ *
+ * Com isso o botão do perfil e o link do rodapé do e-mail passam a mexer no
+ * MESMO registro. Antes o perfil gravava `whatsappMarketing`, que nenhum
+ * endpoint de envio lia — o cliente desligava e continuava recebendo.
+ */
+async function handleEmailPreference(req, res) {
+  if (!handleCors(req, res, { methods: ['GET', 'POST'] })) return;
+
+  try {
+    const user = await requireUser(req);
+    // Sessão anônima (a do checkout) não tem endereço para preferir nada.
+    if (!user.email) throw new HttpError(403, 'forbidden');
+    const email = normalizeEmail(user.email);
+
+    if (req.method === 'GET') {
+      res.status(200).json({ ok: true, subscribed: !(await isOptedOut(email)) });
+      return;
+    }
+
+    const body = parseJsonObject(req.body);
+    assertExactKeys(body, ['subscribed']);
+    if (typeof body.subscribed !== 'boolean') throw new HttpError(400, 'invalid_request');
+    await enforceRateLimit(req, { scope: 'email-preference', limit: 30, windowMs: 60 * 60 * 1000, identity: user.uid });
+    await setOptOut(email, { optedOut: !body.subscribed, source: 'profile' });
+    res.status(200).json({ ok: true, subscribed: body.subscribed });
+  } catch (error) {
+    console.error('[email-preference]', error instanceof Error ? error.message : error);
+    sendError(res, error);
+  }
+}
+
 export default async function handler(req, res) {
   const { action } = req.query;
   if (action === 'email') return handleEmail(req, res);
   if (action === 'push') return handlePush(req, res);
   if (action === 'promo-campaign') return handlePromoCampaign(req, res);
+  if (action === 'email-preference') return handleEmailPreference(req, res);
   return res.status(400).json({ error: 'invalid_action' });
 }
 
-export { handleEmail, handlePush, handlePromoCampaign };
+export { handleEmail, handlePush, handlePromoCampaign, handleEmailPreference };

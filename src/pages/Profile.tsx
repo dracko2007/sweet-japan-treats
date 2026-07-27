@@ -27,6 +27,7 @@ import SocialFollowRewards from '@/components/profile/SocialFollowRewards';
 import ReferralCard from '@/components/profile/ReferralCard';
 import PromoNotificationsCard from '@/components/profile/PromoNotificationsCard';
 import { pushService } from '@/services/pushService';
+import { getEmailSubscription, setEmailSubscription } from '@/services/mailService';
 
 const isDev = import.meta.env.DEV;
 const devLog = isDev ? console.log.bind(console) : () => {};
@@ -92,6 +93,38 @@ const Profile: React.FC = () => {
     } finally {
       setPushBusy(false);
     }
+  };
+
+  // Inscrição de e-mail. O estado verdadeiro é o do servidor (`email_optout`),
+  // o mesmo registro que o link "Cancelar inscrição" do rodapé grava — quem
+  // cancelou por lá precisa ver "desativado" aqui, e não uma flag do perfil que
+  // ninguém consulta na hora de enviar.
+  const [emailNews, setEmailNews] = useState(true);
+  const [emailNewsBusy, setEmailNewsBusy] = useState(true);
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    getEmailSubscription().then((r) => {
+      setEmailNews(r.subscribed);
+      setEmailNewsBusy(false);
+    });
+  }, [isAuthenticated]);
+
+  const toggleEmailNews = async () => {
+    const novo = !emailNews;
+    setEmailNewsBusy(true);
+    const r = await setEmailSubscription(novo);
+    setEmailNews(r.subscribed);
+    setEmailNewsBusy(false);
+    if (!r.ok) {
+      toast({ title: 'Não foi possível salvar', description: r.error, variant: 'destructive' });
+      return;
+    }
+    toast({
+      title: novo ? '✅ Inscrição ativada' : 'Inscrição cancelada',
+      description: novo
+        ? 'Você vai receber novidades e promoções por e-mail.'
+        : 'Você não vai mais receber e-mail de divulgação. Confirmação de pedido e rastreio continuam chegando.',
+    });
   };
 
   // País do ENDEREÇO (independente do idioma do site). Define qual busca de CEP
@@ -673,6 +706,28 @@ const Profile: React.FC = () => {
                   </div>
                   <div className="space-y-2">
                     <Label className="text-muted-foreground flex items-center gap-2">
+                      <Megaphone className="w-4 h-4" />
+                      {t('profile.label.emailNews')}
+                    </Label>
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <p className="font-medium text-foreground">
+                        {emailNews ? t('profile.marketing.on') : t('profile.marketing.off')}
+                      </p>
+                      <button
+                        onClick={toggleEmailNews}
+                        disabled={emailNewsBusy}
+                        className={`text-xs font-semibold px-3 py-1.5 rounded-lg border transition-colors disabled:opacity-60 ${
+                          emailNews
+                            ? 'border-red-300 text-red-600 hover:bg-red-50'
+                            : 'border-green-300 text-green-600 hover:bg-green-50'
+                        }`}
+                      >
+                        {emailNewsBusy ? 'Aguarde…' : emailNews ? t('profile.marketing.disable') : t('profile.marketing.enable')}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-muted-foreground flex items-center gap-2">
                       <Cloud className="w-4 h-4" />
                       {t('profile.label.marketing')}
                     </Label>
@@ -687,8 +742,8 @@ const Profile: React.FC = () => {
                           toast({
                             title: novo ? '✅ Inscrição ativada' : 'Inscrição cancelada',
                             description: novo
-                              ? 'Você vai receber novidades e promoções.'
-                              : 'Você não vai mais receber novidades.',
+                              ? 'Você vai receber novidades e promoções no WhatsApp.'
+                              : 'Você não vai mais receber novidades no WhatsApp.',
                           });
                         }}
                         className={`text-xs font-semibold px-3 py-1.5 rounded-lg border transition-colors ${

@@ -303,6 +303,14 @@ service cloud.firestore {
       allow read, create, update, delete: if isAdmin();
     }
 
+    // Consentimento de e-mail. Só o servidor escreve aqui: o link de
+    // cancelamento é assinado por HMAC e processado em `api/unsubscribe`, que
+    // roda com o Admin SDK e ignora estas regras. Cliente nenhum precisa (nem
+    // pode) mexer — daria para descadastrar terceiros escrevendo direto.
+    match /email_optout/{optOutId} {
+      allow read, write: if isAdmin();
+    }
+
     match /abandoned_carts/{userId} {
       allow read: if isAdmin() || owns(userId);
       allow create: if owns(userId)

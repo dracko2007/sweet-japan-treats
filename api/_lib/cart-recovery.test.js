@@ -10,9 +10,15 @@ const mocks = vi.hoisted(() => ({
   getUser: vi.fn(),
   docs: [],
   cupomExistente: undefined,
+  cancelouInscricao: false,
 }));
 
 vi.mock('./auth.js', () => ({ requireCronSecret: vi.fn() }));
+
+vi.mock('./email-optout.js', async (importOriginal) => ({
+  ...(await importOriginal()),
+  isOptedOut: async () => mocks.cancelouInscricao,
+}));
 
 vi.mock('./firebase-admin.js', () => ({
   adminAuth: () => ({ getUser: mocks.getUser }),
@@ -71,6 +77,8 @@ describe('recuperação de carrinho', () => {
     mocks.set.mockReset().mockResolvedValue(undefined);
     mocks.getUser.mockReset().mockResolvedValue({ email: 'cliente@exemplo.com', displayName: 'Ana' });
     mocks.cupomExistente = undefined;
+    mocks.cancelouInscricao = false;
+    process.env.UNSUBSCRIBE_SECRET = 'segredo-de-teste';
   });
 
   it('primeiro toque não queima desconto', async () => {
@@ -146,5 +154,29 @@ describe('recuperação de carrinho', () => {
     await rodar(1, 0); // 1h < 90min do estágio 1
 
     expect(mocks.sendMail).not.toHaveBeenCalled();
+  });
+
+  it('todo lembrete carrega a saída para parar de receber', async () => {
+    await rodar(24 * 8, 3);
+
+    const { html, unsubscribe } = mocks.sendMail.mock.calls[0][0];
+    expect(unsubscribe).toMatch(/\/api\/unsubscribe\?e=[^&]+&t=.+/);
+    expect(html).toContain('Cancelar inscricao');
+  });
+
+  // Sem tirar o carrinho da fila, o cron reavaliaria o mesmo documento todo dia
+  // só para decidir de novo não enviar nada — e o cliente que já pediu para
+  // parar continuaria custando leitura no Firestore para sempre.
+  it('quem cancelou a inscrição não recebe nem volta na fila', async () => {
+    mocks.cancelouInscricao = true;
+
+    const res = await rodar(24 * 8, 3);
+
+    expect(mocks.sendMail).not.toHaveBeenCalled();
+    expect(mocks.set).not.toHaveBeenCalled();
+    expect(mocks.docs[0].ref.update).toHaveBeenCalledWith(
+      expect.objectContaining({ reminderStage: 4, reminderOptedOut: true }),
+    );
+    expect(res.body.sent).toBe(0);
   });
 });

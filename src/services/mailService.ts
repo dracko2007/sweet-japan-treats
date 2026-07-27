@@ -90,3 +90,54 @@ export async function requestPasswordReset(to: string): Promise<MailResult> {
   devWarn(`[EMAIL] reset de senha falhou (${response.status}):`, error);
   return { ok: false, error, status: response.status };
 }
+
+export interface EmailSubscription {
+  ok: boolean;
+  subscribed: boolean;
+  error?: string;
+}
+
+/**
+ * Estado real da inscrição de e-mail.
+ *
+ * Mora no servidor (`email_optout`), o MESMO registro que o link "Cancelar
+ * inscrição" do rodapé escreve. Ler uma flag do perfil local mentiria para quem
+ * cancelou pelo e-mail: o perfil diria "ativado" e nenhuma promoção chegaria.
+ *
+ * Em caso de falha devolve `subscribed: true` — mostrar "ativado" quando não se
+ * sabe é o erro certo: leva o cliente a clicar em desativar, e aí o servidor
+ * responde de verdade. O contrário esconderia o botão de quem quer cancelar.
+ */
+export async function getEmailSubscription(): Promise<EmailSubscription> {
+  try {
+    const response = await authenticatedFetch('/api/email-preference');
+    const corpo = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      devWarn(`[EMAIL] preferência não lida (${response.status}):`, corpo?.error);
+      return { ok: false, subscribed: true, error: String(corpo?.error || 'sem_codigo') };
+    }
+    return { ok: true, subscribed: corpo?.subscribed !== false };
+  } catch (error) {
+    devWarn('[EMAIL] /api/email-preference não chegou a ser chamado:', error);
+    return { ok: false, subscribed: true, error: 'sem_sessao' };
+  }
+}
+
+export async function setEmailSubscription(subscribed: boolean): Promise<EmailSubscription> {
+  try {
+    const response = await authenticatedFetch('/api/email-preference', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ subscribed }),
+    });
+    const corpo = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      devWarn(`[EMAIL] preferência não salva (${response.status}):`, corpo?.error);
+      return { ok: false, subscribed: !subscribed, error: String(corpo?.error || 'sem_codigo') };
+    }
+    return { ok: true, subscribed: corpo?.subscribed === true };
+  } catch (error) {
+    devWarn('[EMAIL] /api/email-preference não chegou a ser chamado:', error);
+    return { ok: false, subscribed: !subscribed, error: 'sem_sessao' };
+  }
+}
