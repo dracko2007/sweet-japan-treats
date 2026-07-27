@@ -546,26 +546,49 @@ const Cart: React.FC = () => {
                     </div>
                   </div>
 
-                  <Button
-                    className="w-full btn-primary rounded-xl py-6 text-lg font-bold"
-                    onClick={() => navigate('/checkout', { state: { coupon: activeCoupon } })}
-                  >
-                    {t('cart.checkout')}
-                    <ArrowRight className="w-5 h-5 ml-2" />
-                  </Button>
-                  
+                  {/* Antes o botão principal levava sempre ao fluxo com conta, e
+                      quem não estava logado era redirecionado direto para
+                      /cadastro pelo Checkout. A saída sem cadastro existia, mas
+                      como texto cinza sublinhado embaixo do aviso de frete.
+                      O funil mostrava o resultado: 146 visitas ao carrinho e 139
+                      ao cadastro — quase todo mundo empurrado a criar conta.
+                      Os dois caminhos agora têm o mesmo peso visual. */}
+                  {isAuthenticated ? (
+                    <Button
+                      className="w-full btn-primary rounded-xl py-6 text-lg font-bold"
+                      onClick={() => navigate('/checkout', { state: { coupon: activeCoupon } })}
+                    >
+                      {t('cart.checkout')}
+                      <ArrowRight className="w-5 h-5 ml-2" />
+                    </Button>
+                  ) : (
+                    <div className="space-y-2">
+                      <Button
+                        className="w-full btn-primary rounded-xl py-6 text-lg font-bold"
+                        onClick={() => navigate('/checkout', { state: { coupon: activeCoupon, isGuest: true } })}
+                      >
+                        {t('cart.checkoutGuest')}
+                        <ArrowRight className="w-5 h-5 ml-2" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="w-full rounded-xl py-5 text-base font-semibold"
+                        onClick={() => navigate('/checkout', { state: { coupon: activeCoupon } })}
+                      >
+                        {t('cart.checkoutAccount')}
+                      </Button>
+                      <p className="text-center text-[11px] text-muted-foreground">
+                        {t('cart.accountPerk')}
+                      </p>
+                    </div>
+                  )}
+
                   <p className="text-center text-xs text-muted-foreground">
                     {selectedCountry === 'Japão'
                       ? '🏠 Envio direto de Hiroshima - Frete rápido e seguro.'
                       : '✈️ Despachado de Hiroshima com entrega expressa pelos Correios.'
                     }
                   </p>
-                  <button
-                    onClick={() => navigate('/checkout', { state: { coupon: activeCoupon, isGuest: true } })}
-                    className="w-full text-sm text-muted-foreground hover:text-foreground underline underline-offset-2 transition-colors py-1"
-                  >
-                    Continuar como Convidado (sem cadastro)
-                  </button>
                 </div>
               </div>
             </div>
