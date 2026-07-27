@@ -153,6 +153,13 @@ function publicOrder(order) {
 async function stripeIntent(order) {
   const secret = process.env.STRIPE_SECRET_KEY;
   if (!secret) throw new HttpError(503, 'stripe_not_configured');
+  // O webhook não é opcional: `handleConfirmManualPayment` recusa pedido de
+  // cartão com `stripe_orders_require_webhook`, então `payment_intent.succeeded`
+  // é o ÚNICO caminho que processa a venda. Sem `STRIPE_WEBHOOK_SECRET` o
+  // cliente pagaria de verdade e o pedido ficaria parado para sempre — sem
+  // baixa de estoque, sem e-mail, e sem ninguém conseguir destravar pelo
+  // painel. Recusar antes de cobrar é o único desfecho honesto.
+  if (!process.env.STRIPE_WEBHOOK_SECRET) throw new HttpError(503, 'stripe_webhook_not_configured');
   const stripe = new Stripe(secret);
   if (order.stripePaymentIntentId) {
     const existing = await stripe.paymentIntents.retrieve(order.stripePaymentIntentId);
