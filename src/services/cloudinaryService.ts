@@ -29,16 +29,31 @@ async function uploadVideoToFirebase(blob: Blob, folder: string): Promise<string
 
 
 // ─── Entrega ───────────────────────────────────────────────────────────────
-// Perfil único de entrega para toda imagem do site. Medido no acervo atual
-// (master 573x600, 7.3KB) em 2026-07-25:
-//   f_auto      → AVIF/WebP conforme o browser, melhor que WebP fixo.
-//   q_auto:best → topo da escala perceptual: 6626B contra 6426B do `q_auto`
-//                 (+3%). `q_100` custaria 22236B (+246%) sem recuperar detalhe
-//                 que a master não tem — re-encodar um master lossy em q100 só
-//                 preserva o artefato com mais bits.
-//   c_limit     → NUNCA faz upscale. Sem isso, `w_1200` sobre a master de 573px
-//                 devolve 74018B de borrão interpolado (1200x1257).
-const DELIVERY = 'f_auto,q_auto:best,c_limit';
+// Perfil único de entrega para toda imagem do site.
+//
+//   f_auto   → AVIF/WebP conforme o browser, melhor que WebP fixo.
+//   c_limit  → NUNCA faz upscale. Sem isso, `w_1200` sobre uma master de 900px
+//              devolve borrão interpolado.
+//   q_95     → ver abaixo.
+//
+// Sobre o `q_95`: antes era `q_auto:best`, escolhido medindo o PESO do
+// resultado. O que a medição não considerou foi a natureza das masters — quase
+// todas já são JPEG lossy de baixa resolução, herdadas do fallback base64 que
+// gravava com `compressToDataUrl(dataUrl, 900, 0.82)`. Re-comprimir um arquivo
+// já comprimido não remove redundância, remove detalhe.
+//
+// Medido em 26/07/2026 sobre duas masters reais:
+//
+//   master intocada        18 KB (600x376)    70 KB (900x714)
+//   q_auto:best             8 KB  (-56%)      29 KB  (-59%)   <- borrava
+//   q_95                   13 KB  (-28%)      49 KB  (-30%)   <- escolhido
+//   q_100                  49 KB (+172%)     218 KB (+211%)   <- so preserva
+//                                                                o artefato
+//
+// `q_95` entrega perto da master e ainda ganha do JPEG original em bytes,
+// porque AVIF/WebP comprimem melhor. `q_100` explode sem recuperar detalhe que
+// a master nao tem.
+const DELIVERY = 'f_auto,q_95,c_limit';
 
 /**
  * Reescreve qualquer URL Cloudinary para o perfil de entrega de alta qualidade.
