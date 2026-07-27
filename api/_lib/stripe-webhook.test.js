@@ -5,7 +5,23 @@ const mocks = vi.hoisted(() => ({
   fulfillOrder: vi.fn(),
   markFulfillmentReview: vi.fn(),
   sendMail: vi.fn(),
+  retrieveEvent: vi.fn(),
 }));
+
+// Mantém a verificação de assinatura REAL do Stripe e troca só a chamada de
+// rede. Assim o teste do caminho rápido continua provando criptografia de
+// verdade, e o do fallback observa a consulta à API sem sair da máquina.
+vi.mock('stripe', async (importOriginal) => {
+  const Real = (await importOriginal()).default;
+  return {
+    default: class extends Real {
+      constructor(...args) {
+        super(...args);
+        this.events = { retrieve: mocks.retrieveEvent };
+      }
+    },
+  };
+});
 
 vi.mock('./fulfillment.js', () => ({
   fulfillOrder: mocks.fulfillOrder,
@@ -57,6 +73,7 @@ beforeEach(() => {
   mocks.fulfillOrder.mockReset().mockResolvedValue({ replay: false });
   mocks.markFulfillmentReview.mockReset().mockResolvedValue(undefined);
   mocks.sendMail.mockReset().mockResolvedValue({});
+  mocks.retrieveEvent.mockReset();
 });
 
 afterEach(() => {
@@ -84,22 +101,60 @@ function eventPayload() {
 }
 
 describe('Stripe webhook signature boundary', () => {
-  it('rejects an invalid signature without fulfilling the order', async () => {
+  it('recusa quando a assinatura falha e não há id de evento para conferir', async () => {
     const res = response();
-    await webhook({ method: 'POST', headers: { 'stripe-signature': 'invalid' }, body: Buffer.from(eventPayload()) }, res);
+    await webhook({
+      method: 'POST',
+      headers: { 'stripe-signature': 'invalid' },
+      body: Buffer.from(JSON.stringify({ type: 'payment_intent.succeeded', data: { object: {} } })),
+    }, res);
+
     expect(res.statusCode).toBe(400);
     expect(res.body).toEqual({ error: 'invalid_stripe_signature' });
     expect(mocks.fulfillOrder).not.toHaveBeenCalled();
   });
 
-  it('verifies the unmodified payload and fulfills a matching intent', async () => {
+  it('recusa id de evento malformado sem chamar a API do Stripe', async () => {
+    const res = response();
+    await webhook({
+      method: 'POST',
+      headers: { 'stripe-signature': 'invalid' },
+      // `id` fora do formato evt_... nunca vira requisição de rede.
+      body: Buffer.from(JSON.stringify({ id: '../../admin', type: 'payment_intent.succeeded' })),
+    }, res);
+
+    expect(res.statusCode).toBe(400);
+    expect(mocks.retrieveEvent).not.toHaveBeenCalled();
+    expect(mocks.fulfillOrder).not.toHaveBeenCalled();
+  });
+
+  it('com assinatura falha mas id válido, usa o evento da API e IGNORA o corpo', async () => {
+    // O corpo mente: diz que o pedido é outro. Só o que a API devolver vale.
+    const corpoForjado = JSON.stringify({
+      id: 'evt_test123',
+      type: 'payment_intent.succeeded',
+      data: { object: { id: 'pi_falso', metadata: { orderId: 'PEDIDO-FORJADO' }, amount_received: 1, currency: 'brl' } },
+    });
+    mocks.retrieveEvent.mockResolvedValue(JSON.parse(eventPayload()));
+
+    const res = response();
+    await webhook({ method: 'POST', headers: { 'stripe-signature': 'invalid' }, body: Buffer.from(corpoForjado) }, res);
+
+    expect(mocks.retrieveEvent).toHaveBeenCalledWith('evt_test123');
+    // Faturou o pedido que a API confirmou, não o que o corpo alegava.
+    expect(mocks.fulfillOrder).toHaveBeenCalledWith('SE-BR-123456', expect.anything());
+  });
+
+  it('verifica o payload intacto e fatura sem consultar a API', async () => {
     const payload = eventPayload();
     const stripe = new Stripe('sk_test_placeholder');
     const signature = stripe.webhooks.generateTestHeaderString({ payload, secret: 'whsec_test' });
     const res = response();
     await webhook({ method: 'POST', headers: { 'stripe-signature': signature }, body: Buffer.from(payload) }, res);
+
     expect(res.statusCode).toBe(200);
     expect(res.body).toEqual({ received: true, replay: false });
+    expect(mocks.retrieveEvent).not.toHaveBeenCalled();   // caminho rápido, sem rede
     expect(mocks.fulfillOrder).toHaveBeenCalledWith('SE-BR-123456', {
       provider: 'stripe',
       reference: 'pi_test',
