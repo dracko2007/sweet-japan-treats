@@ -47,6 +47,7 @@ const Profile: React.FC = () => {
     updateProfile,
     logout,
     refreshOrders,
+    ordersOffline,
   } = useUser();
   const { t, selectedCountry } = useLanguage();
   const { products } = useProducts();
@@ -914,6 +915,26 @@ const Profile: React.FC = () => {
                   </h2>
                 </div>
               </div>
+
+              {/* Sem isto, uma falha ao ler os pedidos no servidor deixava a
+                  lista vazia sem explicação — e pedido pago sumindo da tela
+                  parece pedido perdido. */}
+              {ordersOffline && (
+                <div className="mb-4 p-4 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200">
+                  <p className="font-semibold text-amber-800">Não conseguimos carregar seus pedidos do servidor</p>
+                  <p className="text-sm text-amber-700/90 mt-1">
+                    O que aparece abaixo está salvo neste navegador e pode estar
+                    incompleto ou desatualizado. Seus pedidos <strong>não foram perdidos</strong> —
+                    tente recarregar a página em instantes.
+                  </p>
+                  <button
+                    onClick={() => { void refreshOrders(); }}
+                    className="mt-3 px-4 py-2 rounded-lg bg-amber-600 text-white text-sm font-semibold hover:bg-amber-700 transition-colors"
+                  >
+                    Tentar novamente
+                  </button>
+                </div>
+              )}
 
               {orders.length > 0 ? (
                 <div className="space-y-4">

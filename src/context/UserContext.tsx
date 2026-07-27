@@ -132,6 +132,11 @@ interface UserContextType {
   addOrder: (order: Omit<Order, 'id' | 'date'> & { orderNumber?: string }) => Promise<void> | void;
   clearOrderHistory: () => void;
   refreshOrders: () => Promise<void>;
+  /** `true` quando a leitura dos pedidos no servidor falhou e o que está na
+   *  tela é só a cópia local — que some se o cliente limpar o navegador ou
+   *  entrar de outro aparelho. Precisa ser visível: um histórico faltando em
+   *  silêncio parece pedido perdido. */
+  ordersOffline: boolean;
   sendPasswordReset: (email: string) => Promise<{ success: boolean; error?: string }>;
   resendVerificationEmail: () => Promise<boolean>;
 }
@@ -157,6 +162,8 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
   const [ordersCursor, setOrdersCursor] = useState<OrderPageCursor | null>(null);
   const [ordersHasMore, setOrdersHasMore] = useState(false);
   const [ordersLoadingMore, setOrdersLoadingMore] = useState(false);
+  // Verdadeiro quando só temos a cópia local dos pedidos — ver `refreshOrders`.
+  const [ordersOffline, setOrdersOffline] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authReady, setAuthReady] = useState(false);
   // Modo da sessão para contas admin: 'admin' (painel) ou 'user' (cliente).
@@ -360,8 +367,15 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       setOrders(mergeOrders(localOrders, page.items));
       setOrdersCursor(page.nextCursor);
       setOrdersHasMore(page.hasMore);
+      setOrdersOffline(false);
     } catch (error) {
-      devWarn('⚠️ [SYNC] Could not refresh orders from Firestore:', error);
+      // Isto NÃO pode ficar só no console de desenvolvimento. Em 27/07/2026 a
+      // consulta falhava por índice composto ausente no Firestore, o `devWarn`
+      // sumia no build de produção, e o histórico do cliente passava a vir só
+      // do localStorage — desaparecendo por completo ao limpar o navegador.
+      // Um pedido pago some da tela e ninguém fica sabendo.
+      console.warn('[pedidos] servidor indisponível, exibindo apenas a cópia local:', error);
+      setOrdersOffline(true);
       setOrdersCursor(null);
       setOrdersHasMore(false);
     }
@@ -1401,6 +1415,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     addOrder,
     clearOrderHistory,
     refreshOrders,
+    ordersOffline,
     sendPasswordReset,
     resendVerificationEmail,
   };
