@@ -348,40 +348,6 @@ export const affiliateService = {
     }
   },
 
-  /**
-   * Registra uma comissão PENDENTE (na compra). Só vira comissão de verdade
-   * quando o admin confirmar a entrega do pedido.
-   */
-  async addPendingCommission(params: {
-    affiliateCode: string;
-    netYen: number;
-    orderId: string;
-    buyerEmail: string;
-  }): Promise<void> {
-    if (!db || !params.affiliateCode) return;
-    try {
-      const code = normalize(params.affiliateCode);
-      const affSnap = await getDoc(doc(db, COL, code));
-      const commissionPercent = affSnap.exists() ? (affSnap.data() as Affiliate).commissionPercent || 0 : 0;
-      const ownerEmail = affSnap.exists() ? (affSnap.data() as Affiliate).ownerEmail || '' : '';
-      const id = `${code}-${params.orderId || Date.now()}`;
-      const record: PendingCommission = {
-        id,
-        affiliateCode: code,
-        netYen: params.netYen,
-        commissionYen: Math.round((params.netYen * commissionPercent) / 100),
-        orderId: params.orderId || id,
-        buyerEmail: params.buyerEmail || '',
-        ownerEmail,
-        status: 'pending',
-        createdAt: new Date().toISOString(),
-      };
-      await setDoc(doc(db, PENDING_COL, id), record);
-    } catch (e) {
-      devWarn('affiliateService.addPendingCommission falhou:', e);
-    }
-  },
-
   /** Lista comissões pendentes (admin). */
   async getPendingCommissions(): Promise<PendingCommission[]> {
     if (!db) return [];

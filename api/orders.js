@@ -178,6 +178,35 @@ async function stripeIntent(order) {
   }, { idempotencyKey: `payment-intent:${order.orderNumber}` });
 }
 
+/**
+ * Registra no painel de Fraude uma tentativa que o servidor acabou de recusar.
+ *
+ * Nunca pode derrubar a resposta: se a gravação falhar, o cliente ainda recebe
+ * o 409 correto. Perder uma linha de log é bem menos grave do que transformar
+ * um bloqueio em erro 500.
+ *
+ * O formato acompanha o que `FraudDashboard.tsx` já lê — `cpf` mascarado para
+ * exibição e `cpfFull` para a busca.
+ */
+async function registrarTentativaFraude(db, customer, { attemptType, productId = '', affiliateCode = '' }) {
+  const digitos = String(customer.cpf || '').replace(/\D/g, '');
+  if (digitos.length !== 11) return;
+  try {
+    await db.collection('fraud_attempts').add({
+      cpf: `${digitos.slice(0, 3)}***${digitos.slice(6)}`,
+      cpfFull: digitos,
+      attemptType,
+      productId,
+      affiliateCode,
+      customerEmail: customer.email || '',
+      customerName: customer.name || '',
+      blockedAt: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error('[fraud-log]', error instanceof Error ? error.message : error);
+  }
+}
+
 async function handleCreate(req, res) {
   if (!handleCors(req, res, { methods: ['POST'] })) return;
 
@@ -269,8 +298,22 @@ async function handleCreate(req, res) {
     }
     const cpfData = cpfSnap?.exists ? cpfSnap.data() : null;
     const promoProducts = quote.items.filter((item) => item.homePromo).map((item) => item.productId);
-    if (promoProducts.some((productId) => cpfData?.productIds?.includes(productId))) throw new HttpError(409, 'promotion_limit');
-    if (coupon?.affiliateCode && !coupon.affiliateProductId && cpfData?.affiliateCodes?.length) throw new HttpError(409, 'affiliate_coupon_already_used');
+    // O painel de Fraude nunca recebeu um registro: quem gravava era
+    // `cpfGuardService.logFraudAttempt`, no navegador, e nenhuma tela chegou a
+    // chamar. Mesmo que chamasse, quem burla o limite é justamente quem tem
+    // motivo para não executar esse código. Aqui é o servidor que recusa, então
+    // é aqui que o registro tem valor.
+    // `!== undefined`, e não truthiness: o bloqueio não pode depender de o id
+    // do produto ser uma string não vazia.
+    const produtoBloqueado = promoProducts.find((productId) => cpfData?.productIds?.includes(productId));
+    if (produtoBloqueado !== undefined) {
+      await registrarTentativaFraude(db, customer, { attemptType: 'product_limit', productId: produtoBloqueado });
+      throw new HttpError(409, 'promotion_limit');
+    }
+    if (coupon?.affiliateCode && !coupon.affiliateProductId && cpfData?.affiliateCodes?.length) {
+      await registrarTentativaFraude(db, customer, { attemptType: 'affiliate_reuse', affiliateCode: coupon.affiliateCode });
+      throw new HttpError(409, 'affiliate_coupon_already_used');
+    }
 
     const now = new Date().toISOString();
     const trackingPrefix = country === 'Japão' ? 'JP' : country === 'Brasil' ? 'NX' : 'EX';

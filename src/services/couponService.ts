@@ -9,7 +9,6 @@ const devError = isDev ? console.error.bind(console) : () => {};
 
 const STORAGE_KEY = 'japan-express-coupons';
 const FIRESTORE_COUPONS = 'coupons';
-const FIRESTORE_USAGE = 'coupon_usage';
 
 // ==================== FIRESTORE HELPERS ====================
 
@@ -86,52 +85,6 @@ const loadCouponsFromFirestore = async (): Promise<Coupon[]> => {
   } catch (err) {
     devWarn('⚠️ [COUPON] Failed to load coupons from Firestore:', err);
     return couponService.getAll();
-  }
-};
-
-// Sync coupon usage to Firestore
-const syncUsageToFirestore = async (couponCode: string, userEmail: string) => {
-  try {
-    const { doc, setDoc, getDoc } = await import('firebase/firestore');
-    const { db } = await import('@/config/firebase');
-    if (!db) return;
-    
-    const usageRef = doc(db, FIRESTORE_USAGE, couponCode.toUpperCase());
-    const usageDoc = await getDoc(usageRef);
-    const usedBy = usageDoc.exists() ? (usageDoc.data().usedBy || []) : [];
-    
-    if (!usedBy.includes(userEmail)) {
-      usedBy.push(userEmail);
-      await setDoc(usageRef, { usedBy, updatedAt: new Date().toISOString() });
-      devLog('✅ [COUPON] Usage synced to Firestore:', couponCode, userEmail);
-    }
-  } catch (err) {
-    devWarn('⚠️ [COUPON] Failed to sync usage to Firestore:', err);
-  }
-};
-
-// Check coupon usage from Firestore
-const checkUsageFromFirestore = async (couponCode: string, userEmail: string): Promise<boolean> => {
-  try {
-    const { doc, getDoc } = await import('firebase/firestore');
-    const { db } = await import('@/config/firebase');
-    if (!db) return false;
-    
-    const usageRef = doc(db, FIRESTORE_USAGE, couponCode.toUpperCase());
-    const usageDoc = await getDoc(usageRef);
-    if (usageDoc.exists()) {
-      const usedBy: unknown[] = usageDoc.data().usedBy || [];
-      // Comparação sem diferenciar maiúsculas: o servidor grava o e-mail como
-      // veio no pedido e compara em minúsculas (api/_lib/fulfillment.js). Se o
-      // cliente comparasse de forma sensível, o cupom pareceria válido no
-      // carrinho e só seria recusado no checkout — confuso e tarde demais.
-      const alvo = userEmail.toLowerCase();
-      return usedBy.some((email) => String(email).toLowerCase() === alvo);
-    }
-    return false;
-  } catch (err) {
-    devWarn('⚠️ [COUPON] Failed to check usage from Firestore:', err);
-    return false;
   }
 };
 
@@ -235,24 +188,13 @@ export const couponService = {
     return { valid: true, coupon };
   },
 
-  // Async validation: loads coupons from Firestore first, then checks usage
+  // Recarrega os cupons criados no painel antes de validar. O uso por cliente
+  // NÃO é conferido aqui: `coupon_usage` é escrito e lido pelo servidor
+  // (`api/_lib/fulfillment.js`), que recusa com `coupon_already_used`.
   validateCouponAsync: async (code: string, userEmail?: string, orderTotalYen?: number): Promise<{ valid: boolean; coupon?: Coupon; error?: string }> => {
-    // Load latest coupons from Firestore so client has admin-created ones
+    // Carrega os cupons criados no painel antes de validar contra o local.
     await loadCouponsFromFirestore();
-
-    // Now do local validation (safeStorage is up to date)
-    const localResult = couponService.validateCoupon(code, userEmail, orderTotalYen);
-    if (!localResult.valid) return localResult;
-    
-    // Then check Firestore for usage
-    if (userEmail) {
-      const usedInFirestore = await checkUsageFromFirestore(code, userEmail);
-      if (usedInFirestore) {
-        return { valid: false, error: 'Você já usou este cupom' };
-      }
-    }
-    
-    return localResult;
+    return couponService.validateCoupon(code, userEmail, orderTotalYen);
   },
 
   // Calculate discount
@@ -264,7 +206,9 @@ export const couponService = {
     }
   },
 
-  // Use coupon (increment usage and track user) - saves to safeStorage AND Firestore
+  // Marca o cupom como usado no armazenamento local (contador e lista de
+  // e-mails). O registro que vale é o do servidor, gravado em `coupon_usage`
+  // pela `fulfillment.js` quando o pagamento confirma.
   useCoupon: (code: string, userEmail: string): void => {
     const coupons = couponService.getAll();
     const index = coupons.findIndex(c => c.code.toUpperCase() === code.toUpperCase());
@@ -281,11 +225,6 @@ export const couponService = {
       }
       
       safeStorage.setItem(STORAGE_KEY, JSON.stringify(coupons));
-      
-      // Sync usage to Firestore (fire-and-forget)
-      syncUsageToFirestore(code, userEmail);
-      // Also update the coupon usedCount in Firestore
-      syncCouponToFirestore(coupons[index]);
     }
   },
 

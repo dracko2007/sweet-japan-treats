@@ -4,7 +4,7 @@ import { collection, getDocs, doc, setDoc, deleteDoc } from 'firebase/firestore'
 import { ShieldAlert, ShieldCheck, Eye, Trash2, AlertTriangle, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { normalizeCPF } from '@/services/cpfGuardService';
+import { normalizeCPF } from '@/utils/validation';
 import CpfMigration from './CpfMigration';
 
 interface FraudAttempt {

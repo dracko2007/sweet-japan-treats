@@ -4,7 +4,7 @@ import { collection, getDocs, doc, setDoc } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { ShieldCheck, AlertTriangle, CheckCircle } from 'lucide-react';
-import { normalizeCPF } from '@/services/cpfGuardService';
+import { normalizeCPF } from '@/utils/validation';
 
 interface MigrationResult {
   total: number;

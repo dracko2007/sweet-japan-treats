@@ -283,6 +283,9 @@ export const isNonEmpty = (value: string, min = 1): boolean =>
 /*  Máscaras (formatação durante a digitação)                          */
 /* ------------------------------------------------------------------ */
 
+/** Só os 11 dígitos — é a forma usada como ID em `cpf_index`. */
+export const normalizeCPF = (cpf: string): string => cpf.replace(/\D/g, '');
+
 /** Formata CPF: 000.000.000-00 */
 export const maskCPF = (value: string): string => {
   const d = value.replace(/\D/g, '').slice(0, 11);

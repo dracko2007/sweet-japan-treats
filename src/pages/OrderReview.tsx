@@ -30,7 +30,6 @@ import { paymentSettingsService } from '@/services/paymentSettingsService';
 import { Wallet } from 'lucide-react';
 import { referralService } from '@/services/referralService';
 import { calcBrazilTax, calcImportTax } from '@/utils/taxRules';
-import { cpfGuardService, normalizeCPF } from '@/services/cpfGuardService';
 import { promoCampaignService } from '@/services/promoCampaignService';
 import { thermalPrintService } from '@/services/thermalPrintService';
 import StripeCardForm from '@/components/checkout/StripeCardForm';
