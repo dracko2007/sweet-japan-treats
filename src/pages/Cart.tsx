@@ -42,6 +42,9 @@ const Cart: React.FC = () => {
   const [activeCoupon, setActiveCoupon] = useState<Coupon | null>(null);
   const [couponError, setCouponError] = useState('');
   const [showCouponList, setShowCouponList] = useState(false);
+  // Produto da campanha promocional. `null` para cupom comum, que vale para
+  // todos os itens sem preço promocional.
+  const [promoProductId, setPromoProductId] = useState<string | null>(null);
 
   // Os pontos são aplicados só na etapa de revisão do pedido — no carrinho fica 0.
   const [pointsToUse, setPointsToUse] = useState<number>(0);
@@ -136,6 +139,12 @@ const Cart: React.FC = () => {
       if (cancelled || !c) return;
       if (c.mechanic === 'discount') {
         const pct = Math.max(1, Math.min(90, c.discountPct || 0));
+        // O produto da campanha fica guardado à parte: sem ele o desconto virava
+        // um cupom percentual comum e caía sobre o carrinho INTEIRO, enquanto o
+        // servidor só o aplica ao produto da campanha
+        // (api/_lib/commerce.js: `campaign?.productId === productId`). O cliente
+        // mostrava um total e o servidor cobrava outro.
+        setPromoProductId(c.productId || null);
         setActiveCoupon({
           id: `promo-${c.code}`,
           code: c.code,
@@ -162,6 +171,7 @@ const Cart: React.FC = () => {
       safeStorage.removeItem('promo_full_price');
       window.dispatchEvent(new Event('promo-pricing-changed'));
     }
+    setPromoProductId(null);
     setActiveCoupon(null);
   };
 
@@ -192,8 +202,16 @@ const Cart: React.FC = () => {
   const baseTotalPrice = promoSubtotal + regularSubtotal;
   const hasPromoItems = promoSubtotal > 0;
 
-  // Cupom só entra nos itens sem desconto promocional
-  const discountAmount = activeCoupon ? computeDiscount(activeCoupon, regularSubtotal) : 0;
+  // Base do desconto. Campanha de produto (`promo-`) incide SÓ sobre o produto
+  // dela, igual ao servidor faz em `api/_lib/commerce.js`. Cupom comum — e o de
+  // recuperação de carrinho — incide sobre todos os itens sem preço promocional.
+  const baseDoCupom = promoProductId
+    ? items.reduce(
+      (sum, item) => (!item.freeGift && item.product.id === promoProductId)
+        ? sum + fxConvert(effectiveYen(item.product, item.size), currency) * item.quantity
+        : sum, 0)
+    : regularSubtotal;
+  const discountAmount = activeCoupon ? computeDiscount(activeCoupon, baseDoCupom) : 0;
 
   // Resgate de pontos: 1 ponto = ¥1, limitado ao valor dos produtos (em ¥)
   const convertYen = (yen: number) => fxConvert(yen, currency);

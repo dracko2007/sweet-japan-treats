@@ -24,34 +24,45 @@ const STAGES = [
 ];
 
 /**
- * Cria um cupom exclusivo do cliente, de uso único e com prazo.
+ * Cria o cupom de recuperação para este cliente.
  *
- * Antes os estágios usavam códigos fixos (`VOLTA10`, `VOLTA15`) que precisavam
- * existir à mão no Firestore — e o `VOLTA10` simplesmente NÃO existia, então o
- * estágio 2 prometia um desconto que dava erro no checkout. Gerar o cupom aqui
- * elimina essa classe de falha: o código nunca é prometido sem existir.
+ * O código é fixo e legível (`CARRINHO30`), como pedido — dá para ditar por
+ * telefone ou WhatsApp. O que impede o óbvio ("CARRINHO30" é trivial de
+ * adivinhar) é o `targetType: 'email'`: só funciona nas contas que realmente
+ * abandonaram um carrinho e receberam o e-mail. A cada envio o endereço entra
+ * na lista; quem digitar o código sem estar nela recebe recusa.
  *
- * Também é o que dá sentido ao "feche agora": prazo por cliente, não uma data
- * global. E `usageLimit: 1` impede que um cupom de 30% vaze e vire desconto
- * permanente para quem repassar o código.
+ * Vale para o CARRINHO INTEIRO — diferente das campanhas de produto, que o
+ * servidor restringe ao `campaign.productId`.
+ *
+ * Antes os estágios usavam `VOLTA10` e `VOLTA15`, que precisavam existir à mão
+ * no Firestore — e o `VOLTA10` nunca foi criado, então o estágio 2 prometia um
+ * desconto que dava erro no checkout. Aqui o documento é criado/atualizado no
+ * mesmo passo do envio, então a promessa nunca existe sem o cupom.
  */
-async function criarCupomPessoal(email, discount, validadeMs) {
-  const code = `VOLTA${discount}-${randomUUID().slice(0, 6).toUpperCase()}`;
+async function garantirCupom(email, discount, validadeMs) {
+  const code = `CARRINHO${discount}`;
+  const ref = adminDb().collection('coupons').doc(code);
+  const atual = (await ref.get()).data();
+  const alvos = Array.isArray(atual?.targetEmails) ? atual.targetEmails : [];
   const expiraEm = Date.now() + validadeMs;
-  await adminDb().collection('coupons').doc(code).set({
+
+  await ref.set({
     code,
     type: 'percent',
     discount: 0,               // legado: o valor real fica em discountPercent
     discountPercent: discount,
-    description: `Recuperacao de carrinho — ${discount}% OFF`,
+    description: `Recuperacao de carrinho — ${discount}% OFF no pedido`,
+    // A validade acompanha o envio mais recente. Quem recebeu antes e demorou
+    // demais perde o desconto — que é o ponto do "finalize agora".
     expiryDate: new Date(expiraEm).toISOString(),
     isActive: true,
-    usageLimit: 1,
-    usedCount: 0,
     targetType: 'email',
-    targetEmails: [email],
-    createdAt: new Date().toISOString(),
-  });
+    targetEmails: alvos.includes(email) ? alvos : [...alvos, email],
+    updatedAt: new Date().toISOString(),
+    ...(atual ? {} : { usedCount: 0, createdAt: new Date().toISOString() }),
+  }, { merge: true });
+
   return { code, horas: Math.round(validadeMs / 3600000) };
 }
 
@@ -143,7 +154,7 @@ export default async function handler(req, res) {
         // O cupom nasce antes do envio: se a criação falhar, o e-mail não sai
         // prometendo um código inexistente — o carrinho fica para o próximo cron.
         const cupom = stageDef.discount
-          ? await criarCupomPessoal(user.email, stageDef.discount, stageDef.validadeMs)
+          ? await garantirCupom(user.email, stageDef.discount, stageDef.validadeMs)
           : null;
         await sendMail({ to: user.email, ...buildRecoveryEmail(stageDef, user.displayName || '', data.items, cupom) });
         await document.ref.update({

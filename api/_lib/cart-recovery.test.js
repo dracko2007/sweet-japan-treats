@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   set: vi.fn(),
   getUser: vi.fn(),
   docs: [],
+  cupomExistente: undefined,
 }));
 
 vi.mock('./auth.js', () => ({ requireCronSecret: vi.fn() }));
@@ -17,7 +18,9 @@ vi.mock('./firebase-admin.js', () => ({
   adminAuth: () => ({ getUser: mocks.getUser }),
   adminDb: () => ({
     collection: () => ({
-      doc: () => ({ set: mocks.set }),
+      // `garantirCupom` lê o documento antes de gravar, para acumular os
+      // e-mails já autorizados. Sem cupom prévio, devolve vazio.
+      doc: () => ({ set: mocks.set, get: async () => ({ data: () => mocks.cupomExistente }) }),
       where: () => ({ limit: () => ({ get: async () => ({ docs: mocks.docs, size: mocks.docs.length }) }) }),
     }),
     runTransaction: async (fn) => fn({
@@ -67,6 +70,7 @@ describe('recuperação de carrinho', () => {
     mocks.sendMail.mockReset().mockResolvedValue({ accepted: ['x'] });
     mocks.set.mockReset().mockResolvedValue(undefined);
     mocks.getUser.mockReset().mockResolvedValue({ email: 'cliente@exemplo.com', displayName: 'Ana' });
+    mocks.cupomExistente = undefined;
   });
 
   it('primeiro toque não queima desconto', async () => {
@@ -96,13 +100,30 @@ describe('recuperação de carrinho', () => {
     expect(ordemCriacao).toBeLessThan(ordemEnvio);
   });
 
-  it('o cupom de 30% é pessoal, de uso único e expira em 24h', async () => {
+  it('o cupom vale para o CARRINHO INTEIRO, não para um produto', async () => {
     await rodar(24 * 8, 3);
 
     const c = mocks.set.mock.calls[0][0];
+    // Campanha de produto carrega `productId` e o servidor a restringe a ele.
+    // O cupom de recuperação não tem — incide sobre o pedido todo.
+    expect(c.productId).toBeUndefined();
+    expect(c.type).toBe('percent');
+  });
+
+  it('usa código fixo e legível, liberado só para quem recebeu o e-mail', async () => {
+    await rodar(24 * 8, 3);
+
+    const c = mocks.set.mock.calls[0][0];
+    expect(c.code).toBe('CARRINHO30');
+    // "CARRINHO30" é trivial de adivinhar; o que protege é a lista de alvos.
     expect(c.targetType).toBe('email');
-    expect(c.targetEmails).toEqual(['cliente@exemplo.com']);
-    expect(c.usageLimit).toBe(1);
+    expect(c.targetEmails).toContain('cliente@exemplo.com');
+  });
+
+  it('o prazo acompanha o envio — 24h para finalizar', async () => {
+    await rodar(24 * 8, 3);
+
+    const c = mocks.set.mock.calls[0][0];
     const horas = (new Date(c.expiryDate).getTime() - Date.now()) / 3600000;
     expect(horas).toBeGreaterThan(23);
     expect(horas).toBeLessThan(25);
