@@ -120,8 +120,13 @@ const checkUsageFromFirestore = async (couponCode: string, userEmail: string): P
     const usageRef = doc(db, FIRESTORE_USAGE, couponCode.toUpperCase());
     const usageDoc = await getDoc(usageRef);
     if (usageDoc.exists()) {
-      const usedBy = usageDoc.data().usedBy || [];
-      return usedBy.includes(userEmail);
+      const usedBy: unknown[] = usageDoc.data().usedBy || [];
+      // Comparação sem diferenciar maiúsculas: o servidor grava o e-mail como
+      // veio no pedido e compara em minúsculas (api/_lib/fulfillment.js). Se o
+      // cliente comparasse de forma sensível, o cupom pareceria válido no
+      // carrinho e só seria recusado no checkout — confuso e tarde demais.
+      const alvo = userEmail.toLowerCase();
+      return usedBy.some((email) => String(email).toLowerCase() === alvo);
     }
     return false;
   } catch (err) {
