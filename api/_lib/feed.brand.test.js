@@ -8,7 +8,8 @@
 // tirados do catálogo real.
 import { describe, expect, it } from 'vitest';
 
-import { GOOGLE_CATEGORY, detectBrand } from '../feed.js';
+import { detectBrand } from '../../shared/brand.js';
+import { GOOGLE_CATEGORY } from '../feed.js';
 
 describe('detectBrand', () => {
   it('usa o fabricante, nunca a loja, quando a marca está no nome', () => {

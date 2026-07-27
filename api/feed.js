@@ -10,28 +10,23 @@
 //
 // Produtos são públicos no Firestore (allow read: if true) — lê via REST sem auth.
 
+import { detectBrand } from '../shared/brand.js';
 import { fetchProducts, escapeXml, isVisibleInternationally } from './_lib/firestore-products.js';
+import { convertYen as convertYenFx, getFxRates } from './_lib/fx.js';
 
 const SITE_URL = 'https://www.japanexpress-store.com';
 
-// Taxa fixa de fallback (mesma base do fxService) — feed precisa ser determinístico.
-// ¥→BRL ≈ 1/28, ¥→EUR ≈ 0.16/28, ¥→USD ≈ 1/150. Cushion de 6% para variação cambial.
-const FX = {
-  BRL: { rate: 1 / 28, cushion: 0.06, symbol: 'BRL' },
-  EUR: { rate: 0.16 / 28, cushion: 0.06, symbol: 'EUR' },
-  USD: { rate: 1 / 150, cushion: 0.06, symbol: 'USD' },
-};
-const BUFFER_YEN = 5;
+// A conversão é a MESMA de `_lib/fx.js`, que também serve o checkout: Wise →
+// open-er-api → taxa fixa, cushion de 4% fora da Wise, buffer de ¥5.
+//
+// O feed tinha uma tabela própria, fixa em 1/28 com cushion de 6% e sem consulta
+// à taxa viva. Isso publicava a maionese Kewpie por R$45,62 enquanto o site
+// cobrava R$38 — 20% acima. O Google compara o preço do feed com o da página de
+// destino e suspende a conta por divergência.
+const CURRENCY_BY_REGION = { eu: 'EUR', us: 'USD', br: 'BRL' };
 
-// region: 'br' | 'eu' | 'us'
-function fxForRegion(region) {
-  if (region === 'eu') return FX.EUR;
-  if (region === 'us') return FX.USD;
-  return FX.BRL;
-}
-function convertYen(yen, region) {
-  const fx = fxForRegion(region);
-  return Math.round((yen + BUFFER_YEN) * fx.rate * (1 + fx.cushion) * 100) / 100;
+function currencyForRegion(region) {
+  return CURRENCY_BY_REGION[region] || 'BRL';
 }
 
 // ── Tabelas Japan Post (mesmos dados de src/utils/japanPostRates.ts) ─────────
@@ -109,95 +104,6 @@ const REGION_COUNTRIES = {
   ],
 };
 
-// ── Marca do fabricante ──────────────────────────────────────────────────────
-// O Firestore não tem campo `brand`, então a marca sai do nome do produto.
-// Declarar "Japan Express" nos 296 itens faz o Google reprovar por marca
-// incorreta (os produtos são Kewpie, Bioré, Glico) e ainda colide com as outras
-// empresas chamadas "Japan Express" — logística e frete de automóveis.
-//
-// A primeira entrada que casar vence, então a ordem importa: "ReFa" precisa vir
-// antes de "honey" por causa de "ReFa Honey Queen", e "Senka" antes de qualquer
-// coisa da Shiseido. Marcas de uma sigla só (VT, OXY, QY, Kao) usam `\b` para
-// não casar dentro de outra palavra — sem isso "Deoxyribose" viraria OXY.
-const BRANDS = [
-  ['Beauty of Joseon', /beauty of joseon/i],
-  ['The Animal Organics', /the animal organics/i],
-  ['Keana Nadeshiko', /keana nadeshiko/i],
-  ['Nature Republic', /nature republic/i],
-  ['Yum Yum Yum!', /yum yum yum/i],
-  ['Japan Premium', /japan premium/i],
-  ['Black Thunder', /black thunder/i],
-  ['Tokyo Banana', /tokyo banana/i],
-  ['Hada Labo', /hada\s*labo/i],
-  ['Skin Aqua', /skin\s*aqua/i],
-  ['Melano CC', /melano\s*cc/i],
-  ['Dr. Althea', /dr\.?\s*althea/i],
-  ['Baby Star', /baby star/i],
-  ['Gwangcheon', /gwangcheon/i],
-  ['Ito En', /\bito en\b/i],
-  ['ReFa', /\brefa\b/i],
-  ['SKIN1004', /skin\s*1004/i],
-  ['Medicube', /medicube/i],
-  ['Bioré', /bior[eé]/i],
-  ['&honey', /&\s*honey|\bhoney\b/i],
-  ['Glico', /\bglico\b|\bpocky\b|\bpretz\b|\bcaplico\b/i],
-  ['Obagi', /\bobagi\b/i],
-  ['Anessa', /\banessa\b/i],
-  ['Senka', /\bsenka\b/i],
-  ['Naturie', /naturie|hatomugi/i],
-  ['Doggyman', /doggyman/i],
-  ['Elizavecca', /elizavecca/i],
-  ['Cosparade', /cosparade/i],
-  ['Marukome', /marukome/i],
-  ['Marumiya', /marumiya/i],
-  ['Maruchan', /maruchan/i],
-  ['Morinaga', /morinaga/i],
-  ['LuLuLun', /lululun/i],
-  ['Celimax', /celimax/i],
-  ['Kasugai', /kasugai/i],
-  ['House Foods', /\bhouse\b/i],
-  ['lilyeve', /lilyeve/i],
-  ['Tsubaki', /tsubaki/i],
-  ['Umaibo', /umaibo/i],
-  ['TIRTIR', /tirtir/i],
-  ['Calbee', /calbee/i],
-  ['Gatsby', /gatsby/i],
-  ['Eyebon', /eyebon/i],
-  ['Peloty', /peloty/i],
-  ['Ululis', /ululis/i],
-  ['Kewpie', /\bkewpie\b/i],
-  ['KitKat', /kit\s*kat/i],
-  ['PetitQ', /petit\s*q/i],
-  ['Nissin', /\bnissin\b/i],
-  ['Kanro', /\bkanro\b/i],
-  ['Lotte', /\blotte\b/i],
-  ['Meiji', /\bmeiji\b/i],
-  ['Nippn', /\bnippn\b/i],
-  ['Kose', /\bkose\b/i],
-  ['Fino', /\bfino\b/i],
-  ['Ritz', /\britz\b/i],
-  ['CIAO', /\bciao\b/i],
-  ['S&B', /s\s*&\s*b\b/i],
-  ['DHC', /\bdhc\b/i],
-  ['OXY', /\boxy\b/i],
-  ['Kao', /\bkao\b/i],
-  ['8x4', /\b8x4\b/i],
-  ['VT', /\bvt\b/i],
-  ['QY', /\bqy\b/i],
-];
-
-// Sem marca reconhecida, a loja assina o produto. "Store" no fim evita a colisão
-// com as transportadoras homônimas.
-const FALLBACK_BRAND = 'Japan Express Store';
-
-export function detectBrand(name) {
-  const alvo = String(name || '');
-  for (const [marca, padrao] of BRANDS) {
-    if (padrao.test(alvo)) return marca;
-  }
-  return FALLBACK_BRAND;
-}
-
 // google_product_category pela categoria da loja, usando a taxonomia oficial:
 //   469  Saúde e beleza
 //   422  Alimentos, bebidas e tabaco > Alimentos
@@ -209,9 +115,9 @@ export const GOOGLE_CATEGORY = { cosmeticos: 469, doces: 422, pet: 2 };
 const DEFAULT_CATEGORY = 469;
 
 // ── Monta os itens do catálogo ───────────────────────────────────────────────
-function buildCatalog(products, region) {
+function buildCatalog(products, region, rates) {
   const zone = region === 'eu' ? 3 : region === 'us' ? 4 : 5;
-  const currency = region === 'eu' ? 'EUR' : region === 'us' ? 'USD' : 'BRL';
+  const currency = currencyForRegion(region);
 
   return products
     .filter(p => {
@@ -243,7 +149,7 @@ function buildCatalog(products, region) {
       // Frete por país de destino da região (cada país tem sua zona/preço)
       const shippingByCountry = (REGION_COUNTRIES[region] || []).map(c => ({
         iso: c.iso,
-        priceLocal: convertYen(cheapestShippingYen(weightG, c.zone) || 0, region),
+        priceLocal: convertYenFx(cheapestShippingYen(weightG, c.zone) || 0, currency, rates),
       }));
 
       return {
@@ -260,9 +166,9 @@ function buildCatalog(products, region) {
         priceYen: productYen,
         shippingYen: shipYen,
         totalYen,
-        priceLocal: convertYen(productYen, region),
-        shippingLocal: convertYen(shipYen, region),
-        totalLocal: convertYen(totalYen, region),
+        priceLocal: convertYenFx(productYen, currency, rates),
+        shippingLocal: convertYenFx(shipYen, currency, rates),
+        totalLocal: convertYenFx(totalYen, currency, rates),
         shippingByCountry,
         currency,
       };
@@ -321,8 +227,8 @@ export default async function handler(req, res) {
   const format = req.query.format === 'json' ? 'json' : 'xml';
 
   try {
-    const products = await fetchProducts();
-    const items = buildCatalog(products, region);
+    const [products, rates] = await Promise.all([fetchProducts(), getFxRates()]);
+    const items = buildCatalog(products, region, rates);
 
     // Cache 6h no CDN da Vercel — feed não precisa ser em tempo real
     res.setHeader('Cache-Control', 's-maxage=21600, stale-while-revalidate=86400');

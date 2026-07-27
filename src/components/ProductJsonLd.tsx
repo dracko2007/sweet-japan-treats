@@ -5,6 +5,7 @@ import { convertYen } from '@/services/fxService';
 import { catalogShippingYen } from '@/utils/catalogShipping';
 import { getCurrencyByCountry } from '@/utils/currency';
 import { getCountryConfig } from '@/data/worldCountries';
+import { detectBrand } from '../../shared/brand.js';
 
 interface Props {
   product: Product;
@@ -41,7 +42,7 @@ const ProductJsonLd: React.FC<Props> = ({ product, country, rating }) => {
       name: product.name,
       image: image ? [image] : undefined,
       description: (product.description || product.name).slice(0, 5000),
-      brand: { '@type': 'Brand', name: 'Japan Express' },
+      brand: { '@type': 'Brand', name: detectBrand(product.name) },
       sku: product.id,
       offers: {
         '@type': 'Offer',
