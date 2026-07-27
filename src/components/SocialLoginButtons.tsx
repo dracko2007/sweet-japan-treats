@@ -1,31 +1,29 @@
 import React from 'react';
 import SocialLoginButton from './SocialLoginButton';
-import PhoneLoginButton from './PhoneLoginButton';
 
 /**
- * Bloco com todos os métodos de login alternativos: Google, Facebook,
- * Twitter/X e telefone (SMS). Usado nas telas de Login e Cadastro abaixo do
- * divisor "ou". Cada provedor só funciona depois de ativado no Firebase Console.
+ * Métodos de login alternativos das telas de Login e Cadastro. O divisor "ou"
+ * que aparece acima mora nas páginas, não aqui — se este bloco não renderizar
+ * nada, sobra um "ou" solto embaixo do formulário.
+ *
+ * Só o Google fica visível. Os outros três continuam fora, cada um por um
+ * motivo diferente:
+ *
+ *   Facebook   app ainda não aprovado no Meta — e o provedor nem existe no
+ *              Firebase, então o clique daria auth/operation-not-allowed
+ *   Twitter/X  configurado e ativo no Firebase, escondido para encurtar o fluxo
+ *   Telefone   SMS ativo no Firebase, escondido pelo mesmo motivo
+ *
+ * Para trazer qualquer um de volta basta a linha do componente — ambos seguem
+ * no repo: `SocialLoginButton` (provider) e `PhoneLoginButton`.
  */
 const SocialLoginButtons: React.FC<{ disabled?: boolean; mode?: 'login' | 'register' }> = ({
   disabled = false,
   mode = 'login',
-}) => {
-  // All social providers disabled temporarily — email/password login only
-  const disableSocial = true;
-
-  if (disableSocial) {
-    return null; // Hide entire section
-  }
-
-  return (
-    <div className="space-y-3">
-      <SocialLoginButton provider="google" mode={mode} disabled={disabled} />
-      <SocialLoginButton provider="facebook" mode={mode} disabled={disabled} />
-      <SocialLoginButton provider="twitter" mode={mode} disabled={disabled} />
-      <PhoneLoginButton disabled={disabled} />
-    </div>
-  );
-};
+}) => (
+  <div className="space-y-3">
+    <SocialLoginButton provider="google" mode={mode} disabled={disabled} />
+  </div>
+);
 
 export default SocialLoginButtons;
