@@ -4,12 +4,36 @@ import { fulfillOrder, markFulfillmentReview } from './_lib/fulfillment.js';
 import { getHeader, HttpError, sendError } from './_lib/http.js';
 import { buildOrderEmail, sendMail } from './_lib/mailer.js';
 
+// `api.bodyParser` é convenção do Next.js. Em função avulsa na Vercel ele é
+// IGNORADO: o corpo `application/json` chega já convertido em objeto, e o
+// Stripe precisa dos bytes originais para conferir a assinatura. Medido em
+// produção em 27/07/2026:
+//   Content-Type: application/json         -> req.body vira objeto
+//   Content-Type: application/octet-stream -> req.body fica cru
+// Mantido porque não atrapalha e passa a valer se o projeto migrar para Next.
 export const config = { api: { bodyParser: false } };
 
+/**
+ * Devolve os bytes exatos do corpo, na ordem de preferência:
+ *
+ * 1. `rawBody`, quando a plataforma o expõe (Buffer intacto — o ideal)
+ * 2. corpo já cru, como Buffer ou string
+ * 3. re-serialização do objeto parseado
+ * 4. leitura do stream, se nada foi consumido
+ *
+ * O caso 3 é o que salva a Vercel hoje. `JSON.stringify` reproduz os bytes
+ * originais porque o Stripe envia JSON compacto, sem espaços, e o JavaScript
+ * preserva a ordem das chaves de string. Não é garantido pelo padrão, por isso
+ * vem depois das opções que usam os bytes de verdade — e, se a reconstrução
+ * divergir num único caractere, a assinatura falha de forma visível em vez de
+ * aceitar um evento adulterado.
+ */
 async function rawBody(req) {
+  if (Buffer.isBuffer(req.rawBody)) return req.rawBody;
+  if (typeof req.rawBody === 'string') return Buffer.from(req.rawBody, 'utf8');
   if (Buffer.isBuffer(req.body)) return req.body;
-  if (typeof req.body === 'string') return Buffer.from(req.body);
-  if (req.body && typeof req.body === 'object') throw new HttpError(400, 'raw_body_required');
+  if (typeof req.body === 'string') return Buffer.from(req.body, 'utf8');
+  if (req.body && typeof req.body === 'object') return Buffer.from(JSON.stringify(req.body), 'utf8');
   const chunks = [];
   for await (const chunk of req) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
   return Buffer.concat(chunks);
