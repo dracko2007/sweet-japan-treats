@@ -756,10 +756,11 @@ const OrderReview: React.FC = () => {
                         <Label htmlFor="wise" className="flex-1 cursor-pointer">
                           <div className="flex items-center gap-2 mb-1">
                             <Wallet className="w-5 h-5 text-emerald-600" />
-                            <span className="font-bold text-base text-gray-800">Wise (Transferência Internacional)</span>
+                            <span className="font-bold text-base text-gray-800">Wise — pague com PIX</span>
                           </div>
                           <p className="text-xs text-muted-foreground leading-relaxed">
-                            Pague em qualquer moeda com câmbio justo. Mostraremos o link de pagamento Wise na próxima tela.
+                            Você paga em <strong>reais, por PIX</strong>, dentro da Wise. Ela converte e envia
+                            os ienes para a loja. O link de pagamento aparece na próxima tela.
                           </p>
                           <div className="mt-2 flex flex-col gap-1">
                             <div className="flex items-start gap-1.5 text-[11px] text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-md px-2 py-1.5">
@@ -806,8 +807,18 @@ const OrderReview: React.FC = () => {
                         </div>
                       )}
 
-                      {/* PIX Option */}
-                      {paySettings.pixEnabled ? (
+                      {/* PIX direto. Fica DESLIGADO no painel: a remessa para o Japão
+                          come IOF mais taxa de conversão, e o mesmo PIX pago dentro da
+                          Wise não paga IOF — o caminho existe, só não é este.
+
+                          Quando desligado a opção não é desenhada. Um botão cinza
+                          "em manutenção" num site novo o cliente lê como site quebrado,
+                          e ele não vai deduzir sozinho que o PIX está logo acima, na Wise.
+                          O código fica: religar é trocar `pixEnabled` no painel.
+
+                          Não precisa de guarda contra ficar selecionado e invisível: o
+                          efeito da linha ~97 já troca para o primeiro método ativo. */}
+                      {paySettings.pixEnabled && (
                       <div className={cn(
                         "flex items-start space-x-3 p-4 rounded-xl border-2 transition-all cursor-pointer",
                         paymentMethod === 'pix' ? "border-pink-500 bg-pink-50/50" : "border-border hover:border-gray-300"
@@ -823,20 +834,6 @@ const OrderReview: React.FC = () => {
                           </p>
                         </Label>
                       </div>
-                      ) : (
-                        <div className="flex items-start space-x-3 p-4 rounded-xl border-2 border-border opacity-60 cursor-not-allowed">
-                          <RadioGroupItem value="pix" id="pix" className="mt-1" disabled />
-                          <Label htmlFor="pix" className="flex-1">
-                            <div className="flex items-center gap-2 mb-1">
-                              <Smartphone className="w-5 h-5 text-gray-400" />
-                              <span className="font-bold text-base text-gray-600">PIX</span>
-                              <span className="text-[10px] bg-gray-400 text-white font-extrabold px-2 py-0.5 rounded-full uppercase">Em manutenção</span>
-                            </div>
-                            <p className="text-xs text-muted-foreground leading-relaxed">
-                              Pagamento via PIX em manutenção. Volta em breve!
-                            </p>
-                          </Label>
-                        </div>
                       )}
 
                       {/* Credit Card Option (Stripe) */}
