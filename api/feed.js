@@ -11,6 +11,7 @@
 // Produtos são públicos no Firestore (allow read: if true) — lê via REST sem auth.
 
 import { detectBrand } from '../shared/brand.js';
+import { minEffectiveYen, variantPrices } from '../shared/pricing.js';
 import { fetchProducts, escapeXml, isVisibleInternationally } from './_lib/firestore-products.js';
 import { convertYen as convertYenFx, getFxRates } from './_lib/fx.js';
 
@@ -66,20 +67,10 @@ function cheapestShippingYen(weightG, zone) {
   return opts.length ? Math.min(...opts) : null;
 }
 
-// ── Lógica de preço do produto (espelha src/utils/pricing.ts) ────────────────
-function getVariants(p) {
-  if (Array.isArray(p.variants) && p.variants.length) return p.variants;
-  return [
-    { id: 'small', label: 'Pequeno', price: p.prices?.small || 0 },
-    { id: 'large', label: 'Grande', price: p.prices?.large || p.prices?.small || 0 },
-  ].filter(v => v.price > 0);
-}
-function minEffectiveYen(p) {
-  const vs = getVariants(p);
-  if (!vs.length) return 0;
-  const disc = p.discountPercent > 0 ? (1 - p.discountPercent / 100) : 1;
-  return Math.min(...vs.map(v => Math.round(v.price * disc)));
-}
+// ── Preço: `shared/pricing.js`, o mesmo módulo da vitrine e do checkout ──────
+// Este arquivo tinha a própria cópia, anunciada como "espelha
+// src/utils/pricing.ts" — e sem o arredondamento dos outros dois. Três produtos
+// saíam com preço menor do que o site cobra.
 
 // Peso usado para frete: weightGrams real, ou estimativa por tamanho
 function productWeightG(p) {
@@ -122,7 +113,7 @@ function buildCatalog(products, region, rates) {
   return products
     .filter(p => {
       if (!isVisibleInternationally(p)) return false;
-      return getVariants(p).length > 0;
+      return variantPrices(p).length > 0;
     })
     .map(p => {
       const productYen = minEffectiveYen(p);

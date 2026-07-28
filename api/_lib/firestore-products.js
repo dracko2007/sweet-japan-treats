@@ -47,6 +47,13 @@ export async function fetchProducts() {
 
 // Catálogo internacional: some produtos só podem ser entregues dentro do Japão
 // e não devem aparecer em sitemap/feeds voltados a clientes de fora.
+//
+// `__deleted` é obrigatório aqui. O painel apaga produto por soft delete: o
+// documento fica no Firestore como lápide para que os navegadores com cache
+// aprendam a remoção pelo delta (`src/services/productService.ts:remove`). Como
+// este módulo lê a coleção crua, 29 produtos já apagados continuavam sendo
+// anunciados no Google — e cada clique caía em "produto não encontrado", que é
+// dinheiro de anúncio queimado e motivo de reprovação no Merchant Center.
 export function isVisibleInternationally(p) {
-  return !p.hidden && p.deliveryRestrict !== 'japan-only';
+  return !p.hidden && !p.__deleted && p.deliveryRestrict !== 'japan-only';
 }

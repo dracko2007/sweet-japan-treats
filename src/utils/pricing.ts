@@ -1,13 +1,11 @@
 import { Product, ProductVariant } from '@/types';
 
-/** Arredonda preço em ¥ para cima: resto 1-50 → xx50, 51-80 → xx80, 81-99 → próximo xx00. */
-export const roundYen = (value: number): number => {
-  const r = value % 100;
-  if (r === 0 || r === 50 || r === 80) return value;
-  if (r < 50) return value - r + 50;
-  if (r <= 80) return value - r + 80;
-  return value - r + 100;
-};
+// `roundYen` mora em `shared/pricing.js` para não existir uma cópia por lado.
+// A do feed tinha ficado sem ele, e o Google recebia preço menor do que o site
+// cobra — divergência que suspende conta no Merchant Center.
+import { roundYen } from '../../shared/pricing.js';
+
+export { roundYen };
 
 /** Promoção ativa? (desconto entre 1 e 99%) */
 export const hasDiscount = (product: Pick<Product, 'discountPercent'>): boolean => {

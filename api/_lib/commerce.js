@@ -1,3 +1,4 @@
+import { roundYen } from '../../shared/pricing.js';
 import { HttpError } from './http.js';
 import { convertYen, currencyForCountry } from './fx.js';
 
@@ -82,14 +83,7 @@ const COUNTRY_CONFIG = new Map([
 ]);
 const US_TAX = { AL:.0924,AK:.0176,AZ:.0838,AR:.0947,CA:.0882,CO:.0777,CT:.0635,DE:0,FL:.0702,GA:.0735,HI:.0444,ID:.0603,IL:.0888,IN:.07,IA:.0694,KS:.0869,KY:.06,LA:.0955,ME:.055,MD:.06,MA:.0625,MI:.06,MN:.0749,MS:.07,MO:.0825,MT:0,NE:.0694,NV:.0823,NH:0,NJ:.066,NM:.0762,NY:.0852,NC:.0698,ND:.0697,OH:.0723,OK:.0899,OR:0,PA:.0634,RI:.07,SC:.0744,SD:.064,TN:.0955,TX:.082,UT:.0719,VT:.0624,VA:.0573,WA:.0938,WV:.0656,WI:.0543,WY:.0536,DC:.06 };
 
-export function roundYen(value) {
-  const integer = Math.max(0, Math.round(Number(value) || 0));
-  const remainder = integer % 100;
-  if (remainder === 0 || remainder === 50 || remainder === 80) return integer;
-  if (remainder < 50) return integer - remainder + 50;
-  if (remainder <= 80) return integer - remainder + 80;
-  return integer - remainder + 100;
-}
+export { roundYen };
 
 function baseYen(product, variantId) {
   const variants = Array.isArray(product.variants) && product.variants.length
