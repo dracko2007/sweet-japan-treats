@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useUser } from '@/context/UserContext';
 import { useToast } from '@/hooks/use-toast';
+import { useLanguage } from '@/context/LanguageContext';
 import { Button } from '@/components/ui/button';
 import type { SocialProvider } from '@/services/firebaseSyncService';
 
@@ -10,6 +11,11 @@ import type { SocialProvider } from '@/services/firebaseSyncService';
  * Todos os provedores federados retornam o e-mail JÁ verificado, então o fluxo
  * de confirmação de e-mail é pulado — o maior gatilho de cadastro. O redirect
  * pós-login é tratado pelo useEffect de cada página ao perceber isAuthenticated.
+ *
+ * Toda a cópia sai do dicionário: a loja abre em japonês para quem acessa do
+ * Japão, e o rótulo escrito no JSX aparecia em português no meio de ログイン e
+ * パスワードを忘れた？. `loginWithProvider` devolve o código cru do Firebase —
+ * a frase mostrada ao cliente nasce aqui, já traduzida.
  */
 
 type Brand = { label: string; className: string; icon: React.ReactNode };
@@ -47,6 +53,24 @@ const BRANDS: Record<SocialProvider, Brand> = {
   },
 };
 
+// Códigos do Firebase que significam "o cliente desistiu" — fechar o popup não
+// é erro, então não vira toast.
+const CANCEL_CODES = ['popup-closed-by-user', 'cancelled-popup-request', 'cancel-popup-request'];
+
+// Código do Firebase → chave do dicionário. `includes` porque o código vem
+// prefixado (`auth/popup-blocked`). Três códigos distintos descrevem a mesma
+// falha de configuração e compartilham a mesma frase.
+const ERROR_KEYS: ReadonlyArray<readonly [string, string]> = [
+  ['popup-blocked', 'auth.social.error.popupBlocked'],
+  ['account-exists-with-different-credential', 'auth.social.error.otherMethod'],
+  ['operation-not-allowed', 'auth.social.error.notEnabled'],
+  ['unauthorized-domain', 'auth.social.error.domain'],
+  ['network-request-failed', 'auth.social.error.network'],
+  ['configuration-not-found', 'auth.social.error.misconfigured'],
+  ['internal-error', 'auth.social.error.misconfigured'],
+  ['invalid-credential', 'auth.social.error.misconfigured'],
+];
+
 const SocialLoginButton: React.FC<{
   provider: SocialProvider;
   mode?: 'login' | 'register';
@@ -55,9 +79,21 @@ const SocialLoginButton: React.FC<{
   const navigate = useNavigate();
   const { loginWithProvider } = useUser();
   const { toast } = useToast();
+  const { t } = useLanguage();
   const [loading, setLoading] = useState(false);
   const brand = BRANDS[provider];
-  const verb = mode === 'register' ? 'Cadastrar com' : 'Entrar com';
+  const label = t(mode === 'register' ? 'auth.social.register' : 'auth.social.login')
+    .replace('{provider}', brand.label);
+
+  // `null` = nada a mostrar. O código cru entra na frase genérica porque é o
+  // que permite diagnosticar uma falha relatada por cliente em produção.
+  const errorMessage = (code: string): string | null => {
+    if (CANCEL_CODES.some(c => code.includes(c))) return null;
+    const hit = ERROR_KEYS.find(([c]) => code.includes(c));
+    if (hit) return t(hit[1]).replace('{host}', window.location.hostname);
+    if (code === 'unknown') return t('auth.social.error.unknown');
+    return t('auth.social.error.generic').replace('{code}', code);
+  };
 
   const handleClick = async () => {
     setLoading(true);
@@ -65,12 +101,13 @@ const SocialLoginButton: React.FC<{
       const result = await loginWithProvider(provider);
       if (result.success && result.error === 'new-user') {
         // Novo usuário — redirecionar para cadastro
-        toast({ title: 'Completa seu cadastro', description: 'Complete seus dados para finalizar o cadastro.' });
+        toast({ title: t('auth.social.newUser.title'), description: t('auth.social.newUser.desc') });
         navigate('/cadastro');
       } else if (result.success) {
-        toast({ title: 'Login realizado!', description: 'Bem-vindo(a)!' });
-      } else if (result.error && result.error !== 'Login cancelado.') {
-        toast({ title: 'Não foi possível entrar', description: result.error, variant: 'destructive' });
+        toast({ title: t('auth.social.success.title'), description: t('auth.social.success.desc') });
+      } else if (result.error) {
+        const message = errorMessage(result.error);
+        if (message) toast({ title: t('auth.social.error.title'), description: message, variant: 'destructive' });
       }
     } finally {
       setLoading(false);
@@ -86,7 +123,7 @@ const SocialLoginButton: React.FC<{
       className={`w-full rounded-xl py-5 font-semibold flex items-center justify-center gap-3 border-2 ${brand.className}`}
     >
       <span className="shrink-0 flex items-center justify-center">{brand.icon}</span>
-      {loading ? 'Entrando...' : `${verb} ${brand.label}`}
+      {loading ? t('auth.social.loading') : label}
     </Button>
   );
 };

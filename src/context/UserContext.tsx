@@ -141,6 +141,15 @@ interface UserContextType {
   resendVerificationEmail: () => Promise<boolean>;
 }
 
+// Código de erro do Firebase (ex.: 'auth/popup-blocked') a partir do valor
+// solto que o catch recebe. Estreita de verdade em vez de assertar a forma:
+// quem entra aqui é `unknown` vindo do SDK, e um `as` só esconderia o dia em
+// que o rejeitado não for um FirebaseError.
+const firebaseErrorCode = (error: unknown): string =>
+  error && typeof error === 'object' && 'code' in error && typeof error.code === 'string'
+    ? error.code
+    : '';
+
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
 export const useUser = () => {
@@ -1057,38 +1066,12 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     return userData as UserProfile;
   };
 
-  // Mensagem amigável para os erros mais comuns de OAuth popup.
-  const friendlySocialError = (code: string): string => {
-    if (code.includes('popup-closed-by-user') || code.includes('cancelled-popup-request') || code.includes('cancel-popup-request')) {
-      return 'Login cancelado.';
-    }
-    if (code.includes('popup-blocked')) {
-      return 'Seu navegador bloqueou a janela de login. Libere os popups para este site e tente novamente.';
-    }
-    if (code.includes('account-exists-with-different-credential')) {
-      return 'Já existe uma conta com este e-mail usando outro método de login. Entre por aquele método.';
-    }
-    if (code.includes('operation-not-allowed')) {
-      return 'Este método de login ainda não está ativado no Firebase (Authentication > Sign-in method).';
-    }
-    if (code.includes('unauthorized-domain')) {
-      const host = typeof window !== 'undefined' ? window.location.hostname : 'seu domínio';
-      return `Domínio não autorizado no Firebase. Adicione ${host} em Authentication > Settings > Authorized domains.`;
-    }
-    if (code.includes('network-request-failed')) {
-      return 'Falha de conexão. Verifique sua internet (se estiver usando VPN, tente desativá-la) e tente novamente.';
-    }
-    if (code.includes('configuration-not-found') || code.includes('internal-error') || code.includes('invalid-credential')) {
-      return 'Este provedor não está configurado corretamente no Firebase (faltam App ID/segredo do provedor).';
-    }
-    // Fallback: expõe o código real para facilitar o diagnóstico em produção.
-    return code
-      ? `Não foi possível entrar (${code}). Tente novamente.`
-      : 'Não foi possível entrar. Tente novamente.';
-  };
-
   // Login social genérico (Google, Facebook, Apple, Twitter/X). Provedores
   // federados já trazem o e-mail verificado, então pulam a confirmação manual.
+  //
+  // `error` devolve CÓDIGO, nunca frase — igual ao 'new-user' logo abaixo. A
+  // cópia mostrada ao cliente sai do dicionário em SocialLoginButton, senão a
+  // loja em japonês recebia a mensagem de erro escrita aqui em português.
   const loginWithProvider = async (key: SocialProvider): Promise<{ success: boolean; error?: string }> => {
     try {
       const fbUser = await firebaseSyncService.loginWithProvider(key);
@@ -1120,7 +1103,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       return { success: true };
     } catch (error) {
       devError(`❌ [SOCIAL LOGIN] Falhou (${key}):`, error);
-      return { success: false, error: friendlySocialError((error as { code?: string })?.code || '') };
+      return { success: false, error: firebaseErrorCode(error) || 'unknown' };
     }
   };
 
@@ -1139,7 +1122,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       return { success: true, confirmationResult };
     } catch (error) {
       devError('❌ [PHONE LOGIN] Falha ao enviar SMS:', error);
-      const code = (error as { code?: string })?.code || '';
+      const code = firebaseErrorCode(error);
       if (code.includes('invalid-phone-number')) {
         return { success: false, error: 'Número inválido. Use o formato internacional, ex.: +5511999998888.' };
       }
@@ -1168,7 +1151,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       return { success: true };
     } catch (error) {
       devError('❌ [PHONE LOGIN] Código inválido:', error);
-      const ecode = (error as { code?: string })?.code || '';
+      const ecode = firebaseErrorCode(error);
       if (ecode.includes('invalid-verification-code')) {
         return { success: false, error: 'Código incorreto. Confira os 6 dígitos do SMS.' };
       }
