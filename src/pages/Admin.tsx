@@ -45,6 +45,7 @@ import { customerService } from '@/services/customerService';
 import { requireAdminPassword } from '@/utils/adminGuard';
 import { negotiationService } from '@/services/negotiationService';
 import { COMPANY_PROFILE } from '@/config/companyProfile';
+import { auth } from '@/config/firebase';
 
 const isDev = import.meta.env.DEV;
 const devLog = isDev ? console.log.bind(console) : () => {};
@@ -67,7 +68,7 @@ interface AdminTabItem {
 
 const Admin: React.FC = () => {
   const navigate = useNavigate();
-  const { user, permissions } = useUser();
+  const { user, permissions, authReady } = useUser();
   const { toast } = useToast();
   const [allOrders, setAllOrders] = useState<any[]>([]);
   const [ordersLoading, setOrdersLoading] = useState(true);
@@ -83,6 +84,9 @@ const Admin: React.FC = () => {
   const [cn23Order, setCn23Order] = useState<any | null>(null);
   const [promoModalOpen, setPromoModalOpen] = useState(false);
   const [pendingNegotiationsCount, setPendingNegotiationsCount] = useState(0);
+  // Sem sessão no Firebase (expirada, ou nunca aberta neste navegador): nenhuma
+  // leitura protegida vai passar até entrar de novo.
+  const [noAdminSession, setNoAdminSession] = useState(false);
   const { settings, saveSettings } = useSiteSettings();
 
   // A lista cresce em páginas reais do Firestore; nenhum carregamento integral é feito no navegador.
@@ -91,6 +95,17 @@ const Admin: React.FC = () => {
   const ADMIN_EMAIL = 'dracko2007@gmail.com';
 
   useEffect(() => {
+    // Espera o SDK resolver o estado inicial antes de qualquer leitura. Pedidos
+    // e contagem de clientes exigem token de admin nas regras do Firestore:
+    // disparados antes da sessão existir voltam permission-denied — e ninguém
+    // refaz a consulta sozinho depois.
+    if (!authReady) return;
+    if (!auth?.currentUser) {
+      setNoAdminSession(true);
+      setOrdersLoading(false);
+      return;
+    }
+    setNoAdminSession(false);
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
     let lastRefresh = 0;
     const MIN_INTERVAL_MS = 10_000; // no mínimo 10s entre refreshes
@@ -135,13 +150,16 @@ const Admin: React.FC = () => {
       document.removeEventListener('visibilitychange', onVisible);
       window.removeEventListener('focus', debouncedRefresh);
     };
-  }, [user, navigate]);
+  }, [user, navigate, authReady]);
 
   useEffect(() => {
+    // `onSnapshot` sem sessão erra na primeira resposta e não se reinscreve:
+    // o contador de negociações ficaria zerado o resto da sessão.
+    if (!authReady || !auth?.currentUser) return;
     return negotiationService.listenAll((negs) => {
       setPendingNegotiationsCount(negs.filter(n => n.status === 'pending').length);
     });
-  }, []);
+  }, [authReady]);
 
   const loadOrders = async (append = false) => {
     if (append && (!ordersHasMore || ordersLoadingMore)) return;
@@ -165,7 +183,9 @@ const Admin: React.FC = () => {
       }
       toast({
         title: 'Erro ao carregar pedidos',
-        description: 'Não foi possível consultar o Firestore. Tente novamente.',
+        description: auth?.currentUser
+          ? 'Não foi possível consultar o Firestore. Tente novamente.'
+          : 'Sua sessão de admin não está ativa. Entre novamente para ver os pedidos.',
         variant: 'destructive',
       });
     } finally {
@@ -766,6 +786,19 @@ _This is an automated test message_
           </div>
         </div>
       </div>
+
+      {noAdminSession && (
+        <div className="container mx-auto px-4 pt-6">
+          <div className="max-w-7xl mx-auto rounded-xl border border-destructive/40 bg-destructive/10 p-4 flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-destructive">
+              Sua sessão de admin não está ativa. Pedidos, clientes e dashboard só carregam depois de entrar novamente.
+            </p>
+            <Button variant="destructive" size="sm" onClick={() => navigate('/login')}>
+              Entrar novamente
+            </Button>
+          </div>
+        </div>
+      )}
 
       <section className="py-12 bg-background">
         <div className="container mx-auto px-4">

@@ -630,6 +630,11 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       }
     });
 
+    // Sem Firebase (config ausente ou init que falhou) o listener acima nunca
+    // dispara: `authReady` ficaria false para sempre e as telas que esperam por
+    // ele (checkout, perfil, painel) travariam no estado de carregando.
+    if (!firebaseConfigReady || !auth) setAuthReady(true);
+
     return () => unsubscribe();
   }, []);
 
@@ -707,15 +712,19 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
         address: { postalCode: '', prefecture: '', city: '', address: '' },
         createdAt: new Date().toISOString(),
       };
-      setUser(adminUser);
-      setIsAuthenticated(true);
-      setCoupons([]);
-      setOrders([]);
+      // Grava o admin no localStorage ANTES de autenticar no Firebase: quando
+      // `onAuthStateChanged` disparar, o guard do listener já encontra o admin
+      // salvo e não sobrescreve a sessão com um perfil de cliente.
+      const previousStoredUser = safeStorage.getItem('user');
       safeStorage.setItem('user', JSON.stringify(stripSensitive(adminUser)));
 
-      // Autentica no Firebase DEPOIS de salvar estado+localStorage.
-      // Assim quando onAuthStateChanged disparar, o guard do listener (linha ~463)
-      // já encontra o admin no localStorage e retorna cedo.
+      // O painel só funciona COM sessão do Firebase: pedidos, clientes,
+      // negociações e todas as rotas /api exigem token de admin. Antes o
+      // `setUser` vinha ANTES deste await — a tela de login navegava para
+      // /admin no mesmo instante, o painel montava e disparava as leituras
+      // privilegiadas enquanto o signIn ainda estava no ar. Dava
+      // permission-denied em `users`/`negotiations` e dashboard sem dados,
+      // exatamente a impressão de "voltou deslogado" logo depois de entrar.
       if (auth) {
         try {
           if (adminSession.customToken) {
@@ -724,9 +733,23 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
             await signInWithEmailAndPassword(auth, ADMIN_EMAIL, password);
           }
         } catch (err) {
-          devWarn('⚠️ Admin verificado, mas signIn do SDK falhou:', err);
+          // Antes isto era só um `devWarn`: em produção o admin entrava num
+          // painel que não conseguia ler nada e nada explicava o porquê.
+          devError('❌ Admin verificado, mas signIn do SDK falhou:', err);
+          if (previousStoredUser) safeStorage.setItem('user', previousStoredUser);
+          else safeStorage.removeItem('user');
+          return {
+            success: false,
+            error: 'Senha correta, mas não foi possível abrir a sessão do painel. Tente novamente.',
+            code: firebaseErrorCode(err),
+          };
         }
       }
+
+      setUser(adminUser);
+      setIsAuthenticated(true);
+      setCoupons([]);
+      setOrders([]);
       devLog(`✅ Admin "${adminSession.name}" (nível ${adminSession.role}) logado`);
       return { success: true };
     }
