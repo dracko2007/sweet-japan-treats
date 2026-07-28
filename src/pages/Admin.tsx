@@ -156,8 +156,9 @@ const Admin: React.FC = () => {
     // `onSnapshot` sem sessão erra na primeira resposta e não se reinscreve:
     // o contador de negociações ficaria zerado o resto da sessão.
     if (!authReady || !auth?.currentUser) return;
-    return negotiationService.listenAll((negs) => {
-      setPendingNegotiationsCount(negs.filter(n => n.status === 'pending').length);
+    // Só as pendentes: o sino precisa do número, não da coleção inteira.
+    return negotiationService.listenPending((pendentes) => {
+      setPendingNegotiationsCount(pendentes.length);
     });
   }, [authReady]);
 

@@ -47,6 +47,21 @@ export const negotiationService = {
     );
   },
 
+  // Só o contador do sino do painel. Filtrado NO SERVIDOR de propósito: com
+  // `listenAll`, abrir o painel baixava a coleção inteira de negociações só
+  // para contar as pendentes, e cada documento carrega o carrinho e o
+  // formulário de checkout completos — custo que cresce para sempre. Pendência
+  // dura 24h, então este conjunto é pequeno por definição.
+  //
+  // Um único filtro de igualdade não exige índice composto.
+  listenPending(cb: (pendentes: Negotiation[]) => void): () => void {
+    return onSnapshot(
+      query(collection(db, COL), where('status', '==', 'pending')),
+      (snap) => cb(snap.docs.map((d) => d.data() as Negotiation)),
+      (err) => console.error('[negotiations] listenPending error:', err)
+    );
+  },
+
   // userId pode ser o Firebase UID ou o email do usuário.
   // Sem orderBy para não exigir índice composto — ordena em JS.
   listenByUser(userId: string, cb: (negs: Negotiation[]) => void): () => void {
