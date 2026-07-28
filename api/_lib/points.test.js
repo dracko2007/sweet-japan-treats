@@ -85,3 +85,66 @@ describe('pontos do pedido', () => {
     expect(earnedPointsForOrder(0, 0)).toBe(0);
   });
 });
+
+// Ponto paga mercadoria. Frete e taxa do personal shopper são serviço prestado
+// — se o resgate pudesse cobri-los, um pedido grande o bastante sairia com a
+// loja pagando a remessa do próprio bolso.
+describe('no que o ponto pode ser gasto', () => {
+  it('resgate absurdo zera os produtos e não encosta no frete nem na taxa', () => {
+    const q = pedido({ redeemPoints: 99999 });
+
+    expect(q.redeemPoints).toBe(10000);      // teto = subtotal dos produtos
+    expect(q.netProductsYen).toBe(0);
+    expect(q.shippingYen).toBeGreaterThan(0);
+    expect(q.psFeeYen).toBe(2000);
+    expect(q.total).toBeGreaterThan(0);      // ainda sobra frete + taxa a pagar
+  });
+
+  it('o teto respeita o cupom, para o total da tela bater com o cobrado', () => {
+    const q = pedido({ redeemPoints: 10000, coupon: CUPOM_10 });
+
+    expect(q.couponDiscountYen).toBe(1000);
+    expect(q.redeemPoints).toBe(9000);
+  });
+});
+
+// A taxa é a margem do serviço. Descontar a taxa E aceitar ponto no lugar do
+// produto produz um pedido que não paga nem a mercadoria nem o trabalho.
+describe('pontos com taxa de personal shopper negociada', () => {
+  const negociacaoAprovada = {
+    type: 'ps_fee',
+    status: 'approved',
+    approvedBy: 'admin-uid',
+    approvedDiscountYen: 1500,
+  };
+
+  it('recusa a combinação em vez de descartar um dos dois em silêncio', () => {
+    expect(() => pedido({ redeemPoints: 2000, negotiation: negociacaoAprovada }))
+      .toThrowError(expect.objectContaining({ statusCode: 409, code: 'points_with_ps_negotiation' }));
+  });
+
+  it('a taxa negociada sozinha continua valendo', () => {
+    const q = pedido({ negotiation: negociacaoAprovada });
+
+    expect(q.psFeeYen).toBe(500); // ¥2.000 − ¥1.500 negociados
+    expect(q.earnedPoints).toBe(100);
+  });
+
+  it('os pontos sozinhos continuam valendo', () => {
+    const q = pedido({ redeemPoints: 2000 });
+
+    expect(q.redeemPoints).toBe(2000);
+    expect(q.psFeeYen).toBe(2000);
+  });
+
+  // Só a taxa é exclusiva com pontos. Frete negociado não tem esse conflito.
+  it('desconto negociado no frete convive com pontos', () => {
+    const q = pedido({
+      redeemPoints: 2000,
+      negotiation: { type: 'shipping', status: 'approved', approvedBy: 'admin-uid', approvedDiscountYen: 500 },
+    });
+
+    expect(q.redeemPoints).toBe(2000);
+    expect(q.shippingYen).toBe(3400); // ¥3.900 − ¥500
+  });
+});

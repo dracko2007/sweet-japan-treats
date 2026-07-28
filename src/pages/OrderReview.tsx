@@ -136,9 +136,20 @@ const OrderReview: React.FC = () => {
     (sum, item) => item.freeGift ? sum : sum + convertYen(effectiveYen(item.product, item.size)) * item.quantity, 0
   );
 
-  // Resgate de pontos (1 ponto = ¥1). Não pode passar do valor dos produtos.
+  // Resgate de pontos (1 ponto = ¥1). Paga só mercadoria — nunca frete nem a
+  // taxa do personal shopper. O teto desconta o cupom porque o servidor também
+  // desconta (`api/_lib/commerce.js`); sem isso a tela deixaria arrastar até o
+  // subtotal cheio e o total exibido não bateria com o cobrado.
+  //
+  // Com desconto negociado na taxa, o resgate fica travado: o servidor recusa a
+  // combinação com `points_with_ps_negotiation`, e é melhor a trava aparecer
+  // aqui do que o pedido falhar no fim.
   const availablePoints = user?.points || 0;
-  const maxRedeemable = Math.min(availablePoints, Math.floor(productSubtotalYen / POINTS.yenPerPoint));
+  const couponDiscountYen = couponDiscount > 0 ? Math.floor(yenFromConverted(couponDiscount, currency)) : 0;
+  const psFeeNegociada = psFeeDiscountYen > 0;
+  const maxRedeemable = psFeeNegociada
+    ? 0
+    : Math.min(availablePoints, Math.max(0, Math.floor((productSubtotalYen - couponDiscountYen) / POINTS.yenPerPoint)));
   const redeemPoints = Math.max(0, Math.min(pointsToUse, maxRedeemable));
   const pointsDiscount = convertYen(redeemPoints * POINTS.yenPerPoint); // desconto na moeda exibida
   // Mesma função que `api/_lib/commerce.js` usa para creditar — o número que
@@ -294,9 +305,15 @@ const OrderReview: React.FC = () => {
       setStripeClientSecret(result.clientSecret || '');
       setPaymentModal(true);
     } catch (error) {
+      // A tela já trava a combinação; este é o caminho de quem chegou aqui com
+      // a página aberta desde antes da negociação ser aprovada. Sem traduzir, o
+      // cliente veria o código cru do servidor.
+      const codigo = error instanceof Error ? error.message : '';
       toast({
         title: 'Não foi possível criar o pedido',
-        description: error instanceof Error ? error.message : 'Revise os itens e tente novamente.',
+        description: codigo === 'points_with_ps_negotiation'
+          ? 'Este pedido já tem desconto negociado na taxa do Personal Shopper, e os dois benefícios não se somam. Zere os pontos para continuar.'
+          : codigo || 'Revise os itens e tente novamente.',
         variant: 'destructive',
       });
     } finally {
@@ -473,21 +490,33 @@ const OrderReview: React.FC = () => {
                         </span>
                         <span className="text-[11px] text-purple-700">1 ponto = ¥1</span>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="number" min={0} max={maxRedeemable}
-                          value={pointsToUse || ''}
-                          onChange={(e) => setPointsToUse(Math.max(0, Math.min(maxRedeemable, Number(e.target.value) || 0)))}
-                          placeholder="0"
-                          className="w-24 px-2 py-1.5 rounded-lg border border-purple-300 bg-background text-sm"
-                        />
-                        <button type="button" onClick={() => setPointsToUse(maxRedeemable)}
-                          className="text-xs font-semibold text-purple-700 hover:underline">Usar máx. ({maxRedeemable})</button>
-                        {redeemPoints > 0 && (
-                          <button type="button" onClick={() => setPointsToUse(0)}
-                            className="text-xs text-muted-foreground hover:underline ml-auto">limpar</button>
-                        )}
-                      </div>
+                      {psFeeNegociada ? (
+                        <p className="text-xs text-purple-800 dark:text-purple-300 leading-snug">
+                          Você já tem desconto negociado na taxa do Personal Shopper neste pedido, e os dois
+                          benefícios não se somam. Para usar pontos, refaça o pedido sem o desconto da taxa.
+                        </p>
+                      ) : (
+                        <>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="number" min={0} max={maxRedeemable}
+                              value={pointsToUse || ''}
+                              onChange={(e) => setPointsToUse(Math.max(0, Math.min(maxRedeemable, Number(e.target.value) || 0)))}
+                              placeholder="0"
+                              className="w-24 px-2 py-1.5 rounded-lg border border-purple-300 bg-background text-sm"
+                            />
+                            <button type="button" onClick={() => setPointsToUse(maxRedeemable)}
+                              className="text-xs font-semibold text-purple-700 hover:underline">Usar máx. ({maxRedeemable})</button>
+                            {redeemPoints > 0 && (
+                              <button type="button" onClick={() => setPointsToUse(0)}
+                                className="text-xs text-muted-foreground hover:underline ml-auto">limpar</button>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-purple-700 mt-1.5">
+                            Vale só para os produtos — frete e taxa do Personal Shopper não podem ser pagos com pontos.
+                          </p>
+                        </>
+                      )}
                     </div>
                   )}
 

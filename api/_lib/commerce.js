@@ -268,6 +268,10 @@ export function buildQuote({ requestedItems, products, country, prefecture, stat
         : Math.min(regularSubtotalYen, Math.round(regularSubtotalYen * percentage / 100));
     }
   }
+  // Ponto paga mercadoria, e só. O teto é o subtotal dos produtos já sem o
+  // cupom — frete e taxa do personal shopper ficam de fora por construção:
+  // entram no total depois, sem passar por aqui. Resgatar ¥99.999 num pedido
+  // de ¥10.000 zera os produtos e não tira um iene do frete.
   const points = Math.max(0, Math.floor(Number(redeemPoints || 0)));
   const pointsDiscountYen = Math.min(points, Math.max(0, productSubtotalYen - couponDiscountYen));
   const afterBenefitsYen = Math.max(0, productSubtotalYen - couponDiscountYen - pointsDiscountYen);
@@ -282,6 +286,12 @@ export function buildQuote({ requestedItems, products, country, prefecture, stat
     && negotiation.approvedBy !== 'auto'
     && (!negotiation.expiresAt || new Date(negotiation.expiresAt).getTime() > now);
   const psDiscountYen = approved && negotiation.type === 'ps_fee' ? Math.min(psFeeYen, Number(negotiation.approvedDiscountYen || 0)) : 0;
+  // Pontos e taxa negociada não se acumulam. A taxa é a margem do serviço: dar
+  // desconto nela E aceitar pontos no lugar do produto abre um pedido que não
+  // paga nem a mercadoria nem o trabalho. O cliente escolhe um dos dois — e
+  // recusar é melhor que descartar um em silêncio, que faria o total da tela
+  // não bater com o cobrado.
+  if (pointsDiscountYen > 0 && psDiscountYen > 0) throw new HttpError(409, 'points_with_ps_negotiation');
   const shipping = shippingYen(lineItems, country, prefecture, carrier, productSubtotalYen - couponDiscountYen, coupon?.freeShipping === true);
   const shippingDiscountYen = approved && negotiation.type === 'shipping' ? Math.min(shipping.amount, Number(negotiation.approvedDiscountYen || 0)) : 0;
   const finalShippingYen = Math.max(0, shipping.amount - shippingDiscountYen);
