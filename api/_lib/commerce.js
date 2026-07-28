@@ -1,3 +1,4 @@
+import { earnedPointsForOrder } from '../../shared/points.js';
 import { roundYen } from '../../shared/pricing.js';
 import { HttpError } from './http.js';
 import { convertYen, currencyForCountry } from './fx.js';
@@ -305,7 +306,7 @@ export function buildQuote({ requestedItems, products, country, prefecture, stat
     couponDiscountYen,
     pointsDiscountYen,
     redeemPoints: pointsDiscountYen,
-    earnedPoints: Math.floor(netProductsYen / 100),
+    earnedPoints: earnedPointsForOrder(productSubtotalYen, pointsDiscountYen),
     shippingYen: finalShippingYen,
     shippingWeightG: shipping.weightG,
     psFeeYen: psFeeYen - psDiscountYen,

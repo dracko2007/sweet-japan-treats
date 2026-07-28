@@ -21,7 +21,7 @@ import { convertYen as fxConvert, yenFromConverted } from '@/services/fxService'
 import { negotiationService } from '@/services/negotiationService';
 import { psFeeWaiver } from '@/utils/psFeeWaiver';
 import { productService } from '@/services/productService';
-import { pointsForSpendYen, POINTS } from '@/services/pointsService';
+import { earnedPointsForOrder, POINTS } from '@/services/pointsService';
 import { productEnglishName } from '@/utils/productName';
 import { Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -141,8 +141,9 @@ const OrderReview: React.FC = () => {
   const maxRedeemable = Math.min(availablePoints, Math.floor(productSubtotalYen / POINTS.yenPerPoint));
   const redeemPoints = Math.max(0, Math.min(pointsToUse, maxRedeemable));
   const pointsDiscount = convertYen(redeemPoints * POINTS.yenPerPoint); // desconto na moeda exibida
-  // Pontos ganhos pelo gasto em produtos (descontando o que foi pago com pontos)
-  const earnedPoints = pointsForSpendYen(Math.max(0, productSubtotalYen - redeemPoints * POINTS.yenPerPoint));
+  // Mesma função que `api/_lib/commerce.js` usa para creditar — o número que
+  // aparece aqui é exatamente o que vai cair na conta do cliente.
+  const earnedPoints = earnedPointsForOrder(productSubtotalYen, redeemPoints * POINTS.yenPerPoint);
 
   const isPix = paymentMethod === 'pix';
   const subtotalWithCoupon = Math.max(0, baseTotalPrice - couponDiscount - pointsDiscount);

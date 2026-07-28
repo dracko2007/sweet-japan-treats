@@ -3,9 +3,17 @@
 //  - 1 ponto por avaliação (nota 1–5 + comentário), 1 por produto, qualquer nota.
 //  - Vídeo de review: 5 pontos por minuto (1 min = 5, 2 min = 10), 1 vídeo por produto,
 //    liberado SÓ após o admin validar (pode mandar vídeo que não é review).
-//  - 1 ponto a cada 100 ¥ gastos em produtos (sem contar o frete).
+//  - 1 ponto a cada 100 ¥ em produtos. Frete e taxa do personal shopper não
+//    contam; cupom e desconto de pagamento NÃO cortam ponto (vale o valor
+//    cheio da mercadoria). Só o que foi pago com pontos sai da base.
 //  - Aniversário: 1000 pontos para a próxima compra.
 //  - Resgate: 1 ponto = ¥1 de desconto.
+import {
+  earnedPointsForOrder,
+  pointsForSpendYen,
+  POINTS_PER_100_YEN,
+  YEN_PER_POINT,
+} from '../../shared/points.js';
 import { db } from '@/config/firebase';
 import { collection, doc, getDoc, getDocs, setDoc, deleteDoc, updateDoc } from 'firebase/firestore';
 import { safeStorage } from '@/utils/storage';
@@ -20,10 +28,10 @@ const devError = isDev ? console.error.bind(console) : () => {};
 export const POINTS = {
   perReview: 1,
   perVideoMinute: 5,
-  per100YenSpent: 1,
+  per100YenSpent: POINTS_PER_100_YEN,
   birthday: 1000,
-  yenPerPoint: 1,   // 1 ponto = ¥1 de desconto
-  minRedeem: 1000,  // mínimo para resgatar
+  yenPerPoint: YEN_PER_POINT, // 1 ponto = ¥1 de desconto
+  minRedeem: 1000,            // mínimo para resgatar
 };
 
 export type VideoReviewStatus = 'pending' | 'approved' | 'rejected';
@@ -45,9 +53,10 @@ export interface VideoReview {
 const COL = 'video_reviews';
 const LOCAL = 'jp_video_reviews';
 
-/** Pontos pelo gasto em produtos (¥), sem frete. */
-export const pointsForSpendYen = (yen: number): number =>
-  Math.max(0, Math.floor((yen || 0) / 100) * POINTS.per100YenSpent);
+// `pointsForSpendYen` e `earnedPointsForOrder` vêm de `shared/points.js` — a
+// mesma função que `api/_lib/commerce.js` usa para creditar. Reimplementar aqui
+// foi o que fez a tela prometer 100 e o servidor pagar 85.
+export { earnedPointsForOrder, pointsForSpendYen };
 
 /** Pontos por minutos de vídeo: 5 por minuto iniciado (mín. 1 min). */
 export const pointsForVideoMinutes = (minutes: number): number => {
