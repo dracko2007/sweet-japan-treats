@@ -36,6 +36,15 @@ export function migrateLocalStorage(): void {
         }
       }
     }
+
+    // Idioma que a antiga detecção por IP gravava sozinha: apagado uma vez.
+    // Quem acessava do Japão passava a abrir a loja em japonês PARA SEMPRE sem
+    // nunca ter pedido isso — inclusive a dona da loja. Escolha feita no
+    // seletor grava `preferred-language-source` e sobrevive à limpeza.
+    if (localStorage.getItem('preferred-language') !== null
+      && localStorage.getItem('preferred-language-source') === null) {
+      localStorage.removeItem('preferred-language');
+    }
   } catch {
     // localStorage pode estar bloqueado em contextos privados — silencia
   }

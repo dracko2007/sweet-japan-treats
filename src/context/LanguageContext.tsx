@@ -29,10 +29,6 @@ export const useLanguage = () => {
 const ISO_TO_CONFIG: Record<string, import('@/data/worldCountries').CountryConfig> =
   Object.fromEntries(WORLD_COUNTRIES.map(c => [c.iso.toUpperCase(), c]));
 
-function ipToLanguage(code: string): Language {
-  return ISO_TO_CONFIG[code]?.language ?? 'en';
-}
-
 interface LanguageProviderProps { children: ReactNode; }
 
 export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) => {
@@ -50,11 +46,17 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
   const [fxRates, setFxRates] = useState(getRates());
   useEffect(() => { loadFxRates().then(setFxRates); }, []);
 
-  // Auto-detect idioma/país por IP — só na primeira visita (sem preferência salva)
+  // Auto-detect do PAÍS por IP — só na primeira visita (sem país salvo).
+  //
+  // O idioma NÃO é mais derivado do IP. A loja vende produto japonês para
+  // brasileiros, e boa parte deles mora no Japão: derivar `ja` do IP abria a
+  // loja em japonês justamente para quem não lê japonês — inclusive para a
+  // dona da loja, todo dia. País continua vindo do IP porque manda em preço e
+  // frete (¥ no Japão, R$ no Brasil), que é geografia de verdade, não de
+  // leitura. Quem quiser japonês troca no seletor, e a escolha fica salva.
   useEffect(() => {
-    const hasLang    = safeStorage.getItem('preferred-language');
     const hasCountry = safeStorage.getItem('sakura_selected_country');
-    if (hasLang && hasCountry) return; // já tem preferências salvas
+    if (hasCountry) return; // já tem país salvo
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 2000);
@@ -70,11 +72,6 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
         if (!data?.countryCode) return;
         const code = data.countryCode.toUpperCase();
 
-        if (!hasLang) {
-          const lang = ipToLanguage(code);
-          setLanguageState(lang);
-          safeStorage.setItem('preferred-language', lang);
-        }
         if (!hasCountry) {
           const country = ISO_TO_CONFIG[code]?.name;
           if (country) {
@@ -109,6 +106,10 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
   const setLanguage = useCallback((lang: Language) => {
     setLanguageState(lang);
     safeStorage.setItem('preferred-language', lang);
+    // Marca que a escolha foi do usuário. `migrateLocalStorage` usa a marca
+    // para distinguir escolha real do idioma que a detecção por IP gravava
+    // antes — e apagar só o que era automático.
+    safeStorage.setItem('preferred-language-source', 'user');
   }, []);
 
   const setSelectedCountry = useCallback((country: CountryType) => {
