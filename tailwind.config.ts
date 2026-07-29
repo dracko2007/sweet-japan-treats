@@ -97,10 +97,21 @@ export default {
             height: "0",
           },
         },
+        // Usado no CTA de negociar a taxa Personal Shopper: cliente não percebia
+        // que a taxa era negociável, então o botão "respira" até ser clicado.
+        "pulse-zoom": {
+          "0%, 100%": {
+            transform: "scale(1)",
+          },
+          "50%": {
+            transform: "scale(1.05)",
+          },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        "pulse-zoom": "pulse-zoom 2s ease-in-out infinite",
       },
     },
   },

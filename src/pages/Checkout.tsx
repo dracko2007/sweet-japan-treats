@@ -1247,18 +1247,10 @@ const Checkout: React.FC = () => {
                         </div>
                         <div className="flex items-center justify-between mt-1">
                           <span className="text-[10px] text-muted-foreground">{totalQty}x ¥1.000 • serviço de compra</span>
-                          {psFeeWaived ? (
+                          {psFeeWaived && (
                             <span className="text-[10px] text-green-600 font-bold flex items-center gap-0.5">
                               <CheckCircle2 className="w-3 h-3" /> Isenta — oferta
                             </span>
-                          ) : !activeNeg && (
-                            <button
-                              type="button"
-                              onClick={() => setNegModalType('ps_fee')}
-                              className="flex items-center gap-1 text-[10px] font-semibold text-primary hover:underline"
-                            >
-                              <Handshake className="w-3 h-3" /> Negociar
-                            </button>
                           )}
                           {negIsApproved && activeNeg?.type === 'ps_fee' && (
                             <span className="text-[10px] text-green-600 font-bold flex items-center gap-0.5">
@@ -1281,6 +1273,24 @@ const Checkout: React.FC = () => {
                             </span>
                           )}
                         </div>
+                        {/* A dona relatou que todo mundo passava batido pela taxa: o antigo link de
+                            10px parecia rótulo, não convite. Agora é um alvo de toque cheio que
+                            "respira" (pulse-zoom) até ser clicado. Texto "Pedir desconto" em vez de
+                            "Negociar" porque nomeia o benefício, não o processo. */}
+                        {!psFeeWaived && !activeNeg && (
+                          <div className="mt-2">
+                            <button
+                              type="button"
+                              onClick={() => setNegModalType('ps_fee')}
+                              className="w-full min-h-[44px] flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border-2 border-primary bg-pink-50 dark:bg-pink-950/20 text-sm font-bold text-pink-700 dark:text-pink-300 transition-colors hover:bg-pink-700 hover:text-white dark:hover:bg-pink-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 animate-pulse-zoom hover:animate-none motion-reduce:animate-none"
+                            >
+                              <Handshake className="w-5 h-5 shrink-0" /> Pedir desconto nesta taxa
+                            </button>
+                            <p className="text-xs text-muted-foreground mt-1.5 leading-snug">
+                              Esta taxa é negociável: até ¥{(300 * psFeeQty).toLocaleString()} de desconto sai aprovado na hora.
+                            </p>
+                          </div>
+                        )}
                         {psFeeWaived && (
                           <p className="text-[10px] text-amber-600 dark:text-amber-500 mt-1 leading-snug">
                             Isenção válida só para finalização imediata — se sair da página, a taxa volta a ser cobrada.
