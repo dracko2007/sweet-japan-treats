@@ -100,9 +100,12 @@ const SocialLoginButton: React.FC<{
     try {
       const result = await loginWithProvider(provider);
       if (result.success && result.error === 'new-user') {
-        // Novo usuário — redirecionar para cadastro
+        // Cliente JÁ criado pelo provedor (com cupom de boas-vindas) e sessão
+        // aberta — falta endereço e telefone, que se completam no perfil.
+        // `/cadastro` não serve mais: quem já está autenticado é redirecionado
+        // de lá para o perfil no efeito da própria página.
         toast({ title: t('auth.social.newUser.title'), description: t('auth.social.newUser.desc') });
-        navigate('/cadastro');
+        navigate('/perfil');
       } else if (result.success) {
         toast({ title: t('auth.social.success.title'), description: t('auth.social.success.desc') });
       } else if (result.error) {

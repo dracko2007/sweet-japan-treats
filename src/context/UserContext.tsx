@@ -1102,21 +1102,23 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       // Check if user already exists in Firestore
       const existingUser = await firebaseSyncService.getUserFromFirestore(fbUser.uid);
 
-      // Se é novo usuário (não tem cadastro), não logar automaticamente
+      // Primeiro acesso pelo provedor: cria o perfil AGORA, igual ao login por
+      // telefone logo abaixo. Antes daqui só saía `tempSocialSignUp` no
+      // localStorage — e NADA no app lê essa chave. O cliente ficava
+      // autenticado no Firebase e sem documento em `users`: invisível na lista
+      // de clientes do painel, sem cupom de boas-vindas, sem receber e-mail
+      // de marketing — e sem conseguir se cadastrar depois, porque o e-mail já
+      // está em uso no Auth e a senha nova não abre uma conta que é do Google.
+      // Deu dois clientes perdidos até 28/07/2026 (25 contas no Auth, 23 na
+      // lista).
+      //
+      // O sinal 'new-user' continua: o cliente existe, mas ainda falta endereço
+      // e telefone. Quem trata o sinal leva para completar o perfil.
       if (!existingUser) {
-        devLog(`ℹ️ [SOCIAL LOGIN] Novo usuário (${key}) — redirecionando para completar cadastro`);
-        // Salvar dados temporários do Google para uso na página de cadastro
-        const tempData = {
-          tempGoogleUser: {
-            uid: fbUser.uid,
-            email: fbUser.email,
-            displayName: fbUser.displayName,
-            photoURL: (fbUser as any).photoURL,
-          },
-          provider: key,
-        };
-        safeStorage.setItem('tempSocialSignUp', JSON.stringify(tempData));
-        return { success: true, error: 'new-user' }; // Sinal para redirecionar
+        await hydrateSessionFromFirebaseUser(fbUser);
+        devLog(`✅ [SOCIAL LOGIN] Perfil criado no primeiro acesso (${key})`);
+        trackSignUp(key);
+        return { success: true, error: 'new-user' };
       }
 
       // Usuário já existe → fazer login
