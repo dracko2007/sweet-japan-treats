@@ -34,8 +34,33 @@ async function getRegistration(): Promise<ServiceWorkerRegistration> {
   return navigator.serviceWorker.register(SW_PATH, { scope: SW_SCOPE });
 }
 
-/** Doc id estável por assinatura (hash simples do endpoint) — evita duplicar ao reinscrever o mesmo device. */
+// Um documento por APARELHO, não por endpoint.
+//
+// O id vinha do hash do endpoint, e o endpoint muda quando o navegador refaz a
+// inscrição: cada reinscrição criava um documento NOVO e deixava o antigo para
+// trás. O painel passava a contar dois clientes onde havia um, e o envio para o
+// endpoint velho é aceito pelo provedor (HTTP 201) sem nunca aparecer na tela,
+// então nem a limpeza por 404/410 do servidor dava conta dele.
+const DEVICE_KEY = 'jp_push_device';
+
+function deviceId(): string {
+  try {
+    const salvo = localStorage.getItem(DEVICE_KEY);
+    if (salvo) return salvo;
+    const novo = 'dev-' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+    localStorage.setItem(DEVICE_KEY, novo);
+    return novo;
+  } catch {
+    // Sem localStorage cai no hash do endpoint: pior para deduplicar, mas ainda
+    // inscreve o aparelho.
+    return '';
+  }
+}
+
+/** Doc id estável por aparelho; hash do endpoint como reserva. */
 function subscriptionDocId(endpoint: string): string {
+  const device = deviceId();
+  if (device) return device;
   let hash = 0;
   for (let i = 0; i < endpoint.length; i++) hash = (hash * 31 + endpoint.charCodeAt(i)) | 0;
   return 'sub-' + Math.abs(hash).toString(36);
@@ -100,6 +125,34 @@ export const pushService = {
       return { ok: true };
     } catch (e) {
       return { ok: false, error: e instanceof Error ? e.message : String(e) };
+    }
+  },
+
+  /**
+   * Reconcilia navegador ↔ Firestore. Chamado no carregamento do app.
+   *
+   * O registro em '/push/' pode desaparecer sem avisar ninguém — era o que a
+   * recuperação de chunk error fazia a cada deploy, e limpar dados do site tem o
+   * mesmo efeito. Quando isso acontece o silêncio é total: o documento continua
+   * em `push_subscriptions`, o painel conta o cliente como inscrito, o provedor
+   * aceita o envio com HTTP 201 e nada aparece na tela.
+   *
+   * Só age quando a permissão JÁ está concedida: nunca abre diálogo por conta
+   * própria — pedir permissão sem o cliente clicar em nada é o caminho para ele
+   * bloquear notificações para sempre.
+   */
+  async resync(customer: { email: string; name?: string }): Promise<{ ok: boolean; recriada: boolean; error?: string }> {
+    if (!isPushSupported() || !db || !customer.email) return { ok: false, recriada: false };
+    if (Notification.permission !== 'granted') return { ok: false, recriada: false };
+    try {
+      const registro = await navigator.serviceWorker.getRegistration(SW_SCOPE);
+      const inscricao = registro ? await registro.pushManager.getSubscription() : null;
+      // `subscribe` já registra o service worker, inscreve se preciso e grava o
+      // documento — aqui basta reaproveitá-lo e informar se houve recriação.
+      const resultado = await this.subscribe(customer);
+      return { ...resultado, recriada: !inscricao };
+    } catch (e) {
+      return { ok: false, recriada: false, error: e instanceof Error ? e.message : String(e) };
     }
   },
 

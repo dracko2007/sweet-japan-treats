@@ -24,6 +24,7 @@ import InstallPrompt from "./components/InstallPrompt";
 import ExitIntentPopup from "./components/ExitIntentPopup";
 import CartAbandonmentTracker from "./components/CartAbandonmentTracker";
 import CartRecoveryBanner from "./components/CartRecoveryBanner";
+import PushSubscriptionSync from "./components/PushSubscriptionSync";
 import AnimatedPlaneLogo from "./components/AnimatedPlaneLogo";
 import MaintenancePage from "./pages/Maintenance";
 import RouteLoader from "./components/RouteLoader";
@@ -206,6 +207,7 @@ const FullApp: React.FC = () => (
           <ExitIntentPopup />
           <CartAbandonmentTracker />
           <CartRecoveryBanner />
+          <PushSubscriptionSync />
         </TooltipProvider>
       </CartProvider>
       </ProductsProvider>
