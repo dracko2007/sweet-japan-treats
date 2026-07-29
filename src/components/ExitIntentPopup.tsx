@@ -14,6 +14,9 @@ const WARN_KEY = 'exit_waiver_warn_shown';     // aviso de perda da isenção �
 const GUIDE_COOLDOWN_KEY = 'exit_intent_shown_at';
 const GUIDE_COOLDOWN_DAYS = 14;
 const MIN_TIME_ON_PAGE_MS = 6000;
+// Tempo no toque antes de a oferta poder aparecer sozinha. Eram 35s: quem entrava
+// e saía rápido — a maioria no celular — nunca chegava a ver a isenção da taxa.
+const MOBILE_DWELL_MS = 25000;
 
 // Funil de checkout = /checkout + /order-review (revisão/pagamento).
 const inFunnel = (p: string): boolean => p.startsWith('/checkout') || p.startsWith('/order-review');
@@ -153,9 +156,32 @@ const ExitIntentPopup: React.FC = () => {
     let scrolled = false;
     const onScroll = () => { scrolled = true; };
 
+    // No toque não existe "mouse saindo pela borda", então o sinal de saída é
+    // outro: o gesto/botão VOLTAR. É o que a pessoa aperta para abandonar a
+    // página, e é o momento exato em que a oferta faz sentido.
+    //
+    // A âncora empilhada é o que permite ver o voltar sem levar o cliente para
+    // fora: o primeiro voltar consome esse estado extra, cai aqui e abre o
+    // popup; se ele apertar voltar de novo, sai normalmente. Uma interceptação
+    // só, e apenas enquanto a oferta ainda não foi mostrada nesta sessão.
+    let ancoraArmada = false;
+    const onPopState = () => {
+      if (!ancoraArmada) return;
+      ancoraArmada = false;
+      trigger();
+    };
+
     if (isTouch) {
       window.addEventListener('scroll', onScroll, { passive: true });
-      mobileTimer = setTimeout(() => { if (scrolled) trigger(); }, 35000);
+      // 25s (era 35s): tempo demais deixava a maioria sair antes de ver a oferta.
+      mobileTimer = setTimeout(() => { if (scrolled) trigger(); }, MOBILE_DWELL_MS);
+      try {
+        window.history.pushState({ jeExitAnchor: true }, '');
+        ancoraArmada = true;
+        window.addEventListener('popstate', onPopState);
+      } catch {
+        /* history bloqueado — segue só com o timer */
+      }
     } else {
       document.addEventListener('mouseout', onMouseOut);
     }
@@ -163,7 +189,8 @@ const ExitIntentPopup: React.FC = () => {
     return () => {
       document.removeEventListener('mouseout', onMouseOut);
       window.removeEventListener('scroll', onScroll);
-      if (mobileTimer) clearTimeout(mobileTimer);
+      window.removeEventListener('popstate', onPopState);
+      clearTimeout(mobileTimer);
     };
   }, [trigger]);
 
