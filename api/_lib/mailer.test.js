@@ -8,12 +8,18 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
 const sendMailMock = vi.fn();
+const transportesCriados = [];
 
 vi.mock('nodemailer', () => ({
-  default: { createTransport: () => ({ sendMail: sendMailMock }) },
+  default: {
+    createTransport: (opcoes) => {
+      transportesCriados.push(opcoes);
+      return { sendMail: sendMailMock };
+    },
+  },
 }));
 
-const { sendMail, unsubscribeUrl, wrapEmail } = await import('./mailer.js');
+const { sendMail, unsubscribeUrl, wrapEmail, MAIL_FROM } = await import('./mailer.js');
 
 const CARTA = { to: 'cliente@exemplo.com', subject: 'Confirme seu e-mail', html: '<p>oi</p>' };
 
@@ -126,5 +132,48 @@ describe('cancelamento de inscrição', () => {
     const enviado = sendMailMock.mock.calls[0][0];
     expect(enviado.html).not.toMatch(/cancelar inscricao/i);
     expect(enviado.headers).toBeUndefined();
+  });
+});
+
+// `noreply@` virou alias da conta principal no Workspace, e alias não autentica
+// no Gmail: só caixa real tem senha. O login estava fixo em `MAIL_FROM`, então
+// TODO envio passou a morrer em 535 — com "Enviar como" corretamente
+// configurado, porque isso governa o `From`, não a autenticação. Além disso o
+// EAUTH subia como erro desconhecido e o painel só dizia "internal_error".
+describe('login SMTP separado do remetente', () => {
+  beforeEach(() => {
+    sendMailMock.mockReset().mockResolvedValue({ accepted: ['cliente@exemplo.com'], rejected: [], messageId: '<x>' });
+    transportesCriados.length = 0;
+    process.env.NOREPLY_EMAIL_PASSWORD = 'senha-de-teste';
+    delete process.env.SMTP_USER;
+  });
+
+  it('autentica com SMTP_USER e mantém o remetente visível', async () => {
+    process.env.SMTP_USER = 'shiokawa@japanexpress-store.com';
+
+    await sendMail(CARTA);
+
+    expect(transportesCriados.at(-1).auth.user).toBe('shiokawa@japanexpress-store.com');
+    expect(sendMailMock.mock.calls.at(-1)[0].from).toContain(MAIL_FROM);
+  });
+
+  it('sem SMTP_USER, autentica no próprio remetente (instalação antiga)', async () => {
+    await sendMail(CARTA);
+
+    expect(transportesCriados.at(-1).auth.user).toBe(MAIL_FROM);
+  });
+
+  it('credencial recusada chega ao painel como email_auth_failed, não erro interno', async () => {
+    sendMailMock.mockRejectedValue(Object.assign(new Error('535-5.7.8 Username and Password not accepted'), {
+      code: 'EAUTH', responseCode: 535,
+    }));
+
+    await expect(sendMail(CARTA)).rejects.toMatchObject({ statusCode: 503, code: 'email_auth_failed' });
+  });
+
+  it('erro que não é de credencial continua subindo como ele mesmo', async () => {
+    sendMailMock.mockRejectedValue(Object.assign(new Error('sem rede'), { code: 'ECONNECTION' }));
+
+    await expect(sendMail(CARTA)).rejects.toThrow(/sem rede/);
   });
 });

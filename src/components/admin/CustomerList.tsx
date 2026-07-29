@@ -123,6 +123,7 @@ const CustomerList: React.FC = () => {
       unauthorized: 'Sessão expirada ou sem token. Saia e entre de novo no painel.',
       forbidden: 'Esta conta não é reconhecida como admin pelo servidor. Confira ADMIN_EMAIL na Vercel e se o e-mail está verificado no Firebase Auth.',
       email_not_configured: 'Falta a variável NOREPLY_EMAIL_PASSWORD na Vercel.',
+      email_auth_failed: 'O Gmail recusou a credencial de SMTP (535). Confira SMTP_USER (precisa ser conta real, não alias) e a App Password na Vercel.',
       email_rejected_by_smtp: `O Gmail recusou o endereço ${email}. Confira se está escrito certo.`,
       rate_limited: 'Limite de envios por hora atingido. Tente daqui a pouco.',
       firebase_admin_not_configured: 'Firebase Admin sem credencial na Vercel (FIREBASE_SERVICE_ACCOUNT_JSON).',
