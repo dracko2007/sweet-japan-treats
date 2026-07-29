@@ -154,7 +154,7 @@ export const translations: Record<Language, Record<string, string>> = {
     "cinematicHero.skip": "Pular ↓",
     "cinematicHero.intro.eyebrow": "Beleza do Japão · Curadoria",
     "cinematicHero.intro.title.1": "Beleza",
-    "cinematicHero.intro.title.highlight": "japonesa",
+    "cinematicHero.intro.title.highlight": "Japonesa",
     "cinematicHero.intro.title.2": "em cada detalhe",
     "cinematicHero.intro.description": "Cosméticos japoneses selecionados e enviados com segurança para o seu destino.",
     "cinematicHero.intro.scroll": "Role para começar",
