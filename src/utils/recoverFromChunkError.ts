@@ -44,11 +44,22 @@ export const recoverFromChunkError = async (): Promise<boolean> => {
     /* ignore */
   }
 
-  // Desregistra todos os Service Workers para o próximo load pegar o HTML novo.
+  // Desregistra o Service Worker do Workbox para o próximo load pegar o HTML novo.
+  //
+  // MENOS o registro em '/push/': a inscrição de Web Push pertence a ele, e
+  // desregistrar destrói o PushSubscription do aparelho. O documento em
+  // `push_subscriptions` continua no Firestore, o painel segue contando aquele
+  // cliente como "vai receber push de verdade", o provedor aceita o envio — e
+  // nada aparece na tela, sem erro em lugar nenhum. O problema de chunk é do SW
+  // do Workbox, em '/', que é o único que precisa cair aqui.
   try {
     if ('serviceWorker' in navigator) {
       const regs = await navigator.serviceWorker.getRegistrations();
-      await Promise.all(regs.map((r) => r.unregister()));
+      await Promise.all(
+        regs
+          .filter((r) => !new URL(r.scope).pathname.startsWith('/push/'))
+          .map((r) => r.unregister())
+      );
     }
   } catch {
     /* ignore */
