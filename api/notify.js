@@ -1,4 +1,5 @@
 import { randomBytes } from 'node:crypto';
+import { promoOffer } from '../shared/promo-offer.js';
 import { requireAdmin, requireUser } from './_lib/auth.js';
 import { isOptedOut, optedOutAmong, setOptOut } from './_lib/email-optout.js';
 import { adminAuth, adminDb } from './_lib/firebase-admin.js';
@@ -81,21 +82,40 @@ function cleanCampaign(raw) {
 }
 
 function offerFor(campaign, product, giftProduct) {
-  const productName = String(product?.name || 'produto selecionado');
-  if (campaign.mechanic === 'discount') return { badge: `-${campaign.discountPct}%`, tagline: `${campaign.discountPct}% de desconto`, description: `Aproveite ${productName} com ${campaign.discountPct}% de desconto.` };
-  if (campaign.mechanic === 'bogo') return { badge: 'COMPRE 1 GANHE 1', tagline: 'Compre 1 e ganhe 1', description: `Compre ${productName} e leve duas unidades.` };
-  if (campaign.mechanic === 'bogo_other') return { badge: 'COMPRE E GANHE', tagline: 'Compre e ganhe outro produto', description: `Compre ${productName} e ganhe ${String(giftProduct?.name || 'outro produto')}.` };
-  if (campaign.mechanic === 'points') return { badge: `+${campaign.points} PONTOS`, tagline: 'Compre e ganhe pontos', description: `Compre ${productName} e ganhe ${campaign.points} pontos.` };
-  if (campaign.mechanic === 'coupon') return { badge: `CUPOM ${campaign.couponCode}`, tagline: 'Compre e ganhe um cupom', description: `Compre ${productName} e receba o cupom ${campaign.couponCode} para a proxima compra.` };
-  return { badge: 'OFERTA', tagline: 'Oferta especial', description: `Confira ${productName}.` };
+  return promoOffer({
+    mechanic: campaign.mechanic,
+    discountPct: campaign.discountPct,
+    keepProductDiscount: campaign.keepProductDiscount,
+    points: campaign.points,
+    couponCode: campaign.couponCode,
+    productName: product?.name || '',
+    // O desconto que o produto já carrega. Sem isto o e-mail anunciava só o
+    // extra da campanha ("15% de desconto") enquanto o painel prometia a soma.
+    productDiscountPercent: product?.discountPercent || 0,
+    giftProductName: giftProduct?.name || '',
+  });
 }
 
 function promoEmail({ subject, headline, extraMessage, ctaLabel, offer, product, url, unsub }) {
   const image = product?.thumbnail || product?.image;
   const imageHtml = image ? `<img src="${escapeHtml(image)}" alt="${escapeHtml(product.name)}" style="width:100%;max-height:320px;object-fit:contain">` : '';
+  // O bloco da oferta empilhava selo, título e frase como três linhas soltas —
+  // "-15%" em cima de "15% de desconto" em cima de "Aproveite X com 15% de
+  // desconto" —, três vezes a mesma informação e nenhuma explicação de como os
+  // descontos se somam. Agora o selo é o número grande, o título diz de onde vem
+  // cada parte, e a frase explica o que o link faz.
+  const cupomHtml = offer.couponLabel
+    ? `<p style="margin:10px 0 0;font-size:13px;color:#7c2d12">O cupom <strong>${escapeHtml(offer.couponLabel)}</strong> é aplicado pelo próprio link, uma vez por cliente. Não precisa digitar nada.</p>`
+    : '';
+  const ofertaHtml = `<div style="background:#fff7ed;border:1px solid #fdba74;border-radius:12px;padding:18px;text-align:center">
+    <div style="font-size:30px;line-height:1.1;font-weight:800;color:#c2410c">${escapeHtml(offer.badge)}</div>
+    <div style="font-size:15px;font-weight:700;color:#111827;margin-top:6px">${escapeHtml(offer.tagline)}</div>
+    <p style="font-size:14px;color:#4b5563;line-height:1.6;margin:10px 0 0">${escapeHtml(offer.description)}</p>
+    ${cupomHtml}
+  </div>`;
   return {
     subject,
-    html: wrapEmail(`<h2>${escapeHtml(headline)}</h2>${imageHtml}<h3>${escapeHtml(product?.name || '')}</h3><div style="background:#fff7ed;border:1px solid #fdba74;border-radius:10px;padding:14px"><strong>${escapeHtml(offer.badge)}</strong><br>${escapeHtml(offer.tagline)}<p>${escapeHtml(offer.description)}</p></div><p>${escapeHtml(extraMessage)}</p><p style="text-align:center"><a href="${escapeHtml(url)}" style="display:inline-block;background:#ec4899;color:#fff;text-decoration:none;padding:14px 28px;border-radius:10px;font-weight:bold">${escapeHtml(ctaLabel)}</a></p>`, { unsubscribeUrl: unsub }),
+    html: wrapEmail(`<h2>${escapeHtml(headline)}</h2>${imageHtml}<h3>${escapeHtml(product?.name || '')}</h3>${ofertaHtml}<p>${escapeHtml(extraMessage)}</p><p style="text-align:center"><a href="${escapeHtml(url)}" style="display:inline-block;background:#ec4899;color:#fff;text-decoration:none;padding:16px 32px;border-radius:12px;font-weight:bold;font-size:16px">${escapeHtml(ctaLabel)}</a></p><p style="text-align:center;font-size:12px;color:#6b7280;margin-top:-6px">O link já abre o carrinho com o produto e os descontos aplicados.</p>`, { unsubscribeUrl: unsub }),
   };
 }
 
@@ -290,7 +310,17 @@ async function handlePromoCampaign(req, res) {
       if (body.cancelHomePromotion === true) transaction.delete(db.collection('siteContent').doc('homePromotion'));
     });
 
-    const path = campaign.productId ? `/produto/${encodeURIComponent(campaign.productId)}?promo=${encodeURIComponent(code)}` : `/?promo=${encodeURIComponent(code)}`;
+    // Cai no CARRINHO com o produto dentro e a promoção armada: é a tela onde os
+    // dois descontos aparecem somados e o botão de pagamento fica ao lado. Antes
+    // caía na página do produto, e ainda era preciso achar "adicionar ao
+    // carrinho" — degrau onde a campanha morria.
+    //
+    // Não é o checkout direto de propósito: `Checkout.tsx` manda quem não está
+    // autenticado para /cadastro, então o link levaria boa parte da lista para um
+    // formulário em vez da oferta.
+    const path = campaign.productId
+      ? `/carrinho?promo=${encodeURIComponent(code)}&add=${encodeURIComponent(campaign.productId)}`
+      : `/carrinho?promo=${encodeURIComponent(code)}`;
     const url = `${siteOrigin()}${path}`;
     const results = [];
     if (channel === 'email' || channel === 'both') {

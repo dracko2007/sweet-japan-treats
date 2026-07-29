@@ -14,6 +14,8 @@ export interface PromoCampaign {
   tagline?: string;
   description?: string;
   badge?: string;
+  couponLabel?: string;    // nome do cupom que o link aplica ("AGORA15"), mostrado
+                           // no carrinho e no e-mail no lugar do código interno
   productName?: string;    // só p/ exibição
   productImage?: string;   // só p/ exibição (feed de notificações do perfil)
   keepProductDiscount?: boolean; // true = mantém o discountPercent do produto junto com a promo; false/ausente = produto volta ao preço original

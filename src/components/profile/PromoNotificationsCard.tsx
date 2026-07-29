@@ -2,7 +2,8 @@
 // enviadas pelo admin (e-mail/push). Fonte: siteContent/promoNotifications —
 // doc de leitura pública já permitida nas regras (match /siteContent),
 // gravado pelo promoCampaignService junto com a criação da campanha.
-// O botão "Ver oferta" navega com ?promo=CODE, que arma o resgate no carrinho.
+// O botão "Ver oferta" leva ao CARRINHO com o produto dentro (?promo=CODE&add=ID),
+// o mesmo destino do e-mail e do push: é onde os descontos aparecem somados.
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Bell, Sparkles, ArrowRight } from 'lucide-react';
@@ -90,7 +91,9 @@ const PromoNotificationsCard: React.FC = () => {
                 </p>
               </div>
               <Link
-                to={item.productId ? `/produto/${item.productId}?promo=${item.code}` : `/?promo=${item.code}`}
+                to={item.productId
+                  ? `/carrinho?promo=${item.code}&add=${item.productId}`
+                  : `/carrinho?promo=${item.code}`}
                 className="inline-flex items-center gap-1.5 shrink-0 text-sm font-semibold text-primary hover:underline"
               >
                 <Sparkles className="w-4 h-4" /> Ver oferta <ArrowRight className="w-4 h-4" />

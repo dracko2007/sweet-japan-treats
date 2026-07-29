@@ -8,7 +8,10 @@ export default defineConfig({
     environment: "jsdom",
     globals: true,
     setupFiles: ["./src/test/setup.ts"],
-    include: ["src/**/*.{test,spec}.{ts,tsx}", "api/**/*.{test,spec}.js"],
+    // `shared/` também entra: é o código que api/ e src/ dividem (preço, pontos,
+    // texto de promoção), justamente onde uma divergência entre os dois lados
+    // passa despercebida.
+    include: ["src/**/*.{test,spec}.{ts,tsx}", "api/**/*.{test,spec}.js", "shared/**/*.{test,spec}.js"],
   },
   resolve: {
     alias: { "@": path.resolve(__dirname, "./src") },

@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { ShoppingBag, ArrowRight, Trash2, Tag, ShieldCheck, Sparkles } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import CartItemComponent from '@/components/cart/CartItem';
 import { Button } from '@/components/ui/button';
 import { useCart } from '@/context/CartContext';
+import { useProducts } from '@/context/ProductsContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { useUser, Coupon } from '@/context/UserContext';
 import { useNavigate } from 'react-router-dom';
@@ -32,10 +33,12 @@ const affiliateToCoupon = (aff: Affiliate, productId?: string | null): Coupon =>
 });
 
 const Cart: React.FC = () => {
-  const { items, clearCart } = useCart();
+  const { items, clearCart, addToCart } = useCart();
+  const { products } = useProducts();
   const { t, selectedCountry, setSelectedCountry } = useLanguage();
   const { isAuthenticated, validateProfileCoupon, coupons, user } = useUser();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   // Coupon state
   const [couponCode, setCouponCode] = useState('');
@@ -45,6 +48,9 @@ const Cart: React.FC = () => {
   // Produto da campanha promocional. `null` para cupom comum, que vale para
   // todos os itens sem preço promocional.
   const [promoProductId, setPromoProductId] = useState<string | null>(null);
+  // Como o desconto da campanha se compõe, para explicar no resumo em vez de
+  // mostrar só "Cupom (PROMO-A1B2) −15%", que não diz nada ao cliente.
+  const [promoBreakdown, setPromoBreakdown] = useState('');
 
   // Os pontos são aplicados só na etapa de revisão do pedido — no carrinho fica 0.
   const [pointsToUse, setPointsToUse] = useState<number>(0);
@@ -129,6 +135,22 @@ const Cart: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Produto do link da campanha (?add=ID): entra no carrinho sozinho. Sem isto o
+  // e-mail levava para a página do produto e ainda era preciso achar "adicionar
+  // ao carrinho" — degrau em que a campanha morria.
+  useEffect(() => {
+    const addId = searchParams.get('add');
+    if (!addId || products.length === 0) return;
+    if (items.some((i) => i.product.id === addId)) return;
+    const produto = products.find((p) => p.id === addId);
+    if (!produto) return;
+    // Mesma convenção do card da vitrine: primeira variante, ou 'small' nos
+    // produtos antigos que ainda usam `prices.small`/`prices.large`.
+    const variante = produto.variants?.[0];
+    addToCart(produto, variante?.id || 'small', 1, variante?.label);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, products, items]);
+
   // Campanha promocional (?promo=CODE): armPending (compartilhado com a página
   // do produto) valida e arma preço original/brinde/pontos; aqui aplicamos só
   // o cupom % quando a mecânica é desconto.
@@ -145,10 +167,22 @@ const Cart: React.FC = () => {
         // (api/_lib/commerce.js: `campaign?.productId === productId`). O cliente
         // mostrava um total e o servidor cobrava outro.
         setPromoProductId(c.productId || null);
+        // Nome do cupom em vez do código interno: o cliente recebeu "cupom
+        // AGORA15" no e-mail, não "PROMO-A1B2". O código de verdade continua indo
+        // ao servidor por `promo_applied`, gravado pelo próprio armPending.
+        const rotulo = c.couponLabel || c.code;
+        const base = c.keepProductDiscount
+          ? (products.find((p) => p.id === c.productId)?.discountPercent || 0)
+          : 0;
+        setPromoBreakdown(
+          base > 0
+            ? `Dois descontos somados neste link: ${base}% já embutidos no preço do produto e ${pct}% do cupom ${rotulo} aplicados agora. O cupom vale uma única vez.`
+            : `Cupom ${rotulo} aplicado pelo link: ${pct}% de desconto, válido uma única vez.`
+        );
         setActiveCoupon({
           id: `promo-${c.code}`,
-          code: c.code,
-          description: c.tagline || `Promoção ${c.code}`,
+          code: rotulo,
+          description: c.tagline || `Promoção ${rotulo}`,
           discount: pct,
           discountType: 'percentage',
           expiresAt: c.expiresAt ? new Date(c.expiresAt).toISOString() : new Date(Date.now() + 30 * 86400000).toISOString(),
@@ -158,7 +192,7 @@ const Cart: React.FC = () => {
     });
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [products]);
 
   const handleRemoveCoupon = () => {
     // Cupom de campanha: desarma o resgate inteiro (inclusive o preço original),
@@ -172,6 +206,7 @@ const Cart: React.FC = () => {
       window.dispatchEvent(new Event('promo-pricing-changed'));
     }
     setPromoProductId(null);
+    setPromoBreakdown('');
     setActiveCoupon(null);
   };
 
@@ -490,6 +525,11 @@ const Cart: React.FC = () => {
                             </button>
                           </span>
                         </div>
+                        {promoBreakdown && (
+                          <p className="text-[11px] text-purple-700 dark:text-purple-300 font-medium bg-purple-50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-900 rounded-lg px-2 py-1.5 leading-snug">
+                            🎁 {promoBreakdown}
+                          </p>
+                        )}
                         {hasPromoItems && regularSubtotal === 0 && (
                           <p className="text-[11px] text-pink-600 font-semibold bg-pink-50 border border-pink-200 rounded-lg px-2 py-1.5 leading-snug">
                             ⚠️ Todos os itens já têm desconto promocional. O cupom não foi aplicado.

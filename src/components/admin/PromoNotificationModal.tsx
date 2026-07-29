@@ -8,6 +8,7 @@ import { ActivePromo, PROMO_TYPES } from '@/types/promotion';
 import { db } from '@/config/firebase';
 import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
 import { authenticatedFetch } from '@/services/authenticatedFetch';
+import { promoOffer } from '../../../shared/promo-offer.js';
 
 const STORE_URL = 'https://japanexpress-store.com';
 
@@ -20,9 +21,10 @@ type SendResult = { email: string; ok: boolean; channel: 'email' | 'app'; error?
 type PromoMechanic = 'none' | 'discount' | 'bogo' | 'bogo_other' | 'points' | 'coupon';
 
 interface PromoOffer {
-  badge: string;       // selo curto: "-15%", "COMPRE 1 GANHE 1", "+100 PONTOS"
-  tagline: string;     // tipo da promoção: "Compre 1 e Ganhe 1"
-  description: string; // frase com nome do produto
+  badge: string;        // selo curto: "15% + 15%", "COMPRE 1 GANHE 1", "+100 PONTOS"
+  tagline: string;      // de onde vem cada parte do desconto
+  description: string;  // frase com nome do produto e o que o link faz
+  couponLabel: string;  // nome do cupom que o link aplica ('' quando não há)
 }
 
 interface Props { onClose: () => void }
@@ -174,44 +176,18 @@ const PromoNotificationModal: React.FC<Props> = ({ onClose }) => {
     return d;
   })();
 
-  // "Loop" que aplica a mecânica escolhida e monta o corpo da promoção: badge + tipo + frase.
-  const buildOffer = (): PromoOffer => {
-    const name = selectedProduct?.name ?? 'o produto selecionado';
-    switch (mechanic) {
-      case 'discount': {
-        const extra = Math.max(1, Math.min(90, discountPct || 0));
-        // Sem o checkbox "manter desconto inicial", a base é DESCARTADA: anuncia
-        // e aplica só o extra sobre o preço cheio (sem propaganda enganosa).
-        const base = keepInitialDiscount ? baseDiscount : 0;
-        const total = base > 0 ? Math.min(90, base + extra) : extra;
-        return {
-          badge: `-${total}%`,
-          tagline: base > 0 ? 'Compre agora e ganhe mais desconto' : `${extra}% de desconto`,
-          description: base > 0
-            ? `${name} já está com ${base}% OFF. Compre agora e ganhe mais ${extra}% de desconto — total de ${total}% OFF!`
-            : `Aproveite ${name} com ${extra}% de desconto.`,
-        };
-      }
-      case 'bogo':
-        return { badge: 'COMPRE 1 GANHE 1', tagline: 'Compre 1 e Ganhe 1', description: `Compre um ${name} e leve dois! Oferta por tempo limitado.` };
-      case 'bogo_other':
-        return giftProduct
-          ? { badge: 'COMPRE E GANHE', tagline: 'Compre 1 e ganhe outro produto', description: `Compre ${name} e ganhe ${giftProduct.name} de presente!` }
-          : { badge: 'COMPRE E GANHE', tagline: 'Compre 1 e ganhe outro produto', description: `Compre ${name} e ganhe outro produto de presente!` };
-      case 'points': {
-        const pts = Math.max(1, pointsCount || 0);
-        return { badge: `+${pts} PONTOS`, tagline: 'Compre e ganhe pontos', description: `Compre ${name} e ganhe ${pts} pontos no programa de fidelidade.` };
-      }
-      case 'coupon': {
-        const code = couponCode.trim();
-        return code
-          ? { badge: `CUPOM ${code}`, tagline: 'Compre e ganhe um cupom', description: `Compre ${name} e ganhe um cupom ${code} para usar na próxima compra.` }
-          : { badge: 'GANHE UM CUPOM', tagline: 'Compre e ganhe um cupom', description: `Compre ${name} e ganhe um cupom de desconto para a próxima compra.` };
-      }
-      default:
-        return { badge: 'OFERTA', tagline: headline, description: extraMsg };
-    }
-  };
+  // Preview e envio precisam sair do MESMO gerador: quando eram duas funções, o
+  // painel prometia "-30%" e o e-mail dizia "15% de desconto".
+  const buildOffer = (): PromoOffer => promoOffer({
+    mechanic,
+    discountPct,
+    keepProductDiscount: keepInitialDiscount,
+    points: pointsCount,
+    couponCode,
+    productName: selectedProduct?.name ?? '',
+    productDiscountPercent: baseDiscount,
+    giftProductName: giftProduct?.name ?? '',
+  });
 
   const offer = buildOffer();
   // Versão HTML do selo + linha da oferta para o template do e-mail.
