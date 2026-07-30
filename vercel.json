@@ -43,7 +43,7 @@
     { "source": "/api/unsubscribe", "destination": "/api/public-forms?action=unsubscribe" },
     { "source": "/api/email-preference", "destination": "/api/notify?action=email-preference" },
     {
-      "source": "/((?!api/).*)",
+      "source": "/((?!api/)(?!.*\\.[a-zA-Z0-9]+$).*)",
       "destination": "/index.html"
     }
   ],
