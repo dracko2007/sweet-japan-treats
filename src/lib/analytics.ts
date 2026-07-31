@@ -1,4 +1,5 @@
-// Camada única de analytics de conversão (GA4 via Firebase Analytics + Meta Pixel).
+// Camada única de analytics de conversão (GA4 via Firebase Analytics + Meta
+// Pixel + Google Ads/Merchant Center via gtag.js).
 //
 // Por que Firebase Analytics em vez de gtag.js solto: o projeto já tem um
 // measurementId real vinculado em src/config/firebase.ts, então getAnalytics(app)
@@ -8,8 +9,8 @@
 //
 // Consentimento: nada aqui inicializa ou dispara SEM `consent === 'accepted'`
 // (mesmo gate do CookieBanner/useCookieConsent). Todas as funções são no-op
-// seguro se: sem consentimento, sem Firebase, ou sem VITE_META_PIXEL_ID
-// configurado — nunca lança erro, nunca quebra a navegação do usuário.
+// seguro se: sem consentimento, sem Firebase, sem VITE_META_PIXEL_ID, ou sem
+// VITE_GOOGLE_ADS_TAG_ID configurados — nunca lança erro, nunca quebra a navegação.
 
 import type { Analytics } from 'firebase/analytics';
 import { app } from '@/config/firebase';
@@ -19,17 +20,21 @@ const isDev = import.meta.env.DEV;
 const devWarn = isDev ? console.warn.bind(console) : () => {};
 
 const META_PIXEL_ID = import.meta.env.VITE_META_PIXEL_ID as string | undefined;
+const GOOGLE_ADS_TAG_ID = import.meta.env.VITE_GOOGLE_ADS_TAG_ID as string | undefined;
 
 declare global {
   interface Window {
     fbq?: ((...args: unknown[]) => void) & { queue?: unknown[]; loaded?: boolean; callMethod?: (...args: unknown[]) => void };
     _fbq?: Window['fbq'];
+    gtag?: (...args: unknown[]) => void;
+    dataLayer?: unknown[];
   }
 }
 
 let analyticsInstance: Analytics | null = null;
 let analyticsInitPromise: Promise<Analytics | null> | null = null;
 let pixelReady = false;
+let googleAdsTagReady = false;
 
 function consentGiven(): boolean {
   return getCookieConsent() === 'accepted';
@@ -84,11 +89,48 @@ function ensureMetaPixel(): void {
   window.fbq('init', META_PIXEL_ID);
 }
 
+/**
+ * Injeta o Google tag (gtag.js) do Google Ads/Merchant Center — o GT-… gerado
+ * em Merchant Center → Conversões → Origens de rastreamento → tag do Google —
+ * para o evento-chave de compra alimentar a atribuição de conversão dos
+ * anúncios/vitrines gratuitas.
+ *
+ * Reaproveita o script gtag.js se o Firebase Analytics (GA4) já inseriu um
+ * (mesmo dataLayer/gtag global dos dois, é assim que o Google projeta multi-
+ * tag): não duplica a tag nem o download. O que evita misturar as duas é o
+ * `send_to` em cada chamada — o `logEvent` do Firebase já se restringe à
+ * própria measurementId (ver node_modules/@firebase/analytics), e o evento
+ * de compra desta tag faz o mesmo em sentido contrário (fireGoogleAdsPurchase).
+ */
+function ensureGoogleAdsTag(): void {
+  if (!consentGiven() || !GOOGLE_ADS_TAG_ID || googleAdsTagReady || typeof window === 'undefined') return;
+
+  window.dataLayer = window.dataLayer || [];
+  if (!window.gtag) {
+    window.gtag = function gtag(...args: unknown[]) {
+      window.dataLayer!.push(args);
+    };
+  }
+
+  if (!document.querySelector('script[src*="googletagmanager.com/gtag/js"]')) {
+    const script = document.createElement('script');
+    script.async = true;
+    script.src = `https://www.googletagmanager.com/gtag/js?id=${GOOGLE_ADS_TAG_ID}`;
+    script.onerror = () => devWarn('[analytics] Falha ao carregar Google tag (Ads/Merchant Center)');
+    document.head.appendChild(script);
+  }
+
+  googleAdsTagReady = true;
+  window.gtag('js', new Date());
+  window.gtag('config', GOOGLE_ADS_TAG_ID);
+}
+
 /** Chamado uma vez quando o consentimento vira 'accepted' (ou no boot, se já aceito). */
 export function initAnalytics(): void {
   if (!consentGiven()) return;
   void ensureGa();
   ensureMetaPixel();
+  ensureGoogleAdsTag();
 }
 
 /** Dispara pageview no GA4 e no Meta Pixel. Chamar a cada mudança de rota (SPA). */
@@ -147,6 +189,19 @@ function fireEvent(gaName: string, metaName: string | null, payload: EcommercePa
   }
 }
 
+/**
+ * Envia o "purchase" (key event de conversão) só para a tag do Google
+ * Ads/Merchant Center, isolado via `send_to` — sem isso o evento cairia no
+ * dataLayer compartilhado e contaria como conversão em qualquer outra tag
+ * configurada nele (GA4 incluso). Só a compra é key event no Merchant
+ * Center; o resto do funil (view_item, add_to_cart, begin_checkout) fica
+ * só no GA4/Meta, como já era.
+ */
+function fireGoogleAdsPurchase(payload: EcommercePayload): void {
+  if (!consentGiven() || !GOOGLE_ADS_TAG_ID || !googleAdsTagReady || typeof window.gtag !== 'function') return;
+  window.gtag('event', 'purchase', { ...payload, send_to: GOOGLE_ADS_TAG_ID });
+}
+
 export const trackSignUp = (method: string): void =>
   fireEvent('sign_up', 'CompleteRegistration', { method });
 
@@ -171,5 +226,8 @@ export const trackPurchase = (
   currency: string,
   value: number,
   items: AnalyticsItem[],
-): void =>
-  fireEvent('purchase', 'Purchase', { transaction_id: orderId, currency, value, items });
+): void => {
+  const payload = { transaction_id: orderId, currency, value, items };
+  fireEvent('purchase', 'Purchase', payload);
+  fireGoogleAdsPurchase(payload);
+};
