@@ -115,7 +115,7 @@ function ensureGoogleAdsTag(): void {
   if (!document.querySelector('script[src*="googletagmanager.com/gtag/js"]')) {
     const script = document.createElement('script');
     script.async = true;
-    script.src = `https://www.googletagmanager.com/gtag/js?id=${GOOGLE_ADS_TAG_ID}`;
+    script.src = `https://www.googletagmanager.com/gtag/js?l=dataLayer&id=${GOOGLE_ADS_TAG_ID}`;
     script.onerror = () => devWarn('[analytics] Falha ao carregar Google tag (Ads/Merchant Center)');
     document.head.appendChild(script);
   }
