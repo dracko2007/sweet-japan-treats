@@ -17,6 +17,7 @@ export interface ProductPackageDimensionsCm {
 export interface Product {
   id: string;
   sku?: string; // Código único do produto (ex.: JE-COS-0001) — gerado automaticamente se ausente
+  gtin?: string; // JAN/EAN-13 (código de barras) real do produto — vira <g:gtin> no feed do Google Merchant quando presente. Sem ele, o item sai como identifier_exists=no (sem marca) para não cair na reprovação de "GTIN ausente em produto de marca".
   name: string;
   description: string;
   category: string;

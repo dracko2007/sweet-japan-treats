@@ -775,6 +775,21 @@ const ProductManager: React.FC = () => {
                 </span>
               </div>
 
+              {/* GTIN / JAN (código de barras para Google Merchant) */}
+              <div>
+                <label className="text-sm font-semibold block mb-1">Código de barras (JAN/EAN-13)</label>
+                <input
+                  value={editing.gtin ?? ''}
+                  onChange={(e) => setEditing({ ...editing, gtin: e.target.value.trim().replace(/\D/g, '') || undefined })}
+                  inputMode="numeric"
+                  placeholder="Ex: 4901301234567 (13 dígitos do código de barras da embalagem)"
+                  className="w-full px-3 py-2 rounded-lg border border-border bg-background font-mono text-sm"
+                />
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  Com o código real, o produto passa a aparecer no Google Shopping com marca (bem casado). <strong>Sem código</strong>, o item continua elegível mas como "sem identificador". Não invente — código errado suspende a conta do Merchant.
+                </p>
+              </div>
+
               {/* Categoria + Sabor/tag */}
               <div className="grid grid-cols-2 gap-3">
                 <div>

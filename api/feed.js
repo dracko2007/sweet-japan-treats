@@ -145,6 +145,7 @@ function buildCatalog(products, region, rates) {
 
       return {
         id: p.id,
+        gtin: p.gtin || undefined,
         title: p.name.slice(0, 150),
         description: (p.description || p.name).slice(0, 5000),
         link: `${SITE_URL}/produto/${p.id}`,
@@ -169,8 +170,10 @@ function buildCatalog(products, region, rates) {
 
 // ── Saída XML (Google Merchant RSS 2.0 + namespace g:) ───────────────────────
 // title/description/link usam RSS padrão; campos próprios do Google usam g:
-// google_product_category sai da categoria da loja; identifier_exists=no porque
-// produtos importados não têm GTIN/MPN cadastrado.
+// google_product_category sai da categoria da loja. identifier_exists depende de
+// o produto ter GTIN (JAN/EAN) cadastrado: com GTIN -> yes + brand + gtin (ideal);
+// sem GTIN -> no, SEM brand (declarar brand junto de identifier_exists=no e
+// exatamente o padrao que o Google reprova como "GTIN ausente em produto de marca").
 function toXml(items, region) {
   const title = region === 'eu' ? 'Japan Express — Catálogo (Europa)'
     : region === 'us' ? 'Japan Express — Catalog (USA)'
@@ -183,6 +186,15 @@ function toXml(items, region) {
         <g:service>Japan Post</g:service>
         <g:price>${s.priceLocal.toFixed(2)} ${it.currency}</g:price>
       </g:shipping>`).join('');
+    // Bloco de identificacao: com GTIN real -> gtin + marca + identifier_exists=yes
+    // (produto propriamente identificado, melhor matching no Shopping). Sem GTIN ->
+    // identifier_exists=no e NENHUMA marca/gtin/mpn (unica forma declarada pelo
+    // Google de tratar "custom/no-identifier" sem reprovacao).
+    const identifierBlock = it.gtin
+      ? `      <g:gtin>${escapeXml(it.gtin)}</g:gtin>
+      <g:brand>${escapeXml(it.brand)}</g:brand>
+      <g:identifier_exists>yes</g:identifier_exists>`
+      : `      <g:identifier_exists>no</g:identifier_exists>`;
     return `
     <item>
       <g:id>${escapeXml(it.id)}</g:id>
@@ -193,8 +205,7 @@ function toXml(items, region) {
       <g:availability>${it.availability}</g:availability>
       <g:condition>new</g:condition>
       <g:price>${it.priceLocal.toFixed(2)} ${it.currency}</g:price>
-      <g:brand>${escapeXml(it.brand)}</g:brand>
-      <g:identifier_exists>no</g:identifier_exists>
+${identifierBlock}
       <g:google_product_category>${it.googleCategory}</g:google_product_category>${shippingBlocks}
       <g:shipping_weight>${(it.weightG / 1000).toFixed(2)} kg</g:shipping_weight>
       <g:custom_label_0>${it.totalLocal.toFixed(2)} ${it.currency}</g:custom_label_0>
