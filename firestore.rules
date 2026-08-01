@@ -1,3 +1,20 @@
+// ⚠️ ESTE ARQUIVO NÃO ESTÁ PUBLICADO POR INTEIRO.
+//
+// O ruleset no ar é uma versão CIRÚRGICA: só os blocos "seguros" deste arquivo
+// foram publicados (Grupo 1 = escrita que já vai pela API vira admin-only;
+// Grupo 5 = `write` -> `create, update, delete`). Os Grupos 2, 3 e 4 AINDA
+// NÃO FORAM publicados — precisam de teste fluxo a fluxo:
+//   - Grupo 2 (abandoned_carts, negotiations, video_reviews, push_subscriptions,
+//     eventos, users, affiliate_requests): validação campo a campo, frágil.
+//   - Grupo 3 (coupons): afrouxa leitura para público.
+//   - Grupo 4 (orders, affiliates, affiliate_pending, admins): remove
+//     capacidade do dono — quebra o "Confirmar Recebimento" do cliente.
+//
+// Rodar `firebase deploy --only firestore:rules` publica TUDO de uma vez e
+// desfaz a abordagem incremental. Não faça isso sem ter testado os fluxos
+// acima. Para publicar blocos avulsos, use o padrão da API de rulesets (ver
+// publish-rules.cjs como referência, atualizando a API para firebase-admin v14:
+// `admin.cert`, não `admin.credential.cert`).
 rules_version = '2';
 
 service cloud.firestore {
