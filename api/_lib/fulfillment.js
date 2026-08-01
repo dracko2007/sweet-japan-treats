@@ -1,4 +1,5 @@
 import { FieldValue } from 'firebase-admin/firestore';
+import { recordPurchaseDiscount } from './cart-recovery-profile.js';
 import { adminDb } from './firebase-admin.js';
 import { HttpError } from './http.js';
 
@@ -10,11 +11,42 @@ function eventId(provider, reference) {
   return `${provider}:${reference}`.replace(/[^A-Za-z0-9:_-]/g, '_').slice(0, 300);
 }
 
+/**
+ * Extrai o percentual de desconto efetivo do pedido.
+ *
+ * Tenta primeiro calcular a partir de `couponDiscountYen` dividido pelo subtotal
+ * de mercadoria (itens que não são brinde ou promoção); se não houver base de
+ * cálculo finita/positiva, tenta extrair o número de um código tipo `CARRINHO<n>`
+ * (ex: `CARRINHO15` → 15); sem nada disso, retorna 0 (sem desconto).
+ */
+function extractDiscountPercent(order) {
+  const items = Array.isArray(order.items) ? order.items : [];
+  const regularSubtotal = items
+    .filter((item) => !item.homePromo && !item.freeGift)
+    .reduce((sum, item) => sum + Number(item.unitYen || 0) * Number(item.quantity || 0), 0);
+
+  if (Number.isFinite(regularSubtotal) && regularSubtotal > 0 && Number.isFinite(order.couponDiscountYen)) {
+    const pct = Math.round(Number(order.couponDiscountYen) / regularSubtotal * 100);
+    if (Number.isFinite(pct) && pct >= 0) return pct;
+  }
+
+  // Fallback: tenta extrair o número do código `CARRINHO<n>`
+  if (typeof order.couponCode === 'string') {
+    const match = order.couponCode.match(/^CARRINHO(\d{1,2})$/i);
+    if (match) {
+      const extracted = Number(match[1]);
+      if (Number.isFinite(extracted)) return extracted;
+    }
+  }
+
+  return 0;
+}
+
 export async function fulfillOrder(orderId, { provider, reference, confirmedBy }) {
   const db = adminDb();
   const orderRef = db.collection('orders').doc(orderId);
 
-  return db.runTransaction(async (transaction) => {
+  const result = await db.runTransaction(async (transaction) => {
     const orderSnap = await transaction.get(orderRef);
     if (!orderSnap.exists) throw new HttpError(404, 'order_not_found');
     const order = orderSnap.data();
@@ -206,6 +238,20 @@ export async function fulfillOrder(orderId, { provider, reference, confirmedBy }
     });
     return { replay: false, order: { ...order, status: 'confirmed', fulfillmentState: 'fulfilled', fulfilledAt } };
   });
+
+  // Registra o desconto do pedido no perfil de recuperação de carrinho —
+  // só se a compra foi efetivamente confirmada (não é replay de uma tentativa
+  // anterior). Falha de registro não aborta o fluxo de pagamento.
+  if (!result.replay && result.order) {
+    try {
+      const discountPercent = extractDiscountPercent(result.order);
+      await recordPurchaseDiscount(result.order.userId, discountPercent);
+    } catch (error) {
+      console.error('[fulfillment] falha ao registrar desconto no perfil:', error instanceof Error ? error.message : error);
+    }
+  }
+
+  return result;
 }
 
 export async function markFulfillmentReview(orderId, reason) {

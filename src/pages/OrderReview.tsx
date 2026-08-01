@@ -1,5 +1,5 @@
 import { safeStorage } from '@/utils/storage';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { emailServiceSimple } from '@/services/emailServiceSimple';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Package, ArrowRight, Printer, CreditCard, Landmark, Smartphone, MapPin, User, Phone, Mail, CheckCircle, Tag, Copy, AlertCircle, ExternalLink, Wallet as WalletIcon, X } from 'lucide-react';
@@ -21,7 +21,7 @@ import { convertYen as fxConvert, yenFromConverted } from '@/services/fxService'
 import { negotiationService } from '@/services/negotiationService';
 import { psFeeWaiver } from '@/utils/psFeeWaiver';
 import { productService } from '@/services/productService';
-import { earnedPointsForOrder, POINTS } from '@/services/pointsService';
+import { earnedPointsForOrder, POINTS, pointsMultiplierForSpend, spendWindowStart } from '@/services/pointsService';
 import { productEnglishName } from '@/utils/productName';
 import { Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -47,7 +47,7 @@ const devError = isDev ? console.error.bind(console) : () => {};
 const OrderReview: React.FC = () => {
   const { items, clearCart } = useCart();
   const { refresh: refreshProducts } = useProducts();
-  const { consumeCouponByCode, user, addPoints, addOrder, addCoupon } = useUser();
+  const { consumeCouponByCode, user, addPoints, addOrder, addCoupon, orders } = useUser();
   const [pointsToUse, setPointsToUse] = useState<number>(() => {
     const v = Number(safeStorage.getItem('redeem_points'));
     return Number.isFinite(v) && v > 0 ? v : 0;
@@ -136,6 +136,33 @@ const OrderReview: React.FC = () => {
     (sum, item) => item.freeGift ? sum : sum + convertYen(effectiveYen(item.product, item.size)) * item.quantity, 0
   );
 
+  // Gasto dos últimos 3 meses-calendário, para o multiplicador de pontos.
+  // Mesmo critério do servidor (`api/_lib/loyalty-tier.js`): só pedido pago, só
+  // mercadoria, sempre em ienes.
+  //
+  // Pedido sem `unitYen` (histórico local antigo) conta zero em vez de cair
+  // para `price`: `price` está na moeda do cliente, e somar BRL com ¥ inflaria
+  // o nível. Subestimar aqui só mostra um multiplicador menor do que o servidor
+  // vai creditar — errar para menos é o lado seguro de uma promessa na tela.
+  const recentSpendYen = useMemo(() => {
+    if (!orders?.length) return 0;
+    const inicioJanela = spendWindowStart().getTime();
+    let total = 0;
+    for (const order of orders) {
+      const quando = order.orderDate ? new Date(order.orderDate).getTime() : 0;
+      const pago = order.status === 'confirmed' || order.paymentConfirmed === true;
+      if (!pago || quando < inicioJanela) continue;
+      if (!Array.isArray(order.items)) continue;
+      for (const item of order.items) {
+        if (item.freeGift === true) continue;
+        total += (Number(item.unitYen) || 0) * (Number(item.quantity) || 0);
+      }
+    }
+    return Math.max(0, Math.round(total));
+  }, [orders]);
+
+  const pointsMultiplier = pointsMultiplierForSpend(recentSpendYen);
+
   // Resgate de pontos (1 ponto = ¥1). Paga só mercadoria — nunca frete nem a
   // taxa do personal shopper. O teto desconta o cupom porque o servidor também
   // desconta (`api/_lib/commerce.js`); sem isso a tela deixaria arrastar até o
@@ -151,10 +178,14 @@ const OrderReview: React.FC = () => {
     ? 0
     : Math.min(availablePoints, Math.max(0, Math.floor((productSubtotalYen - couponDiscountYen) / POINTS.yenPerPoint)));
   const redeemPoints = Math.max(0, Math.min(pointsToUse, maxRedeemable));
+  // Pedido zerado por pontos: resgate cobre toda a mercadoria após cupom.
+  const netProductsAfterCouponAndPoints = productSubtotalYen - couponDiscountYen - redeemPoints;
+  const pointsCoverAllProducts = productSubtotalYen > 0 && redeemPoints > 0 && netProductsAfterCouponAndPoints <= 0;
   const pointsDiscount = convertYen(redeemPoints * POINTS.yenPerPoint); // desconto na moeda exibida
   // Mesma função que `api/_lib/commerce.js` usa para creditar — o número que
-  // aparece aqui é exatamente o que vai cair na conta do cliente.
-  const earnedPoints = earnedPointsForOrder(productSubtotalYen, redeemPoints * POINTS.yenPerPoint);
+  // aparece aqui é exatamente o que vai cair na conta do cliente, incluindo
+  // o multiplicador de pontos pelo nível do cliente.
+  const earnedPoints = earnedPointsForOrder(productSubtotalYen, redeemPoints * POINTS.yenPerPoint, pointsMultiplier);
 
   const isPix = paymentMethod === 'pix';
   const subtotalWithCoupon = Math.max(0, baseTotalPrice - couponDiscount - pointsDiscount);
@@ -490,10 +521,15 @@ const OrderReview: React.FC = () => {
                         </span>
                         <span className="text-[11px] text-purple-700">1 ponto = ¥1</span>
                       </div>
-                      {psFeeNegociada ? (
+                      {psFeeNegociada && !pointsCoverAllProducts ? (
                         <p className="text-xs text-purple-800 dark:text-purple-300 leading-snug">
                           Você já tem desconto negociado na taxa do Personal Shopper neste pedido, e os dois
                           benefícios não se somam. Para usar pontos, refaça o pedido sem o desconto da taxa.
+                        </p>
+                      ) : pointsCoverAllProducts && psFeeNegociada ? (
+                        <p className="text-xs text-orange-700 dark:text-orange-400 leading-snug">
+                          Como o pedido é pago integralmente com pontos, o desconto negociado na taxa será
+                          desconsiderado — ela será cobrada cheia.
                         </p>
                       ) : (
                         <>
@@ -537,7 +573,7 @@ const OrderReview: React.FC = () => {
                   {user && earnedPoints > 0 && (
                     <div className="flex justify-between text-green-700 text-xs bg-green-50/60 p-2 rounded">
                       <span className="flex items-center gap-1"><Sparkles className="w-3.5 h-3.5" /> Você ganhará nesta compra</span>
-                      <span className="font-bold">+{earnedPoints} pts</span>
+                      <span className="font-bold">+{earnedPoints} pts{pointsMultiplier > 1 && <span className="ml-1 inline-block bg-green-600 text-white px-2 py-0.5 rounded text-[10px] font-bold">x{pointsMultiplier}</span>}</span>
                     </div>
                   )}
 
@@ -1011,7 +1047,7 @@ const OrderReview: React.FC = () => {
                       {user && earnedPoints > 0 && (
                         <div className="flex justify-center gap-1 text-green-700 text-xs mt-3 bg-green-50 rounded-lg py-2">
                           <Sparkles className="w-3.5 h-3.5 mt-0.5" />
-                          <span>+{earnedPoints} pontos após a compra</span>
+                          <span>+{earnedPoints} pontos após a compra{pointsMultiplier > 1 && <span className="ml-1 inline-block bg-green-600 text-white px-2 py-0.5 rounded text-[10px] font-bold">x{pointsMultiplier}</span>}</span>
                         </div>
                       )}
                     </div>

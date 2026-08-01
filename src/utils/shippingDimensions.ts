@@ -1,3 +1,4 @@
+import { packedWeightG } from '../../shared/weight.js';
 import type { CartItem, ProductPackageDimensionsCm } from '@/types';
 
 export const PACKAGE_SAFETY_MARGIN_CM = 5;
@@ -102,8 +103,8 @@ export const calculateCartShippingBoxes = (
   let hasAnyEstimated = false;
   for (const item of items) {
     if (item.product.weightGrams && item.product.weightGrams > 0) {
-      // Peso real cadastrado — já inclui frasco/embalagem, sem overhead
-      totalWeightG += item.product.weightGrams * item.quantity;
+      // Peso real cadastrado + embalagem
+      totalWeightG += packedWeightG(item.product.weightGrams) * item.quantity;
     } else {
       hasAnyEstimated = true;
       const dim = sanitizePackageDimensions(item.product.packageDimensionsCm);

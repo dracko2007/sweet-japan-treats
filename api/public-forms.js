@@ -12,7 +12,7 @@ import {
   requiredText,
   sendError,
 } from './_lib/http.js';
-import { MAIL_REPLY_TO, siteOrigin, unsubscribeUrl } from './_lib/mailer.js';
+import { MAIL_REPLY_TO, sendMail, siteOrigin, unsubscribeUrl, wrapEmail } from './_lib/mailer.js';
 import { enforceRateLimit } from './_lib/rate-limit.js';
 
 const SOURCES = new Set(['exit_intent', 'newsletter_footer', 'guide', 'cart_reminder']);
@@ -126,6 +126,28 @@ async function persistSubmission(type, data) {
   });
 }
 
+// O formulário "Faça seu Pedido" cai numa coleção que ninguém acompanha: sem
+// aviso ativo a loja só descobre o pedido quando abre o painel por acaso —
+// foi assim que dois ficaram parados sem resposta.
+async function notifyStoreCustomRequest(data) {
+  const to = process.env.ORDER_NOTIFICATION_EMAIL || process.env.ADMIN_EMAIL;
+  if (!to) return;
+  const linha = (rotulo, valor) =>
+    `<p style="margin:0 0 6px"><strong>${rotulo}:</strong> ${escapeHtml(valor || '—')}</p>`;
+  const html = wrapEmail(
+    `<h2 style="margin:0 0 12px;font-size:18px">Novo pedido personalizado</h2>`
+    + linha('Nome', data.name)
+    + linha('Contato', data.contact)
+    + linha('País', data.country)
+    + linha('Quantidade', data.quantity)
+    + linha('Link de referência', data.referenceLink)
+    + `<p style="margin:12px 0 6px"><strong>Descrição do produto:</strong></p>`
+    + `<p style="margin:0;white-space:pre-wrap">${escapeHtml(data.productDesc || '—')}</p>`
+    + `<p style="margin:16px 0 0"><a href="${siteOrigin()}/admin">Abrir no painel</a></p>`,
+  );
+  await sendMail({ to, subject: `Novo pedido personalizado — ${data.name}`, html });
+}
+
 async function handleSubmission(req, res) {
   if (!handleCors(req, res, { methods: ['POST'] })) return;
   try {
@@ -136,6 +158,15 @@ async function handleSubmission(req, res) {
       windowMs: 60 * 60 * 1000,
     });
     await persistSubmission(submission.type, submission.data);
+    if (submission.type === 'custom_request') {
+      // O pedido já está gravado: problema de SMTP não pode transformar um
+      // envio bem-sucedido em erro na cara do cliente. Só vira log.
+      try {
+        await notifyStoreCustomRequest(submission.data);
+      } catch (error) {
+        console.error('[public-submission] aviso de pedido personalizado falhou:', error instanceof Error ? error.message : error);
+      }
+    }
     res.status(201).json({ ok: true });
   } catch (error) {
     console.error('[public-submission]', error instanceof Error ? error.message : error);

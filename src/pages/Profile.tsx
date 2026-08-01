@@ -424,13 +424,27 @@ const Profile: React.FC = () => {
           <div className="max-w-6xl mx-auto space-y-6">
 
             {/* Pontos de Fidelidade */}
-            <div className="bg-gradient-to-r from-amber-400 to-pink-500 rounded-2xl p-6 lg:p-8 text-white shadow-elevated flex items-center justify-between">
-              <div>
-                <p className="text-sm font-semibold uppercase tracking-wide text-white/90">{t('profile.points.title')}</p>
-                <p className="font-display text-5xl font-extrabold mt-1">{user?.points || 0} <span className="text-2xl font-bold">pts</span></p>
-                <p className="text-sm text-white/90 mt-1">{t('profile.points.desc')}</p>
+            <div className="bg-gradient-to-r from-amber-400 to-pink-500 rounded-2xl p-6 lg:p-8 text-white shadow-elevated">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-semibold uppercase tracking-wide text-white/90">{t('profile.points.title')}</p>
+                  <p className="font-display text-5xl font-extrabold mt-1">{user?.points || 0} <span className="text-2xl font-bold">pts</span></p>
+                  <p className="text-sm text-white/90 mt-1">{t('profile.points.desc')}</p>
+                </div>
+                <div className="text-7xl opacity-80">🎁</div>
               </div>
-              <div className="text-7xl opacity-80">🎁</div>
+              {/* Níveis de pontos: quanto mais o cliente compra em 3 meses, mais
+                  pontos cada compra rende. Fica no mesmo cartão dos pontos porque
+                  é a resposta para "como eu ganho mais?". */}
+              <div className="mt-6 pt-6 border-t border-white/20">
+                <p className="text-sm font-semibold uppercase tracking-wide text-white/90 mb-3">{t('profile.points.tiers.title')}</p>
+                <div className="text-xs text-white/80 space-y-2">
+                  <p>• {t('profile.points.tiers.tier1')}</p>
+                  <p>• {t('profile.points.tiers.tier2')}</p>
+                  <p>• {t('profile.points.tiers.tier3')}</p>
+                  <p className="pt-2 italic text-white/70">{t('profile.points.tiers.window')}</p>
+                </div>
+              </div>
             </div>
 
             <ReferralCard />

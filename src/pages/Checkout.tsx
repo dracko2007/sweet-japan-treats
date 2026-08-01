@@ -22,7 +22,7 @@ import { usePostalCodeLookup } from '@/hooks/usePostalCodeLookup';
 import { useLanguage, CountryType } from '@/context/LanguageContext';
 import { formatPrice, getCurrencyByCountry } from '@/utils/currency';
 import { effectiveYen } from '@/utils/pricing';
-import { convertYen as fxConvert, getRates } from '@/services/fxService';
+import { convertYen as fxConvert, yenFromConverted, getRates } from '@/services/fxService';
 import { POINTS } from '@/services/pointsService';
 import { safeStorage } from '@/utils/storage';
 import { psFeeWaiver, PS_FEE_WAIVER_EVENT } from '@/utils/psFeeWaiver';
@@ -116,6 +116,12 @@ const Checkout: React.FC = () => {
   const maxRedeemable = canRedeem ? Math.min(availablePoints, Math.floor(productSubtotalYen / POINTS.yenPerPoint)) : 0;
   const redeemPoints = Math.max(0, Math.min(pointsToUse, maxRedeemable));
   const pointsDiscount = convertYen(redeemPoints * POINTS.yenPerPoint);
+  // Quanto do cupom em ienes (mesmo cálculo que o servidor)
+  const couponDiscountYen = couponDiscount > 0 ? Math.floor(yenFromConverted(couponDiscount, currency)) : 0;
+  // Pedido zerado por pontos: resgate cobre toda a mercadoria após cupom.
+  // Quando verdadeiro, taxa PS é cobrada cheia (sem negociação nem isenção de popup).
+  const netProductsAfterCouponAndPoints = productSubtotalYen - couponDiscountYen - redeemPoints;
+  const pointsCoverAllProducts = productSubtotalYen > 0 && redeemPoints > 0 && netProductsAfterCouponAndPoints <= 0;
 
   // Erros de validação do formulário
   const [errors, setErrors] = useState<FieldErrors>({});
@@ -598,7 +604,7 @@ const Checkout: React.FC = () => {
     : Math.min(psFeeDiscountYen, maxAutoApprovable);
   // Oferta de saída isenta a taxa por completo e tem prioridade sobre a negociação
   // (limitada ao valor real da taxa — nunca desconta mais do que a taxa atual).
-  const effectivePsFeeDiscountYen = psFeeWaived ? psFeeYen : negPsFeeDiscountYen;
+  const effectivePsFeeDiscountYen = pointsCoverAllProducts ? 0 : (psFeeWaived ? psFeeYen : negPsFeeDiscountYen);
   const psFeeFinalYen = Math.max(0, psFeeYen - effectivePsFeeDiscountYen);
   const psFeeDisplay = convertYenExact(psFeeFinalYen);
   const psFeeOriginalDisplay = convertYenExact(psFeeYen);
@@ -1277,7 +1283,7 @@ const Checkout: React.FC = () => {
                             10px parecia rótulo, não convite. Agora é um alvo de toque cheio que
                             "respira" (pulse-zoom) até ser clicado. Texto "Pedir desconto" em vez de
                             "Negociar" porque nomeia o benefício, não o processo. */}
-                        {!psFeeWaived && !activeNeg && (
+                        {!psFeeWaived && !activeNeg && !pointsCoverAllProducts && (
                           <div className="mt-2">
                             <button
                               type="button"
@@ -1290,6 +1296,11 @@ const Checkout: React.FC = () => {
                               Esta taxa é negociável: até ¥{(300 * psFeeQty).toLocaleString()} de desconto sai aprovado na hora.
                             </p>
                           </div>
+                        )}
+                        {pointsCoverAllProducts && (
+                          <p className="text-xs text-muted-foreground mt-2 leading-snug">
+                            Esta taxa não é negociável quando o pedido é pago integralmente com pontos.
+                          </p>
                         )}
                         {psFeeWaived && (
                           <p className="text-[10px] text-amber-600 dark:text-amber-500 mt-1 leading-snug">

@@ -36,8 +36,8 @@ describe('pontos do pedido', () => {
     expect(pedido().earnedPoints).toBe(100);
   });
 
-  // Frete (¥3.900) e taxa do personal shopper (¥1.000 por item) entram no total
-  // pago, mas não na base de pontos: ponto é sobre mercadoria.
+  // Frete e taxa do personal shopper (¥1.000 por item) entram no total pago,
+  // mas não na base de pontos: ponto é sobre mercadoria.
   it('frete e taxa do personal shopper não geram ponto', () => {
     const q = pedido();
 
@@ -145,6 +145,8 @@ describe('pontos com taxa de personal shopper negociada', () => {
     });
 
     expect(q.redeemPoints).toBe(2000);
-    expect(q.shippingYen).toBe(3400); // ¥3.900 − ¥500
+    // 2 × 300g cadastrados + 200g de embalagem cada = 1.000g → faixa EMS de
+    // ¥5.100 (ver `shared/weight.js`); menos os ¥500 negociados.
+    expect(q.shippingYen).toBe(4600);
   });
 });

@@ -1,12 +1,13 @@
+import { packedWeightG } from '../../shared/weight.js';
 // Frete estimado por peso para o catálogo/SEO (Schema.org e feed).
 // Usa o serviço mais barato disponível (e-Packet Light ou Air Parcel) pelo peso real.
 
 import { getELightRate, getAirParcelRate, countryToZone, type JapanPostZone } from './japanPostRates';
 import type { Product } from '@/types';
 
-/** Peso usado para frete: weightGrams real, ou 500g base. */
+/** Peso usado para frete: weightGrams + embalagem real, ou 500g base. */
 export function catalogWeightG(product: Product): number {
-  if (product.weightGrams && product.weightGrams > 0) return product.weightGrams;
+  if (product.weightGrams && product.weightGrams > 0) return packedWeightG(product.weightGrams);
   return 500;
 }
 

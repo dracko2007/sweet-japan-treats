@@ -1,4 +1,5 @@
-import { earnedPointsForOrder } from '../../shared/points.js';
+import { earnedPointsForOrder, pointsMultiplierForSpend } from '../../shared/points.js';
+import { packedWeightG } from '../../shared/weight.js';
 import { roundYen } from '../../shared/pricing.js';
 import { HttpError } from './http.js';
 import { convertYen, currencyForCountry } from './fx.js';
@@ -128,7 +129,7 @@ function shippingShape(items) {
   let maxSum = 0;
   for (const item of items) {
     const dims = dimensions(item.product);
-    const weight = Number(item.product.weightGrams || 0);
+    const weight = packedWeightG(item.product.weightGrams);
     if (weight > 0) totalWeightG += weight * item.quantity;
     else {
       estimated = true;
@@ -212,7 +213,7 @@ function normalizeMoney(value, currency) {
   return currency === 'JPY' ? Math.round(value) : Math.round(value * 100) / 100;
 }
 
-export function buildQuote({ requestedItems, products, country, prefecture, state, carrier, paymentMethod, coupon, redeemPoints, negotiation, campaign, homePromotion, rates }) {
+export function buildQuote({ requestedItems, products, country, prefecture, state, carrier, paymentMethod, coupon, redeemPoints, negotiation, campaign, homePromotion, rates, recentSpendYen = 0 }) {
   const now = Date.now();
   if (!Array.isArray(requestedItems) || requestedItems.length < 1 || requestedItems.length > 100) throw new HttpError(400, 'invalid_items');
   const lineItems = [];
@@ -291,6 +292,17 @@ export function buildQuote({ requestedItems, products, country, prefecture, stat
   // paga nem a mercadoria nem o trabalho. O cliente escolhe um dos dois — e
   // recusar é melhor que descartar um em silêncio, que faria o total da tela
   // não bater com o cobrado.
+  //
+  // É esta recusa que segura a margem no caso extremo — pedido pago inteiro
+  // com pontos. A taxa é a única linha do total que ainda cobre separar,
+  // conferir e despachar; se ela cair junto, o pedido sai de graça. Note que a
+  // recusa vale para QUALQUER resgate combinado com taxa negociada, zerando o
+  // pedido ou não: descartar o desconto negociado só quando o pedido zera
+  // deixaria o cliente perder um benefício aprovado sem nenhum aviso.
+  //
+  // A isenção do popup de saída (`src/utils/psFeeWaiver.ts`) nunca chega aqui:
+  // é só do cliente, o corpo aceito em `api/orders.js` não tem campo para ela,
+  // e por isso a taxa nasce sempre cheia neste cálculo.
   if (pointsDiscountYen > 0 && psDiscountYen > 0) throw new HttpError(409, 'points_with_ps_negotiation');
   const shipping = shippingYen(lineItems, country, prefecture, carrier, productSubtotalYen - couponDiscountYen, coupon?.freeShipping === true);
   const shippingDiscountYen = approved && negotiation.type === 'shipping' ? Math.min(shipping.amount, Number(negotiation.approvedDiscountYen || 0)) : 0;
@@ -306,6 +318,8 @@ export function buildQuote({ requestedItems, products, country, prefecture, stat
   const taxDisplay = country === 'Japão' ? 0 : normalizeMoney(displayTax(productsDisplay, country, state || prefecture), currency);
   const total = normalizeMoney(productsDisplay + shippingDisplay + psFeeDisplay + taxDisplay, currency);
   if (!(total > 0)) throw new HttpError(400, 'invalid_total');
+  
+  const pointsMultiplier = pointsMultiplierForSpend(recentSpendYen);
 
   return {
     currency,
@@ -316,7 +330,8 @@ export function buildQuote({ requestedItems, products, country, prefecture, stat
     couponDiscountYen,
     pointsDiscountYen,
     redeemPoints: pointsDiscountYen,
-    earnedPoints: earnedPointsForOrder(productSubtotalYen, pointsDiscountYen),
+    earnedPoints: earnedPointsForOrder(productSubtotalYen, pointsDiscountYen, pointsMultiplier),
+    pointsMultiplier,
     shippingYen: finalShippingYen,
     shippingWeightG: shipping.weightG,
     psFeeYen: psFeeYen - psDiscountYen,

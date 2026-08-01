@@ -41,6 +41,7 @@ vi.mock('./mailer.js', async (importOriginal) => ({
   sendMail: mocks.sendMail,
 }));
 
+
 const { default: handler } = await import('../cart-recovery.js');
 
 function resposta() {
@@ -89,8 +90,8 @@ describe('recuperação de carrinho', () => {
     expect(html).not.toMatch(/desconto/i);
   });
 
-  it('oferece 30% só no último toque, a 7 dias', async () => {
-    await rodar(24 * 8, 3); // 8 dias, já recebeu os 3 primeiros
+  it('oferece 30% só no último toque, a 9 dias', async () => {
+    await rodar(24 * 10, 3); // 10 dias, já recebeu os 3 primeiros
 
     const cupom = mocks.set.mock.calls[0][0];
     expect(cupom.discountPercent).toBe(30);
@@ -100,7 +101,7 @@ describe('recuperação de carrinho', () => {
   });
 
   it('o cupom é criado ANTES de prometer o código no e-mail', async () => {
-    await rodar(24 * 8, 3);
+    await rodar(24 * 10, 3);
 
     // Era exatamente o bug do VOLTA10: e-mail com código que não existia.
     const ordemCriacao = mocks.set.mock.invocationCallOrder[0];
@@ -109,7 +110,7 @@ describe('recuperação de carrinho', () => {
   });
 
   it('o cupom vale para o CARRINHO INTEIRO, não para um produto', async () => {
-    await rodar(24 * 8, 3);
+    await rodar(24 * 10, 3);
 
     const c = mocks.set.mock.calls[0][0];
     // Campanha de produto carrega `productId` e o servidor a restringe a ele.
@@ -119,7 +120,7 @@ describe('recuperação de carrinho', () => {
   });
 
   it('usa código fixo e legível, liberado só para quem recebeu o e-mail', async () => {
-    await rodar(24 * 8, 3);
+    await rodar(24 * 10, 3);
 
     const c = mocks.set.mock.calls[0][0];
     expect(c.code).toBe('CARRINHO30');
@@ -133,7 +134,7 @@ describe('recuperação de carrinho', () => {
   });
 
   it('o prazo acompanha o envio — 24h para finalizar', async () => {
-    await rodar(24 * 8, 3);
+    await rodar(24 * 10, 3);
 
     const c = mocks.set.mock.calls[0][0];
     const horas = (new Date(c.expiryDate).getTime() - Date.now()) / 3600000;
@@ -144,7 +145,7 @@ describe('recuperação de carrinho', () => {
   it('não envia nada se o cupom não puder ser criado', async () => {
     mocks.set.mockRejectedValue(new Error('firestore fora'));
 
-    const res = await rodar(24 * 8, 3);
+    const res = await rodar(24 * 10, 3);
 
     expect(mocks.sendMail).not.toHaveBeenCalled();
     expect(res.body.sent).toBe(0);
@@ -157,7 +158,7 @@ describe('recuperação de carrinho', () => {
   });
 
   it('todo lembrete carrega a saída para parar de receber', async () => {
-    await rodar(24 * 8, 3);
+    await rodar(24 * 10, 3);
 
     const { html, unsubscribe } = mocks.sendMail.mock.calls[0][0];
     expect(unsubscribe).toMatch(/\/api\/unsubscribe\?e=[^&]+&t=.+/);
@@ -170,7 +171,7 @@ describe('recuperação de carrinho', () => {
   it('quem cancelou a inscrição não recebe nem volta na fila', async () => {
     mocks.cancelouInscricao = true;
 
-    const res = await rodar(24 * 8, 3);
+    const res = await rodar(24 * 10, 3);
 
     expect(mocks.sendMail).not.toHaveBeenCalled();
     expect(mocks.set).not.toHaveBeenCalled();
@@ -179,4 +180,5 @@ describe('recuperação de carrinho', () => {
     );
     expect(res.body.sent).toBe(0);
   });
+
 });

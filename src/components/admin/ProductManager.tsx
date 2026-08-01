@@ -1335,7 +1335,7 @@ const ProductManager: React.FC = () => {
                     className="w-full px-3 py-2 rounded-lg border border-orange-200 bg-background text-sm mt-1"
                   />
                   <p className="text-[11px] text-orange-700 dark:text-orange-300 mt-1">
-                    Usado pelo Japan Post para calcular o custo do frete por peso.
+                    Peso do produto (sem embalagem). O sistema soma 200 g de embalagem no cálculo do frete para produtos abaixo de 2 kg.
                   </p>
                 </div>
               </div>

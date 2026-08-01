@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Users, ShoppingBag, DollarSign, TrendingUp, Package, Calendar, Mail, Phone, Trash2, AlertTriangle, Gift, X, Sparkles, Megaphone, RefreshCw, Handshake, UserX, MailCheck } from 'lucide-react';
+import { Users, ShoppingBag, DollarSign, TrendingUp, Package, Calendar, Mail, Phone, Trash2, AlertTriangle, Gift, X, Sparkles, Megaphone, RefreshCw, Handshake, UserX, MailCheck, Instagram, Music } from 'lucide-react';
 import { affiliateService, AffiliateRequest } from '@/services/affiliateService';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -152,6 +152,19 @@ const CustomerList: React.FC = () => {
       loadCustomers();
     } else {
       toast({ title: 'Não foi possível ajustar', description: res.error, variant: 'destructive' });
+    }
+  };
+
+  const handleToggleSocialFollow = async (email: string, name: string, network: 'instagram' | 'tiktok', currentValue: boolean) => {
+    if (!(await requireAdminPassword(`marcar rede social de ${name}`))) return;
+    await ensureAdminAuth();
+    const res = await firebaseSyncService.setSocialFollowByEmail(email, network, !currentValue);
+    if (res.success) {
+      const networkLabel = network === 'instagram' ? 'Instagram' : 'TikTok';
+      toast({ title: `✅ ${networkLabel} atualizado`, description: `${name} ${!currentValue ? 'agora segue' : 'deixou de seguir'} no ${networkLabel}.` });
+      loadCustomers();
+    } else {
+      toast({ title: 'Não foi possível atualizar', description: res.error, variant: 'destructive' });
     }
   };
 
@@ -593,6 +606,24 @@ const CustomerList: React.FC = () => {
                     >
                       <Sparkles className="w-3 h-3 mr-1" />
                       Dar pontos
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className={`text-xs flex-1 ${customer.socialFollows?.instagram ? 'bg-pink-50 text-pink-700 border-pink-300' : 'text-pink-600 border-pink-200 hover:bg-pink-50'}`}
+                      onClick={() => handleToggleSocialFollow(customer.email, customer.name, 'instagram', Boolean(customer.socialFollows?.instagram))}
+                    >
+                      <Instagram className="w-3 h-3 mr-1" />
+                      {customer.socialFollows?.instagram ? 'IG ✓' : 'IG'}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className={`text-xs flex-1 ${customer.socialFollows?.tiktok ? 'bg-gray-800 text-white border-gray-700' : 'text-gray-700 border-gray-300 hover:bg-gray-50'}`}
+                      onClick={() => handleToggleSocialFollow(customer.email, customer.name, 'tiktok', Boolean(customer.socialFollows?.tiktok))}
+                    >
+                      <Music className="w-3 h-3 mr-1" />
+                      {customer.socialFollows?.tiktok ? 'TT ✓' : 'TT'}
                     </Button>
                     <Button
                       size="sm"

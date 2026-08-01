@@ -7,6 +7,7 @@ import { useToast } from '@/hooks/use-toast';
 import { newsletterService } from '@/services/newsletterService';
 import { psFeeWaiver } from '@/utils/psFeeWaiver';
 import { safeStorage } from '@/utils/storage';
+import { effectiveYen } from '@/utils/pricing';
 import type { CartItem } from '@/types';
 
 const MARKETING_KEY = 'exit_popup_shown';      // oferta/guia/retenção simples — 1× por sessão
@@ -37,6 +38,10 @@ const flagSet = (k: string): void => {
 // Quantidade de itens que pagam taxa PS (¥1.000/un): exclui brindes e isentos (noPsFee).
 const psFeeQtyOf = (list: CartItem[]): number =>
   list.reduce((s, i) => (i.freeGift || i.product?.noPsFee) ? s : s + i.quantity, 0);
+
+// Subtotal da mercadoria em ¥ (exclui brindes): base dos pontos
+const productSubtotalYenOf = (list: CartItem[]): number =>
+  list.reduce((s, i) => i.freeGift ? s : s + effectiveYen(i.product, i.size) * i.quantity, 0);
 
 // Moldura do modal (overlay + cartão + botão fechar). Definida no nível do módulo
 // para NÃO remontar a subárvore a cada render (senão o input de e-mail perde o foco).
@@ -113,7 +118,12 @@ const ExitIntentPopup: React.FC = () => {
       if (list.length === 0) return null;
       // Só na página de checkout (endereço), com taxa PS e sem isenção ativa,
       // oferecemos a isenção por finalizar agora. Caso contrário, retenção simples.
-      if (path.startsWith('/checkout') && psFeeQtyOf(list) > 0 && !psFeeWaiver.isActive()) return 'ps_offer';
+      // Ler pontos resgatados do storage (gravado antes de navegar para /order-review)
+      const redeemPoints = Number(safeStorage.getItem('redeem_points')) || 0;
+      const productSubtotalYen = productSubtotalYenOf(list);
+      const pointsCoverAllProducts = productSubtotalYen > 0 && redeemPoints > 0 && redeemPoints >= productSubtotalYen;
+      // Só oferecemos a isenção da taxa PS se a mercadoria não for coberta por pontos
+      if (path.startsWith('/checkout') && psFeeQtyOf(list) > 0 && !psFeeWaiver.isActive() && !pointsCoverAllProducts) return 'ps_offer';
       return 'retention';
     }
     // FORA do checkout: NÃO oferecemos a isenção — o cliente ainda pode estar

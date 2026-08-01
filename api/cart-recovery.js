@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { requireCronSecret } from './_lib/auth.js';
+import { isBlockedFrom30 } from './_lib/cart-recovery-profile.js';
 import { isOptedOut } from './_lib/email-optout.js';
 import { adminAuth, adminDb } from './_lib/firebase-admin.js';
 import { escapeHtml, handleCors, sendError } from './_lib/http.js';
@@ -13,15 +14,23 @@ const CLAIM_TTL_MS = 10 * 60 * 1000;
 // entre execuções do cron. `reminderStage` no doc = último estágio já enviado
 // (0 = nenhum ainda). STAGES[reminderStage] = definição do PRÓXIMO estágio devido.
 //
-// O desconto escala e o de 30% é o ÚLTIMO recurso, a 7 dias: oferecer cedo
-// ensina o cliente a abandonar o carrinho de propósito para esperar o cupom.
+// Cadência pedida pelo dono: os três e-mails de desconto (10% → 15% → 30%)
+// saem de 3 em 3 dias — como os thresholds são tempo total, isso vira 3, 6 e 9
+// dias. Depois do estágio 4 não sai mais nada: `dueStage` devolve null assim
+// que `reminderStage >= STAGES.length`, e o próprio filtro da consulta tira o
+// documento da fila. O toque de 90 minutos continua sem cupom porque quem só
+// esqueceu a aba aberta volta sozinho — dar desconto ali é queimar margem.
 // Margem conferida em 26/07/2026 sobre 273 produtos com custo cadastrado —
 // com 30% a margem mediana ainda é 29%.
+//
+// Oferecer 30% de forma previsível ensina o cliente a abandonar o carrinho de
+// propósito; quem já comprou usando esse cupom fica com teto de 15% (ver
+// `_lib/cart-recovery-profile.js`).
 const STAGES = [
   { stage: 1, thresholdMs: 90 * 60 * 1000, discount: null, validadeMs: 0 },
-  { stage: 2, thresholdMs: 24 * 60 * 60 * 1000, discount: 10, validadeMs: 48 * 60 * 60 * 1000 },
-  { stage: 3, thresholdMs: 72 * 60 * 60 * 1000, discount: 15, validadeMs: 48 * 60 * 60 * 1000 },
-  { stage: 4, thresholdMs: 7 * 24 * 60 * 60 * 1000, discount: 30, validadeMs: 24 * 60 * 60 * 1000 },
+  { stage: 2, thresholdMs: 3 * 24 * 60 * 60 * 1000, discount: 10, validadeMs: 48 * 60 * 60 * 1000 },
+  { stage: 3, thresholdMs: 6 * 24 * 60 * 60 * 1000, discount: 15, validadeMs: 48 * 60 * 60 * 1000 },
+  { stage: 4, thresholdMs: 9 * 24 * 60 * 60 * 1000, discount: 30, validadeMs: 24 * 60 * 60 * 1000 },
 ];
 
 /**
@@ -164,6 +173,20 @@ export default async function handler(req, res) {
           await document.ref.update({
             reminderStage: STAGES.length,
             reminderOptedOut: true,
+            reminderClaimId: null,
+            reminderClaimedAt: null,
+          });
+          skipped += 1;
+          continue;
+        }
+        // Quem comprou usando o cupom de 30% fica com teto de 15% para evitar
+        // que aprenda a abandonar carrinho de propósito esperando o desconto máximo.
+        // Se estiver bloqueado e o estágio devido é 30%, encerra com `reminderCapped30`
+        // marcado para auditoria. Fora disso o carrinho segue normal.
+        if (stageDef.discount === 30 && await isBlockedFrom30(document.id)) {
+          await document.ref.update({
+            reminderStage: STAGES.length,
+            reminderCapped30: true,
             reminderClaimId: null,
             reminderClaimedAt: null,
           });

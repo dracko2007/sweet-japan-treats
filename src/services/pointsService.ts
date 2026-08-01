@@ -11,6 +11,9 @@
 import {
   earnedPointsForOrder,
   pointsForSpendYen,
+  pointsMultiplierForSpend,
+  spendWindowStart,
+  TIERS,
   POINTS_PER_100_YEN,
   YEN_PER_POINT,
 } from '../../shared/points.js';
@@ -56,8 +59,7 @@ const LOCAL = 'jp_video_reviews';
 // `pointsForSpendYen` e `earnedPointsForOrder` vêm de `shared/points.js` — a
 // mesma função que `api/_lib/commerce.js` usa para creditar. Reimplementar aqui
 // foi o que fez a tela prometer 100 e o servidor pagar 85.
-export { earnedPointsForOrder, pointsForSpendYen };
-
+export { earnedPointsForOrder, pointsForSpendYen, pointsMultiplierForSpend, spendWindowStart, TIERS };
 /** Pontos por minutos de vídeo: 5 por minuto iniciado (mín. 1 min). */
 export const pointsForVideoMinutes = (minutes: number): number => {
   const m = Math.max(1, Math.floor(minutes || 0));

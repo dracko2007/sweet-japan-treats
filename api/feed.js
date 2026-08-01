@@ -11,6 +11,7 @@
 // Produtos são públicos no Firestore (allow read: if true) — lê via REST sem auth.
 
 import { detectBrand } from '../shared/brand.js';
+import { packedWeightG } from '../shared/weight.js';
 import { minEffectiveYen, variantPrices } from '../shared/pricing.js';
 import { fetchProducts, escapeXml, isVisibleInternationally } from './_lib/firestore-products.js';
 import { convertYen as convertYenFx, getFxRates } from './_lib/fx.js';
@@ -71,10 +72,9 @@ function cheapestShippingYen(weightG, zone) {
 // Este arquivo tinha a própria cópia, anunciada como "espelha
 // src/utils/pricing.ts" — e sem o arredondamento dos outros dois. Três produtos
 // saíam com preço menor do que o site cobra.
-
-// Peso usado para frete: weightGrams real, ou estimativa por tamanho
+// Peso usado para frete: weightGrams + embalagem real, ou estimativa por tamanho
 function productWeightG(p) {
-  if (p.weightGrams && p.weightGrams > 0) return p.weightGrams;
+  if (p.weightGrams && p.weightGrams > 0) return packedWeightG(p.weightGrams);
   return 500; // base padrão
 }
 

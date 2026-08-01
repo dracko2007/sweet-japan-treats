@@ -74,11 +74,23 @@ export interface Order {
   id: string;
   orderNumber: string;
   date: string;
+  /** ISO gravado pelo servidor (`api/orders.js`). `date` é a versão pt-BR, só
+   *  para exibição — para comparar datas use este. */
+  orderDate?: string;
+  /** Só vira `true` quando o pagamento é confirmado
+   *  (`api/_lib/fulfillment.js`): separa pedido pago de pedido só criado. */
+  paymentConfirmed?: boolean;
   items: Array<{
     productName: string;
     size: string;
     quantity: number;
+    /** Preço unitário na moeda exibida ao cliente (BRL, USD...). */
     price: number;
+    /** Preço unitário em ienes. É o único valor comparável entre pedidos de
+     *  países diferentes — o que o cálculo de nível de pontos precisa. */
+    unitYen?: number;
+    /** Brinde de promoção: não é mercadoria paga, fica fora dos pontos. */
+    freeGift?: boolean;
   }>;
   totalAmount: number;
   paymentMethod: string;

@@ -22,6 +22,10 @@ export interface CustomerStats {
   totalSpent: number;
   averageOrderValue: number;
   lastOrderDate: string | null;
+  socialFollows?: {
+    instagram?: boolean;
+    tiktok?: boolean;
+  };
   favoriteProducts: Array<{
     name: string;
     quantity: number;
@@ -228,6 +232,7 @@ export const customerService = {
           totalSpent,
           averageOrderValue: orders.length > 0 ? totalSpent / orders.length : 0,
           lastOrderDate: orderHistory[0]?.date || null,
+          socialFollows: data.socialFollows,
           favoriteProducts,
           orderHistory,
         });

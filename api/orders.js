@@ -4,6 +4,7 @@ import { requireAdmin, requireUser } from './_lib/auth.js';
 import { buildQuote } from './_lib/commerce.js';
 import { adminDb } from './_lib/firebase-admin.js';
 import { fulfillOrder } from './_lib/fulfillment.js';
+import { recentProductSpendYen } from './_lib/loyalty-tier.js';
 import { getFxRates } from './_lib/fx.js';
 import {
   assertExactKeys,
@@ -258,12 +259,13 @@ async function handleCreate(req, res) {
     const productSnaps = await db.getAll(...uniqueProductIds.map((id) => db.collection('products').doc(id)));
     const products = new Map(productSnaps.filter((snap) => snap.exists).map((snap) => [snap.id, { id: snap.id, ...snap.data() }]));
 
-    const [userSnap, homePromoSnap, negotiationSnap, cpfSnap, promoUsageSnap] = await Promise.all([
+    const [userSnap, homePromoSnap, negotiationSnap, cpfSnap, promoUsageSnap, recentSpendYen] = await Promise.all([
       db.collection('users').doc(user.uid).get(),
       db.collection('siteContent').doc('homePromotion').get(),
       negotiationId ? db.collection('negotiations').doc(negotiationId).get() : Promise.resolve(null),
       customer.cpf ? db.collection('cpf_index').doc(customer.cpf).get() : Promise.resolve(null),
       promoCode && customer.cpf ? db.collection('promo_usage').doc(`${promoCode}_${customer.cpf}`).get() : Promise.resolve(null),
+      recentProductSpendYen(db, user.uid),
     ]);
     if (promoUsageSnap?.exists) throw new HttpError(409, 'promotion_already_used');
     const userData = userSnap.exists ? userSnap.data() : null;
@@ -288,6 +290,7 @@ async function handleCreate(req, res) {
       campaign,
       homePromotion: homePromoSnap.exists ? homePromoSnap.data() : null,
       rates,
+      recentSpendYen,
     });
 
     const stockByProduct = new Map();
@@ -346,10 +349,10 @@ async function handleCreate(req, res) {
       affiliateOwnerEmail: coupon?.ownerEmail || '',
       promoCode: promoCode || '',
       promoMechanic: campaign?.mechanic || '',
-      promoPoints: Number(campaign?.points || 0),
-      promoCouponCode: campaign?.couponCode || '',
       redeemPoints: quote.redeemPoints,
       earnedPoints: quote.earnedPoints,
+      pointsMultiplier: quote.pointsMultiplier,
+      promoCouponCode: campaign?.couponCode || '',
       taxAmount: quote.tax,
       shippingCarrier: carrier,
       shippingCostYen: quote.shippingYen,

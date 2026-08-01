@@ -235,6 +235,29 @@ export const firebaseSyncService = {
   },
 
   /**
+   * Marca/desmarca seguimento de rede social para um usuário pelo e-mail (admin).
+   * Não dispara recompensa de pontos — escrita direta ao map socialFollows.
+   */
+  async setSocialFollowByEmail(email: string, network: 'instagram' | 'tiktok', follow: boolean): Promise<{ success: boolean; error?: string }> {
+    try {
+      ensureFirebaseReady();
+      const u = await this.getUserByEmail(email);
+      if (!u?.id) return { success: false, error: 'Cliente não encontrado no Firestore' };
+      // Caminho pontilhado, e NÃO um objeto aninhado: `updateDoc` com
+      // `{ socialFollows: { instagram } }` SUBSTITUI o map inteiro e apagaria
+      // as outras redes (tiktok/facebook/x) que o cliente já confirmou —
+      // zerando a recompensa de `SocialFollowRewards`. (`updateDoc` também não
+      // aceita `{ merge: true }`; isso é opção de `setDoc`.)
+      await updateDoc(doc(db, 'users', u.id), { [`socialFollows.${network}`]: follow });
+      devLog('✅ [FIREBASE] Social follow updated:', email, network, follow);
+      return { success: true };
+    } catch (error: any) {
+      devError('❌ [FIREBASE] setSocialFollowByEmail:', error);
+      return { success: false, error: error?.message };
+    }
+  },
+
+  /**
    * Sincroniza pedido para Firestore
    */
   async syncOrderToFirestore(userId: string, order: any) {

@@ -59,6 +59,7 @@ const ReturnPolicy     = lazy(() => import("./pages/ReturnPolicy"));
 const FirebaseSync     = lazy(() => import("./pages/FirebaseSync"));
 const SyncData         = lazy(() => import("./pages/SyncData"));
 const Promotion        = lazy(() => import("./pages/Promotion"));
+const Sorteio          = lazy(() => import("./pages/Sorteio"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -199,6 +200,7 @@ const FullApp: React.FC = () => (
                 <Route path="/return-policy" element={<ReturnPolicy />} />
                 <Route path="/devolucao" element={<ReturnPolicy />} />
                 <Route path="/promocao" element={<Promotion />} />
+                <Route path="/sorteio" element={<Sorteio />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </Suspense>

@@ -1,7 +1,7 @@
 import { safeStorage } from '@/utils/storage';
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Package, Printer, ShoppingBag, User, MapPin, Phone, Mail, Calendar, TestTube, Tag, Truck, CheckCircle, XCircle, Trash2, BarChart3, Users, PackagePlus, Video, Megaphone, Clapperboard, Building2, Sparkles, ShieldCheck, Calculator, CloudUpload, FileText, Handshake, Flag, TrendingDown, MessageCircle } from 'lucide-react';
+import { Package, Printer, ShoppingBag, User, MapPin, Phone, Mail, Calendar, TestTube, Tag, Truck, CheckCircle, XCircle, Trash2, BarChart3, Users, PackagePlus, Video, Megaphone, Clapperboard, Building2, Sparkles, ShieldCheck, Calculator, CloudUpload, FileText, Handshake, Flag, TrendingDown, MessageCircle, Trophy } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { useUser } from '@/context/UserContext';
@@ -41,6 +41,8 @@ import PromoNotificationModal from '@/components/admin/PromoNotificationModal';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { orderService } from '@/services/orderService';
 import type { OrderPageCursor } from '@/services/firebaseSyncService';
+import { customRequestService } from '@/services/customRequestService';
+import SorteioManager from '@/components/admin/SorteioManager';
 import { customerService } from '@/services/customerService';
 import { requireAdminPassword } from '@/utils/adminGuard';
 import { negotiationService } from '@/services/negotiationService';
@@ -55,7 +57,7 @@ const devError = isDev ? console.error.bind(console) : () => {};
 
 type AdminTab =
   | 'orders' | 'coupons' | 'dashboard' | 'customers' | 'products'
-  | 'home' | 'vlog' | 'affiliates' | 'requests' | 'b2b' | 'admins' | 'videos'
+  | 'home' | 'vlog' | 'sorteio' | 'affiliates' | 'requests' | 'b2b' | 'admins' | 'videos'
   | 'calculator' | 'migration' | 'promotion' | 'negotiations' | 'marketing' | 'employees' | 'coupon-usage' | 'fraud'
   | 'thermal-printer' | 'whatsapp' | 'review-moderation' | 'margin-audit' | 'visitors';
 
@@ -77,6 +79,7 @@ const Admin: React.FC = () => {
   const [ordersLoadingMore, setOrdersLoadingMore] = useState(false);
   const [customerCount, setCustomerCount] = useState(0);
   const [newCustomers, setNewCustomers] = useState(0);
+  const [newRequests, setNewRequests] = useState(0);
   const [isTesting, setIsTesting] = useState(false);
   const [activeTab, setActiveTab] = useState<AdminTab>('dashboard');
   const [trackingModalOpen, setTrackingModalOpen] = useState(false);
@@ -121,6 +124,7 @@ const Admin: React.FC = () => {
       lastRefresh = now;
       loadOrders();
       loadCustomers();
+      loadCustomRequests();
     };
 
     const debouncedRefresh = () => {
@@ -211,6 +215,25 @@ const Admin: React.FC = () => {
       }
     } catch (e) {
       devWarn('[admin] contagem de clientes falhou:', e);
+    }
+  };
+
+  // Pedidos personalizados a processar. O próprio `status` já é o controle, e é
+  // ele que o badge conta — não um "visto" guardado no storage.
+  //
+  // Um badge por "visto" tem exatamente a falha que motivou este pedido: na
+  // PRIMEIRA carga ele grava visto = pendentes e mostra zero, escondendo o
+  // trabalho que já estava parado (o dono tinha 2 pedidos sem resposta e o
+  // painel não indicava nada). O mesmo acontece toda vez que o storage é
+  // limpo, ou em outro navegador. Contando `status === 'new'`, o badge só
+  // apaga quando o pedido vira 'quoted'/'closed' — ou seja, quando alguém de
+  // fato tratou dele.
+  const loadCustomRequests = async () => {
+    try {
+      const todos = await customRequestService.getAll();
+      setNewRequests(todos.filter((r) => r.status === 'new').length);
+    } catch (e) {
+      devWarn('[admin] contagem de pedidos personalizados falhou:', e);
     }
   };
 
@@ -726,13 +749,14 @@ _This is an automated test message_
       { id: 'review-moderation', label: 'Moderação Reviews', icon: Flag },
     ] },
     { title: 'Solicitações', items: [
-      { id: 'requests', label: 'Personalizados', icon: Sparkles },
+      { id: 'requests', label: 'Personalizados', icon: Sparkles, badge: newRequests },
       { id: 'b2b', label: 'Empresas', icon: Building2 },
       { id: 'videos', label: 'Vídeos de review', icon: Video },
     ] },
     { title: 'Conteúdo', items: [
       { id: 'home', label: 'Início', icon: Video },
       { id: 'vlog', label: 'Vlog', icon: Clapperboard },
+      { id: 'sorteio', label: 'Sorteio', icon: Trophy },
     ] },
     { title: 'Financeiro', items: [
       { id: 'marketing', label: 'Gastos Marketing', icon: Megaphone },
@@ -1227,6 +1251,8 @@ _This is an automated test message_
               <HomeContentManager />
             ) : activeTab === 'vlog' ? (
               <VlogManager />
+            ) : activeTab === 'sorteio' ? (
+              <SorteioManager />
             ) : activeTab === 'affiliates' ? (
               <AffiliateManager />
             ) : activeTab === 'requests' ? (

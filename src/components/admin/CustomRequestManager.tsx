@@ -81,7 +81,7 @@ const CustomRequestManager: React.FC = () => {
           {list.map((r) => {
             const wa = waLink(r.contact);
             return (
-              <div key={r.id} className="bg-card rounded-2xl border border-border p-5">
+              <div key={r.id} className={`bg-card rounded-2xl border p-5 ${r.status === 'new' ? 'border-yellow-400 border-2' : 'border-border'}`}>
                 <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
                   <div>
                     <p className="font-bold text-foreground">{r.name} <span className="text-xs text-muted-foreground font-normal">• {r.country}</span></p>
