@@ -13,6 +13,7 @@ import CountrySwitcher from '@/components/CountrySwitcher';
 import JapanExpressLogo from '@/components/JapanExpressLogo';
 import { useToast } from '@/hooks/use-toast';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
+import { raffleService } from '@/services/raffleService';
 
 const Header: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -37,6 +38,15 @@ const Header: React.FC = () => {
     (c) => products.some((p) => !p.hidden && p.category === c.id)
   );
 
+  // Link do sorteio só aparece com sorteio publicado — nada de mandar o cliente
+  // para uma página vazia. Mesmo padrão condicional do Vlog logo abaixo.
+  // Uma leitura de UM documento na montagem do Header; qualquer falha deixa
+  // `false` e o link some, que é o lado seguro.
+  const [raffleLive, setRaffleLive] = useState(false);
+  useEffect(() => {
+    raffleService.getRaffle().then((r) => setRaffleLive(r.published === true)).catch(() => {});
+  }, []);
+
   useEffect(() => {
     if (!isMoreOpen) return;
     const handleClickOutside = (event: MouseEvent) => {
@@ -59,6 +69,7 @@ const Header: React.FC = () => {
   // "Mais" entre md e lg (faixa "intermediária" apertada) e inline a partir de lg.
   const primaryNavItems = [
     { label: t('nav.offers'), href: '/ofertas' },
+    ...(raffleLive ? [{ label: t('nav.raffle'), href: '/sorteio' }] : []),
     ...(settings.vlogEnabled ? [{ label: t('nav.vlog'), href: '/vlog' }] : []),
     { label: t('nav.shipping'), href: '/frete' },
   ];

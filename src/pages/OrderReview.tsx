@@ -21,7 +21,8 @@ import { convertYen as fxConvert, yenFromConverted } from '@/services/fxService'
 import { negotiationService } from '@/services/negotiationService';
 import { psFeeWaiver } from '@/utils/psFeeWaiver';
 import { productService } from '@/services/productService';
-import { earnedPointsForOrder, POINTS, pointsMultiplierForSpend, spendWindowStart } from '@/services/pointsService';
+import { earnedPointsForOrder, POINTS, pointsMultiplierForSpend } from '@/services/pointsService';
+import { recentProductSpendYen } from '@/utils/loyaltySpend';
 import { productEnglishName } from '@/utils/productName';
 import { Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -137,29 +138,8 @@ const OrderReview: React.FC = () => {
   );
 
   // Gasto dos últimos 3 meses-calendário, para o multiplicador de pontos.
-  // Mesmo critério do servidor (`api/_lib/loyalty-tier.js`): só pedido pago, só
-  // mercadoria, sempre em ienes.
-  //
-  // Pedido sem `unitYen` (histórico local antigo) conta zero em vez de cair
-  // para `price`: `price` está na moeda do cliente, e somar BRL com ¥ inflaria
-  // o nível. Subestimar aqui só mostra um multiplicador menor do que o servidor
-  // vai creditar — errar para menos é o lado seguro de uma promessa na tela.
-  const recentSpendYen = useMemo(() => {
-    if (!orders?.length) return 0;
-    const inicioJanela = spendWindowStart().getTime();
-    let total = 0;
-    for (const order of orders) {
-      const quando = order.orderDate ? new Date(order.orderDate).getTime() : 0;
-      const pago = order.status === 'confirmed' || order.paymentConfirmed === true;
-      if (!pago || quando < inicioJanela) continue;
-      if (!Array.isArray(order.items)) continue;
-      for (const item of order.items) {
-        if (item.freeGift === true) continue;
-        total += (Number(item.unitYen) || 0) * (Number(item.quantity) || 0);
-      }
-    }
-    return Math.max(0, Math.round(total));
-  }, [orders]);
+  // A conta mora em `utils/loyaltySpend` porque o perfil mostra o MESMO nível.
+  const recentSpendYen = useMemo(() => recentProductSpendYen(orders), [orders]);
 
   const pointsMultiplier = pointsMultiplierForSpend(recentSpendYen);
 

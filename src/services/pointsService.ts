@@ -9,10 +9,12 @@
 //  - Aniversário: 1000 pontos para a próxima compra.
 //  - Resgate: 1 ponto = ¥1 de desconto.
 import {
+  currentTier,
   earnedPointsForOrder,
   pointsForSpendYen,
   pointsMultiplierForSpend,
   spendWindowStart,
+  tierProgress,
   TIERS,
   POINTS_PER_100_YEN,
   YEN_PER_POINT,
@@ -59,7 +61,8 @@ const LOCAL = 'jp_video_reviews';
 // `pointsForSpendYen` e `earnedPointsForOrder` vêm de `shared/points.js` — a
 // mesma função que `api/_lib/commerce.js` usa para creditar. Reimplementar aqui
 // foi o que fez a tela prometer 100 e o servidor pagar 85.
-export { earnedPointsForOrder, pointsForSpendYen, pointsMultiplierForSpend, spendWindowStart, TIERS };
+export { currentTier, earnedPointsForOrder, pointsForSpendYen, pointsMultiplierForSpend, spendWindowStart, tierProgress, TIERS };
+
 /** Pontos por minutos de vídeo: 5 por minuto iniciado (mín. 1 min). */
 export const pointsForVideoMinutes = (minutes: number): number => {
   const m = Math.max(1, Math.floor(minutes || 0));

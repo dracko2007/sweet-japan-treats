@@ -21,23 +21,62 @@ export function pointsForSpendYen(yen) {
  *
  * Patamares como DADO, não como cadeia de `if`: o dono muda faixa e
  * multiplicador com frequência, e mexer numa lista é mais seguro do que mexer
- * em ramificação. Ordem decrescente porque a busca devolve o primeiro atingido.
+ * em ramificação. Ordem CRESCENTE — a tela desenha os três em sequência e o
+ * cálculo do próximo nível depende disso.
+ *
+ * O `id` é a chave de tradução e do troféu na tela; o nome em si não mora aqui
+ * porque `shared/` é usado pelo servidor, que não tem idioma.
  *
  * O gasto que conta é só mercadoria — taxa do personal shopper e frete ficam
  * de fora, pela mesma razão que não geram ponto: são serviço, não compra.
  */
 export const TIERS = [
-  { minSpendYen: 100000, multiplier: 3 },
-  { minSpendYen: 50000, multiplier: 2 },
+  { id: 'bronze', minSpendYen: 0, multiplier: 1 },
+  { id: 'prata', minSpendYen: 50000, multiplier: 2 },
+  { id: 'ouro', minSpendYen: 100000, multiplier: 3 },
 ];
 
 /** Janela do gasto: o mês atual mais os 2 anteriores. */
 export const SPEND_WINDOW_MONTHS = 3;
 
+/** Nível atingido por um gasto acumulado na janela (o mais alto alcançado). */
+export function currentTier(spendYen) {
+  const gasto = Math.max(0, Number(spendYen) || 0);
+  let atingido = TIERS[0];
+  for (const tier of TIERS) {
+    if (gasto >= tier.minSpendYen) atingido = tier;
+  }
+  return atingido;
+}
+
 /** Multiplicador de pontos para um gasto acumulado na janela: 1, 2 ou 3. */
 export function pointsMultiplierForSpend(spendYen) {
+  return currentTier(spendYen).multiplier;
+}
+
+/**
+ * Onde o cliente está e quanto falta para subir — o que a tela do perfil
+ * mostra. Mora aqui junto dos patamares: quem mudar a faixa muda a barra de
+ * progresso no mesmo lugar, sem uma segunda conta para desencontrar.
+ *
+ * No topo devolve `next: null` e `percent: 100` — não existe "faltando" para
+ * quem já está no nível máximo.
+ */
+export function tierProgress(spendYen) {
   const gasto = Math.max(0, Number(spendYen) || 0);
-  return TIERS.find((tier) => gasto >= tier.minSpendYen)?.multiplier ?? 1;
+  const tier = currentTier(gasto);
+  const next = TIERS.find((candidato) => candidato.minSpendYen > gasto) ?? null;
+  if (!next) return { spendYen: gasto, tier, next: null, remainingYen: 0, percent: 100 };
+  const faixa = next.minSpendYen - tier.minSpendYen;
+  return {
+    spendYen: gasto,
+    tier,
+    next,
+    remainingYen: next.minSpendYen - gasto,
+    // Teto de 99 enquanto falta subir: com arredondamento, ¥49.999 daria 100% e
+    // a barra apareceria cheia ainda em bronze. Barra cheia = nível alcançado.
+    percent: Math.max(0, Math.min(99, Math.floor(((gasto - tier.minSpendYen) / faixa) * 100))),
+  };
 }
 
 /**

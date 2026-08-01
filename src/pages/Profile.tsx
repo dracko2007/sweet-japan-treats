@@ -1,7 +1,7 @@
 import { safeStorage } from '@/utils/storage';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { User, Mail, Phone, MapPin, Calendar, Gift, ShoppingBag, Edit2, LogOut, Package, RotateCcw, Cloud, Truck, Tag, Megaphone, ArrowRight, Handshake, CheckCircle2, XCircle, Hourglass, FileText, Bell, BellOff } from 'lucide-react';
+import { User, Mail, Phone, MapPin, Calendar, Gift, ShoppingBag, Edit2, LogOut, Package, RotateCcw, Cloud, Truck, Tag, Megaphone, ArrowRight, Handshake, CheckCircle2, XCircle, Hourglass, FileText, Bell, BellOff, Trophy } from 'lucide-react';
 import { negotiationService } from '@/services/negotiationService';
 import type { Negotiation } from '@/types/negotiation';
 import Layout from '@/components/layout/Layout';
@@ -28,12 +28,21 @@ import ReferralCard from '@/components/profile/ReferralCard';
 import PromoNotificationsCard from '@/components/profile/PromoNotificationsCard';
 import { pushService } from '@/services/pushService';
 import { getEmailSubscription, setEmailSubscription } from '@/services/mailService';
+import { TIERS, tierProgress } from '@/services/pointsService';
+import { recentProductSpendYen } from '@/utils/loyaltySpend';
 
 const isDev = import.meta.env.DEV;
 const devLog = isDev ? console.log.bind(console) : () => {};
 const devWarn = isDev ? console.warn.bind(console) : () => {};
 const devError = isDev ? console.error.bind(console) : () => {};
 
+// Cor do troféu por nível. Fica fora do componente para não recriar o objeto a
+// cada render; as cores são fixas (metal), não seguem o tema.
+const TIER_TROPHY: Record<string, string> = {
+  bronze: 'text-amber-700',
+  prata: 'text-slate-200',
+  ouro: 'text-yellow-300',
+};
 
 const Profile: React.FC = () => {
   const {
@@ -57,6 +66,10 @@ const Profile: React.FC = () => {
   const { toast } = useToast();
   const [isEditing, setIsEditing] = useState(false);
   const [editedUser, setEditedUser] = useState<Partial<UserProfile>>(user || {});
+
+  // Nível de pontos: mesmo gasto e mesmas faixas que a revisão do pedido usa
+  // para prometer os pontos, então as duas telas nunca discordam.
+  const tierInfo = useMemo(() => tierProgress(recentProductSpendYen(orders)), [orders]);
 
   // Notificações push (Web Push/VAPID) — estado real da inscrição neste navegador,
   // checado no navegador (não só a flag `pushEnabled` do perfil, que pode ficar
@@ -433,17 +446,71 @@ const Profile: React.FC = () => {
                 </div>
                 <div className="text-7xl opacity-80">🎁</div>
               </div>
-              {/* Níveis de pontos: quanto mais o cliente compra em 3 meses, mais
-                  pontos cada compra rende. Fica no mesmo cartão dos pontos porque
-                  é a resposta para "como eu ganho mais?". */}
+              {/* Níveis de pontos. Mostra ONDE o cliente está e QUANTO falta —
+                  a lista de faixas sozinha é abstrata e não responde "e eu?".
+                  Fica no cartão dos pontos porque é a resposta para "como eu
+                  ganho mais?". */}
               <div className="mt-6 pt-6 border-t border-white/20">
-                <p className="text-sm font-semibold uppercase tracking-wide text-white/90 mb-3">{t('profile.points.tiers.title')}</p>
-                <div className="text-xs text-white/80 space-y-2">
-                  <p>• {t('profile.points.tiers.tier1')}</p>
-                  <p>• {t('profile.points.tiers.tier2')}</p>
-                  <p>• {t('profile.points.tiers.tier3')}</p>
-                  <p className="pt-2 italic text-white/70">{t('profile.points.tiers.window')}</p>
+                <p className="text-sm font-semibold uppercase tracking-wide text-white/90 mb-4">{t('profile.points.tiers.title')}</p>
+
+                <div className="grid grid-cols-3 gap-2 sm:gap-3">
+                  {TIERS.map((nivel) => {
+                    const atual = nivel.id === tierInfo.tier.id;
+                    const alcancado = tierInfo.spendYen >= nivel.minSpendYen;
+                    return (
+                      <div
+                        key={nivel.id}
+                        className={`rounded-xl px-2 py-3 text-center transition ${
+                          atual ? 'bg-white/25 ring-2 ring-white/80 shadow-lg' : 'bg-white/10'
+                        }`}
+                      >
+                        <Trophy
+                          className={`w-7 h-7 mx-auto ${TIER_TROPHY[nivel.id]} ${alcancado ? '' : 'opacity-40'}`}
+                          strokeWidth={2.5}
+                        />
+                        <p className="text-xs font-bold mt-1.5 capitalize">{t(`profile.points.tiers.name.${nivel.id}`)}</p>
+                        <p className="text-[11px] text-white/80">{nivel.multiplier}x</p>
+                        <p className="text-[10px] text-white/70 mt-0.5">
+                          {nivel.minSpendYen === 0
+                            ? t('profile.points.tiers.start')
+                            : `${t('profile.points.tiers.goal')} ¥${nivel.minSpendYen.toLocaleString('pt-BR')}`}
+                        </p>
+                      </div>
+                    );
+                  })}
                 </div>
+
+                <div className="mt-4">
+                  <div className="flex items-baseline justify-between text-xs text-white/90 mb-1.5">
+                    <span>
+                      {t('profile.points.tiers.spent')} <strong className="text-sm">¥{tierInfo.spendYen.toLocaleString('pt-BR')}</strong>
+                    </span>
+                    {tierInfo.next && (
+                      <span className="text-white/80">¥{tierInfo.next.minSpendYen.toLocaleString('pt-BR')}</span>
+                    )}
+                  </div>
+                  <div className="h-2.5 rounded-full bg-white/25 overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-white transition-all duration-500"
+                      style={{ width: `${tierInfo.percent}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-white/95 mt-2 font-medium">
+                    {tierInfo.next ? (
+                      <>
+                        {t('profile.points.tiers.missing')}{' '}
+                        <strong>¥{tierInfo.remainingYen.toLocaleString('pt-BR')}</strong>{' '}
+                        {t('profile.points.tiers.toReach')}{' '}
+                        <strong className="capitalize">{t(`profile.points.tiers.name.${tierInfo.next.id}`)}</strong>{' '}
+                        ({tierInfo.next.multiplier}x)
+                      </>
+                    ) : (
+                      t('profile.points.tiers.max')
+                    )}
+                  </p>
+                </div>
+
+                <p className="text-[11px] italic text-white/70 mt-3">{t('profile.points.tiers.window')}</p>
               </div>
             </div>
 

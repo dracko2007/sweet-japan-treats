@@ -21,6 +21,7 @@ const SorteioManager: React.FC = () => {
 
   const [raffle, setRaffle] = useState<Raffle | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [drawing, setDrawing] = useState(false);
 
@@ -33,13 +34,25 @@ const SorteioManager: React.FC = () => {
 
   // Carrega dados iniciais
   useEffect(() => {
-    const unsub = raffleService.subscribe((r) => {
-      setRaffle(r);
-      setRules(r.rules);
-      setPrizeCount(r.prizeCount);
-      setPrizes(r.prizes);
-      setLoading(false);
-    });
+    const unsub = raffleService.subscribe(
+      (r) => {
+        setRaffle(r);
+        setRules(r.rules);
+        setPrizeCount(r.prizeCount);
+        setPrizes(r.prizes);
+        setLoadError(null);
+        setLoading(false);
+      },
+      (err) => {
+        // Sair do "carregando" no erro é o que impede a tela de ficar presa.
+        setLoading(false);
+        setLoadError(
+          err instanceof Error && /permission|insufficient/i.test(err.message)
+            ? 'Sem permissão para ler o sorteio. As regras do Firestore precisam ser publicadas (a coleção `raffles` é nova).'
+            : 'Não foi possível carregar o sorteio. Verifique a conexão e tente de novo.'
+        );
+      }
+    );
     return () => {
       if (unsub) unsub();
     };
@@ -170,6 +183,23 @@ const SorteioManager: React.FC = () => {
 
   if (loading) {
     return <p className="text-muted-foreground">Carregando sorteio...</p>;
+  }
+
+  if (loadError) {
+    return (
+      <div className="rounded-xl border-2 border-destructive/40 bg-destructive/5 p-5">
+        <p className="flex items-center gap-2 font-semibold text-destructive">
+          <AlertTriangle className="w-4 h-4 shrink-0" /> Não foi possível abrir o sorteio
+        </p>
+        <p className="mt-2 text-sm text-muted-foreground">{loadError}</p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Publique as regras com <code className="font-mono">firebase deploy --only firestore:rules</code>.
+        </p>
+        <Button className="mt-4" variant="outline" onClick={() => window.location.reload()}>
+          Tentar de novo
+        </Button>
+      </div>
+    );
   }
 
   // Aviso: vencedores que não seguem

@@ -90,12 +90,23 @@ export const raffleService = {
   },
 
   // Listener em tempo real (mesmo padrão de negotiationService.listenById).
-  subscribe(cb: (raffle: Raffle) => void): () => void {
-    if (!db) return () => undefined;
+  //
+  // `onError` não é opcional por capricho: sem ele, quem chama fica preso no
+  // estado de "carregando" quando o Firestore recusa a leitura (regra não
+  // publicada, rede caída), porque o callback de sucesso nunca roda. Em
+  // produção o `devWarn` é no-op, então a tela trava sem nem um log.
+  subscribe(cb: (raffle: Raffle) => void, onError?: (err: unknown) => void): () => void {
+    if (!db) {
+      onError?.(new Error('Firebase indisponível'));
+      return () => undefined;
+    }
     return onSnapshot(
       doc(db, COL, RAFFLE_DOC),
       (snap) => cb(snap.exists() ? normalize(snap.data()) : DEFAULT_RAFFLE),
-      (err) => devWarn('raffleService.subscribe falhou:', err)
+      (err) => {
+        devWarn('raffleService.subscribe falhou:', err);
+        onError?.(err);
+      }
     );
   },
 
