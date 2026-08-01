@@ -14,9 +14,10 @@
  * note, found) são ignorados — pode vir direto da saída do lookup.
  */
 const admin = require('firebase-admin');
+const { getFirestore } = require('firebase-admin/firestore');
 const sa = require('../serviceAccountKey.json');
-admin.initializeApp({ credential: admin.credential.cert(sa) });
-const db = admin.firestore();
+admin.initializeApp({ credential: admin.cert(sa) });
+const db = getFirestore();
 
 const DRY_RUN = process.argv.includes('--dry-run');
 const fileArg = process.argv.slice(2).find((a) => !a.startsWith('--'));
