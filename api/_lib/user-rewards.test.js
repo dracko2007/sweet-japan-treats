@@ -153,6 +153,58 @@ describe('server-defined user rewards', () => {
     expect(db.get('users/u1').points).toBe(10);
   });
 
+  // O caso que a trava dos 30 dias atropelava: a pessoa se cadastra NO dia do
+  // próprio aniversário — muitas vezes por causa do próprio brinde — e levava
+  // um "indisponível". Conta nova e golpista olham igual no cadastro; o que
+  // separa os dois é ter comprado de verdade. Ninguém paga um pedido para
+  // levar ¥1.000 de desconto.
+  it('libera na hora para conta nova que já tem compra paga', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-01-14T15:30:00.000Z'));
+    // Cadastrou hoje, e hoje é o aniversário dela.
+    mocks.getUser.mockResolvedValue({ metadata: { creationTime: new Date().toISOString() } });
+    const db = new FakeDb({
+      'users/u1': { points: 10, birthdate: '1990-01-15' },
+      'orders/o1': { userId: 'u1', paymentConfirmed: true, items: [{ productId: 'p1' }] },
+    });
+
+    const resultado = await claimBirthday(db, user, { action: 'birthday' });
+
+    expect(resultado).toEqual({ ok: true, awarded: 1000, total: 1010, alreadyClaimed: false });
+  });
+
+  // Pedido criado mas não pago não vale: senão bastava abrir um checkout e
+  // abandonar para destravar o brinde, que é de graça.
+  it('pedido não pago não destrava a conta nova', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-01-14T15:30:00.000Z'));
+    mocks.getUser.mockResolvedValue({ metadata: { creationTime: new Date().toISOString() } });
+    const db = new FakeDb({
+      'users/u1': { points: 10, birthdate: '1990-01-15' },
+      'orders/o1': { userId: 'u1', status: 'pending_payment', paymentConfirmed: false },
+    });
+
+    await expect(claimBirthday(db, user, { action: 'birthday' }))
+      .rejects.toMatchObject({ statusCode: 409, code: 'birthday_unavailable' });
+    expect(db.get('users/u1').points).toBe(10);
+  });
+
+  // Convidado que comprou antes de criar conta fica preso ao e-mail, sem
+  // `userId`. Ignorar esse caminho puniria justamente o cliente mais antigo.
+  it('conta a compra feita como convidado, pelo e-mail', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-01-14T15:30:00.000Z'));
+    mocks.getUser.mockResolvedValue({ metadata: { creationTime: new Date().toISOString() } });
+    const db = new FakeDb({
+      'users/u1': { points: 10, birthdate: '1990-01-15' },
+      'orders/o1': { customerEmail: 'buyer@example.com', paymentConfirmed: true },
+    });
+
+    const resultado = await claimBirthday(db, user, { action: 'birthday' });
+
+    expect(resultado.awarded).toBe(1000);
+  });
+
   // A primeira versão desta trava comparava `NaN < 30`, que é `false` — ou
   // seja, conta sem data de criação legível passava direto e ganhava o bônus.
   // Checagem de segurança precisa recusar quando não consegue decidir.

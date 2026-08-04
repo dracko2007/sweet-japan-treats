@@ -9,16 +9,23 @@ import {
   requiredText,
   sendError,
 } from './_lib/http.js';
+import { isPaidLoyaltyOrder } from '../shared/points.js';
 
 const SOCIAL_POINTS = 500;
 const BIRTHDAY_POINTS = 1000;
 const REVIEW_POINTS = 1;
 const SOCIAL_NETWORKS = new Set(['instagram', 'facebook', 'tiktok', 'x']);
 const PAID_STATUSES = new Set(['confirmed', 'processing', 'shipped', 'delivered']);
-// Impede exploração: contas recém-criadas não podem setar birthdate para hoje e sacar
-// 1.000 pontos na hora, repetindo por conta nova. O Firebase Auth `creationTime`
-// é controlado pelo servidor, logo não-forjável; o campo de documento não serve pois
-// é escrito pelo cliente.
+// Impede exploração: conta recém-criada não pode apontar `birthdate` para hoje e
+// sacar 1.000 pontos na hora, repetindo por conta nova. O `creationTime` do
+// Firebase Auth é carimbado pelo servidor, logo não-forjável; o campo do
+// documento não serve, porque quem escreve é o cliente.
+//
+// A trava tem uma saída, e ela não é frouxa: quem já pagou um pedido recebe na
+// hora (ver `claimBirthday`). Sem essa saída, quem se cadastra NO dia do próprio
+// aniversário — que é justamente quem se cadastrou por causa do brinde — leva um
+// "indisponível" e só ganha no ano seguinte. Com ela, a fraude fica sem conta:
+// ninguém compra de verdade para levar ¥1.000 de desconto.
 const IDADE_MINIMA_CONTA_DIAS = 30;
 const TOKYO_DATE_FORMAT = new Intl.DateTimeFormat('en-US', {
   timeZone: 'Asia/Tokyo',
@@ -101,7 +108,16 @@ async function claimBirthday(db, user, body) {
   // "menor que" passaria batido, e a trava viraria enfeite.
   const contaCriadaEm = new Date((await adminAuth().getUser(user.uid))?.metadata?.creationTime ?? NaN).getTime();
   const idadeEmDias = (Date.now() - contaCriadaEm) / 86_400_000;
-  if (!Number.isFinite(idadeEmDias) || idadeEmDias < IDADE_MINIMA_CONTA_DIAS) {
+  if (!Number.isFinite(idadeEmDias)) throw new HttpError(409, 'birthday_unavailable');
+  // Conta nova só passa com compra paga. É o que separa o cliente que se
+  // cadastrou NO dia do próprio aniversário — e perderia o brinde que o trouxe
+  // até aqui — de quem abre conta descartável para sacar ¥1.000: os dois olham
+  // igual no cadastro, e só a compra distingue. Fraudar passa a exigir um
+  // pedido pago de verdade, que custa mais do que o prêmio.
+  //
+  // A consulta de pedidos só roda para conta nova; cliente antigo nem paga esse
+  // custo.
+  if (idadeEmDias < IDADE_MINIMA_CONTA_DIAS && !(await temCompraPaga(db, user))) {
     throw new HttpError(409, 'birthday_unavailable');
   }
 
@@ -141,7 +157,12 @@ function orderContainsProduct(order, productId) {
   });
 }
 
-async function hasPurchasedProduct(db, user, productId) {
+/**
+ * Pedidos do cliente, por conta e por e-mail. Os dois caminhos existem porque
+ * um pedido feito como convidado fica preso ao e-mail, sem `userId` da conta
+ * que ele criou depois.
+ */
+async function pedidosDoCliente(db, user) {
   const queries = [
     db.collection('orders').where('userId', '==', user.uid).limit(200).get(),
   ];
@@ -157,7 +178,16 @@ async function hasPurchasedProduct(db, user, productId) {
   for (const snapshot of snapshots) {
     for (const document of snapshot.docs) orders.set(document.id, document.data());
   }
-  return [...orders.values()].some((order) => orderContainsProduct(order, productId));
+  return [...orders.values()];
+}
+
+/** Cliente de verdade: pelo menos um pedido com pagamento confirmado. */
+async function temCompraPaga(db, user) {
+  return (await pedidosDoCliente(db, user)).some(isPaidLoyaltyOrder);
+}
+
+async function hasPurchasedProduct(db, user, productId) {
+  return (await pedidosDoCliente(db, user)).some((order) => orderContainsProduct(order, productId));
 }
 
 async function claimProductReview(db, user, body) {
