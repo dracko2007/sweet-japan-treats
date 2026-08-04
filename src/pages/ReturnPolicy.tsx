@@ -67,15 +67,9 @@ const ReturnPolicy: React.FC = () => (
           <section>
             <h2 className="text-xl font-semibold text-foreground mb-3">5. Produtos com defeito ou avarias de transporte</h2>
             <ul className="list-disc pl-6 space-y-2">
-              <li>Caso o pacote chegue com avarias visíveis causadas pelo transporte ou o produto apresente defeito de fabricação, entre em contato com nossa equipe em até 48 horas após o recebimento.</li>
-              <li>É obrigatório o envio de fotos e vídeos claros mostrando a embalagem externa, o rótulo de envio e o estado do produto danificado.</li>
-              <li>
-                Cada caso será avaliado individualmente para providenciarmos o reenvio do item ou o reembolso
-                integral, sem custos adicionais de frete para o cliente. O prazo de 48 horas é o que a transportadora
-                exige para abrir sinistro, e reportar dentro dele acelera a análise — mas ele não substitui nem
-                reduz os prazos de reclamação garantidos ao consumidor no Brasil pelo Código de Defesa do
-                Consumidor (Lei nº 8.078/1990, art. 26).
-              </li>
+              <li><strong>Prazo recomendado e sinistro:</strong> caso o pacote chegue com avarias visíveis causadas pelo transporte ou o produto apresente defeito de fabricação, solicitamos que entre em contato em até 48 horas após o recebimento, enviando fotos e vídeos da embalagem externa, etiqueta de envio e do produto danificado.</li>
+              <li><strong>Nota legal:</strong> o prazo de 48 horas é o exigido pelas transportadoras para abertura de sinistro e acionamento do seguro de transporte, mas ele não substitui nem reduz os prazos de reclamação garantidos ao consumidor no Brasil pelo Código de Defesa do Consumidor (Lei nº 8.078/1990, art. 26).</li>
+              <li><strong>Procedimento:</strong> cada caso será avaliado individualmente para providenciarmos o reenvio do item ou o reembolso integral, sem custos de frete para o cliente em casos de responsabilidade da loja ou avaria comprovada no transporte.</li>
             </ul>
           </section>
 
