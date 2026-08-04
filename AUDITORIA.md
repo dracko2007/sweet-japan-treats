@@ -8,15 +8,17 @@ Estado do disco em **04/08/2026**. Auditoria mecânica (grafo de imports determi
 
 | Bloco | Achados |
 |---|---|
-| **Críticos** | 3 — cupom de recuperação com 0% de desconto; loop infinito no checkout ao escolher frete; promoção da home sem limite de unidades |
+| **Críticos** | 3 — ✅ **todos corrigidos**: cupom de recuperação com 0% de desconto; loop infinito no checkout ao escolher frete; promoção da home sem limite de unidades |
 | **Altos** | 4 — webhook Stripe processa sem assinatura; pedido pago morre em `payment_review` sem aviso; e-mail spoofado no checkout anônimo; senha admin legada em texto puro |
 | **Médios** | 4 — pontos de campanha nunca creditados; pontos não reservados; limites de promoção só valem com CPF; bônus de aniversário editável pelo cliente |
 | **Baixos** | 2 — conta de subtotal não bate na tela; admin fallback hardcoded + comparação de cron não constante |
-| **Arquivos mortos** | 52 (5.598 linhas) — prontos para apagar |
-| **Dependências** | 2 não usadas hoje + ~27 que só vivem nos componentes `ui/` mortos |
+| **Arquivos mortos** | 52 (5.598 linhas) — ✅ **apagados** |
+| **Dependências** | 29 não usadas — ✅ **removidas** do `package.json` |
 | **Falsos positivos** | 3 — segredos **não** estão commitados (verificado histórico completo, 810 commits) |
 
-Os três críticos foram reproduzidos por mim antes de entrarem aqui.
+Os três críticos foram reproduzidos por mim antes de entrarem aqui, e cada
+correção tem teste de regressão provado por reversão (o teste falha sem o fix).
+A suíte saiu de 283 para 289 testes.
 
 ---
 
@@ -114,9 +116,13 @@ Não é urgente, mas é dívida: ou o símbolo virou lixo, ou o caller foi apaga
 
 ---
 
+> **Status (04/08/2026, após esta auditoria):** os três CRÍTICOS foram
+> corrigidos e cobertos por teste de regressão — cada teste foi provado
+> revertendo o fix e conferindo que ele falha. Detalhe em cada item abaixo.
+
 ## 5. Bugs por severidade
 
-### CRÍTICO 1 — Cupom de recuperação de carrinho aplica **0%** de desconto `[VERIFICADO]`
+### CRÍTICO 1 — Cupom de recuperação de carrinho aplica **0%** de desconto `[VERIFICADO]` — ✅ **CORRIGIDO**
 
 - **Onde:** `api/cart-recovery.js:50-53` → `api/orders.js:108` → `api/_lib/commerce.js:265`
 - **Código:**
@@ -132,20 +138,24 @@ Não é urgente, mas é dívida: ou o símbolo virou lixo, ou o caller foi apaga
   ```
 - **Defeito:** o percentual real fica em `discountPercent`, mas `buildQuote` lê `discount` no ramo que sempre cai (`discountType==='percentage'`). A API de validação (`coupons.js`) devolve `discountPercent: 30` para a tela, então o cliente **vê** 30% OFF e o pedido é cobrado sem desconto nenhum.
 - **Impacto:** toda a campanha de recuperação (3 estágios 10/15/30%) não dá desconto. Cobrança divergente do prometido, chargeback certo.
-- **Correção:** `commerce.js:265` → `Number(coupon.discountPercent ?? coupon.discount ?? 0)`.
+- **Correção aplicada:** `commerce.js:266` → `coupon.discountPercent != null ? Number(coupon.discountPercent) : Number(coupon.discount || 0)`. O fallback preserva o cupom global, que traz o percentual em `discount`.
+- **Regressão:** `commerce.test.js` — "aplica o percentual do cupom de recuperação, que vem em discountPercent" e "mantém o cupom global, que traz o percentual em discount". Provado: revertendo o fix, o primeiro falha.
 
-### CRÍTICO 2 — Loop infinito no checkout ao escolher frete `[VERIFICADO no browser]`
+### CRÍTICO 2 — Loop infinito no checkout ao escolher frete `[VERIFICADO no browser]` — ✅ **CORRIGIDO**
 
 - **Onde:** `src/components/shipping/ShippingCalculator.tsx:40,51-54,197-206`
 - **Defeito:** `getSpaceUsed()` devolve objeto novo a cada render → invalida o `useMemo(calculateBoxes)` → invalida `shippingOptions` → o `useEffect` chama `onShippingSelect({...})` com objeto literal novo → `setSelectedShipping` no pai → re-render → repete.
 - **Reproduzido:** `/checkout` + carrinho, endereço BR, clique em EMS → `Maximum update depth exceeded` em `ShippingCalculator` (múltiplos warnings). Carrier "selecionado" mas componente em churn; em mobile congela a aba.
-- **Correção:** `const spaceInfo = useMemo(() => getSpaceUsed(), [getSpaceUsed]);` e no efeito comparar valor anterior via `useRef` antes de chamar `onShippingSelect`.
+- **Correção aplicada:** `ShippingCalculator.tsx:40` → `const spaceInfo = useMemo(() => getSpaceUsed(), [getSpaceUsed]);`. `getSpaceUsed` já é `useCallback(..., [items])` no CartContext, então a referência só muda quando o carrinho muda — o que estabiliza `calculateBoxes` e `shippingOptions`, e o efeito para de reentrar.
+- **Regressão:** `ShippingCalculator.test.tsx` — monta o componente com um pai que tem `useState` real (um `vi.fn()` não fecha o ciclo, por não ser setState de verdade) e clica num carrier. Provado: revertendo o fix, o teste **trava** (loop infinito sem bail-out), em vez de só falhar.
 
-### CRÍTICO 3 — Limite de unidades da promoção da home nunca é verificado `[VERIFICADO]`
+### CRÍTICO 3 — Limite de unidades da promoção da home nunca é verificado `[VERIFICADO]` — ✅ **CORRIGIDO**
 
 - **Onde:** `api/_lib/commerce.js:236-240` (a variável `remaining` aparece **1×** no arquivo — calculada e jogada fora)
 - **Defeito:** a checagem de `maxProducts` só acontece em `fulfillment.js:118`, **depois** do cartão ser cobrado. A promoção vende ilimitado no checkout; os pedidos além do limite caem em `payment_review` (ver ALTO 1).
-- **Correção:** `if (quantity > remaining) throw new HttpError(409, 'promotion_unavailable');` logo após o cálculo, e reservar (`reservedCount`) na criação do pedido.
+- **Correção aplicada:** `commerce.js:239` → `if (quantity > remaining) throw new HttpError(409, 'promotion_unavailable');`, logo após o cálculo de `remaining`. A recusa passa a acontecer na cotação, antes de cobrar. A trava atômica do `fulfillment.js:121` continua como segunda linha de defesa contra corrida.
+- **Pendente (menor):** `reservedCount` já entra na conta de `remaining`, mas ainda não é gravado na criação do pedido. Enquanto não for, dois checkouts simultâneos no limite ainda dependem só da trava do fulfillment — que agora é exceção, não regra.
+- **Regressão:** `commerce.test.js` — "recusa a promoção da home quando o estoque promocional acabou", "conta as reservas em aberto no limite da promoção" e "ainda vende enquanto sobra unidade promocional". Provado: revertendo o fix, os dois primeiros falham.
 
 ### ALTO 1 — Pedido pago morre em `payment_review` sem aviso nem estorno `[AUDITORIA]`
 
@@ -232,14 +242,22 @@ Os arquivos **existem no disco** (são lidos pelo app e pelos scripts locais) ma
 
 ---
 
-## 7. Plano de ação sugerido (ordenado por risco/efeito)
+## 7. Plano de ação (ordenado por risco/efeito)
 
-1. **Hoje:** corrigir o cupom de recuperação (1 linha em `commerce.js:265`) — é o que mais queima dinheiro.
-2. **Hoje:** corrigir o loop do `ShippingCalculator` — checkout travando em mobile.
-3. **Esta semana:** colocar checagem de `remaining` na promoção da home + notificação/estorno no `payment_review`.
-4. **Esta semana:** subir `strict:true` no `tsconfig.app.json` e limpar os erros — vai revelar mais defeitos do tipo "pode ser undefined".
+### Concluído nesta auditoria
+
+1. ✅ Cupom de recuperação — `commerce.js:266`, com regressão.
+2. ✅ Loop do `ShippingCalculator` — `ShippingCalculator.tsx:40`, com regressão.
+3. ✅ Checagem de `remaining` na promoção da home — `commerce.js:239`, com regressão.
+4. ✅ Limpeza: 52 arquivos mortos e 29 dependências removidos; typecheck, build e suíte verdes após cada corte.
+
+### Restante, por prioridade
+
+1. **Esta semana:** notificação + estorno no `payment_review` (ALTO 1) — hoje o cliente é cobrado e o pedido morre em silêncio. É o maior risco aberto.
+2. **Esta semana:** e-mail spoofado no checkout anônimo (ALTO 3) e senha admin legada em texto puro (ALTO 4).
+3. **Esta semana:** subir `strict:true` no `tsconfig.app.json` e limpar os erros — vai revelar mais defeitos do tipo "pode ser undefined".
+4. **Quando der:** gravar `reservedCount` na criação do pedido (fecha a corrida que sobra do CRÍTICO 3) e `promoPoints` (MEDIO 1, campanha de pontos credita zero hoje).
 5. **Quando tocar o arquivo:** remover exports órfãos, não criar novo.
-6. **Limpeza:** apagar os 17 arquivos de negócio mortos (confirmar `HeroSection.tsx` antes — tem edição não commitada). Decidir o destino dos 35 `ui/` shadcn e, se forem, limpar as ~27 deps que só os sustentam.
 
 ---
 

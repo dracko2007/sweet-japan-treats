@@ -37,7 +37,7 @@ const ShippingCalculator: React.FC<ShippingCalculatorProps> = ({
     setSelectedCarrier(null);
   }, [destinationCountry]);
 
-  const spaceInfo = getSpaceUsed();
+  const spaceInfo = useMemo(() => getSpaceUsed(), [getSpaceUsed]);
 
   // Check if there are Custom Request items (Faça seu Pedido) in the cart
   const hasCustomRequest = items.some(item => item.product?.id?.includes('custom') || item.product?.category === 'custom-request');

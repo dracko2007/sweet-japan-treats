@@ -65,4 +65,48 @@ describe('authoritative checkout quote', () => {
   it('rejects a carrier that is unavailable for the cart weight', () => {
     expect(() => quote({ carrier: 'kozutsumi-air' })).toThrowError('invalid_shipping');
   });
+
+  // Regressão do CRÍTICO #1 do AUDITORIA.md: o cupom de recuperação de
+  // carrinho grava o percentual em `discountPercent` e deixa `discount: 0`
+  // (legado). Lendo `discount` no ramo 'percentage', todo cupom de
+  // recuperação valia 0% — a tela prometia 30% OFF e o pedido saía cheio.
+  it('aplica o percentual do cupom de recuperação, que vem em discountPercent', () => {
+    const result = quote({
+      requestedItems: [{ productId: 'p1', variantId: 'small', quantity: 1 }],
+      coupon: { code: 'VOLTA30', type: 'percent', discountType: 'percentage', discount: 0, discountPercent: 30 },
+    });
+    expect(result.couponDiscountYen).toBe(300);
+  });
+
+  it('mantém o cupom global, que traz o percentual em discount', () => {
+    const result = quote({
+      coupon: { code: 'GLOBAL10', discountType: 'percentage', discount: 10 },
+    });
+    expect(result.couponDiscountYen).toBe(100);
+  });
+
+  // Regressão do CRÍTICO #3: `remaining` era calculado e descartado. O limite
+  // de unidades só era conferido no fulfillment — depois de cobrar o cartão,
+  // deixando o pedido preso em `payment_review`.
+  it('recusa a promoção da home quando o estoque promocional acabou', () => {
+    expect(() => quote({
+      requestedItems: [{ productId: 'p1_promo', variantId: 'small', quantity: 1 }],
+      homePromotion: { productId: 'p1', promoPriceYen: 500, limitPerPerson: 5, maxProducts: 10, soldCount: 10 },
+    })).toThrowError('promotion_unavailable');
+  });
+
+  it('conta as reservas em aberto no limite da promoção', () => {
+    expect(() => quote({
+      requestedItems: [{ productId: 'p1_promo', variantId: 'small', quantity: 2 }],
+      homePromotion: { productId: 'p1', promoPriceYen: 500, limitPerPerson: 5, maxProducts: 10, soldCount: 8, reservedCount: 1 },
+    })).toThrowError('promotion_unavailable');
+  });
+
+  it('ainda vende enquanto sobra unidade promocional', () => {
+    const result = quote({
+      requestedItems: [{ productId: 'p1_promo', variantId: 'small', quantity: 2 }],
+      homePromotion: { productId: 'p1', promoPriceYen: 500, limitPerPerson: 5, maxProducts: 10, soldCount: 8 },
+    });
+    expect(result.homePromoQuantity).toBe(2);
+  });
 });

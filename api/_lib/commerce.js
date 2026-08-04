@@ -236,6 +236,7 @@ export function buildQuote({ requestedItems, products, country, prefecture, stat
       const remaining = homePromotion.maxProducts == null
         ? Infinity
         : Number(homePromotion.maxProducts) - Number(homePromotion.soldCount || 0) - Number(homePromotion.reservedCount || 0);
+      if (quantity > remaining) throw new HttpError(409, 'promotion_unavailable');
       unitYen = roundYen(homePromotion.promoPriceYen);
       homePromoQuantity += quantity;
     } else {
@@ -262,7 +263,7 @@ export function buildQuote({ requestedItems, products, country, prefecture, stat
   if (coupon) {
     if (coupon.minOrderValue && productSubtotalYen < Number(coupon.minOrderValue)) throw new HttpError(409, 'coupon_minimum_not_met');
     if (!coupon.freeShipping) {
-      const percentage = coupon.discountType === 'percentage' ? Number(coupon.discount || 0) : Number(coupon.discountPercent || 0);
+      const percentage = coupon.discountPercent != null ? Number(coupon.discountPercent) : Number(coupon.discount || 0);
       couponDiscountYen = coupon.discountType === 'fixed' || coupon.type === 'fixed'
         ? Math.min(regularSubtotalYen, Number(coupon.discount || 0))
         : Math.min(regularSubtotalYen, Math.round(regularSubtotalYen * percentage / 100));
