@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
 import { COMPANY_PROFILE } from '@/config/companyProfile';
 
@@ -14,98 +15,135 @@ const PrivacyPolicy: React.FC = () => (
           <section>
             <h2 className="text-xl font-semibold text-foreground mb-3">1. Quem somos</h2>
             <p>
-              A <strong>{COMPANY_PROFILE.brand}</strong> é uma loja de importados do Japão, operada por 
+              A <strong>{COMPANY_PROFILE.brand}</strong> é uma loja de produtos importados do Japão, operada por
               <strong> {COMPANY_PROFILE.contactName}</strong>, estabelecida em <strong>{COMPANY_PROFILE.fulfillmentOrigin.formatted}</strong>.
               Operamos o site <strong>japanexpress-store.com</strong> e tratamos os dados dos nossos clientes
               com transparência e responsabilidade, em conformidade com a Lei Geral de Proteção de Dados (LGPD —
               Lei nº 13.709/2018).
             </p>
-            <p className="mt-2">Contato do responsável pelos dados: <a href={`mailto:${COMPANY_PROFILE.email}`} className="text-primary hover:underline">{COMPANY_PROFILE.email}</a></p>
+            <p className="mt-2">
+              Contato do responsável pelos dados: <a href={`mailto:${COMPANY_PROFILE.email}`} className="text-primary hover:underline">{COMPANY_PROFILE.email}</a>
+            </p>
           </section>
 
           <section>
             <h2 className="text-xl font-semibold text-foreground mb-3">2. Quais dados coletamos</h2>
             <ul className="list-disc pl-6 space-y-2">
               <li><strong>Dados de cadastro:</strong> nome, e-mail e senha (armazenada de forma criptografada).</li>
-              <li><strong>Dados de entrega:</strong> endereço, CEP, cidade, estado/prefeitura e telefone.</li>
-              <li><strong>Dados de pedido:</strong> produtos comprados, valores, método de pagamento e status.</li>
-              <li><strong>Dados de navegação:</strong> páginas visitadas, tempo de sessão e dispositivo — coletados anonimamente pelo Firebase Analytics, somente após seu consentimento via banner de cookies.</li>
+              <li><strong>Dados de entrega:</strong> endereço completo, CEP, cidade, estado/prefeitura e telefone de contato.</li>
+              <li><strong>Dados de pedido:</strong> produtos adquiridos, valores, método de pagamento selecionado e status do pedido.</li>
+              <li><strong>Dados de navegação:</strong> páginas visitadas, tempo de sessão e dispositivo — coletados anonimamente via Firebase Analytics, somente após seu consentimento no banner de cookies.</li>
             </ul>
-            <p className="mt-3">Não coletamos dados de cartão de crédito em nossos servidores. Pagamentos via PIX e PayPay são processados externamente.</p>
+            <p className="mt-3">
+              <strong>Importante:</strong> não coletamos nem armazenamos dados de cartão de crédito em nossos servidores.
+              Pagamentos via PIX e PayPay são processados externamente por plataformas seguras.
+            </p>
           </section>
 
           <section>
             <h2 className="text-xl font-semibold text-foreground mb-3">3. Como usamos seus dados</h2>
             <ul className="list-disc pl-6 space-y-2">
-              <li>Processar e entregar seus pedidos.</li>
-              <li>Enviar confirmações de pedido e atualizações de rastreamento por e-mail e WhatsApp.</li>
-              <li>Melhorar nossos produtos, serviços e experiência no site.</li>
-              <li>Cumprir obrigações legais e fiscais.</li>
-              <li>Prevenir fraudes e garantir a segurança da plataforma.</li>
+              <li>Processar, faturar e entregar seus pedidos.</li>
+              <li>Enviar confirmações de compra, atualizações de status e rastreamento por e-mail e WhatsApp.</li>
+              <li>Melhorar nossa linha de produtos, atendimento e a experiência de navegação no site.</li>
+              <li>Cumprir obrigações legais, fiscais e regulatórias do comércio internacional.</li>
+              <li>Prevenir fraudes e garantir a segurança cibernética da plataforma.</li>
             </ul>
           </section>
 
           <section>
             <h2 className="text-xl font-semibold text-foreground mb-3">4. Base legal para o tratamento (LGPD)</h2>
             <ul className="list-disc pl-6 space-y-2">
-              <li><strong>Execução de contrato</strong> — para processar pedidos e entregas.</li>
-              <li><strong>Consentimento</strong> — para cookies analíticos e marketing.</li>
-              <li><strong>Interesse legítimo</strong> — para segurança e prevenção de fraudes.</li>
-              <li><strong>Obrigação legal</strong> — para emissão de notas e registros fiscais.</li>
+              <li><strong>Execução de contrato</strong> — para processar compras, pagamentos e entregas.</li>
+              <li><strong>Consentimento</strong> — para uso de cookies analíticos e comunicações de marketing.</li>
+              <li><strong>Interesse legítimo</strong> — para prevenção de fraudes e melhorias na plataforma.</li>
+              <li><strong>Obrigação legal</strong> — para emissão de documentos e registros fiscais.</li>
             </ul>
           </section>
 
           <section>
             <h2 className="text-xl font-semibold text-foreground mb-3">5. Compartilhamento de dados</h2>
-            <p>Seus dados são compartilhados apenas com:</p>
+            <p>Seus dados são compartilhados estritamente com parceiros necessários para a prestação do serviço:</p>
             <ul className="list-disc pl-6 space-y-2 mt-2">
-              <li><strong>Google Firebase</strong> — banco de dados, autenticação e analytics (servidores na UE/EUA com cláusulas contratuais padrão).</li>
-              <li><strong>Resend</strong> — plataforma de envio de e-mails transacionais.</li>
-              <li><strong>Correios / transportadoras</strong> — para entrega dos pedidos.</li>
+              <li>
+                <strong>Google Firebase</strong> — banco de dados, autenticação de conta e métricas analíticas.
+                Os servidores seguem padrões internacionais de segurança, e a transferência internacional de dados
+                é amparada por cláusulas contratuais padrão, conforme o art. 33 da LGPD.
+              </li>
+              <li><strong>Resend</strong> — plataforma técnica para envio de e-mails transacionais (confirmação de pedidos e rastreamento).</li>
+              <li><strong>Japan Post / Correios / transportadoras</strong> — para a realização da entrega física dos produtos.</li>
             </ul>
-            <p className="mt-3">Nunca vendemos seus dados a terceiros.</p>
+            <p className="mt-3">Jamais vendemos ou comercializamos seus dados pessoais com terceiros.</p>
           </section>
 
           <section>
             <h2 className="text-xl font-semibold text-foreground mb-3">6. Seus direitos (LGPD)</h2>
-            <p>Você pode, a qualquer momento, solicitar:</p>
+            <p>Como titular dos dados, você pode solicitar a qualquer momento:</p>
             <ul className="list-disc pl-6 space-y-2 mt-2">
-              <li>Acesso aos dados que temos sobre você.</li>
-              <li>Correção de dados incorretos ou desatualizados.</li>
-              <li>Exclusão dos seus dados pessoais.</li>
-              <li>Portabilidade dos dados para outro fornecedor.</li>
-              <li>Revogação do consentimento para cookies analíticos.</li>
+              <li>Confirmar e acessar os dados pessoais que mantemos sobre você.</li>
+              <li>Corrigir dados incompletos, inexatos ou desatualizados.</li>
+              <li>Solicitar a exclusão ou anonimização de seus dados de nossa base.</li>
+              <li>Solicitar a portabilidade dos dados para outro fornecedor.</li>
+              <li>Revogar o consentimento previamente dado para cookies analíticos.</li>
             </ul>
-            <p className="mt-3">Para exercer esses direitos, envie um e-mail para <a href={`mailto:${COMPANY_PROFILE.email}`} className="text-primary hover:underline">{COMPANY_PROFILE.email}</a>. Responderemos em até 15 dias úteis.</p>
+            <p className="mt-3">
+              Para exercer seus direitos, entre em contato via e-mail em <a href={`mailto:${COMPANY_PROFILE.email}`} className="text-primary hover:underline">{COMPANY_PROFILE.email}</a>.
+              Responderemos em até 15 dias úteis.
+            </p>
           </section>
 
           <section>
             <h2 className="text-xl font-semibold text-foreground mb-3">7. Cookies</h2>
-            <p>Utilizamos cookies essenciais (necessários para o funcionamento do site) e analíticos (com seu consentimento). Veja nossa <a href="/cookies" className="text-primary hover:underline">Política de Cookies</a> para mais detalhes.</p>
+            <p>
+              Utilizamos cookies essenciais (necessários para o funcionamento correto do carrinho e login) e
+              cookies analíticos (somente com o seu consentimento prévio). Veja nossa <Link to="/cookies" className="text-primary hover:underline">Política de Cookies</Link> para mais detalhes.
+            </p>
           </section>
 
           <section>
             <h2 className="text-xl font-semibold text-foreground mb-3">8. Retenção de dados</h2>
-            <p>Mantemos seus dados pelo tempo necessário para cumprir as finalidades descritas nesta política, ou conforme exigido por lei (em geral, 5 anos para registros fiscais). Dados de contas inativas por mais de 2 anos podem ser excluídos.</p>
+            <p>
+              Mantemos seus dados pessoais apenas pelo tempo necessário para cumprir as finalidades desta política
+              ou conforme exigido pela legislação aplicável (em geral, 5 anos para registros fiscais e contábeis).
+              Contas inativas há mais de 2 anos poderão ser anonimizadas ou excluídas.
+            </p>
           </section>
 
           <section>
             <h2 className="text-xl font-semibold text-foreground mb-3">9. Segurança</h2>
-            <p>Adotamos medidas técnicas e organizacionais para proteger seus dados, incluindo transmissão via HTTPS, autenticação com Firebase e acesso restrito ao painel administrativo.</p>
+            <p>
+              Adotamos medidas técnicas e organizacionais avançadas para proteger suas informações, incluindo
+              criptografia de navegação (HTTPS/SSL), autenticação segura com Firebase e controle estrito de acesso
+              ao painel administrativo.
+            </p>
           </section>
 
           <section>
             <h2 className="text-xl font-semibold text-foreground mb-3">10. Alterações nesta política</h2>
-            <p>Podemos atualizar esta política periodicamente. Quando houver mudanças relevantes, avisaremos por e-mail ou banner no site. A data de última atualização sempre estará indicada no topo desta página.</p>
+            <p>
+              Podemos atualizar esta política periodicamente para refletir melhorias em nossos processos.
+              Alterações relevantes serão notificadas via e-mail ou por aviso em nosso site. A data de última
+              atualização sempre estará indicada no topo desta página.
+            </p>
           </section>
 
           <section>
             <h2 className="text-xl font-semibold text-foreground mb-3">11. Contato</h2>
             <p>Para dúvidas sobre privacidade e proteção de dados:</p>
             <ul className="list-none mt-2 space-y-1">
-              <li>📧 <a href={`mailto:${COMPANY_PROFILE.email}`} className="text-primary hover:underline">{COMPANY_PROFILE.email}</a></li>
-              <li>💬 WhatsApp: {COMPANY_PROFILE.whatsapp.international}</li>
-              <li>📍 {COMPANY_PROFILE.fulfillmentOrigin.shortPt} 🇯🇵</li>
+              <li>📧 E-mail: <a href={`mailto:${COMPANY_PROFILE.email}`} className="text-primary hover:underline">{COMPANY_PROFILE.email}</a></li>
+              <li>
+                💬 WhatsApp:{' '}
+                <a
+                  href={`https://wa.me/${COMPANY_PROFILE.whatsapp.digits}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary hover:underline"
+                >
+                  {COMPANY_PROFILE.whatsapp.international}
+                </a>
+              </li>
+              <li>📍 Endereço: {COMPANY_PROFILE.fulfillmentOrigin.formatted} 🇯🇵</li>
             </ul>
           </section>
 
