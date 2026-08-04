@@ -18,7 +18,7 @@ Estado do disco em **04/08/2026**. Auditoria mecânica (grafo de imports determi
 
 Os três críticos foram reproduzidos por mim antes de entrarem aqui, e cada
 correção tem teste de regressão provado por reversão (o teste falha sem o fix).
-A suíte saiu de 283 para 374 testes, mais 77 checks de regra no emulador.
+A suíte saiu de 283 para 381 testes, mais 77 checks de regra no emulador.
 
 ---
 
@@ -118,10 +118,11 @@ Não é urgente, mas é dívida: ou o símbolo virou lixo, ou o caller foi apaga
 
 > **Status (04/08/2026, após esta auditoria):** os 11 bugs de código —
 > 3 CRÍTICOS, 4 ALTOS, 4 MÉDIOS e 2 BAIXOS — estão corrigidos, cada um com
-> teste de regressão provado por reversão. A regra do `birthdate` foi publicada
-> em produção. Ficam abertas só as **duas decisões de negócio** (estorno
-> automático no ALTO 1; cupom para convidado no ALTO 3) e a dívida de
-> `strict:true` no `tsconfig.app.json`. Detalhe em cada item abaixo.
+> teste de regressão provado por reversão. As duas decisões de negócio foram
+> tomadas pelo dono e implementadas: estorno segue manual (ALTO 1) e o cupom de
+> uso único passou a ser trancado por CPF (ALTO 3). As regras do Firestore
+> estão publicadas e o repo bate byte a byte com produção. Fica aberta só a
+> dívida de `strict:true` no `tsconfig.app.json`. Detalhe em cada item abaixo.
 
 ## 5. Bugs por severidade
 
@@ -177,7 +178,9 @@ Não é urgente, mas é dívida: ou o símbolo virou lixo, ou o caller foi apaga
   - *Escrita no Firestore pode lançar; e-mail nunca.* Se nem registrar o estado der, é melhor o Stripe repetir o webhook do que perder o registro do pedido cobrado e não atendido. Já uma queda de SMTP viraria 500 → tempestade de retry em cima de um pedido que já está com problema.
   - *Só notifica na transição para `review`.* O Stripe entrega evento "pelo menos uma vez"; sem essa trava, cada reentrega mandaria outro par de e-mails.
 - **Regressão:** `fulfillment.test.js`, bloco "pedido pago que não pôde ser separado" — 5 testes (handle de estorno, os dois avisos, idempotência da reentrega, e-mail que falha não derruba, valor cobrado ≠ valor do pedido). Provado: revertendo o fix, os 5 falham e os 7 antigos seguem passando.
-- **Não feito, de propósito:** estorno automático e `capture_method:'manual'`. Ver "Restante" no plano de ação — os dois são decisão de negócio, não de código.
+- **Estorno automático descartado em 04/08/2026, e o risco residual é menor do que esta auditoria supôs.** A loja é **dropship**: não há estoque próprio. Medido em produção (`localstorage-98492`, 308 produtos): **307 não têm sequer o campo `stock`** e o único que tem está `unlimited: true`. Como `commerce.js` e `fulfillment.js` só bloqueiam quando `stock.unlimited === false` **explicitamente**, a causa `insufficient_stock` — a mais citada das 8 que levam a `payment_review` — **nunca dispara hoje**. (O código de baixa de estoque é igualmente inerte, mas está correto: só escreve `stock.quantity` no caso explícito, então não corrompe os 307 produtos sem o campo.)
+  - Das causas que sobravam, as duas com chance real de acontecer eram **pontos insuficientes** e **promoção esgotada** — e as duas foram fechadas nesta mesma leva pelas reservas (MEDIO 2 e resto do CRÍTICO 3), que agora recusam **na cotação, antes de cobrar**. O `payment_review` passou de desfecho provável a exceção.
+  - Por isso o estorno segue **manual**, pelo painel do Stripe, com o e-mail da loja levando o link direto. Automatizar tiraria da loja a chance de salvar a venda num caso que hoje é raro, em troca de nada. `capture_method:'manual'` foi descartado pelo mesmo motivo, somado a quebrar PIX/konbini.
 
 ### ALTO 2 — Webhook Stripe processa evento quando a assinatura falha `[VERIFICADO, severidade ajustada]` — ✅ **CORRIGIDO**
 
@@ -189,7 +192,7 @@ Não é urgente, mas é dívida: ou o símbolo virou lixo, ou o caller foi apaga
   - O log dos dois ramos ficou distinguível (`assinatura falhou com bytes autênticos…` vs `assinatura falhou (corpo reconstruído pela plataforma)…`), que é o que permite medir a frequência do fallback sem instrumentar nada novo.
 - **Regressão:** `stripe-webhook.test.js` — "rejeita com 400 quando os bytes são autênticos e a assinatura não confere" (corpo como `Buffer`) e "usa o fallback da API quando o corpo foi reconstruído pela plataforma" (corpo como objeto). O par trava a distinção nos dois sentidos. Provado: apagando o bloco `if (autentico)`, o primeiro falha — bytes autênticos com HMAC quebrado voltam a cair calados no fallback.
 
-### ALTO 3 — Checkout anônimo deixa o cliente escolher o e-mail do pedido `[VERIFICADO o mecanismo]` — ✅ **CORRIGIDO (impersonação); resta 1 item de política**
+### ALTO 3 — Checkout anônimo deixa o cliente escolher o e-mail do pedido `[VERIFICADO o mecanismo]` — ✅ **CORRIGIDO**
 
 - **Onde:** `api/orders.js:43-45` + `src/services/checkoutService.ts:66` (`signInAnonymously`)
 - **Defeito:** token anônimo não tem `email` → `tokenEmail=''` → a checagem `if (tokenEmail && ...)` é pulada → `customer.email` vem do corpo. Esse e-mail é usado em `assertCouponEligibility` (cupom nominal) e no guarda `coupon_usage.usedBy` (cupom "1× por cliente").
@@ -200,7 +203,10 @@ Não é urgente, mas é dívida: ou o símbolo virou lixo, ou o caller foi apaga
   - A trava vale também para **conta registrada com e-mail não verificado** — dava para se cadastrar com o endereço de outra pessoa sem nunca abrir a caixa dela. Por isso a régua é `email_verified`, não "tem e-mail".
   - `birthday` já falhava fechado (depende de `userDoc`, buscado por uid) e `usageLimit` (teto **total**) nunca foi burlável por e-mail.
   - `coupons.js` usa a mesma régua, para a tela não anunciar desconto que o pedido vai recusar.
-- **Não corrigido, por ser decisão de negócio:** o guarda `coupon_usage.usedBy` ("1× por cliente") continua ancorado em e-mail, então um convidado ainda pode reusar um cupom **público** trocando de endereço. Fechar isso significa **proibir convidado de usar cupom** — decisão de receita, não de código. Vale notar que a mesma reutilização já era possível com contas descartáveis, e que o guarda por CPF (`cpf_index`) continua valendo em qualquer caso.
+- **Reuso de cupom público — decidido em 04/08/2026: trancar por CPF.** O guarda "1× por cliente" era ancorado só em e-mail, que o convidado troca de graça. A decisão do dono foi usar o CPF, que a aduana brasileira já exige de todo pedido para o Brasil; fora do Brasil não existe documento equivalente e o e-mail continua sendo a única âncora possível — risco aceito.
+  - **O servidor passou a exigir o CPF quando o destino é o Brasil** (`orders.js` `parseCustomer`, erro `cpf_required`). O formulário já exigia (`Checkout.tsx` valida `isValidCPF` para Brasil, campo marcado "Obrigatório Aduana"), mas o servidor aceitava sem: chamar a API direto, ou um bug de front, furava a trava. **Não há atrito novo para o cliente legítimo** — só fecha o caminho de quem não passa pela tela.
+  - **`coupon_usage` ganhou `usedByCpf`** ao lado do `usedBy`. Recusa se bater em qualquer um dos dois: o CPF fecha o buraco no Brasil, e o e-mail preserva todo o histórico já gravado — sem isso, todo cupom já consumido voltaria a valer. Pedido sem CPF não grava `''` na lista, senão o primeiro uso fora do Brasil trancaria o cupom para o mundo inteiro.
+  - **Regressão:** `orders.cpf-guard.test.js` (3 testes: Brasil sem CPF recusa, CPF malformado dá o erro específico, fora do Brasil passa) e `fulfillment.test.js`, bloco "cupom global de uso único ancorado no CPF" (4 testes, incluindo o ataque exato — mesmo CPF com e-mail novo). Provado: revertendo cada guarda, o teste correspondente falha.
 - **Regressão:** `coupon-eligibility.test.js` — "recusa cupom nominal quando o e-mail não foi provado", "não deixa herdar fidelidade digitando o e-mail de um cliente antigo" e "mantém a fidelidade pelo histórico do próprio uid". Provado: revertendo o fix, os dois primeiros falham.
 
 ### ALTO 4 — Senha de admin legada em texto puro no Firestore `[AUDITORIA]` — ✅ **CORRIGIDO**
@@ -314,15 +320,15 @@ Os arquivos **existem no disco** (são lidos pelo app e pelos scripts locais) ma
 14. ✅ Fim do e-mail de admin hardcoded e comparação constante-time no cron (BAIXO 2) — `auth.js` / `admin.js` / `kimiclaw.js` / `config/admin.ts`, com 14 regressões.
 15. ✅ Reserva de unidade da promoção, fechando a corrida que sobrava do CRÍTICO 3 — `promo-reserve.js` novo, com 28 regressões.
 16. ✅ Ferramenta de regras: `scripts/rules-history.mjs` (`list`/`current`/`diff`/`publish`/`rollback`) e trava `predeploy` contra `firebase deploy` acidental. O `publish-rules.cjs` antigo estava quebrado desde a v14 do `firebase-admin` (`admin.credential.cert` deixou de existir).
+17. ✅ CPF obrigatório no destino Brasil e cupom de uso único trancado por CPF (ALTO 3, decisão do dono) — `orders.js` / `fulfillment.js`, com 7 regressões.
+18. ✅ Estorno mantido manual (ALTO 1, decisão do dono), com o risco remedido: medido em produção que `insufficient_stock` não dispara em loja dropship, e as duas causas restantes foram fechadas pelas reservas.
 
 ### Restante, por prioridade
 
-1. **Decisão de negócio, pendente de você (ALTO 1):** o estorno em si continua manual, pelo painel do Stripe — o e-mail da loja já leva o link direto. As duas alternativas, se quiser automatizar:
-   - *Estorno automático* nos 409: resolve na hora, mas é irreversível e tira da loja a chance de salvar a venda (estoque parcial, cupom vencido — casos em que hoje se negocia com o cliente).
-   - *`capture_method: 'manual'`*: autoriza no checkout e só captura depois do `fulfillOrder`. Elimina a classe inteira do problema, mas **quebra métodos assíncronos** — hoje o checkout usa `automatic_payment_methods`, e PIX/konbini não suportam captura manual. Exigiria ramificar por método.
-2. **Decisão de negócio, pendente de você (ALTO 3):** convidado ainda pode reusar cupom **público** trocando de e-mail, porque o guarda "1× por cliente" é ancorado em endereço. Fechar = **proibir convidado de usar cupom**. A impersonação (cupom nominal / fidelidade de terceiro) já está fechada.
-3. **Dívida técnica, sem prazo forçado:** subir `strict:true` no `tsconfig.app.json` e limpar os erros — vai revelar mais defeitos do tipo "pode ser undefined". Não foi feito nesta leva porque é uma varredura por `src/` inteiro, sem relação com nenhum bug aberto, e misturá-la com correções de pagamento tornaria o diff impossível de revisar.
-4. **Quando tocar o arquivo:** remover exports órfãos, não criar novo.
+1. **Dívida técnica, sem prazo forçado:** subir `strict:true` no `tsconfig.app.json` e limpar os erros — vai revelar mais defeitos do tipo "pode ser undefined". Não foi feito nesta leva porque é uma varredura por `src/` inteiro, sem relação com nenhum bug aberto, e misturá-la com correções de pagamento tornaria o diff impossível de revisar.
+2. **Quando tocar o arquivo:** remover exports órfãos, não criar novo.
+3. **Risco aceito, registrado:** fora do Brasil o cupom público de uso único continua ancorado só em e-mail, porque não existe documento equivalente ao CPF. Decisão consciente do dono em 04/08/2026.
+4. **Herança inerte que vale revisitar quando incomodar:** o controle de estoque (`stock.unlimited`/`stock.quantity`) não vale para nenhum produto real — 307 de 308 nem têm o campo. Não é bug, e o código é defensivo, mas é uma engrenagem que roda em todo checkout sem decidir nada. Se a loja nunca for sair do dropship, some junto com o `insufficient_stock`; se for, o caminho já está pronto.
 
 ### Lição desta leva
 

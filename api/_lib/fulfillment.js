@@ -155,8 +155,18 @@ export async function fulfillOrder(orderId, { provider, reference, confirmedBy }
       if (!couponSnap.exists) throw new HttpError(409, 'coupon_unavailable');
       const coupon = couponSnap.data();
       if (coupon.isActive === false || (coupon.usageLimit && Number(coupon.usedCount || 0) >= Number(coupon.usageLimit))) throw new HttpError(409, 'coupon_unavailable');
-      const usedBy = Array.isArray(couponUsageSnap.data()?.usedBy) ? couponUsageSnap.data().usedBy : [];
+      // O guarda "1× por cliente" era ancorado só em e-mail, que o convidado
+      // troca de graça. Para o Brasil o CPF agora é obrigatório (`orders.js`
+      // `parseCustomer`) e é ele que tranca — documento não se cria à vontade.
+      // O e-mail continua valendo em paralelo: fora do Brasil não há CPF, e os
+      // usos já gravados são todos por e-mail. Recusar em qualquer um dos dois
+      // é o que fecha o buraco sem invalidar o histórico.
+      const uso = couponUsageSnap.data() || {};
+      const usedBy = Array.isArray(uso.usedBy) ? uso.usedBy : [];
+      const usedByCpf = Array.isArray(uso.usedByCpf) ? uso.usedByCpf : [];
+      const cpfDoPedido = String(order.cpf || '').replace(/\D/g, '');
       if (usedBy.map((email) => String(email).toLowerCase()).includes(String(order.customerEmail).toLowerCase())) throw new HttpError(409, 'coupon_already_used');
+      if (cpfDoPedido.length === 11 && usedByCpf.includes(cpfDoPedido)) throw new HttpError(409, 'coupon_already_used');
     }
 
     const affiliateSnap = affiliateRef ? byPath.get(affiliateRef.path) : null;
@@ -203,8 +213,17 @@ export async function fulfillOrder(orderId, { provider, reference, confirmedBy }
     }
     if (couponRef) transaction.update(couponRef, { usedCount: Number(couponSnap.data().usedCount || 0) + 1 });
     if (couponUsageRef) {
-      const usedBy = Array.isArray(couponUsageSnap.data()?.usedBy) ? couponUsageSnap.data().usedBy : [];
-      transaction.set(couponUsageRef, { usedBy: unique([...usedBy, order.customerEmail]), updatedAt: new Date().toISOString() }, { merge: true });
+      const uso = couponUsageSnap.data() || {};
+      const usedBy = Array.isArray(uso.usedBy) ? uso.usedBy : [];
+      const usedByCpf = Array.isArray(uso.usedByCpf) ? uso.usedByCpf : [];
+      const cpfDoPedido = String(order.cpf || '').replace(/\D/g, '');
+      transaction.set(couponUsageRef, {
+        usedBy: unique([...usedBy, order.customerEmail]),
+        // Só entra CPF válido: uma lista com `''` casaria com todo pedido sem
+        // documento e trancaria o cupom para o mundo inteiro fora do Brasil.
+        usedByCpf: cpfDoPedido.length === 11 ? unique([...usedByCpf, cpfDoPedido]) : usedByCpf,
+        updatedAt: new Date().toISOString(),
+      }, { merge: true });
     }
 
     if (registeredUser) {

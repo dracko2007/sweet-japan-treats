@@ -40,7 +40,7 @@ function parseItems(raw) {
   });
 }
 
-function parseCustomer(raw, user) {
+function parseCustomer(raw, user, country) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new HttpError(400, 'invalid_customer');
   assertExactKeys(raw, ['name', 'email', 'phone', 'cpf', 'postalCode', 'city', 'address', 'building']);
   const tokenEmail = user.email ? normalizeEmail(user.email) : '';
@@ -48,6 +48,12 @@ function parseCustomer(raw, user) {
   if (tokenEmail && tokenEmail !== submittedEmail) throw new HttpError(403, 'email_mismatch');
   const cpf = String(raw.cpf || '').replace(/\D/g, '');
   if (cpf && cpf.length !== 11) throw new HttpError(400, 'invalid_cpf');
+  // A aduana brasileira exige o CPF do destinatário, então para o Brasil ele
+  // não é opcional na prática — o pedido sem CPF trava na importação. Exigir
+  // aqui, além de evitar esse travamento, é o que dá ao guarda de cupom uma
+  // âncora que o cliente não troca à vontade (ver ALTO 3 do AUDITORIA.md).
+  // Fora do Brasil não há documento equivalente e o campo segue opcional.
+  if (country === 'Brasil' && cpf.length !== 11) throw new HttpError(400, 'cpf_required');
   return {
     name: requiredText(raw.name, { max: 120 }),
     email: tokenEmail || submittedEmail,
@@ -300,7 +306,7 @@ async function handleCreate(req, res) {
     const carrier = carrierId(body.shippingCarrier);
     const paymentMethod = requiredText(body.paymentMethod, { max: 20 });
     if (!PAYMENT_METHODS.has(paymentMethod)) throw new HttpError(400, 'invalid_payment_method');
-    const customer = parseCustomer(body.customer, user);
+    const customer = parseCustomer(body.customer, user, country);
     const couponCode = optionalText(body.couponCode, { max: 60 }).toUpperCase();
     const promoCode = optionalText(body.promoCode, { max: 60 }).toUpperCase();
     const negotiationId = optionalText(body.negotiationId, { max: 120 });

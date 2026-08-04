@@ -375,3 +375,67 @@ describe('limite de promoção sem CPF', () => {
     expect(db.get('products/p1').stock.quantity).toBe(5);
   });
 });
+
+// ALTO 3 do AUDITORIA.md, parte de decisão de negócio: o guarda "cupom 1× por
+// cliente" só olhava e-mail, e convidado troca de e-mail de graça. A decisão
+// foi trancar por CPF — que a aduana já exige no Brasil e agora o servidor
+// também (`orders.js` recusa `cpf_required`). Fora do Brasil não há documento,
+// então lá o e-mail segue sendo a única âncora possível.
+describe('cupom global de uso único ancorado no CPF', () => {
+  const CPF = '39053344705';
+
+  function pedidoComCupom(id, overrides = {}) {
+    return order(id, { couponSource: 'global', couponCode: 'BEMVINDO', ...overrides });
+  }
+
+  const cupomAtivo = { 'coupons/BEMVINDO': { isActive: true, usedCount: 0 } };
+
+  it('recusa o mesmo CPF mesmo com e-mail novo', async () => {
+    // É o ataque exato: mesma pessoa, endereço de e-mail diferente. Ancorado
+    // só em e-mail, isto passava e o cupom de uso único virava ilimitado.
+    const db = database(pedidoComCupom('O2', { cpf: CPF, customerEmail: 'outro@example.com' }), 5, {
+      ...cupomAtivo,
+      'coupon_usage/BEMVINDO': { usedBy: ['primeiro@example.com'], usedByCpf: [CPF] },
+    });
+    injected.db = db;
+
+    await expect(fulfillOrder('O2', { provider: 'manual', reference: 'cpf-repetido', confirmedBy: 'admin' }))
+      .rejects.toMatchObject({ code: 'coupon_already_used' });
+  });
+
+  it('grava o CPF junto do e-mail quando o cupom é consumido', async () => {
+    const db = database(pedidoComCupom('O1', { cpf: CPF }), 5, cupomAtivo);
+    injected.db = db;
+
+    await fulfillOrder('O1', { provider: 'manual', reference: 'primeiro-uso', confirmedBy: 'admin' });
+
+    const uso = db.get('coupon_usage/BEMVINDO');
+    expect(uso.usedByCpf).toEqual([CPF]);
+    expect(uso.usedBy).toEqual(['o1@example.com']);
+  });
+
+  // Sem esta guarda, um pedido sem CPF gravaria '' na lista e o próximo pedido
+  // sem CPF casaria com ele — o cupom morreria para o mundo inteiro fora do
+  // Brasil no primeiro uso.
+  it('pedido sem CPF não polui a lista de documentos', async () => {
+    const db = database(pedidoComCupom('O1', { cpf: '' }), 5, cupomAtivo);
+    injected.db = db;
+
+    await fulfillOrder('O1', { provider: 'manual', reference: 'sem-documento', confirmedBy: 'admin' });
+
+    expect(db.get('coupon_usage/BEMVINDO').usedByCpf).toEqual([]);
+  });
+
+  // O histórico gravado antes desta mudança é todo por e-mail: a âncora antiga
+  // não pode parar de valer, senão todo cupom já usado voltaria a valer.
+  it('continua recusando pelo e-mail, como antes', async () => {
+    const db = database(pedidoComCupom('O1', { cpf: '' }), 5, {
+      ...cupomAtivo,
+      'coupon_usage/BEMVINDO': { usedBy: ['o1@example.com'] },
+    });
+    injected.db = db;
+
+    await expect(fulfillOrder('O1', { provider: 'manual', reference: 'email-repetido', confirmedBy: 'admin' }))
+      .rejects.toMatchObject({ code: 'coupon_already_used' });
+  });
+});
