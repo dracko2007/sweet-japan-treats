@@ -14,6 +14,12 @@ const devLog = isDev ? console.log.bind(console) : () => {};
 const devWarn = isDev ? console.warn.bind(console) : () => {};
 const devError = isDev ? console.error.bind(console) : () => {};
 
+// O e-mail chega no Brasil: WhatsApp precisa do DDI, senão a discagem falha.
+// O PayPay é a exceção — app japonês que identifica a conta pelo número local,
+// e o formato internacional simplesmente não encontra a loja.
+const WHATSAPP = COMPANY_PROFILE.whatsapp.international;
+const PAYPAY_ID = COMPANY_PROFILE.whatsapp.domestic;
+
 
 interface EmailData {
   to: string;
@@ -315,13 +321,13 @@ export const emailService = {
                   口座番号: 3366435 (普通)
                 </p>
                 <p style="color: #856404; margin-top: 10px;">
-                  ⚠️ <strong>Importante:</strong> Envie o comprovante via WhatsApp: 070-1367-1679
+                  ⚠️ <strong>Importante:</strong> Envie o comprovante via WhatsApp: ${WHATSAPP}
                 </p>
               </div>
             ` : `
               <div class="info-box">
                 <p><strong>Envie o pagamento via PayPay para:</strong></p>
-                <p style="font-size: 24px; font-weight: bold; margin: 10px 0;">070-1367-1679</p>
+                <p style="font-size: 24px; font-weight: bold; margin: 10px 0;">${PAYPAY_ID}</p>
                 <p style="color: #856404;">
                   ⚠️ <strong>Importante:</strong> Após o pagamento, envie a confirmação via WhatsApp
                 </p>
@@ -411,7 +417,7 @@ export const emailService = {
             <h2>📝 Próximos Passos</h2>
             <ol style="margin: 0; padding-left: 20px;">
               <li>Realize o pagamento conforme as instruções acima</li>
-              <li>Envie o comprovante via WhatsApp (070-1367-1679)</li>
+              <li>Envie o comprovante via WhatsApp (${WHATSAPP})</li>
               <li>Aguarde a confirmação do pagamento</li>
               <li>Seu pedido será enviado em até 2 dias úteis</li>
               <li>Você receberá o código de rastreamento por email</li>
@@ -422,7 +428,7 @@ export const emailService = {
         <div class="footer">
           <p><strong>Japan Express</strong> - Importados do Japão 🌸</p>
           <p>📍 Hiroshima-ken, Japão</p>
-          <p>📞 070-1367-1679 | 📧 contato@japanexpress-store.com</p>
+          <p>📞 ${WHATSAPP} | 📧 ${COMPANY_PROFILE.email}</p>
           <p style="margin-top: 15px; font-size: 12px; color: #999;">
             Se tiver dúvidas, entre em contato conosco via WhatsApp!
           </p>
@@ -546,13 +552,13 @@ export const emailService = {
                   口座番号: 3366435 (普通)
                 </p>
                 <p style="color: #856404; margin-top: 10px;">
-                  ⚠️ <strong>Importante:</strong> Envie o comprovante via WhatsApp: 070-1367-1679
+                  ⚠️ <strong>Importante:</strong> Envie o comprovante via WhatsApp: ${WHATSAPP}
                 </p>
               </div>
             ` : `
               <div class="info-box">
                 <p><strong>Envie o pagamento via PayPay para:</strong></p>
-                <p style="font-size: 24px; font-weight: bold; margin: 10px 0;">070-1367-1679</p>
+                <p style="font-size: 24px; font-weight: bold; margin: 10px 0;">${PAYPAY_ID}</p>
                 <p style="color: #856404;">
                   ⚠️ <strong>Importante:</strong> Após o pagamento, envie a confirmação via WhatsApp
                 </p>
@@ -564,7 +570,7 @@ export const emailService = {
             <h2>📝 Próximos Passos</h2>
             <ol style="margin: 0; padding-left: 20px;">
               <li>Realize o pagamento conforme as instruções acima</li>
-              <li>Envie o comprovante via WhatsApp (070-1367-1679)</li>
+              <li>Envie o comprovante via WhatsApp (${WHATSAPP})</li>
               <li>Aguarde a confirmação do pagamento</li>
               <li>Seu pedido será enviado em até 2 dias úteis</li>
               <li>Você receberá o código de rastreamento por email</li>
@@ -575,7 +581,7 @@ export const emailService = {
         <div class="footer">
           <p><strong>Japan Express</strong> - Importados do Japão 🌸</p>
           <p>📍 Hiroshima-ken, Japão</p>
-          <p>📞 070-1367-1679 | 📧 contato@japanexpress-store.com</p>
+          <p>📞 ${WHATSAPP} | 📧 ${COMPANY_PROFILE.email}</p>
           <p style="margin-top: 15px; font-size: 12px; color: #999;">
             Se tiver dúvidas, entre em contato conosco via WhatsApp!
           </p>

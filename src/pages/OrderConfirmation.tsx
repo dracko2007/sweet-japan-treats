@@ -13,6 +13,13 @@ import { buildPixPayload } from '@/utils/pixPayload';
 import { trackPurchase } from '@/lib/analytics';
 import { useUser } from '@/context/UserContext';
 import { referralService } from '@/services/referralService';
+import { COMPANY_PROFILE } from '@/config/companyProfile';
+
+// O PayPay é app japonês e identifica a conta pelo número LOCAL: um cliente que
+// digitar o formato internacional não encontra a loja. Já o WhatsApp é discado
+// do Brasil, onde o DDI é obrigatório. Por isso os dois formatos convivem — o
+// que não pode é cada tela escolher o seu, que foi como divergiram.
+const { international: WHATSAPP, domestic: PAYPAY_ID } = COMPANY_PROFILE.whatsapp;
 
 const OrderConfirmation: React.FC = () => {
   const navigate = useNavigate();
@@ -81,7 +88,7 @@ const OrderConfirmation: React.FC = () => {
   const waMessage = encodeURIComponent(
     `Olá! Acabei de fazer o pagamento PIX do pedido ${order.id} no valor de ${formatPrice(order.total, order.currency)}. Segue o comprovante:`
   );
-  const whatsappComprovante = `https://wa.me/817013671679?text=${waMessage}`;
+  const whatsappComprovante = `https://wa.me/${COMPANY_PROFILE.whatsapp.digits}?text=${waMessage}`;
 
   const copyToClipboard = () => {
     navigator.clipboard.writeText(pixPayload);
@@ -186,12 +193,12 @@ const OrderConfirmation: React.FC = () => {
 
                 <div className="bg-gray-100 p-4 rounded-xl max-w-sm mx-auto text-xs space-y-2 font-mono text-left">
                   <p><strong className="text-gray-800">{t('order.sendTo')}</strong> Japan Express</p>
-                  <p><strong className="text-gray-800">{t('order.phone')}</strong> 070-1367-1679</p>
+                  <p><strong className="text-gray-800">{t('order.phone')}</strong> {PAYPAY_ID}</p>
                   <p><strong className="text-gray-800">{t('order.value')}</strong> {formatPrice(order.total, 'JPY')}</p>
                 </div>
 
                 <div className="pt-2 text-xs text-muted-foreground leading-relaxed max-w-md mx-auto">
-                  {t('order.transferNote')} <strong className="text-gray-800">070-1367-1679</strong>.
+                  {t('order.transferNote')} <strong className="text-gray-800">{PAYPAY_ID}</strong>.
                 </div>
               </div>
             )}
@@ -206,7 +213,7 @@ const OrderConfirmation: React.FC = () => {
 
                 <div className="bg-yellow-50 text-yellow-700 text-xs font-semibold px-4 py-3 rounded-xl inline-flex items-center gap-2 border border-yellow-200">
                   <AlertCircle className="w-4 h-4 shrink-0" />
-                  <span>Por favor, realize a transferência e nos envie o comprovante pelo WhatsApp (070-1367-1679).</span>
+                  <span>Por favor, realize a transferência e nos envie o comprovante pelo WhatsApp ({WHATSAPP}).</span>
                 </div>
 
                 <div className="bg-gray-50 border border-gray-200 rounded-2xl p-6 max-w-md mx-auto space-y-3 font-mono text-xs md:text-sm text-left">
@@ -236,7 +243,7 @@ const OrderConfirmation: React.FC = () => {
                 </div>
 
                 <div className="pt-2 text-xs text-muted-foreground leading-relaxed max-w-md mx-auto text-center">
-                  Após o depósito, envie uma foto do comprovante para o WhatsApp: <strong className="text-gray-800">070-1367-1679</strong>.
+                  Após o depósito, envie uma foto do comprovante para o WhatsApp: <strong className="text-gray-800">{WHATSAPP}</strong>.
                 </div>
               </div>
             )}
@@ -305,7 +312,7 @@ const OrderConfirmation: React.FC = () => {
                     <p className="text-sm font-bold text-yellow-800">Chave PIX ainda não configurada</p>
                     <p className="text-xs text-yellow-700 leading-relaxed">
                       A loja ainda não cadastrou a chave PIX. Entre em contato pelo WhatsApp
-                      <strong> +81 70-1367-1679</strong> para combinar o pagamento do pedido <strong>{order.id}</strong>.
+                      <strong> {WHATSAPP}</strong> para combinar o pagamento do pedido <strong>{order.id}</strong>.
                     </p>
                   </div>
                 )}

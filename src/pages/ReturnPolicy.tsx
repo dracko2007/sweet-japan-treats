@@ -30,7 +30,8 @@ const C: Record<Lang, {
     ],
     s2Title: '2. Frete de devolução',
     s2: [
-      'Em caso de desistência do produto, o frete de devolução é por conta do cliente.',
+      'Em caso de desistência ou arrependimento, o frete de devolução é por conta do cliente.',
+      'Em caso de produto com defeito, avaria de transporte ou erro nosso, o frete de devolução é pago pela Japan Express — nunca pelo cliente.',
       'O envio de retorno deve ser feito com rastreamento, para garantir a comprovação da devolução.',
       'A Japan Express não se responsabiliza por extravios ou danos durante o transporte de retorno.',
     ],
@@ -48,7 +49,7 @@ const C: Record<Lang, {
       'Impostos e taxas alfandegárias já pagos no destino não são reembolsáveis.',
     ],
     s5Title: '5. Produtos com defeito ou avaria de transporte',
-    s5: 'Caso o produto chegue com defeito de fabricação ou avaria causada no transporte, entre em contato em até 48 horas após o recebimento, com fotos e vídeo do produto e da embalagem. Avaliaremos cada caso individualmente para reenvio ou reembolso, sem custo de frete para o cliente quando a responsabilidade for nossa.',
+    s5: 'Caso o produto chegue com defeito de fabricação ou avaria causada no transporte, entre em contato em até 48 horas após o recebimento, com fotos e vídeo do produto e da embalagem. Avaliaremos cada caso individualmente para reenvio ou reembolso, sem custo de frete para o cliente quando a responsabilidade for nossa. O prazo de 48 horas é o que a transportadora exige para abrir sinistro, e reportar dentro dele acelera muito a análise — mas ele não substitui nem reduz os prazos de reclamação garantidos ao consumidor no Brasil pelo Código de Defesa do Consumidor (Lei nº 8.078/1990, art. 26).',
     s6Title: '6. Como solicitar',
     s6Pre: 'Para iniciar uma devolução, entre em contato pelo WhatsApp ',
     s6Or: ' ou pelo e-mail ',
@@ -69,6 +70,7 @@ const C: Record<Lang, {
     s2Title: '2. Return shipping',
     s2: [
       'In case of withdrawal, return shipping is the customer’s responsibility.',
+      'If the return is due to a manufacturing defect, transport damage, or our mistake, Japan Express pays the return shipping — never the customer.',
       'The return must be shipped with tracking to ensure proof of the return.',
       'Japan Express is not responsible for loss or damage during the return transport.',
     ],
@@ -86,7 +88,7 @@ const C: Record<Lang, {
       'Customs duties and taxes already paid at the destination are non-refundable.',
     ],
     s5Title: '5. Defective products or transport damage',
-    s5: 'If the product arrives with a manufacturing defect or transport damage, contact us within 48 hours of receipt with photos and video of the product and packaging. We will assess each case individually for reshipment or refund, with no shipping cost to the customer when the responsibility is ours.',
+    s5: 'If the product arrives with a manufacturing defect or transport damage, contact us within 48 hours of receipt with photos and video of the product and packaging. We will assess each case individually for reshipment or refund, with no shipping cost to the customer when the responsibility is ours. The 48-hour window is what the carrier requires to open a damage claim, and reporting within it speeds up the assessment considerably — but it does not replace or shorten the statutory complaint periods granted to consumers in Brazil by the Consumer Protection Code (Law 8.078/1990, art. 26).',
     s6Title: '6. How to request',
     s6Pre: 'To start a return, contact us via WhatsApp ',
     s6Or: ' or by email ',
@@ -107,6 +109,7 @@ const C: Record<Lang, {
     s2Title: '2. 返品の送料',
     s2: [
       'お客様都合による返品の場合、返送料はお客様のご負担となります。',
+      '製品の不良、配送中の破損、または当店の手違いによる返品の場合、返送料は Japan Express が負担いたします。お客様のご負担はありません。',
       '返送は追跡付きで行い、返品の証明ができるようにしてください。',
       'Japan Express は返送中の紛失・破損について責任を負いません。',
     ],
@@ -124,7 +127,7 @@ const C: Record<Lang, {
       '到着地ですでに支払われた関税・税金は返金されません。',
     ],
     s5Title: '5. 不良品または配送中の破損',
-    s5: '商品に製造上の不良または配送中の破損があった場合は、到着後48時間以内に、商品と梱包の写真・動画を添えてご連絡ください。当社の責任による場合は、お客様に送料のご負担なく、再送または返金として個別に対応いたします。',
+    s5: '商品に製造上の不良または配送中の破損があった場合は、到着後48時間以内に、商品と梱包の写真・動画を添えてご連絡ください。当社の責任による場合は、お客様に送料のご負担なく、再送または返金として個別に対応いたします。48時間という期限は運送会社に損害賠償を請求するために必要な期間であり、この期間内のご連絡は調査を大幅に早めます。ただし、ブラジルのお客様に消費者保護法（法律第8.078/1990号 第26条）で保障された申し出期間を制限するものではありません。',
     s6Title: '6. お申し込み方法',
     s6Pre: '返品をご希望の場合は、WhatsApp ',
     s6Or: ' またはメール ',
@@ -200,7 +203,16 @@ const ReturnPolicy: React.FC = () => {
                 <Mail className="w-5 h-5 text-primary" /> {c.s6Title}
               </h2>
               <p>
-                {c.s6Pre}<strong>{COMPANY_PROFILE.whatsapp.domestic}</strong>{c.s6Or}
+                {c.s6Pre}
+                <a
+                  href={`https://wa.me/${COMPANY_PROFILE.whatsapp.digits}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary hover:underline font-semibold"
+                >
+                  {COMPANY_PROFILE.whatsapp.international}
+                </a>
+                {c.s6Or}
                 <a href={`mailto:${COMPANY_PROFILE.email}`} className="text-primary hover:underline">
                   {COMPANY_PROFILE.email}
                 </a>

@@ -453,14 +453,17 @@ _This is an automated test message_
       if (import.meta.env.VITE_TWILIO_ACCOUNT_SID && import.meta.env.VITE_TWILIO_AUTH_TOKEN) {
         devLog('📱 Testing Twilio...');
         whatsappResult = await whatsappService.sendMessage({
-          to: '+8107013671679',
+          // `whatsapp.digits` = 81 + 7013671679. O literal antigo era
+          // `+8107013671679`: carregava o zero do DDD japonês, que o formato
+          // internacional não tem. Número com dígito a mais não entrega.
+          to: `+${COMPANY_PROFILE.whatsapp.digits}`,
           message: testMessage
         });
       } else {
         // Use simple WhatsApp (always works)
         devLog('📱 Testing Simple WhatsApp (opens directly)...');
         whatsappServiceSimple.sendMessage({
-          to: '8107013671679',
+          to: COMPANY_PROFILE.whatsapp.digits,
           message: testMessage
         });
         whatsappResult = true; // It opened, so consider it a success

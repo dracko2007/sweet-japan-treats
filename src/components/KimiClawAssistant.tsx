@@ -17,6 +17,12 @@ import { getELightRate, getAirParcelRate, getEmsRate, countryToZone } from '@/ut
 import { convertYen as fxConvert } from '@/services/fxService';
 import { authenticatedFetch } from '@/services/authenticatedFetch';
 import { toast } from 'sonner';
+import { COMPANY_PROFILE } from '@/config/companyProfile';
+
+// Formato internacional em toda mensagem: o cliente que lê isto está no Brasil
+// e disca de lá. O link `wa.me` usa os dígitos puros, sem `+` nem separador.
+const WHATSAPP = COMPANY_PROFILE.whatsapp.international;
+const WHATSAPP_LINK = `wa.me/${COMPANY_PROFILE.whatsapp.digits}`;
 
 interface ShippingOption {
   carrier: string;
@@ -562,10 +568,10 @@ const KimiClawAssistant: React.FC = () => {
       if (country === 'Japão' && results.length === 0) {
         await addKimiMessageWithTyping(
           language === 'pt'
-            ? 'Frete dentro do Japão depende da província exata de entrega — não dá pra calcular sem esse dado aqui no chat. 📍 Veja o valor exato preenchendo o endereço na página de **Frete** ou no **Carrinho → Finalizar**, ou fale com um vendedor no WhatsApp **+81 70-1367-1679**.'
+            ? `Frete dentro do Japão depende da província exata de entrega — não dá pra calcular sem esse dado aqui no chat. 📍 Veja o valor exato preenchendo o endereço na página de **Frete** ou no **Carrinho → Finalizar**, ou fale com um vendedor no WhatsApp **${WHATSAPP}**.`
             : language === 'ja'
               ? '日本国内の送料は配達先の都道府県によって変わるため、チャットだけでは正確な金額を計算できません。📍 正確な金額は配送ページかカートの手続きで住所を入力すると表示されます。'
-              : "Shipping within Japan depends on the exact delivery prefecture — I can't calculate it here in chat. 📍 See the exact cost on the **Shipping** page or at **Cart → Checkout**, or ask a seller on WhatsApp **+81 70-1367-1679**."
+              : `Shipping within Japan depends on the exact delivery prefecture — I can't calculate it here in chat. 📍 See the exact cost on the **Shipping** page or at **Cart → Checkout**, or ask a seller on WhatsApp **${WHATSAPP}**.`
         );
         setShippingData({});
         return;
@@ -734,7 +740,7 @@ const KimiClawAssistant: React.FC = () => {
           ? `Tenho **${keywordTokens.map((k) => k).join(', ')}** no catálogo, mas nenhum cabe em **${fmtBudget(budgetValue)}** já com frete. 😕`
           : `Não encontrei nenhum produto (com frete pra **${country}**) que caiba em **${fmtBudget(budgetValue)}**. 😕`;
         await addKimiMessageWithTyping(
-          `${dica} Tente um valor um pouco maior, ou fale com um vendedor no WhatsApp **+81 70-1367-1679** (wa.me/817013671679) pra uma cotação sob medida! 📦`
+          `${dica} Tente um valor um pouco maior, ou fale com um vendedor no WhatsApp **${WHATSAPP}** (${WHATSAPP_LINK}) pra uma cotação sob medida! 📦`
         );
         return;
       }
@@ -779,7 +785,7 @@ const KimiClawAssistant: React.FC = () => {
         addToCart(targetProduct, 'small', 1);
         toast.success(`Adicionado: 1x ${targetProduct.name}`);
         await addKimiMessageWithTyping(
-          `Boa escolha! ✅ Adicionei o **${targetProduct.name}** ao seu carrinho. Pra finalizar com o frete pra Brasil, vá em **Carrinho → Finalizar** ou confirme direto com um vendedor no WhatsApp **+81 70-1367-1679** (wa.me/817013671679). 📦`,
+          `Boa escolha! ✅ Adicionei o **${targetProduct.name}** ao seu carrinho. Pra finalizar com o frete pra Brasil, vá em **Carrinho → Finalizar** ou confirme direto com um vendedor no WhatsApp **${WHATSAPP}** (${WHATSAPP_LINK}). 📦`,
           ['🛒 Adicionando ao carrinho...']
         );
         return;
@@ -788,7 +794,7 @@ const KimiClawAssistant: React.FC = () => {
       // (c) Várias variantes (refil, kit, pack...) → mostra como SELEÇÃO, não como busca.
       // Enquadra como fechamento de pedido: o cliente escolhe qual variante quer.
       await addKimiMessageWithTyping(
-        `Ótima escolha! 🎯 Encontrei estas versões — toque na que você quer que eu adicione ao carrinho, ou me diga qual (ex.: "quero o kit completo"). Também posso fechar direto pelo **Faça seu Pedido** ou pelo WhatsApp **+81 70-1367-1679**. 📦`
+        `Ótima escolha! 🎯 Encontrei estas versões — toque na que você quer que eu adicione ao carrinho, ou me diga qual (ex.: "quero o kit completo"). Também posso fechar direto pelo **Faça seu Pedido** ou pelo WhatsApp **${WHATSAPP}**. 📦`
       );
       setMessages(prev => [
         ...prev,

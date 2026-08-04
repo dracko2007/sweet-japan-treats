@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import Layout from '@/components/layout/Layout';
 import { COMPANY_PROFILE } from '@/config/companyProfile';
 const TermsOfService: React.FC = () => (
@@ -54,7 +55,7 @@ const TermsOfService: React.FC = () => (
             <h2 className="text-xl font-semibold text-foreground mb-3">5. Pedidos e pagamento</h2>
             <ul className="list-disc pl-6 space-y-2">
               <li>O pedido é confirmado somente após verificação do pagamento (PIX, PayPay ou transferência).</li>
-              <li>Após fazer o pedido, envie o comprovante de pagamento via WhatsApp <strong>{COMPANY_PROFILE.whatsapp.domestic}</strong>.</li>
+              <li>Após fazer o pedido, envie o comprovante de pagamento via WhatsApp <strong>{COMPANY_PROFILE.whatsapp.international}</strong>.</li>
               <li>O prazo de processamento é de até 2 dias úteis após confirmação do pagamento.</li>
               <li>Pedidos com dados incorretos de endereço podem resultar em entrega falha, sem reembolso do frete.</li>
             </ul>
@@ -77,7 +78,9 @@ const TermsOfService: React.FC = () => (
               <li>O produto deve estar sem uso, na embalagem original e sem avarias causadas pelo cliente.</li>
               <li>Para iniciar o processo, entre em contato via WhatsApp ou e-mail com foto do produto.</li>
               <li>Produtos alimentícios e cosméticos abertos não são elegíveis para devolução por questões de higiene.</li>
-              <li>O frete de devolução é de responsabilidade do cliente, exceto em casos de produto com defeito ou erro nosso.</li>
+              <li>Em caso de desistência ou arrependimento, o frete de devolução é por conta do cliente.</li>
+              <li>Em caso de produto com defeito, avaria de transporte ou erro nosso, o frete de devolução é pago pela Japan Express — nunca pelo cliente.</li>
+              <li>As condições completas, incluindo a exigência de produto lacrado e o que não é reembolsável, estão na <Link to="/devolucao" className="text-primary underline">Política de Devolução</Link>, que prevalece em caso de divergência com este resumo.</li>
             </ul>
           </section>
 
