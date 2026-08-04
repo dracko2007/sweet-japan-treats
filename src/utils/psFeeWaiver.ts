@@ -1,48 +1,84 @@
-// Isenção da Taxa de Personal Shopper concedida pela oferta de saída (exit-intent).
-// Regra (ponto 2 do checkout): "finalize agora e não pague a taxa".
-//
-// Persistência intencional em sessionStorage + TTL curto:
-//  - sessionStorage some ao fechar a aba  → se o cliente sair e voltar OUTRA HORA,
-//    a taxa volta a ser cobrada.
-//  - TTL de 60min cobre o caso de deixar a aba aberta e voltar muito depois.
-// Só vira desconto real se o pedido for finalizado dentro dessa janela.
+// Isenção da Taxa de Personal Shopper concedida pela oferta de saída.
+// O navegador guarda só a autorização assinada pelo servidor; timestamp local
+// sozinho não pode alterar o valor cobrado no pedido autoritativo.
 const KEY = 'ps_fee_waiver_until';
-const TTL_MINUTES = 60;
 
-// Evento disparado quando a isenção muda, para páginas já montadas (ex.: /checkout)
-// reagirem sem precisar remontar.
 export const PS_FEE_WAIVER_EVENT = 'psfee-waiver-changed';
 const emitChange = (): void => {
   try { window.dispatchEvent(new Event(PS_FEE_WAIVER_EVENT)); } catch { /* SSR/no window */ }
 };
 
-export const psFeeWaiver = {
-  /** Concede a isenção (chamado quando o cliente aceita a oferta no popup). */
-  grant(): void {
+const POINTS_COVER_ALL_KEY = 'checkout_points_cover_all';
+
+export const checkoutPointsCoverage = {
+  set(coversAll: boolean): void {
     try {
-      sessionStorage.setItem(KEY, String(Date.now() + TTL_MINUTES * 60_000));
-      emitChange();
+      sessionStorage.setItem(POINTS_COVER_ALL_KEY, coversAll ? '1' : '0');
     } catch {
-      /* storage indisponível — sem isenção, cobra a taxa normalmente */
+      /* storage indisponível — o servidor ainda protege a taxa */
     }
   },
 
-  /** Isenção válida agora? Expira sozinha e limpa a chave vencida. */
-  isActive(): boolean {
+  coversAll(): boolean {
     try {
-      const until = Number(sessionStorage.getItem(KEY) || 0);
-      if (!until) return false;
-      if (Date.now() > until) {
-        sessionStorage.removeItem(KEY);
-        return false;
-      }
+      return sessionStorage.getItem(POINTS_COVER_ALL_KEY) === '1';
+    } catch {
+      return false;
+    }
+  },
+
+  clear(): void {
+    try {
+      sessionStorage.removeItem(POINTS_COVER_ALL_KEY);
+    } catch {
+      /* noop */
+    }
+  },
+};
+
+interface StoredWaiver {
+  token: string;
+  expiresAt: number;
+}
+
+function currentWaiver(): StoredWaiver | null {
+  try {
+    const parsed = JSON.parse(sessionStorage.getItem(KEY) || 'null') as Partial<StoredWaiver> | null;
+    if (!parsed || typeof parsed.token !== 'string' || !parsed.token || !Number.isFinite(parsed.expiresAt)) {
+      sessionStorage.removeItem(KEY);
+      return null;
+    }
+    if (Date.now() >= Number(parsed.expiresAt)) {
+      sessionStorage.removeItem(KEY);
+      return null;
+    }
+    return { token: parsed.token, expiresAt: Number(parsed.expiresAt) };
+  } catch {
+    try { sessionStorage.removeItem(KEY); } catch { /* noop */ }
+    return null;
+  }
+}
+
+export const psFeeWaiver = {
+  grant(token: string, expiresAt: number): boolean {
+    if (!token || !Number.isFinite(expiresAt) || expiresAt <= Date.now()) return false;
+    try {
+      sessionStorage.setItem(KEY, JSON.stringify({ token, expiresAt }));
+      emitChange();
       return true;
     } catch {
       return false;
     }
   },
 
-  /** Consome/limpa a isenção (ex.: após o pedido ser finalizado). */
+  token(): string {
+    return currentWaiver()?.token || '';
+  },
+
+  isActive(): boolean {
+    return currentWaiver() !== null;
+  },
+
   clear(): void {
     try {
       sessionStorage.removeItem(KEY);

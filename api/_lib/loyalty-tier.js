@@ -4,8 +4,7 @@
 // para determinar seu multiplicador de pontos. Usa um recorte por
 // mês-calendário (o mês atual + os 2 anteriores), não 90 dias corridos.
 
-import { spendWindowStart } from '../../shared/points.js';
-import { FieldPath } from 'firebase-admin/firestore';
+import { productSpendInWindowYen } from '../../shared/points.js';
 
 /**
  * Gasto total em mercadoria (fora frete, fora taxa do personal shopper)
@@ -18,63 +17,18 @@ import { FieldPath } from 'firebase-admin/firestore';
  * (que viria ao custo de manutenção) e deixar o fallback em memória fazer o
  * trabalho — ordem é milissegundos numa query apenas por userId.
  */
-export async function recentProductSpendYen(db, userId) {
+export async function recentProductSpendYen(db, userId, now = new Date()) {
   if (!db || !userId) return 0;
-
-  const windowStart = spendWindowStart();
-  const userIdStr = String(userId);
-
   try {
-    // Tentar com índice composto: userId + orderDate + paymentConfirmed.
-    const snap = await db
-      .collection('orders')
-      .where('userId', '==', userIdStr)
-      .where('orderDate', '>=', windowStart.toISOString())
-      .where('paymentConfirmed', '==', true)
-      .get();
-
-    return computeProductSpend(snap);
-  } catch (error) {
-    // Índice composto ausente ou erro transiente. Fallback: filtrar em memória.
-    // É seguro porque geralmente há centenas de pedidos por usuário no máximo,
-    // e o que importa é o recorte de 3 meses.
-    try {
-      const snap = await db.collection('orders').where('userId', '==', userIdStr).get();
-      const windowStartTime = windowStart.getTime();
-      const filtered = snap.docs.filter((doc) => {
-        const order = doc.data();
-        const orderTime = order.orderDate ? new Date(order.orderDate).getTime() : 0;
-        const paid = order.paymentConfirmed === true || order.status === 'confirmed';
-        return paid && orderTime >= windowStartTime;
-      });
-      return computeProductSpend({ docs: filtered });
-    } catch {
-      // DB indisponível ou algum outro erro permanente.
-      return 0;
-    }
+    // Uma consulta simples por dono inclui pedidos antigos que ainda não tinham
+    // `paymentConfirmed`. O helper compartilhado reconhece também status pagos
+    // e aplica exatamente a mesma janela exibida no perfil.
+    const snap = await db.collection('orders').where('userId', '==', String(userId)).get();
+    return productSpendInWindowYen(snap.docs.map((document) => document.data()), now);
+  } catch {
+    // Falhar para Bronze é mais seguro do que prometer/creditar multiplicador
+    // sem conseguir comprovar as compras pagas.
+    return 0;
   }
 }
 
-/**
- * Soma o subtotal de mercadoria de um snapshot de pedidos.
- *
- * O pedido não grava `productSubtotalYen` diretamente (esse valor é calculado
- * em `buildQuote` e se transforma em várias colunas específicas — frete,
- * desconto, etc.). A reconstruir é simples: ¥ unitário × quantidade.
- */
-function computeProductSpend(snap) {
-  let total = 0;
-  snap.docs.forEach((doc) => {
-    const order = doc.data();
-    const items = Array.isArray(order.items) ? order.items : [];
-    items.forEach((item) => {
-      // Pula itens gratuitos (brinde ou promoção). Só os que foram pagos.
-      if (item.freeGift !== true) {
-        const unitYen = Number(item.unitYen) || 0;
-        const qty = Number(item.quantity) || 0;
-        total += unitYen * qty;
-      }
-    });
-  });
-  return Math.max(0, Math.round(total));
-}

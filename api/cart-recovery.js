@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHmac, randomUUID } from 'node:crypto';
 import { requireCronSecret } from './_lib/auth.js';
 import { isBlockedFrom30 } from './_lib/cart-recovery-profile.js';
 import { isOptedOut } from './_lib/email-optout.js';
@@ -7,59 +7,43 @@ import { escapeHtml, handleCors, sendError } from './_lib/http.js';
 import { sendMail, siteOrigin, unsubscribeUrl, wrapEmail } from './_lib/mailer.js';
 
 const CLAIM_TTL_MS = 10 * 60 * 1000;
+const DISCOUNT_INTERVAL_MS = 3 * 24 * 60 * 60 * 1000;
 
-// 4 toques de recuperação, todos avaliados no MESMO cron diário (Vercel Hobby
-// só permite 1x/dia) — cada carrinho avança no máximo 1 estágio por execução,
-// calculado pelo tempo TOTAL decorrido desde `abandonedAt`, não pelo intervalo
-// entre execuções do cron. `reminderStage` no doc = último estágio já enviado
-// (0 = nenhum ainda). STAGES[reminderStage] = definição do PRÓXIMO estágio devido.
+// O cron diário envia 10% → 15% → 30%, sempre com três dias reais entre
+// descontos. Se o cron ficar fora do ar, ele não tenta recuperar tudo em dias
+// consecutivos. Depois do estágio 3 o documento sai da fila e nenhum outro
+// e-mail é enviado.
 //
-// Cadência pedida pelo dono: os três e-mails de desconto (10% → 15% → 30%)
-// saem de 3 em 3 dias — como os thresholds são tempo total, isso vira 3, 6 e 9
-// dias. Depois do estágio 4 não sai mais nada: `dueStage` devolve null assim
-// que `reminderStage >= STAGES.length`, e o próprio filtro da consulta tira o
-// documento da fila. O toque de 90 minutos continua sem cupom porque quem só
-// esqueceu a aba aberta volta sozinho — dar desconto ali é queimar margem.
-// Margem conferida em 26/07/2026 sobre 273 produtos com custo cadastrado —
-// com 30% a margem mediana ainda é 29%.
-//
-// Oferecer 30% de forma previsível ensina o cliente a abandonar o carrinho de
-// propósito; quem já comprou usando esse cupom fica com teto de 15% (ver
-// `_lib/cart-recovery-profile.js`).
+// Quem já comprou usando 30% fica impedido de receber outro cupom de 30% até
+// concluir uma compra com desconto abaixo de 15% (ver o perfil de recuperação).
 const STAGES = [
-  { stage: 1, thresholdMs: 90 * 60 * 1000, discount: null, validadeMs: 0 },
-  { stage: 2, thresholdMs: 3 * 24 * 60 * 60 * 1000, discount: 10, validadeMs: 48 * 60 * 60 * 1000 },
-  { stage: 3, thresholdMs: 6 * 24 * 60 * 60 * 1000, discount: 15, validadeMs: 48 * 60 * 60 * 1000 },
-  { stage: 4, thresholdMs: 9 * 24 * 60 * 60 * 1000, discount: 30, validadeMs: 24 * 60 * 60 * 1000 },
+  { stage: 1, thresholdMs: 3 * 24 * 60 * 60 * 1000, discount: 10, validadeMs: 48 * 60 * 60 * 1000 },
+  { stage: 2, thresholdMs: 6 * 24 * 60 * 60 * 1000, discount: 15, validadeMs: 48 * 60 * 60 * 1000 },
+  { stage: 3, thresholdMs: 9 * 24 * 60 * 60 * 1000, discount: 30, validadeMs: 24 * 60 * 60 * 1000 },
 ];
 
 /**
- * Cria o cupom de recuperação para este cliente.
- *
- * O código é fixo e legível (`CARRINHO30`), como pedido — dá para ditar por
- * telefone ou WhatsApp. O que impede o óbvio ("CARRINHO30" é trivial de
- * adivinhar) é o `targetType: 'specific'`: só funciona nas contas que de fato
- * abandonaram um carrinho e receberam o e-mail. A cada envio o endereço entra
- * em `targetEmails`; quem digitar o código sem estar na lista é recusado por
- * `api/orders.js:resolveCoupon`.
- *
- * O valor 'specific' NÃO é decorativo: `checkTargetEligibility` e o servidor
- * comparam exatamente essa string, e qualquer outra (já usei 'email' aqui por
- * engano) cai no `return true` final — liberando o cupom para todo mundo.
- *
- * Vale para o CARRINHO INTEIRO — diferente das campanhas de produto, que o
- * servidor restringe ao `campaign.productId`.
- *
- * Antes os estágios usavam `VOLTA10` e `VOLTA15`, que precisavam existir à mão
- * no Firestore — e o `VOLTA10` nunca foi criado, então o estágio 2 prometia um
- * desconto que dava erro no checkout. Aqui o documento é criado/atualizado no
- * mesmo passo do envio, então a promessa nunca existe sem o cupom.
+ * Cada abandono recebe um código próprio. Um código global estendia a validade
+ * para todos os destinatários sempre que um novo e-mail saía e fazia a lista
+ * `targetEmails` crescer sem limite.
  */
-async function garantirCupom(email, discount, validadeMs) {
-  const code = `CARRINHO${discount}`;
+function recoveryCouponCode(uid, abandonedAt, discount) {
+  const key = process.env.CART_RECOVERY_SECRET
+    || process.env.UNSUBSCRIBE_SECRET
+    || process.env.CRON_SECRET;
+  if (!key) throw new Error('cart_recovery_secret_not_configured');
+  const suffix = createHmac('sha256', key)
+    .update(`${uid}:${abandonedAt}:${discount}`)
+    .digest('hex')
+    .slice(0, 10)
+    .toUpperCase();
+  return `CARRINHO${discount}-${suffix}`;
+}
+
+async function garantirCupom(uid, email, abandonedAt, discount, validadeMs) {
+  const code = recoveryCouponCode(uid, abandonedAt, discount);
   const ref = adminDb().collection('coupons').doc(code);
   const atual = (await ref.get()).data();
-  const alvos = Array.isArray(atual?.targetEmails) ? atual.targetEmails : [];
   const expiraEm = Date.now() + validadeMs;
 
   await ref.set({
@@ -68,12 +52,12 @@ async function garantirCupom(email, discount, validadeMs) {
     discount: 0,               // legado: o valor real fica em discountPercent
     discountPercent: discount,
     description: `Recuperacao de carrinho — ${discount}% OFF no pedido`,
-    // A validade acompanha o envio mais recente. Quem recebeu antes e demorou
-    // demais perde o desconto — que é o ponto do "finalize agora".
+    // Como o documento é individual, renovar este prazo nunca reabre o cupom
+    // de outra pessoa.
     expiryDate: new Date(expiraEm).toISOString(),
     isActive: true,
     targetType: 'specific',
-    targetEmails: alvos.includes(email) ? alvos : [...alvos, email],
+    targetEmails: [email],
     updatedAt: new Date().toISOString(),
     ...(atual ? {} : { usedCount: 0, createdAt: new Date().toISOString() }),
   }, { merge: true });
@@ -88,14 +72,6 @@ function buildRecoveryEmail(stageDef, name, items, cupom, unsub) {
   const greeting = `<p>Ola${name ? `, <strong>${escapeHtml(name)}</strong>` : ''}.</p><p>Seu carrinho ainda esta esperando:</p><table style="width:100%">${rows}</table>`;
   const cta = `<p style="text-align:center"><a href="${siteOrigin()}/carrinho" style="display:inline-block;background:#ec4899;color:#fff;text-decoration:none;padding:14px 28px;border-radius:10px;font-weight:bold">Voltar ao carrinho</a></p>`;
 
-  if (!cupom) {
-    // Estágio 1: lembrete leve, sem cupom — evita queimar desconto em quem só
-    // esqueceu a aba aberta e volta sozinho.
-    return {
-      subject: 'Esqueceu algo no carrinho? - Japan Express',
-      html: wrapEmail(`${greeting}${cta}`, { unsubscribeUrl: unsub }),
-    };
-  }
 
   const ultimo = stageDef.stage === STAGES.length;
   const aviso = ultimo
@@ -110,13 +86,22 @@ function buildRecoveryEmail(stageDef, name, items, cupom, unsub) {
   };
 }
 
-/** Estágio devido agora (ou null) com base no `reminderStage` atual e no tempo decorrido. */
+/** Estágio devido agora, incluindo três dias desde o último desconto enviado. */
 function dueStage(data) {
-  const current = Number(data.reminderStage) || 0;
+  const current = Math.max(0, Math.floor(Number(data.reminderStage) || 0));
   if (current >= STAGES.length) return null;
   const next = STAGES[current];
+  if (!next) return null;
   const abandonedAt = Number(data.abandonedAt) || 0;
-  if (!abandonedAt || Date.now() - abandonedAt < next.thresholdMs) return null;
+  const now = Date.now();
+  if (!abandonedAt || now - abandonedAt < next.thresholdMs) return null;
+  if (current >= 1) {
+    // Documentos antigos podem não ter `reminderSentAt`; o threshold esperado
+    // do estágio anterior é o fallback seguro para que não fiquem presos.
+    const previousSentAt = Number(data.reminderSentAt)
+      || abandonedAt + STAGES[current - 1].thresholdMs;
+    if (now - previousSentAt < DISCOUNT_INTERVAL_MS) return null;
+  }
   return next;
 }
 
@@ -138,6 +123,21 @@ async function claimCart(document, claimId) {
     return { data, stageDef };
   });
 }
+async function dueDocuments(db) {
+  const carts = db.collection('abandoned_carts');
+  // Só igualdade: índices automáticos bastam. A decisão de tempo continua em
+  // `dueStage`, dentro da transação, evitando depender de índice composto novo
+  // para que a campanha funcione em produção.
+  const snapshots = await Promise.all([
+    ...STAGES.map((_, stage) => carts.where('reminderStage', '==', stage).limit(500).get()),
+    // Compatibilidade com snapshots gravados antes de `reminderStage: 0`.
+    carts.where('reminderSent', '==', false).limit(500).get(),
+  ]);
+  return [...new Map(
+    snapshots.flatMap((snapshot) => snapshot.docs).map((document) => [document.id, document]),
+  ).values()];
+}
+
 
 export default async function handler(req, res) {
   if (!handleCors(req, res, { methods: ['GET', 'POST'] })) return;
@@ -145,17 +145,11 @@ export default async function handler(req, res) {
   try {
     requireCronSecret(req);
     const db = adminDb();
-    // Filtro único (reminderStage < 3) evita exigir índice composto novo —
-    // a decisão de qual estágio está devido agora é feita em código, comparando
-    // `abandonedAt` com o threshold do próximo estágio (ver dueStage()).
-    const snap = await db.collection('abandoned_carts')
-      .where('reminderStage', '<', STAGES.length)
-      .limit(50)
-      .get();
+    const documents = await dueDocuments(db);
 
     let sent = 0;
     let skipped = 0;
-    for (const document of snap.docs) {
+    for (const document of documents) {
       const claimId = randomUUID();
       const claimed = await claimCart(document, claimId);
       if (!claimed) {
@@ -195,9 +189,13 @@ export default async function handler(req, res) {
         }
         // O cupom nasce antes do envio: se a criação falhar, o e-mail não sai
         // prometendo um código inexistente — o carrinho fica para o próximo cron.
-        const cupom = stageDef.discount
-          ? await garantirCupom(user.email, stageDef.discount, stageDef.validadeMs)
-          : null;
+        const cupom = await garantirCupom(
+          document.id,
+          user.email,
+          data.abandonedAt,
+          stageDef.discount,
+          stageDef.validadeMs,
+        );
         const unsub = unsubscribeUrl(user.email);
         await sendMail({
           to: user.email,
@@ -206,6 +204,7 @@ export default async function handler(req, res) {
         });
         await document.ref.update({
           reminderStage: stageDef.stage,
+          reminderSent: true,
           reminderSentAt: Date.now(),
           reminderClaimId: null,
           reminderClaimedAt: null,
@@ -217,7 +216,7 @@ export default async function handler(req, res) {
       }
     }
 
-    res.status(200).json({ ok: true, sent, skipped, processed: snap.size });
+    res.status(200).json({ ok: true, sent, skipped, processed: documents.length });
   } catch (error) {
     console.error('[cart-recovery]', error instanceof Error ? error.message : error);
     sendError(res, error);

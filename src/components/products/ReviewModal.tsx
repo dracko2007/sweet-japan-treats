@@ -6,6 +6,7 @@ import { useUser } from '@/context/UserContext';
 import { reviewService } from '@/services/reviewService';
 import { pointsService, POINTS } from '@/services/pointsService';
 import { uploadMedia } from '@/services/uploadService';
+import { userRewardsService } from '@/services/userRewardsService';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
@@ -70,11 +71,24 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ productId, productName, onClo
       try {
         const { url } = await uploadMedia(videoFile, `review-videos/${productId}`, setVideoProgress);
         videoUrl = url;
-      } catch (err: any) {
-        toast({ title: 'Falha ao enviar o vídeo', description: err?.message || 'Tente novamente.', variant: 'destructive' });
+      } catch (err: unknown) {
+        toast({ title: 'Falha ao enviar o vídeo', description: err instanceof Error ? err.message : 'Tente novamente.', variant: 'destructive' });
         setSaving(false);
         return;
       }
+    }
+
+    let reward;
+    try {
+      reward = await userRewardsService.claimProductReview(productId);
+    } catch (err: unknown) {
+      toast({
+        title: 'Não foi possível validar os pontos',
+        description: err instanceof Error ? err.message : 'Confirme que esta compra já foi paga.',
+        variant: 'destructive',
+      });
+      setSaving(false);
+      return;
     }
 
     reviewService.addReview({
@@ -85,10 +99,10 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ productId, productName, onClo
       comment: comment.trim(),
       images: images.length > 0 ? images : undefined,
       videoUrl: videoUrl || undefined,
-      pointsAwarded: POINTS.perReview,
-      verified: true, // veio do histórico → compra garantida
+      pointsAwarded: reward.awarded,
+      verified: true,
     });
-    addPoints(POINTS.perReview);
+    if (reward.awarded > 0) addPoints(reward.awarded);
 
     let videoMsg = '';
     if (videoUrl && !alreadyHasVideo) {
@@ -100,8 +114,10 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ productId, productName, onClo
     }
 
     toast({
-      title: `🎉 Avaliação enviada! +${POINTS.perReview} ponto`,
-      description: `Você agora tem ${(user.points || 0) + POINTS.perReview} pontos.` + videoMsg,
+      title: reward.awarded > 0
+        ? `Avaliação enviada! +${reward.awarded} ponto`
+        : 'Avaliação enviada!',
+      description: `Você agora tem ${reward.total} pontos.` + videoMsg,
     });
     setSaving(false);
     onDone?.();

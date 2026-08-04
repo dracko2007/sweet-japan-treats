@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { handleConfirmManualPayment as confirmManualPayment, handleCreate as createOrder } from '../orders.js';
+import { handleConfirmManualPayment as confirmManualPayment, handleCreate as createOrder, handleIssuePsFeeWaiver as issuePsFeeWaiver } from '../orders.js';
 import cartRecovery from '../cart-recovery.js';
 import { handlePromoCampaign as promoCampaign, handleEmail as sendEmail, handlePush as sendPush } from '../notify.js';
 import { requireUser } from './auth.js';
@@ -56,10 +56,14 @@ describe('server API security boundaries', () => {
     expect(campaignRes.statusCode).toBe(401);
   });
 
-  it('requires authentication before creating or confirming an order', async () => {
+  it('requires authentication before creating, discounting or confirming an order', async () => {
     const createRes = response();
     await createOrder({ method: 'POST', headers: {}, body: {} }, createRes);
     expect(createRes.statusCode).toBe(401);
+
+    const waiverRes = response();
+    await issuePsFeeWaiver({ method: 'POST', headers: {}, body: {} }, waiverRes);
+    expect(waiverRes.statusCode).toBe(401);
 
     const confirmRes = response();
     await confirmManualPayment({ method: 'POST', headers: {}, body: {} }, confirmRes);

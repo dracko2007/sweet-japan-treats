@@ -1,6 +1,6 @@
 import React from 'react';
 import Layout from '@/components/layout/Layout';
-
+import { COMPANY_PROFILE } from '@/config/companyProfile';
 const TermsOfService: React.FC = () => (
   <Layout>
     <div className="py-12 bg-background">
@@ -22,9 +22,11 @@ const TermsOfService: React.FC = () => (
           <section>
             <h2 className="text-xl font-semibold text-foreground mb-3">2. Sobre a Japan Express</h2>
             <p>
-              A Japan Express é uma loja especializada em produtos importados do Japão, operando
-              desde Hiroshima, Japão. Vendemos produtos originais japoneses — cosméticos, doces,
-              papelaria, acessórios e outros — com entrega internacional para o Brasil e outros países.
+              A <strong>{COMPANY_PROFILE.brand}</strong> é uma loja especializada em produtos importados do Japão, operada por 
+              <strong> {COMPANY_PROFILE.contactName}</strong> a partir de <strong>{COMPANY_PROFILE.fulfillmentOrigin.formatted}</strong>.
+              Vendemos produtos originais japoneses — cosméticos, doces, papelaria, acessórios e outros — 
+              com entrega internacional para o Brasil e outros países. Esta é uma venda internacional sujeita a tributos, 
+              taxas alfandegárias e inspeção de autoridades locais do país de destino.
             </p>
           </section>
 
@@ -52,7 +54,7 @@ const TermsOfService: React.FC = () => (
             <h2 className="text-xl font-semibold text-foreground mb-3">5. Pedidos e pagamento</h2>
             <ul className="list-disc pl-6 space-y-2">
               <li>O pedido é confirmado somente após verificação do pagamento (PIX, PayPay ou transferência).</li>
-              <li>Após fazer o pedido, envie o comprovante de pagamento via WhatsApp (070-1367-1679).</li>
+              <li>Após fazer o pedido, envie o comprovante de pagamento via WhatsApp <strong>{COMPANY_PROFILE.whatsapp.domestic}</strong>.</li>
               <li>O prazo de processamento é de até 2 dias úteis após confirmação do pagamento.</li>
               <li>Pedidos com dados incorretos de endereço podem resultar em entrega falha, sem reembolso do frete.</li>
             </ul>
@@ -106,8 +108,8 @@ const TermsOfService: React.FC = () => (
           <section>
             <h2 className="text-xl font-semibold text-foreground mb-3">11. Contato</h2>
             <ul className="list-none space-y-1">
-              <li>📧 <a href="mailto:contato@japanexpress-store.com" className="text-primary hover:underline">contato@japanexpress-store.com</a></li>
-              <li>💬 WhatsApp: +81 70-1367-1679</li>
+              <li>📧 <a href={`mailto:${COMPANY_PROFILE.email}`} className="text-primary hover:underline">{COMPANY_PROFILE.email}</a></li>
+              <li>💬 WhatsApp: {COMPANY_PROFILE.whatsapp.international}</li>
             </ul>
           </section>
 

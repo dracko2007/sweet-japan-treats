@@ -1,6 +1,6 @@
 import { getCountryConfig } from '@/data/worldCountries';
 
-// Brazilian import tax rules (Remessa Conforme program)
+// Brazilian import tax rules
 // Source: Receita Federal / Portaria MF nº 612/2023
 export const BRAZIL_TAX = {
   thresholdBRL: 250,   // ~USD 50 — below this, flat 20% II applies
@@ -18,12 +18,9 @@ export const EU_VAT_RATES: Record<string, number> = {
 };
 
 export function calcBrazilTax(price: number, icmsRate: number = BRAZIL_TAX.icmsRate): { federal: number; icms: number; total: number } {
-  const federal =
-    price < BRAZIL_TAX.thresholdBRL
-      ? price * BRAZIL_TAX.belowRate
-      : price * BRAZIL_TAX.aboveRate - BRAZIL_TAX.aboveOffset;
-  const icms = (price + federal) * icmsRate;
-  return { federal, icms, total: federal + icms };
+  // Brazil import taxes depend on customs authority rules and cannot be reliably estimated without verified regime.
+  // Return zeros to suppress numeric display while preserving function signature for admin tools and API contracts.
+  return { federal: 0, icms: 0, total: 0 };
 }
 
 // ── ICMS por estado (alíquota interna aproximada, 2024/2025) ────────────────
@@ -95,8 +92,9 @@ export function calcEuVat(price: number, country: string): number {
 // Para EUA usa sales tax por estado (calcUsSalesTax); demais usam a taxa do país.
 export function calcImportTax(price: number, country: string, stateCode?: string): { tax: number; label: string } {
   if (country === 'Brasil') {
-    const br = calcBrazilTax(price);
-    return { tax: br.total, label: 'Impostos Estimados (Brasil)' };
+    // Brazil import taxes are subject to customs authority rules and cannot be reliably estimated.
+    // Returning tax: 0 suppresses the estimate display while keeping factual customs warning in UI.
+    return { tax: 0, label: '' };
   }
   if (country === 'Estados Unidos') {
     const tax = calcUsSalesTax(price, stateCode);

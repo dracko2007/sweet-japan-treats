@@ -80,22 +80,66 @@ export function tierProgress(spendYen) {
 }
 
 /**
- * Início da janela de gasto: primeiro instante do mês de 2 meses atrás.
+ * Início da janela de gasto: meia-noite no Japão no primeiro dia de 2 meses
+ * atrás.
  *
  * A janela é por MÊS-CALENDÁRIO, não 90 dias corridos — é o que a loja
  * prometeu: quem compra ¥100.000 em janeiro mantém o x3 em janeiro, fevereiro
  * e março, e em abril a janela (fevereiro a abril) já não enxerga aquela
- * compra. Com 90 dias corridos a data da compra dentro do mês mudaria o
- * resultado, e ninguém consegue explicar isso ao cliente.
- *
- * Usa UTC para evitar desvios de timezone em filtros de servidor.
+ * compra. O Japão usa UTC+9 sem horário de verão; deslocar antes de ler ano/mês
+ * evita virar o nível no horário UTC enquanto o cliente ainda está em outro dia.
  */
 export function spendWindowStart(now = new Date()) {
-  const referencia = now instanceof Date ? now : new Date(now);
-  const year = referencia.getUTCFullYear();
-  const month = referencia.getUTCMonth(); // 0-11
+  const parsed = now instanceof Date ? now : new Date(now);
+  const reference = Number.isFinite(parsed.getTime()) ? parsed : new Date();
+  const tokyo = new Date(reference.getTime() + 9 * 60 * 60 * 1000);
+  const year = tokyo.getUTCFullYear();
+  const month = tokyo.getUTCMonth();
   const windowMonth = month - (SPEND_WINDOW_MONTHS - 1);
-  return new Date(Date.UTC(year, windowMonth, 1, 0, 0, 0, 0));
+  return new Date(Date.UTC(year, windowMonth, 1) - 9 * 60 * 60 * 1000);
+}
+
+const PAID_LOYALTY_STATUSES = new Set(['confirmed', 'processing', 'shipped', 'delivered']);
+
+/** Um pedido só ativa nível depois de o pagamento ter sido confirmado. */
+export function isPaidLoyaltyOrder(order) {
+  return order?.paymentConfirmed === true
+    || order?.fulfillmentState === 'fulfilled'
+    || PAID_LOYALTY_STATUSES.has(String(order?.status || '').trim().toLowerCase());
+}
+
+function orderTime(order) {
+  const iso = new Date(order?.orderDate || '').getTime();
+  if (Number.isFinite(iso)) return iso;
+  const legacy = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(String(order?.date || '').trim());
+  if (!legacy) return NaN;
+  const [, day, month, year] = legacy;
+  return new Date(`${year}-${month}-${day}T00:00:00+09:00`).getTime();
+}
+
+/**
+ * Soma somente mercadoria paga dentro da janela. Esta função é compartilhada
+ * pelo servidor e pelo perfil para os dois lados nunca divergirem.
+ */
+export function productSpendInWindowYen(orders, now = new Date()) {
+  if (!Array.isArray(orders) || orders.length === 0) return 0;
+  const start = spendWindowStart(now).getTime();
+  let total = 0;
+  for (const order of orders) {
+    if (!isPaidLoyaltyOrder(order)) continue;
+    const paidAt = orderTime(order);
+    if (!Number.isFinite(paidAt) || paidAt < start) continue;
+    if (!Array.isArray(order.items)) continue;
+    for (const item of order.items) {
+      if (item?.freeGift === true) continue;
+      const unitYen = Number(item?.unitYen);
+      const quantity = Number(item?.quantity);
+      if (Number.isFinite(unitYen) && unitYen > 0 && Number.isFinite(quantity) && quantity > 0) {
+        total += unitYen * quantity;
+      }
+    }
+  }
+  return Math.max(0, Math.round(total));
 }
 
 /**

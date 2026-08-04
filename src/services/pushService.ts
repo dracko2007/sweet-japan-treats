@@ -92,8 +92,8 @@ export const pushService = {
   async subscribe(customer: { email: string; name?: string }): Promise<{ ok: boolean; error?: string }> {
     if (!isPushSupported()) return { ok: false, error: 'Notificações push não suportadas neste navegador' };
     if (!db) return { ok: false, error: 'Firebase indisponível' };
-    if (!customer.email) return { ok: false, error: 'Faça login para ativar notificações' };
-
+    const customerEmail = customer.email.trim().toLowerCase();
+    if (!customerEmail) return { ok: false, error: 'Faça login para ativar notificações' };
     try {
       if (Notification.permission === 'denied') {
         return { ok: false, error: 'Notificações bloqueadas nas configurações do navegador' };
@@ -112,11 +112,17 @@ export const pushService = {
       }
 
       const json = sub.toJSON();
+      if (!json.keys?.p256dh || !json.keys.auth) {
+        throw new Error('Inscrição push sem chaves válidas');
+      }
       const id = subscriptionDocId(sub.endpoint);
       await setDoc(doc(db, 'push_subscriptions', id), {
         endpoint: sub.endpoint,
-        keys: json.keys || {},
-        customerEmail: customer.email.toLowerCase(),
+        keys: {
+          p256dh: json.keys.p256dh,
+          auth: json.keys.auth,
+        },
+        customerEmail,
         customerName: customer.name || '',
         userAgent: navigator.userAgent,
         updatedAt: serverTimestamp(),

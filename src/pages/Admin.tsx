@@ -230,8 +230,7 @@ const Admin: React.FC = () => {
   // fato tratou dele.
   const loadCustomRequests = async () => {
     try {
-      const todos = await customRequestService.getAll();
-      setNewRequests(todos.filter((r) => r.status === 'new').length);
+      setNewRequests(await customRequestService.getPendingCount());
     } catch (e) {
       devWarn('[admin] contagem de pedidos personalizados falhou:', e);
     }

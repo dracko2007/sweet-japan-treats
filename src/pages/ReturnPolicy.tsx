@@ -2,6 +2,7 @@ import React from 'react';
 import Layout from '@/components/layout/Layout';
 import { ShieldCheck, AlertTriangle, PackageCheck, Truck, XCircle, Mail } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
+import { COMPANY_PROFILE } from '@/config/companyProfile';
 
 type Lang = 'pt' | 'en' | 'ja';
 
@@ -199,9 +200,9 @@ const ReturnPolicy: React.FC = () => {
                 <Mail className="w-5 h-5 text-primary" /> {c.s6Title}
               </h2>
               <p>
-                {c.s6Pre}<strong>070-1367-1679</strong>{c.s6Or}
-                <a href="mailto:contato@japanexpress-store.com" className="text-primary hover:underline">
-                  contato@japanexpress-store.com
+                {c.s6Pre}<strong>{COMPANY_PROFILE.whatsapp.domestic}</strong>{c.s6Or}
+                <a href={`mailto:${COMPANY_PROFILE.email}`} className="text-primary hover:underline">
+                  {COMPANY_PROFILE.email}
                 </a>
                 {c.s6Post}
               </p>

@@ -105,7 +105,7 @@ const STATIC_ROUTE_META: Array<{ match: string; title: string; description: stri
   { match: '/produtos', title: 'Produtos Importados do Japão | Japan Express', description: 'Cosméticos, doces, papelaria e acessórios originais do Japão. Envio direto com frete calculado por peso real.' },
   { match: '/ofertas', title: 'Ofertas e Promoções | Japan Express', description: 'Promoções relâmpago e descontos em produtos japoneses importados. Aproveite enquanto durarem os estoques.' },
   { match: '/frete', title: 'Frete e Prazos de Envio | Japan Express', description: 'Simule o frete e o prazo de envio do Japão para o seu país. Cálculo por peso real, conforme Japan Post.' },
-  { match: '/como-funciona', title: 'Como Funciona | Japan Express', description: 'Passo a passo de como comprar produtos originais do Japão com segurança e Remessa Conforme.' },
+  { match: '/como-funciona', title: 'Como Funciona | Japan Express', description: 'Passo a passo de como comprar produtos originais do Japão com segurança, rastreamento e envio internacional.' },
   { match: '/sobre', title: 'Sobre a Japan Express', description: 'Conheça a Japan Express: importação direta do Japão, produtos originais e atendimento cuidadoso.' },
   { match: '/favoritos', title: 'Meus Favoritos | Japan Express', description: 'Sua lista de produtos japoneses favoritos, salva para comprar depois.' },
   { match: '/empresas', title: 'Vendas para Empresas | Japan Express', description: 'Importação de produtos japoneses para empresas, lojas e revenda.' },

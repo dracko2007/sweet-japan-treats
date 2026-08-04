@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Plus, Trash2, Zap, AlertTriangle, Eye, EyeOff, ChevronDown } from 'lucide-react';
+import { Plus, Trash2, Zap, AlertTriangle, Eye, EyeOff, ChevronDown, RotateCcw } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,7 +10,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { useProducts } from '@/context/ProductsContext';
-import { raffleService, Raffle, RafflePrize, RaffleParticipant, RaffleWinner } from '@/services/raffleService';
+import { raffleService, Raffle, RafflePrize, RaffleParticipant, RaffleAdminWinner, MAX_RAFFLE_PRIZES } from '@/services/raffleService';
 import { ensureAdminAuth } from '@/utils/adminAuth';
 import { requireAdminPassword } from '@/utils/adminGuard';
 
@@ -30,7 +30,7 @@ const SorteioManager: React.FC = () => {
   const [prizeCount, setPrizeCount] = useState(3);
   const [prizes, setPrizes] = useState<RafflePrize[]>([]);
   const [participants, setParticipants] = useState<RaffleParticipant[]>([]);
-  const [drawResult, setDrawResult] = useState<RaffleWinner[] | null>(null);
+  const [drawResult, setDrawResult] = useState<RaffleAdminWinner[] | null>(null);
 
   // Carrega dados iniciais
   useEffect(() => {
@@ -40,6 +40,7 @@ const SorteioManager: React.FC = () => {
         setRules(r.rules);
         setPrizeCount(r.prizeCount);
         setPrizes(r.prizes);
+        if (r.winners.length === 0) setDrawResult(null);
         setLoadError(null);
         setLoading(false);
       },
@@ -66,6 +67,9 @@ const SorteioManager: React.FC = () => {
 
   useEffect(() => {
     loadParticipants();
+    raffleService.getAdminWinners()
+      .then((winners) => setDrawResult(winners.length > 0 ? winners : null))
+      .catch(() => undefined);
   }, []);
 
   // Função: salvar regras
@@ -85,11 +89,12 @@ const SorteioManager: React.FC = () => {
   };
 
   // Função: atualizar contagem de prêmios
-  const handleUpdatePrizeCount = async (newCount: number) => {
-    setPrizeCount(newCount);
-    const newPrizes = prizes.slice(0, newCount);
+  const handleUpdatePrizeCount = (newCount: number) => {
+    const count = Math.min(MAX_RAFFLE_PRIZES, Math.max(1, Math.floor(newCount) || 1));
+    setPrizeCount(count);
+    const newPrizes = prizes.slice(0, count);
     // Preencher posições faltantes
-    for (let i = newPrizes.length; i < newCount; i++) {
+    for (let i = newPrizes.length; i < count; i++) {
       newPrizes.push({
         rank: i + 1,
         type: 'product',
@@ -114,6 +119,10 @@ const SorteioManager: React.FC = () => {
 
   // Função: salvar prêmios
   const handleSavePrizes = async () => {
+    if (drawResult?.length) {
+      toast({ title: 'Sorteio já realizado', description: 'Inicie um novo sorteio antes de alterar os prêmios.', variant: 'destructive' });
+      return;
+    }
     if (!(await requireAdminPassword('atualizar prêmios do sorteio'))) return;
     // Valida que cada prêmio tem um tipo e valor
     for (const prize of prizes) {
@@ -141,6 +150,10 @@ const SorteioManager: React.FC = () => {
 
   // Função: realizar sorteio
   const handleDraw = async () => {
+    if (drawResult?.length) {
+      toast({ title: 'Sorteio já realizado', description: 'Use “Iniciar novo sorteio” para não premiar a mesma rodada duas vezes.', variant: 'destructive' });
+      return;
+    }
     if (!(await requireAdminPassword('realizar sorteio'))) return;
     if (prizes.length === 0) {
       toast({ title: 'Erro', description: 'Configure pelo menos um prêmio primeiro', variant: 'destructive' });
@@ -164,6 +177,24 @@ const SorteioManager: React.FC = () => {
       setDrawing(false);
     }
   };
+  const handleResetDraw = async () => {
+    if (!(await requireAdminPassword('iniciar novo sorteio'))) return;
+    setDrawing(true);
+    try {
+      await raffleService.resetDraw();
+      setDrawResult(null);
+      toast({ title: 'Novo sorteio iniciado', description: 'Os prêmios anteriores continuam entregues; esta rodada está pronta para nova configuração.' });
+    } catch (error: unknown) {
+      toast({
+        title: 'Erro ao iniciar novo sorteio',
+        description: error instanceof Error ? error.message : 'Erro desconhecido',
+        variant: 'destructive',
+      });
+    } finally {
+      setDrawing(false);
+    }
+  };
+
 
   // Função: publicar/despublicar
   const handleTogglePublish = async () => {
@@ -253,13 +284,13 @@ const SorteioManager: React.FC = () => {
                     id="prizecount"
                     type="number"
                     min="1"
-                    max="20"
+                    max={MAX_RAFFLE_PRIZES}
                     value={prizeCount}
                     onChange={(e) => handleUpdatePrizeCount(Math.max(1, Number(e.target.value)))}
                     className="w-24"
                   />
                   <p className="text-sm text-muted-foreground flex items-center">
-                    {prizeCount} posição{prizeCount !== 1 ? 's' : ''} no pódio
+                    {prizeCount} {prizeCount === 1 ? 'posição' : 'posições'} no pódio
                   </p>
                 </div>
               </div>
@@ -382,15 +413,22 @@ const SorteioManager: React.FC = () => {
           {/* Botão de Sorteio */}
           <Card className="bg-primary/5 border-primary/30">
             <CardContent className="pt-6">
-              <Button
-                onClick={handleDraw}
-                disabled={drawing || prizes.length === 0 || participants.length === 0}
-                size="lg"
-                className="w-full"
-              >
-                <Zap className="w-4 h-4 mr-2" />
-                {drawing ? 'Sorteando...' : '⚡ Realizar Sorteio'}
-              </Button>
+              {drawResult?.length ? (
+                <Button onClick={handleResetDraw} disabled={drawing} size="lg" variant="outline" className="w-full">
+                  <RotateCcw className="w-4 h-4 mr-2" />
+                  {drawing ? 'Preparando...' : 'Iniciar novo sorteio'}
+                </Button>
+              ) : (
+                <Button
+                  onClick={handleDraw}
+                  disabled={drawing || prizes.length === 0 || participants.length === 0}
+                  size="lg"
+                  className="w-full"
+                >
+                  <Zap className="w-4 h-4 mr-2" />
+                  {drawing ? 'Sorteando...' : '⚡ Realizar Sorteio'}
+                </Button>
+              )}
               {prizes.length === 0 && <p className="text-xs text-muted-foreground mt-2">Configure prêmios primeiro</p>}
               {participants.length === 0 && <p className="text-xs text-muted-foreground mt-2">Registre participantes na loja</p>}
             </CardContent>
@@ -430,7 +468,7 @@ const SorteioManager: React.FC = () => {
                           {!w.followsInstagram && 'Instagram'}
                           {!w.followsInstagram && !w.followsTiktok ? ', ' : ''}
                           {!w.followsTiktok && 'TikTok'}
-                          {' — cobrar depois'}
+                          {' — não recebe o prêmio e não será publicado'}
                         </li>
                       ))}
                     </ul>

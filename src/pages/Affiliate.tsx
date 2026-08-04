@@ -6,7 +6,8 @@ import { Button } from '@/components/ui/button';
 import { useUser } from '@/context/UserContext';
 import { useProducts } from '@/context/ProductsContext';
 import { useToast } from '@/hooks/use-toast';
-import { affiliateService, Affiliate, PendingCommission, TIER_CONFIG, AffiliateTier } from '@/services/affiliateService';
+import { affiliateService, TIER_CONFIG } from '@/services/affiliateService';
+import type { AffiliateDashboard, AffiliateTier } from '@/services/affiliateService';
 
 const SITE_URL = 'https://japanexpress-store.com';
 
@@ -14,7 +15,7 @@ const AffiliatePage: React.FC = () => {
   const { user, isAuthenticated } = useUser();
   const { products } = useProducts();
   const { toast } = useToast();
-  const [affiliates, setAffiliates] = useState<Affiliate[]>([]);
+  const [affiliates, setAffiliates] = useState<AffiliateDashboard[]>([]);
   const [pendingByCode, setPendingByCode] = useState<Record<string, { commissionYen: number; netYen: number; orders: number }>>({});
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState<string | null>(null);

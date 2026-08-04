@@ -15,8 +15,13 @@ import { useLanguage } from '@/context/LanguageContext';
 import JapanExpressLogo from '@/components/JapanExpressLogo';
 
 const Footer: React.FC = () => {
-  const { t, selectedCountry } = useLanguage();
+  const { t, selectedCountry, language } = useLanguage();
   const isJapan = selectedCountry === 'Japão';
+  const operatorDisclosure = language === 'ja'
+    ? `${COMPANY_PROFILE.brand}は、${COMPANY_PROFILE.contactName}が日本の${COMPANY_PROFILE.fulfillmentOrigin.formattedJa}から運営する海外向けオンラインストアです。`
+    : language === 'en'
+      ? `${COMPANY_PROFILE.brand} is an international store operated by ${COMPANY_PROFILE.contactName} from ${COMPANY_PROFILE.fulfillmentOrigin.formatted}.`
+      : `${COMPANY_PROFILE.brand} é uma loja internacional operada por ${COMPANY_PROFILE.contactName} a partir de ${COMPANY_PROFILE.fulfillmentOrigin.formatted}.`;
   const { platform, isInstalled, install } = usePWAInstall();
   const [showIOSHint, setShowIOSHint] = useState(false);
 
@@ -40,6 +45,9 @@ const Footer: React.FC = () => {
             </div>
             <p className="text-accent-foreground/80 text-sm leading-relaxed max-w-md">
               {t('footer.description')}
+            </p>
+            <p className="text-accent-foreground/70 text-xs leading-relaxed max-w-md mt-3">
+              {operatorDisclosure}
             </p>
             <div className="flex items-center gap-4 mt-6">
               <a
@@ -179,7 +187,7 @@ const Footer: React.FC = () => {
 
         <div className="border-t border-accent-foreground/10 mt-10 pt-6 flex flex-col sm:flex-row items-center justify-between gap-3">
           <p className="text-sm text-accent-foreground/60">
-            © {new Date().getFullYear()} Japan Express. {t('footer.rights')}
+            © {new Date().getFullYear()} {COMPANY_PROFILE.brand}. {t('footer.rights')}
           </p>
           <div className="flex items-center gap-4 flex-wrap justify-center">
             <Link to="/privacidade" className="text-xs text-accent-foreground/50 hover:text-accent-foreground/80 transition-colors">

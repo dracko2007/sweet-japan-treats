@@ -23,7 +23,7 @@ describe('packedWeightG — peso de envio', () => {
     expect(threeUnits).toBe(1509);
   });
 
-  it('não soma embalagem para produto de 1999g', () => {
+  it('soma embalagem para produto de 1999g', () => {
     const weight = packedWeightG(1999);
     expect(weight).toBe(2199);
   });

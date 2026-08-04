@@ -1,5 +1,5 @@
 import { FieldValue } from 'firebase-admin/firestore';
-import { recordPurchaseDiscount } from './cart-recovery-profile.js';
+import { purchaseDiscountProfileUpdate } from './cart-recovery-profile.js';
 import { adminDb } from './firebase-admin.js';
 import { HttpError } from './http.js';
 
@@ -32,7 +32,7 @@ function extractDiscountPercent(order) {
 
   // Fallback: tenta extrair o número do código `CARRINHO<n>`
   if (typeof order.couponCode === 'string') {
-    const match = order.couponCode.match(/^CARRINHO(\d{1,2})$/i);
+    const match = order.couponCode.match(/^CARRINHO(\d{1,2})(?:-[A-Z0-9]+)?$/i);
     if (match) {
       const extracted = Number(match[1]);
       if (Number.isFinite(extracted)) return extracted;
@@ -70,6 +70,7 @@ export async function fulfillOrder(orderId, { provider, reference, confirmedBy }
     const affiliateRef = order.affiliateCode ? db.collection('affiliates').doc(order.affiliateCode) : null;
     const pendingCommissionRef = order.affiliateCode ? db.collection('affiliate_pending').doc(`${order.affiliateCode}-${orderId}`) : null;
     const negotiationRef = order.negotiationId ? db.collection('negotiations').doc(order.negotiationId) : null;
+    const recoveryProfileRef = order.userId ? db.collection('cart_recovery_profiles').doc(order.userId) : null;
 
     const refs = [
       ...productRefs,
@@ -223,6 +224,13 @@ export async function fulfillOrder(orderId, { provider, reference, confirmedBy }
     if (negotiationRef && byPath.get(negotiationRef.path).exists) {
       transaction.update(negotiationRef, { status: 'used', usedAt: new Date().toISOString(), orderId });
     }
+    if (recoveryProfileRef) {
+      transaction.set(
+        recoveryProfileRef,
+        purchaseDiscountProfileUpdate(extractDiscountPercent(order)),
+        { merge: true },
+      );
+    }
 
     const fulfilledAt = new Date().toISOString();
     transaction.update(orderRef, {
@@ -239,17 +247,6 @@ export async function fulfillOrder(orderId, { provider, reference, confirmedBy }
     return { replay: false, order: { ...order, status: 'confirmed', fulfillmentState: 'fulfilled', fulfilledAt } };
   });
 
-  // Registra o desconto do pedido no perfil de recuperação de carrinho —
-  // só se a compra foi efetivamente confirmada (não é replay de uma tentativa
-  // anterior). Falha de registro não aborta o fluxo de pagamento.
-  if (!result.replay && result.order) {
-    try {
-      const discountPercent = extractDiscountPercent(result.order);
-      await recordPurchaseDiscount(result.order.userId, discountPercent);
-    } catch (error) {
-      console.error('[fulfillment] falha ao registrar desconto no perfil:', error instanceof Error ? error.message : error);
-    }
-  }
 
   return result;
 }

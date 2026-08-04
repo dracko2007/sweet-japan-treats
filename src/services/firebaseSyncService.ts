@@ -1,5 +1,6 @@
 import { safeStorage } from '@/utils/storage';
 import { requestPasswordReset } from '@/services/mailService';
+import { ensureAdminAuth } from '@/utils/adminAuth';
 /**
  * Firebase Sync Service
  * Sincroniza safeStorage com Firestore para acesso multi-dispositivo
@@ -20,7 +21,8 @@ import {
   orderBy,
   limit,
   startAfter,
-  documentId
+  documentId,
+  runTransaction
 } from 'firebase/firestore';
 
 import {
@@ -106,6 +108,113 @@ const sanitizeData = (data: any): any => {
   return data;
 };
 
+type DataRecord = Record<string, unknown>;
+
+const isDataRecord = (value: unknown): value is DataRecord =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const USER_UPDATE_FIELDS = [
+  'name',
+  'phone',
+  'birthdate',
+  'personType',
+  'cpf',
+  'cnpj',
+  'razaoSocial',
+  'document',
+  'gender',
+  'whatsappMarketing',
+  'pushEnabled',
+  'address',
+] as const;
+
+const selectDefinedFields = (
+  data: DataRecord,
+  fields: readonly string[],
+): DataRecord => fields.reduce<DataRecord>((selected, field) => {
+  if (data[field] !== undefined) selected[field] = sanitizeData(data[field]);
+  return selected;
+}, {});
+
+const userAddress = (value: unknown): Record<string, string> => {
+  const address = isDataRecord(value) ? value : {};
+  return {
+    postalCode: String(address.postalCode ?? ''),
+    prefecture: String(address.prefecture ?? ''),
+    city: String(address.city ?? ''),
+    address: String(address.address ?? ''),
+    ...(typeof address.building === 'string' ? { building: address.building } : {}),
+  };
+};
+
+const isWelcomeCoupon = (value: unknown): value is DataRecord =>
+  isDataRecord(value) && value.code === 'BEMVINDO10';
+
+const welcomeCoupons = (value: unknown): DataRecord[] => {
+  const source = Array.isArray(value) ? value.find(isWelcomeCoupon) : undefined;
+  const optional = source
+    ? selectDefinedFields(source, [
+        'id',
+        'description',
+        'expiresAt',
+        'freeShipping',
+        'affiliateCode',
+        'affiliateProductId',
+        'minOrderValue',
+      ])
+    : {};
+  return [{
+    ...optional,
+    code: 'BEMVINDO10',
+    discount: 10,
+    discountType: 'percentage',
+    isUsed: false,
+  }];
+};
+
+const userCreatePayload = (userId: string, userData: DataRecord): DataRecord => {
+  const currentUser = auth.currentUser;
+  if (!currentUser || currentUser.uid !== userId || !currentUser.email) {
+    throw new Error('Authenticated user identity does not match profile');
+  }
+  const optional = selectDefinedFields(userData, [
+    ...USER_UPDATE_FIELDS,
+    'referredBy',
+  ]);
+  return {
+    ...optional,
+    id: currentUser.uid,
+    name: String(userData.name || currentUser.displayName || '').trim(),
+    email: currentUser.email,
+    phone: String(userData.phone || currentUser.phoneNumber || ''),
+    address: userAddress(userData.address),
+    createdAt: typeof userData.createdAt === 'string'
+      ? userData.createdAt
+      : new Date().toISOString(),
+    coupons: welcomeCoupons(userData.coupons),
+    points: 0,
+    birthdayBonusYear: 0,
+    referredTotalBrl: 0,
+    referralRewardPaid: false,
+  };
+};
+
+const userUpdatePayload = (
+  userData: DataRecord,
+  existingData: DataRecord,
+): DataRecord => {
+  const payload = selectDefinedFields(userData, USER_UPDATE_FIELDS);
+  if (
+    !Object.prototype.hasOwnProperty.call(existingData, 'referredBy')
+    && typeof userData.referredBy === 'string'
+    && userData.referredBy.trim()
+  ) {
+    payload.referredBy = userData.referredBy.trim();
+  }
+  if (Object.keys(payload).length > 0) payload.lastSyncAt = new Date().toISOString();
+  return payload;
+};
+
 export type OrderPageCursor = string;
 
 export interface OrderPage<T = any> {
@@ -156,19 +265,20 @@ export const firebaseSyncService = {
   /**
    * Sincroniza usuário do safeStorage para Firestore
    */
-  async syncUserToFirestore(userId: string, userData: any) {
+  async syncUserToFirestore(userId: string, userData: unknown) {
     try {
       ensureFirebaseReady();
+      if (!isDataRecord(userData)) throw new Error('Invalid user profile');
       const userRef = doc(db, 'users', userId);
-      // Remove senha antes de enviar ao Firestore (nunca persistir credencial).
-      const { password: _pw, ...safeData } = userData as any;
-      const cleanData = sanitizeData(safeData);
+      const userSnap = await getDoc(userRef);
 
-      await setDoc(userRef, {
-        ...cleanData,
-        lastSyncAt: new Date().toISOString()
-      }, { merge: true });
-      
+      if (!userSnap.exists()) {
+        await setDoc(userRef, userCreatePayload(userId, userData));
+      } else {
+        const payload = userUpdatePayload(userData, userSnap.data());
+        if (Object.keys(payload).length > 0) await updateDoc(userRef, payload);
+      }
+
       devLog('✅ [FIREBASE] User synced:', userId);
       return true;
     } catch (error) {
@@ -222,11 +332,19 @@ export const firebaseSyncService = {
    */
   async addPointsToUserByEmail(email: string, amount: number): Promise<{ success: boolean; total?: number; error?: string }> {
     try {
+      await ensureAdminAuth();
       ensureFirebaseReady();
       const u: any = await this.getUserByEmail(email);
       if (!u?.id) return { success: false, error: 'Cliente não encontrado no Firestore' };
-      const total = Math.max(0, (Number(u.points) || 0) + amount);
-      await updateDoc(doc(db, 'users', u.id), { points: total });
+      const userRef = doc(db, 'users', u.id);
+      const total = await runTransaction(db, async (transaction) => {
+        const snapshot = await transaction.get(userRef);
+        if (!snapshot.exists()) throw new Error('Cliente não encontrado no Firestore');
+        const current = Number(snapshot.data()?.points || 0);
+        const next = Math.max(0, (Number.isFinite(current) ? current : 0) + amount);
+        transaction.update(userRef, { points: next });
+        return next;
+      });
       return { success: true, total };
     } catch (error: any) {
       devError('❌ [FIREBASE] addPointsToUserByEmail:', error);
@@ -240,6 +358,7 @@ export const firebaseSyncService = {
    */
   async setSocialFollowByEmail(email: string, network: 'instagram' | 'tiktok', follow: boolean): Promise<{ success: boolean; error?: string }> {
     try {
+      await ensureAdminAuth();
       ensureFirebaseReady();
       const u = await this.getUserByEmail(email);
       if (!u?.id) return { success: false, error: 'Cliente não encontrado no Firestore' };
@@ -472,6 +591,7 @@ export const firebaseSyncService = {
    */
   async deleteUserByEmail(email: string) {
     try {
+      await ensureAdminAuth();
       ensureFirebaseReady();
       const usersRef = collection(db, 'users');
       const q = query(usersRef, where('email', '==', email));
@@ -491,6 +611,7 @@ export const firebaseSyncService = {
    */
   async clearUserOrdersByEmail(email: string) {
     try {
+      await ensureAdminAuth();
       ensureFirebaseReady();
       const usersRef = collection(db, 'users');
       const q = query(usersRef, where('email', '==', email));
@@ -510,6 +631,7 @@ export const firebaseSyncService = {
    */
   async deleteAllUsersFromFirestore() {
     try {
+      await ensureAdminAuth();
       ensureFirebaseReady();
       const snap = await getDocs(collection(db, 'users'));
       await Promise.all(snap.docs.map((d) => deleteDoc(doc(db, 'users', d.id))));
@@ -526,6 +648,7 @@ export const firebaseSyncService = {
    */
   async deleteAllOrdersFromFirestore() {
     try {
+      await ensureAdminAuth();
       ensureFirebaseReady();
       const snap = await getDocs(collection(db, 'orders'));
       await Promise.all(snap.docs.map((d) => deleteDoc(doc(db, 'orders', d.id))));
@@ -544,6 +667,7 @@ export const firebaseSyncService = {
    */
   async grantCouponToUserByEmail(email: string, coupon: any) {
     try {
+      await ensureAdminAuth();
       ensureFirebaseReady();
       const usersRef = collection(db, 'users');
       const q = query(usersRef, where('email', '==', email));
@@ -573,6 +697,7 @@ export const firebaseSyncService = {
    */
   async grantCouponToAllUsers(coupon: any) {
     try {
+      await ensureAdminAuth();
       ensureFirebaseReady();
       const snap = await getDocs(collection(db, 'users'));
       let granted = 0;
@@ -775,39 +900,68 @@ export const firebaseSyncService = {
    */
   async migrateLocalStorageToFirestore() {
     try {
+      await ensureAdminAuth();
+      ensureFirebaseReady();
       devLog('🔄 [FIREBASE] Starting migration from safeStorage...');
-      
+
       const usersData = safeStorage.getItem('japan-express-users');
-      if (!usersData) {
-        devLog('⚠️ [FIREBASE] No users in safeStorage to migrate');
-        return { success: true, migrated: 0 };
-      }
-      
+      if (!usersData) return { success: true, migrated: 0, orders: 0 };
+
       const users = JSON.parse(usersData);
+      if (!isDataRecord(users)) throw new Error('Invalid local users backup');
+
+      const migrationFields = [
+        ...USER_UPDATE_FIELDS,
+        'createdAt',
+        'coupons',
+        'points',
+        'birthdayBonusYear',
+        'referredBy',
+        'referredTotalBrl',
+        'referralRewardPaid',
+        'socialFollows',
+        'affiliateCode',
+        'lastSyncAt',
+      ] as const;
       let migratedCount = 0;
-      
+      let migratedOrders = 0;
+
       for (const [email, userData] of Object.entries(users)) {
-        const userObj = userData as Record<string, any>;
-        const userId = userObj.id || `user-${Date.now()}-${Math.random()}`;
-        
-        // Sincroniza usuário
-        await this.syncUserToFirestore(userId, {
-          ...userObj,
-          email
-        });
-        
-        // Sincroniza pedidos do usuário
-        if (userObj.orders && Array.isArray(userObj.orders)) {
-          for (const order of userObj.orders) {
-            await this.syncOrderToFirestore(userId, order);
+        if (!isDataRecord(userData)) continue;
+        const userId = typeof userData.id === 'string' && userData.id.trim()
+          ? userData.id.trim()
+          : `user-${Date.now()}-${migratedCount}`;
+        const normalizedEmail = email.trim().toLowerCase();
+        const userPayload = selectDefinedFields(userData, migrationFields);
+
+        await setDoc(doc(db, 'users', userId), {
+          ...userPayload,
+          id: userId,
+          email: normalizedEmail,
+          migratedAt: new Date().toISOString(),
+        }, { merge: true });
+
+        if (Array.isArray(userData.orders)) {
+          for (const rawOrder of userData.orders) {
+            if (!isDataRecord(rawOrder)) continue;
+            const orderNumber = String(
+              rawOrder.orderNumber || rawOrder.id || `order-${userId}-${migratedOrders}`,
+            );
+            const migrated = await this.syncOrderToFirestore(userId, {
+              ...rawOrder,
+              orderNumber,
+              customerEmail: normalizedEmail,
+            });
+            if (!migrated) throw new Error(`Failed to migrate order ${orderNumber}`);
+            migratedOrders += 1;
           }
         }
-        
-        migratedCount++;
+
+        migratedCount += 1;
       }
-      
+
       devLog(`✅ [FIREBASE] Migration complete! ${migratedCount} users migrated`);
-      return { success: true, migrated: migratedCount };
+      return { success: true, migrated: migratedCount, orders: migratedOrders };
     } catch (error) {
       devError('❌ [FIREBASE] Migration error:', error);
       return { success: false, error };
@@ -817,6 +971,7 @@ export const firebaseSyncService = {
   // Zera pedidos, pontos e cupons de todos os usuários — mantém contas e produtos.
   async unlinkAffiliateFromUser(email: string): Promise<{ success: boolean; error?: string }> {
     try {
+      await ensureAdminAuth();
       ensureFirebaseReady();
       const snap = await getDocs(query(collection(db, 'users'), where('email', '==', email)));
       if (snap.empty) return { success: false, error: 'Usuário não encontrado' };
@@ -836,8 +991,6 @@ export const firebaseSyncService = {
   async resetAllPoints(): Promise<{ success: boolean; users: number; error?: string }> {
     try {
       ensureFirebaseReady();
-      // Garante auth de admin antes de escrever
-      const { ensureAdminAuth } = await import('@/utils/adminAuth');
       await ensureAdminAuth();
       const snap = await getDocs(collection(db, 'users'));
       const results = await Promise.allSettled(
@@ -863,6 +1016,7 @@ export const firebaseSyncService = {
   },
 
   async resetAllUsersData(): Promise<{ success: boolean; users: number; error?: unknown }> {
+    await ensureAdminAuth();
     ensureFirebaseReady();
     const snap = await getDocs(collection(db, 'users'));
     await Promise.all(snap.docs.map((d) =>
@@ -875,6 +1029,7 @@ export const firebaseSyncService = {
   // Apaga toda a coleção coupon_usage (histórico de uso de cupons).
   async deleteAllCouponUsage(): Promise<boolean> {
     try {
+      await ensureAdminAuth();
       ensureFirebaseReady();
       const snap = await getDocs(collection(db, 'coupon_usage'));
       await Promise.all(snap.docs.map((d) => deleteDoc(d.ref)));

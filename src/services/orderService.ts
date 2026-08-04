@@ -106,25 +106,41 @@ export const orderService = {
   },
 
 
-  // Update order status (both Firestore and safeStorage)
-  updateOrderStatus: async (orderNumber: string, status: OrderStatus['status']): Promise<boolean> => {
+  // Atualiza o status no Firestore e no armazenamento local.
+  updateOrderStatus: async (
+    orderNumber: string,
+    status: OrderStatus['status'],
+    options: { customerConfirmation?: boolean } = {}
+  ): Promise<boolean> => {
     let updated = false;
 
-    // Update in Firestore
-    try {
-      await ensureAdminAuth();
-      await firebaseSyncService.updateOrderStatus(orderNumber, status);
+    if (status === 'delivered' && options.customerConfirmation) {
+      const response = await authenticatedFetch('/api/orders?action=mark-received', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId: orderNumber }),
+      });
+      const payload = await response.json().catch(() => ({})) as { error?: string };
+      if (!response.ok) {
+        throw new Error(payload.error || 'Não foi possível confirmar o recebimento.');
+      }
       updated = true;
-    } catch (err) {
-      devError('❌ [ORDER] Firestore status update failed:', err);
+    } else {
+      // Os demais status continuam restritos ao fluxo administrativo existente.
+      try {
+        await ensureAdminAuth();
+        await firebaseSyncService.updateOrderStatus(orderNumber, status);
+        updated = true;
+      } catch (err) {
+        devError('❌ [ORDER] Firestore status update failed:', err);
+      }
     }
 
-    // Also update in safeStorage
     const users = JSON.parse(safeStorage.getItem('japan-express-users') || '{}');
     Object.keys(users).forEach((email) => {
       const user = users[email];
       if (user.orders && user.orders.length > 0) {
-        user.orders.forEach((order: any, orderIndex: number) => {
+        user.orders.forEach((order, orderIndex: number) => {
           if (order.orderNumber === orderNumber) {
             users[email].orders[orderIndex].status = status;
             users[email].orders[orderIndex].updatedAt = new Date().toISOString();

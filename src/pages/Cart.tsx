@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { ShoppingBag, ArrowRight, Trash2, Tag, ShieldCheck, Sparkles } from 'lucide-react';
+import { ShoppingBag, ArrowRight, Trash2, Tag, ShieldCheck, Sparkles, AlertCircle } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import CartItemComponent from '@/components/cart/CartItem';
 import { Button } from '@/components/ui/button';
@@ -18,6 +18,7 @@ import { couponService as globalCouponService } from '@/services/couponService';
 import { promoCampaignService } from '@/services/promoCampaignService';
 import { safeStorage } from '@/utils/storage';
 import WelcomeCouponBanner from '@/components/WelcomeCouponBanner';
+import { taxDisclosure } from '../../shared/tax-disclosure.js';
 
 // Converte um afiliado num "cupom" aplicável (carrega o código para gerar comissão)
 const affiliateToCoupon = (aff: Affiliate, productId?: string | null): Coupon => ({
@@ -35,7 +36,7 @@ const affiliateToCoupon = (aff: Affiliate, productId?: string | null): Coupon =>
 const Cart: React.FC = () => {
   const { items, clearCart, addToCart } = useCart();
   const { products } = useProducts();
-  const { t, selectedCountry, setSelectedCountry } = useLanguage();
+  const { t, language, selectedCountry, setSelectedCountry } = useLanguage();
   const { isAuthenticated, validateProfileCoupon, coupons, user } = useUser();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -270,14 +271,11 @@ const Cart: React.FC = () => {
   let taxLabel = '';
   
   if (selectedCountry === 'Brasil') {
-    const isBelow50USD = subtotalWithDiscount < 250;
-    federalTax = isBelow50USD
-      ? subtotalWithDiscount * 0.20
-      : (subtotalWithDiscount * 0.60) - 62.50;
-      
-    icmsTax = (subtotalWithDiscount + federalTax) * 0.17;
-    estimatedTax = federalTax + icmsTax;
-    taxLabel = 'Imposto de Importação Estimado (Brasil)';
+    // Brazil import taxes subject to customs authority determination — no numeric estimate displayed
+    federalTax = 0;
+    icmsTax = 0;
+    estimatedTax = 0;
+    taxLabel = '';
   } else if (isEuro) {
     const rates: Record<string, number> = { Portugal: 0.23, França: 0.20, Itália: 0.22, Espanha: 0.21 };
     const rate = rates[selectedCountry] || 0.20;
@@ -382,24 +380,16 @@ const Cart: React.FC = () => {
                   );
                 })}
 
-                {/* Remessa Conforme Trust Badge Info Banner for Brazil */}
-                {selectedCountry === 'Brasil' && (
-                  <div className="bg-pink-50 border border-pink-200 rounded-xl p-4 flex items-start gap-3 mt-6">
-                    <ShieldCheck className="w-6 h-6 text-pink-600 shrink-0 mt-0.5" />
+                {/* Customs notice for international orders */}
+                {selectedCountry !== 'Japão' && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3 mt-6">
+                    <AlertCircle className="w-6 h-6 text-amber-600 shrink-0 mt-0.5" />
                     <div>
-                      <h4 className="font-sans font-bold text-sm text-orange-800 flex items-center gap-1.5">
-                        Alíquota do Remessa Conforme Atualizada (2026)
+                      <h4 className="font-sans font-bold text-sm text-amber-800">
+                        {taxDisclosure(language).title}
                       </h4>
-                      <p className="text-xs text-pink-700 mt-1 leading-relaxed">
-                        {subtotalWithDiscount < 250 ? (
-                          <span>
-                            <strong>Taxação de 20% + ICMS inclusa:</strong> Conforme a nova legislação brasileira, compras internacionais de até <strong>R$ 250,00</strong> pagam 20% de Imposto de Importação Federal + 17% de ICMS Estadual. Todos os impostos já estão calculados no carrinho para evitar surpresas na alfândega dos Correios.
-                          </span>
-                        ) : (
-                          <span>
-                            <strong>Atenção:</strong> Seu pedido ultrapassou R$ 250,00. Para compras acima de R$ 250, aplica-se a alíquota de <strong>60% de Imposto de Importação Federal</strong> (com abatimento de R$ 62,50) + 17% de ICMS. Considere dividir o seu pedido em dois carrinhos separados de até R$ 250 cada para aproveitar a alíquota reduzida de 20%!
-                          </span>
-                        )}
+                      <p className="text-xs text-amber-700 mt-1 leading-relaxed">
+                        {taxDisclosure(language).body}
                       </p>
                     </div>
                   </div>

@@ -8,7 +8,7 @@ import type { Product } from '@/types';
 /** Peso usado para frete: weightGrams + embalagem real, ou 500g base. */
 export function catalogWeightG(product: Product): number {
   if (product.weightGrams && product.weightGrams > 0) return packedWeightG(product.weightGrams);
-  return 500;
+  return packedWeightG(500);
 }
 
 /** Frete mais barato em ¥ para o peso e zona. Retorna 0 se fora de faixa. */

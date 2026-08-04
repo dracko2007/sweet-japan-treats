@@ -108,9 +108,9 @@ describe('no que o ponto pode ser gasto', () => {
   });
 });
 
-// A taxa é a margem do serviço. Descontar a taxa E aceitar ponto no lugar do
-// produto produz um pedido que não paga nem a mercadoria nem o trabalho.
-describe('pontos com taxa de personal shopper negociada', () => {
+// A taxa é a margem do serviço. Ela volta ao valor cheio somente quando os
+// pontos cobrem toda a mercadoria; resgate parcial não perde benefícios.
+describe('pontos com benefício na taxa de personal shopper', () => {
   const negociacaoAprovada = {
     type: 'ps_fee',
     status: 'approved',
@@ -118,35 +118,39 @@ describe('pontos com taxa de personal shopper negociada', () => {
     approvedDiscountYen: 1500,
   };
 
-  it('recusa a combinação em vez de descartar um dos dois em silêncio', () => {
-    expect(() => pedido({ redeemPoints: 2000, negotiation: negociacaoAprovada }))
-      .toThrowError(expect.objectContaining({ statusCode: 409, code: 'points_with_ps_negotiation' }));
-  });
-
-  it('a taxa negociada sozinha continua valendo', () => {
-    const q = pedido({ negotiation: negociacaoAprovada });
-
-    expect(q.psFeeYen).toBe(500); // ¥2.000 − ¥1.500 negociados
-    expect(q.earnedPoints).toBe(100);
-  });
-
-  it('os pontos sozinhos continuam valendo', () => {
-    const q = pedido({ redeemPoints: 2000 });
-
+  it('resgate parcial convive com a taxa negociada', () => {
+    const q = pedido({ redeemPoints: 2000, negotiation: negociacaoAprovada });
     expect(q.redeemPoints).toBe(2000);
+    expect(q.psFeeYen).toBe(500);
+  });
+
+  it('pontos que zeram a mercadoria restauram a taxa cheia', () => {
+    const q = pedido({ redeemPoints: 10000, negotiation: negociacaoAprovada });
+    expect(q.netProductsYen).toBe(0);
     expect(q.psFeeYen).toBe(2000);
   });
 
-  // Só a taxa é exclusiva com pontos. Frete negociado não tem esse conflito.
+  it('oferta de saída zera a taxa quando ainda há mercadoria a pagar', () => {
+    const q = pedido({ redeemPoints: 2000, psFeeWaived: true });
+    expect(q.netProductsYen).toBeGreaterThan(0);
+    expect(q.psFeeYen).toBe(0);
+    expect(q.psFeeWaiverApplied).toBe(true);
+  });
+
+  it('oferta de saída não zera a taxa quando pontos cobrem tudo', () => {
+    const q = pedido({ redeemPoints: 10000, psFeeWaived: true });
+    expect(q.netProductsYen).toBe(0);
+    expect(q.psFeeYen).toBe(2000);
+    expect(q.psFeeWaiverApplied).toBe(false);
+  });
+
+  // Só a taxa PS é protegida. Frete negociado continua convivendo com pontos.
   it('desconto negociado no frete convive com pontos', () => {
     const q = pedido({
       redeemPoints: 2000,
       negotiation: { type: 'shipping', status: 'approved', approvedBy: 'admin-uid', approvedDiscountYen: 500 },
     });
-
     expect(q.redeemPoints).toBe(2000);
-    // 2 × 300g cadastrados + 200g de embalagem cada = 1.000g → faixa EMS de
-    // ¥5.100 (ver `shared/weight.js`); menos os ¥500 negociados.
     expect(q.shippingYen).toBe(4600);
   });
 });

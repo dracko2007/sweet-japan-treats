@@ -13,10 +13,28 @@
 import { detectBrand } from '../shared/brand.js';
 import { packedWeightG } from '../shared/weight.js';
 import { minEffectiveYen, variantPrices } from '../shared/pricing.js';
+import { taxDisclosure } from '../shared/tax-disclosure.js';
 import { fetchProducts, escapeXml, isVisibleInternationally } from './_lib/firestore-products.js';
 import { convertYen as convertYenFx, getFxRates } from './_lib/fx.js';
 
 const SITE_URL = 'https://www.japanexpress-store.com';
+
+// Idioma do aviso por região do feed. `eu` é o feed em euro, servido em
+// português porque Portugal encabeça REGION_COUNTRIES.eu.
+const DISCLOSURE_LANG = { br: 'pt', eu: 'pt', us: 'en' };
+
+export function feedDisclosure(region) {
+  return taxDisclosure(DISCLOSURE_LANG[region] || 'pt').body;
+}
+
+// Descrição do item = texto do produto + aviso, dentro dos 5000 caracteres do
+// Merchant. O corte é feito no texto do produto, nunca no aviso: aviso truncado
+// não divulga nada.
+export function merchantDescription(description, region) {
+  const disclosure = feedDisclosure(region);
+  const source = String(description || '').slice(0, 5000 - disclosure.length - 1).trimEnd();
+  return `${source} ${disclosure}`.trim();
+}
 
 // A conversão é a MESMA de `_lib/fx.js`, que também serve o checkout: Wise →
 // open-er-api → taxa fixa, cushion de 4% fora da Wise, buffer de ¥5.
@@ -75,7 +93,7 @@ function cheapestShippingYen(weightG, zone) {
 // Peso usado para frete: weightGrams + embalagem real, ou estimativa por tamanho
 function productWeightG(p) {
   if (p.weightGrams && p.weightGrams > 0) return packedWeightG(p.weightGrams);
-  return 500; // base padrão
+  return packedWeightG(500);
 }
 
 // Países de destino por região do feed (ISO Merchant + zona Japan Post).
@@ -95,15 +113,107 @@ const REGION_COUNTRIES = {
   ],
 };
 
-// google_product_category pela categoria da loja, usando a taxonomia oficial:
-//   469  Saúde e beleza
-//   422  Alimentos, bebidas e tabaco > Alimentos
-//     2  Animais e pet shop > Suprimentos para animais de estimação
-// `doces` recebe 422 (o pai) em vez de 4748 (Doces e chocolates) porque a
-// categoria mistura curry, maionese, ramen e chá — 4748 seria falso para 31 dos
-// 72 itens, e categoria errada é motivo de reprovação.
+// Categoria ampla por departamento da loja. Produtos com identidade inequívoca
+// recebem uma categoria mais profunda em `classifyMerchantProduct`.
 export const GOOGLE_CATEGORY = { cosmeticos: 469, doces: 422, pet: 2 };
 const DEFAULT_CATEGORY = 469;
+
+const HAIR_CATEGORY = {
+  care: 486,
+  kit: 8452,
+  shampoo: 543615,
+  conditioner: 543616,
+  shampooConditionerSet: 543617,
+};
+
+const HAIR_PRODUCT_TYPE_BR = {
+  care: 'Saúde e Beleza > Cuidados Pessoais > Cuidados com os Cabelos > Tratamentos Capilares',
+  mask: 'Saúde e Beleza > Cuidados Pessoais > Cuidados com os Cabelos > Máscaras Capilares',
+  oil: 'Saúde e Beleza > Cuidados Pessoais > Cuidados com os Cabelos > Óleos e Séruns Capilares',
+  kit: 'Saúde e Beleza > Cuidados Pessoais > Cuidados com os Cabelos > Kits de Cuidados com os Cabelos',
+  shampoo: 'Saúde e Beleza > Cuidados Pessoais > Cuidados com os Cabelos > Xampus',
+  conditioner: 'Saúde e Beleza > Cuidados Pessoais > Cuidados com os Cabelos > Condicionadores',
+  shampooConditionerSet: 'Saúde e Beleza > Cuidados Pessoais > Cuidados com os Cabelos > Conjuntos de Xampu e Condicionador',
+};
+
+function normalizedProductIdentity(p) {
+  return [p.name, ...(Array.isArray(p.tags) ? p.tags : [])]
+    .filter(Boolean)
+    .join(' ')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+}
+
+export function classifyMerchantProduct(p, region = 'br') {
+  const fallbackCategory = GOOGLE_CATEGORY[p.category] || DEFAULT_CATEGORY;
+  if (p.category !== 'cosmeticos') return { googleCategory: fallbackCategory };
+
+  const identity = normalizedProductIdentity(p);
+  const hasShampoo = /\b(shampoo|xampu)\b/.test(identity);
+  const hasConditioner = /\b(conditioner|condicionador)\b/.test(identity);
+  const isMask = /\b(hair mask|hair pack|mascara capilar|mascara para cabelos?)\b/.test(identity);
+  const isOil = /\b(hair oil|hair serum|oleo capilar|serum capilar|essencia capilar)\b/.test(identity);
+  const isOtherHairCare = /\b(hair treatment|tratamento capilar|couro cabeludo|scalp)\b/.test(identity);
+  const isHairKit = /\bkit\b/.test(identity)
+    && (hasShampoo || hasConditioner || isMask || isOil || isOtherHairCare);
+  const productType = region === 'br' ? HAIR_PRODUCT_TYPE_BR : {};
+
+  if (hasShampoo && hasConditioner) {
+    return {
+      googleCategory: HAIR_CATEGORY.shampooConditionerSet,
+      productType: productType.shampooConditionerSet,
+    };
+  }
+  if (isHairKit) {
+    return { googleCategory: HAIR_CATEGORY.kit, productType: productType.kit };
+  }
+  if (hasShampoo) {
+    return { googleCategory: HAIR_CATEGORY.shampoo, productType: productType.shampoo };
+  }
+  if (hasConditioner) {
+    return { googleCategory: HAIR_CATEGORY.conditioner, productType: productType.conditioner };
+  }
+  if (isMask || isOil || isOtherHairCare) {
+    return {
+      googleCategory: HAIR_CATEGORY.care,
+      productType: isMask ? productType.mask : isOil ? productType.oil : productType.care,
+    };
+  }
+  return { googleCategory: fallbackCategory };
+}
+
+function merchantImageUrl(url) {
+  if (typeof url !== 'string' || !/^https?:\/\//.test(url)) return '';
+  let image = url;
+  if (image.includes('res.cloudinary.com')) {
+    image = image.replace(/\/upload\/(?:[a-z]{1,3}_[^/]*\/)?/, '/upload/f_jpg,q_auto:best/');
+    image = image.replace(/\.webp(\?.*)?$/i, '.jpg$1');
+  }
+  return image;
+}
+
+export function merchantImagesForProduct(p) {
+  const candidates = [
+    p.image,
+    ...(Array.isArray(p.gallery) ? p.gallery : []),
+  ];
+  const images = [];
+  const seen = new Set();
+  for (const candidate of candidates) {
+    const image = merchantImageUrl(candidate);
+    if (!image || seen.has(image)) continue;
+    seen.add(image);
+    images.push(image);
+    if (images.length === 11) break; // principal + até 10 additional_image_link
+  }
+  // Thumbnail é reduzida para cards; use apenas quando não existir foto completa.
+  if (images.length === 0) {
+    const thumbnail = merchantImageUrl(p.thumbnail);
+    if (thumbnail) images.push(thumbnail);
+  }
+  return images;
+}
 
 // ── Monta os itens do catálogo ───────────────────────────────────────────────
 function buildCatalog(products, region, rates) {
@@ -119,19 +229,11 @@ function buildCatalog(products, region, rates) {
       const productYen = minEffectiveYen(p);
       if (!productYen) return null;
 
-      // Imagem: só URLs http(s) válidas. Google rejeita base64/data-URI e WebP.
-      // Procura a primeira imagem que seja URL http (ignora base64 salvo no Firestore).
-      const candidates = [p.image, p.thumbnail, ...(p.gallery || [])].filter(Boolean);
-      let image = candidates.find(u => typeof u === 'string' && /^https?:\/\//.test(u)) || '';
-      if (image.includes('res.cloudinary.com')) {
-        // Força entrega JPG E troca a extensão .webp → .jpg (Google valida pela extensão da URL).
-        // O grupo opcional só casa um segmento de transformação (`x_y`), então
-        // versão (`v123`) e pastas ficam intactas — descartá-las geraria uma URL
-        // 404 e o Google derrubaria o produto do feed.
-        image = image.replace(/\/upload\/(?:[a-z]{1,3}_[^/]*\/)?/, '/upload/f_jpg,q_auto:best/');
-        image = image.replace(/\.webp(\?.*)?$/i, '.jpg$1');
-      }
-      if (!image) return null; // sem URL http válida → fora do feed
+      // Imagem principal + imagens adicionais públicas em JPG. Base64/data-URI
+      // e duplicatas ficam de fora; o Merchant aceita até 10 imagens adicionais.
+      const images = merchantImagesForProduct(p);
+      const image = images[0] || '';
+      if (!image) return null;
 
       const weightG = productWeightG(p);
       const shipYen = cheapestShippingYen(weightG, zone) || 0;
@@ -143,17 +245,22 @@ function buildCatalog(products, region, rates) {
         priceLocal: convertYenFx(cheapestShippingYen(weightG, c.zone) || 0, currency, rates),
       }));
 
+      const classification = classifyMerchantProduct(p, region);
+      const link = `${SITE_URL}/produto/${p.id}`;
       return {
         id: p.id,
         gtin: p.gtin || undefined,
-        title: p.name.slice(0, 150),
-        description: (p.description || p.name).slice(0, 5000),
-        link: `${SITE_URL}/produto/${p.id}`,
+        title: String(p.name || p.id).replace(/\s+/g, ' ').trim().slice(0, 150),
+        description: merchantDescription(p.description || p.name || p.id, region),
+        link,
+        canonicalLink: link,
         image,
+        additionalImages: images.slice(1),
         availability: (p.stock && !p.stock.unlimited && p.stock.quantity === 0) ? 'out_of_stock' : 'in_stock',
         condition: 'new',
         brand: detectBrand(p.name),
-        googleCategory: GOOGLE_CATEGORY[p.category] || DEFAULT_CATEGORY,
+        googleCategory: classification.googleCategory,
+        productType: classification.productType,
         weightG,
         priceYen: productYen,
         shippingYen: shipYen,
@@ -195,18 +302,25 @@ function toXml(items, region) {
       <g:brand>${escapeXml(it.brand)}</g:brand>
       <g:identifier_exists>yes</g:identifier_exists>`
       : `      <g:identifier_exists>no</g:identifier_exists>`;
+    const additionalImageBlocks = (it.additionalImages || []).map(image => `
+      <g:additional_image_link>${escapeXml(image)}</g:additional_image_link>`).join('');
+    const productTypeBlock = it.productType
+      ? `
+      <g:product_type>${escapeXml(it.productType)}</g:product_type>`
+      : '';
     return `
     <item>
       <g:id>${escapeXml(it.id)}</g:id>
       <title>${escapeXml(it.title)}</title>
       <description>${escapeXml(it.description)}</description>
       <link>${escapeXml(it.link)}</link>
-      <g:image_link>${escapeXml(it.image)}</g:image_link>
+      <g:canonical_link>${escapeXml(it.canonicalLink)}</g:canonical_link>
+      <g:image_link>${escapeXml(it.image)}</g:image_link>${additionalImageBlocks}
       <g:availability>${it.availability}</g:availability>
       <g:condition>new</g:condition>
       <g:price>${it.priceLocal.toFixed(2)} ${it.currency}</g:price>
 ${identifierBlock}
-      <g:google_product_category>${it.googleCategory}</g:google_product_category>${shippingBlocks}
+      <g:google_product_category>${it.googleCategory}</g:google_product_category>${productTypeBlock}${shippingBlocks}
       <g:shipping_weight>${(it.weightG / 1000).toFixed(2)} kg</g:shipping_weight>
       <g:custom_label_0>${it.totalLocal.toFixed(2)} ${it.currency}</g:custom_label_0>
     </item>`;
@@ -217,7 +331,7 @@ ${identifierBlock}
   <channel>
     <title>${escapeXml(title)}</title>
     <link>${SITE_URL}</link>
-    <description>Produtos importados do Japão com preço e frete estimado por peso.</description>${entries}
+    <description>${escapeXml(feedDisclosure(region))}</description>${entries}
   </channel>
 </rss>`;
 }

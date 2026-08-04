@@ -20,9 +20,9 @@ import {
   YEN_PER_POINT,
 } from '../../shared/points.js';
 import { db } from '@/config/firebase';
-import { collection, doc, getDoc, getDocs, setDoc, deleteDoc, updateDoc } from 'firebase/firestore';
+import { collection, deleteDoc, doc, getDoc, getDocs, runTransaction, setDoc, updateDoc } from 'firebase/firestore';
 import { safeStorage } from '@/utils/storage';
-import { firebaseSyncService } from '@/services/firebaseSyncService';
+import { ensureAdminAuth } from '@/utils/adminAuth';
 
 const isDev = import.meta.env.DEV;
 const devLog = isDev ? console.log.bind(console) : () => {};
@@ -45,7 +45,7 @@ export interface VideoReview {
   id: string;
   userId: string;
   userName: string;
-  userEmail?: string;
+  userEmail: string;
   productId: string;
   productName: string;
   videoUrl: string;
@@ -80,9 +80,21 @@ export const pointsService = {
   POINTS,
 
   /** Cliente envia um vídeo de review para validação (1 por produto). */
-  async submitVideo(entry: Omit<VideoReview, 'id' | 'status' | 'submittedAt'>): Promise<{ ok: boolean; error?: string }> {
+  async submitVideo(entry: Omit<VideoReview, 'id' | 'status' | 'submittedAt' | 'minutes' | 'pointsAwarded'>): Promise<{ ok: boolean; error?: string }> {
     const id = `vr-${entry.userId}-${entry.productId}`; // 1 por usuário+produto
-    const rec: VideoReview = { ...entry, id, status: 'pending', submittedAt: new Date().toISOString() };
+    const rec: VideoReview = {
+      id,
+      userId: entry.userId,
+      userName: entry.userName,
+      userEmail: entry.userEmail,
+      productId: entry.productId,
+      productName: entry.productName,
+      videoUrl: entry.videoUrl,
+      status: 'pending',
+      submittedAt: new Date().toISOString(),
+      minutes: 0,
+      pointsAwarded: 0,
+    };
     // cache local
     const local = readLocal().filter((v) => v.id !== id);
     local.push(rec);
@@ -91,9 +103,9 @@ export const pointsService = {
     try {
       await setDoc(doc(db, COL, id), rec);
       return { ok: true };
-    } catch (e: any) {
+    } catch (e: unknown) {
       devWarn('[points] submitVideo falhou:', e);
-      return { ok: false, error: e?.message };
+      return { ok: false, error: e instanceof Error ? e.message : 'Falha ao enviar vídeo' };
     }
   },
 
@@ -122,18 +134,47 @@ export const pointsService = {
     }
   },
 
-  /** Admin aprova: concede pontos pela duração e marca como aprovado. */
+  /** Admin aprova e credita pontos atomicamente; repetir a ação não duplica crédito. */
   async approveVideo(v: VideoReview, minutes: number): Promise<{ ok: boolean; points: number; error?: string }> {
-    const points = pointsForVideoMinutes(minutes);
+    const approvedMinutes = Math.min(180, Math.max(1, Math.floor(Number(minutes) || 1)));
+    const points = pointsForVideoMinutes(approvedMinutes);
     try {
-      await this.awardPointsToUser(v.userId, points);
-      if (db) {
-        await updateDoc(doc(db, COL, v.id), { status: 'approved', minutes, pointsAwarded: points });
-      }
-      writeLocal(readLocal().map((x) => (x.id === v.id ? { ...x, status: 'approved', minutes, pointsAwarded: points } : x)));
-      return { ok: true, points };
-    } catch (e: any) {
-      return { ok: false, points: 0, error: e?.message };
+      if (!db) throw new Error('Firebase indisponível');
+      await ensureAdminAuth();
+      let creditedPoints = points;
+      await runTransaction(db, async (transaction) => {
+        const videoRef = doc(db, COL, v.id);
+        const videoSnapshot = await transaction.get(videoRef);
+        if (!videoSnapshot.exists()) throw new Error('Vídeo não encontrado');
+
+        const video = videoSnapshot.data() as VideoReview;
+        if (video.status === 'approved') {
+          creditedPoints = Number(video.pointsAwarded || 0);
+          return;
+        }
+        if (video.status !== 'pending') throw new Error('Vídeo não está pendente');
+
+        const userRef = doc(db, 'users', video.userId);
+        const userSnapshot = await transaction.get(userRef);
+        if (!userSnapshot.exists()) throw new Error('Usuário não encontrado');
+        const current = Number(userSnapshot.data()?.points || 0);
+        const currentPoints = Number.isFinite(current) ? Math.max(0, current) : 0;
+
+        transaction.update(userRef, { points: currentPoints + points });
+        transaction.update(videoRef, {
+          status: 'approved',
+          minutes: approvedMinutes,
+          pointsAwarded: points,
+        });
+      });
+      writeLocal(readLocal().map((entry) => (
+        entry.id === v.id
+          ? { ...entry, status: 'approved', minutes: approvedMinutes, pointsAwarded: creditedPoints }
+          : entry
+      )));
+      return { ok: true, points: creditedPoints };
+    } catch (e: unknown) {
+      return { ok: false, points: 0, error: e instanceof Error ? e.message : 'Falha ao aprovar vídeo' };
     }
   },
 
@@ -154,11 +195,4 @@ export const pointsService = {
     } catch { return false; }
   },
 
-  /** Soma pontos a um usuário específico (usado pelo admin) lendo/gravando no Firestore. */
-  async awardPointsToUser(userId: string, amount: number): Promise<void> {
-    if (!userId || amount <= 0) return;
-    const current = await firebaseSyncService.getUserFromFirestore(userId);
-    const newTotal = ((current?.points as number) || 0) + amount;
-    await firebaseSyncService.syncUserToFirestore(userId, { points: newTotal });
-  },
 };

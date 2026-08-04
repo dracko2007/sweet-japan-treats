@@ -264,9 +264,8 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     safeStorage.setItem(`coupons_${userId}`, JSON.stringify(coupons));
   };
 
-  // Resolve a lista de cupons priorizando o que veio do Firestore (userData.coupons),
-  // caindo para o localStorage. Garante o cupom de boas-vindas (exceto admin) de
-  // forma determinística, e mantém localStorage + Firestore em sincronia.
+  // Resolve a lista de cupons priorizando o perfil carregado e mantém o cache
+  // local determinístico; mutações de cupons pertencem aos endpoints do servidor.
   const resolveUserCoupons = (userData: { id: string; email?: string; coupons?: Coupon[] }): Coupon[] => {
     let list = Array.isArray(userData.coupons) ? userData.coupons : getUserCoupons(userData.id);
 
@@ -274,10 +273,6 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     const hasWelcome = list.some((c) => c.code.toUpperCase() === 'BEMVINDO10');
     if (!isAdmin && !hasWelcome) {
       list = [...list, makeWelcomeCoupon()];
-      // Persiste no Firestore para sincronizar entre dispositivos
-      firebaseSyncService
-        .syncUserToFirestore(userData.id, { coupons: list })
-        .catch(() => {});
     }
 
     saveUserCoupons(userData.id, list);
@@ -1223,9 +1218,16 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       // Sync to Firestore (fire-and-forget)
       firebaseSyncService.syncUserToFirestore(user.id, {
         name: updatedUser.name,
-        email: updatedUser.email,
         phone: updatedUser.phone,
         birthdate: updatedUser.birthdate || null,
+        personType: updatedUser.personType,
+        cpf: updatedUser.cpf,
+        cnpj: updatedUser.cnpj,
+        razaoSocial: updatedUser.razaoSocial,
+        document: updatedUser.document,
+        gender: updatedUser.gender,
+        whatsappMarketing: updatedUser.whatsappMarketing,
+        pushEnabled: updatedUser.pushEnabled,
         address: updatedUser.address || {},
       }).then(() => {
         devLog('✅ [SYNC] Profile synced to Firestore');
@@ -1254,19 +1256,14 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     const updatedUsers = allUsers.map(u => (u.id === user.id ? updatedUser : u));
     saveAllUsers(updatedUsers);
 
-    // Sincroniza com Firestore (fire-and-forget)
-    firebaseSyncService.syncUserToFirestore(user.id, { points: newTotal }).catch(() => {});
 
     devLog(`✅ +${amount} pontos (total: ${newTotal})`);
   };
 
-  // Persiste a lista de cupons do usuário no localStorage e no Firestore.
+  // Persiste a lista de cupons do usuário somente no cache local.
   const persistUserCoupons = (updated: Coupon[]) => {
     if (!user) return;
     saveUserCoupons(user.id, updated);
-    firebaseSyncService
-      .syncUserToFirestore(user.id, { coupons: updated })
-      .catch((e) => devWarn('⚠️ Falha ao sincronizar cupons:', e));
   };
 
   const addCoupon = (coupon: Coupon) => {

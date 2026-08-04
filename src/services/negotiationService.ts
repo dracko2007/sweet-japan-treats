@@ -11,23 +11,70 @@ import {
   where,
   orderBy,
 } from 'firebase/firestore';
-import { db } from '@/config/firebase';
+import { db, auth } from '@/config/firebase';
 import { Negotiation } from '@/types/negotiation';
 
 const COL = 'negotiations';
 const EXPIRY_HOURS = 24;
 
+type CreateNegotiationInput = Omit<
+  Negotiation,
+  | 'id'
+  | 'userId'
+  | 'userEmail'
+  | 'status'
+  | 'autoApproved'
+  | 'approvedDiscountYen'
+  | 'approvedBy'
+  | 'approvedAt'
+  | 'adminNote'
+  | 'createdAt'
+  | 'expiresAt'
+  | 'resolvedAt'
+  | 'clientNotified'
+  | 'clientSeen'
+>;
+
 export const negotiationService = {
-  async create(data: Omit<Negotiation, 'id' | 'createdAt' | 'expiresAt' | 'resolvedAt'>): Promise<Negotiation> {
-    const ref = doc(collection(db, COL));
+  async create(data: CreateNegotiationInput): Promise<Negotiation> {
+    // A identidade e o estado inicial vêm da sessão e deste serviço, nunca do caller.
+    const cur = auth?.currentUser;
+    if (!cur) {
+      throw new Error('É preciso estar logado para enviar a negociação.');
+    }
+
+    if (!Number.isFinite(data.requestedDiscountYen) || data.requestedDiscountYen <= 0) {
+      throw new Error('O desconto solicitado deve ser maior que zero.');
+    }
+    if (
+      !Number.isFinite(data.originalAmountYen)
+      || data.requestedDiscountYen >= data.originalAmountYen
+    ) {
+      throw new Error('O desconto solicitado deve ser menor que o valor original.');
+    }
+    if (!Array.isArray(data.cartItems) || data.cartItems.length < 1 || data.cartItems.length > 100) {
+      throw new Error('A negociação deve conter entre 1 e 100 itens.');
+    }
+
     const now = new Date();
     const expires = new Date(now.getTime() + EXPIRY_HOURS * 60 * 60 * 1000);
+    const ref = doc(collection(db, COL));
     const neg: Negotiation = {
       ...data,
+      userId: cur.uid,
+      userEmail: cur.email ?? '',
+      status: 'pending',
+      autoApproved: false,
+      approvedDiscountYen: null,
+      adminNote: '',
+      approvedBy: '',
+      approvedAt: null,
+      resolvedAt: null,
+      clientNotified: false,
+      clientSeen: false,
       id: ref.id,
       createdAt: now.toISOString(),
       expiresAt: expires.toISOString(),
-      resolvedAt: null,
     };
     await setDoc(ref, neg);
     return neg;
@@ -105,7 +152,7 @@ export const negotiationService = {
     });
   },
 
-  // Called client-side or by admin panel when expiresAt is past
+  // Acionado somente pelo painel admin, cuja sessão satisfaz isAdmin().
   async expire(id: string): Promise<void> {
     await updateDoc(doc(db, COL, id), {
       status: 'expired',
@@ -118,14 +165,13 @@ export const negotiationService = {
     await updateDoc(doc(db, COL, id), { clientSeen: true });
   },
 
-  async markUsed(id: string, orderId: string): Promise<void> {
-    await updateDoc(doc(db, COL, id), {
-      status: 'used',
-      resolvedAt: new Date().toISOString(),
-      clientSeen: true,
-      usedInOrderId: orderId,
-    });
-  },
+  // A transição para 'used' é feita PELO SERVIDOR, em api/_lib/fulfillment.js
+  // (Admin SDK, que ignora estas regras), no instante em que o pedido é
+  // finalizado. Não existe markUsed no lado cliente de propósito: a regra de
+  // update de /negotiations/ só deixa o dono mudar `clientSeen`, então qualquer
+  // escrita de status/resolvedAt/usedInOrderId partiria daqui seria sempre
+  // rejeitada. Se precisar marcar como usada, faça pelo caminho do pedido
+  // (servidor), não direto pelo cliente.
 
   async getById(id: string): Promise<Negotiation | null> {
     const snap = await getDoc(doc(db, COL, id));

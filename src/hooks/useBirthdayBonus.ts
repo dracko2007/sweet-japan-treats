@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useUser } from '@/context/UserContext';
 import { useToast } from '@/hooks/use-toast';
-import { POINTS } from '@/services/pointsService';
+import { userRewardsService } from '@/services/userRewardsService';
 
 /**
  * No aniversário do cliente, concede 1000 pontos (uma vez por ano),
@@ -15,22 +15,35 @@ export function useBirthdayBonus() {
   useEffect(() => {
     if (!isAuthenticated || !user?.birthdate || checked.current) return;
 
-    const today = new Date();
-    const bd = new Date(user.birthdate);
-    if (isNaN(bd.getTime())) return;
+    const todayParts = Object.fromEntries(
+      new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Asia/Tokyo',
+        year: 'numeric',
+        month: 'numeric',
+        day: 'numeric',
+      }).formatToParts(new Date()).map(({ type, value }) => [type, value]),
+    );
+    const birthday = /^(?:\d{4})-(\d{2})-(\d{2})(?:$|T)/.exec(user.birthdate);
+    if (!birthday) return;
 
-    const isBirthday = bd.getMonth() === today.getMonth() && bd.getDate() === today.getDate();
-    const alreadyGiven = user.birthdayBonusYear === today.getFullYear();
+    const year = Number(todayParts.year);
+    const isBirthday =
+      Number(birthday[1]) === Number(todayParts.month)
+      && Number(birthday[2]) === Number(todayParts.day);
+    if (!isBirthday || user.birthdayBonusYear === year) return;
 
-    if (isBirthday && !alreadyGiven) {
-      checked.current = true;
-      addPoints(POINTS.birthday);
-      updateProfile({ birthdayBonusYear: today.getFullYear() });
+    checked.current = true;
+    void userRewardsService.claimBirthday().then((reward) => {
+      if (reward.awarded <= 0) return;
+      addPoints(reward.awarded);
+      updateProfile({ birthdayBonusYear: year });
       toast({
-        title: '🎂 Feliz aniversário, ' + (user.name?.split(' ')[0] || '') + '!',
-        description: `Você ganhou ${POINTS.birthday} pontos (¥${POINTS.birthday}) para usar na sua próxima compra. 🎉`,
+        title: 'Feliz aniversário, ' + (user.name?.split(' ')[0] || '') + '!',
+        description: `Você ganhou ${reward.awarded} pontos (¥${reward.awarded}) para usar na sua próxima compra.`,
         duration: 10000,
       });
-    }
+    }).catch(() => {
+      // O servidor é a autoridade para data e idempotência; falhas não concedem pontos locais.
+    });
   }, [isAuthenticated, user, addPoints, updateProfile, toast]);
 }

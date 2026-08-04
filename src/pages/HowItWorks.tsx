@@ -223,10 +223,10 @@ const getTax = (lang: string): Record<TaxKey, TaxEntry> => {
   if (lang === 'en') return {
     Brasil: {
       flag: '🇧🇷', tone: '#f59e0b', label: 'Brazil',
-      headline: 'Brazilian Federal Revenue (Receita Federal) collects taxes — Remessa Conforme',
+      headline: 'Brazilian Federal Revenue (Receita Federal) inspects packages and collects taxes',
       rows: [
-        ['Orders up to US$ 50', '20% Federal Tax + 17% ICMS'],
-        ['From US$ 50 to US$ 3,000', '60% (− US$ 20 discount) + 17% ICMS'],
+        ['Taxes, fees and inspection', 'Defined by the competent authorities according to the shipment and destination'],
+        ['Official notification', 'Any charge is communicated through official channels; amounts and release times are not guaranteed'],
       ],
       note: 'Correios only delivers — the Federal Revenue is the taxing authority. You\'re notified by the Correios app/email/SMS and pay online (Pix, card or boleto) BEFORE the package is released. Never pay in cash to the postal worker. ⚠️ Beware of fake links: always confirm in the official app or at correios.com.br.',
       flow: [
@@ -267,10 +267,10 @@ const getTax = (lang: string): Record<TaxKey, TaxEntry> => {
   if (lang === 'ja') return {
     Brasil: {
       flag: '🇧🇷', tone: '#f59e0b', label: 'ブラジル',
-      headline: 'ブラジル連邦税務署（Receita Federal）が税金を徴収 — Remessa Conforme',
+      headline: 'ブラジル連邦税務署（Receita Federal）がパッケージを検査して税金を徴収',
       rows: [
-        ['US$ 50以下の購入', '連邦税20% + ICMS 17%'],
-        ['US$ 50〜US$ 3,000', '連邦税60%（US$ 20割引）+ ICMS 17%'],
+        ['税金・手数料・検査', '発送内容と配送先に応じて、管轄当局が決定します'],
+        ['公式通知', '請求がある場合は公式チャネルで案内され、金額と通関期間は保証されません'],
       ],
       note: 'Correiosは配送のみ — 課税するのは連邦税務署です。Correiosのアプリ/メール/SMSで通知が届き、荷物引き渡し前にオンラインで支払います。配達員への現金払いは不要です。⚠️ 偽リンクに注意：必ず公式アプリまたはcorreios.com.brで確認してください。',
       flow: [
@@ -311,10 +311,10 @@ const getTax = (lang: string): Record<TaxKey, TaxEntry> => {
   return {
     Brasil: {
       flag: '🇧🇷', tone: '#f59e0b', label: 'Brasil',
-      headline: 'Quem cobra é a Receita Federal (Remessa Conforme)',
+      headline: 'Receita Federal inspeciona pacotes e cobra tributos',
       rows: [
-        ['Compras até US$ 50', '20% Imposto de Importação + 17% ICMS'],
-        ['De US$ 50 a US$ 3.000', '60% (− US$ 20 de desconto) + 17% ICMS'],
+        ['Tributos, taxas e fiscalização', 'Definidos pelas autoridades competentes conforme a remessa e o destino'],
+        ['Comunicação oficial', 'Eventual cobrança é informada por canais oficiais; valores e prazo de liberação não são garantidos'],
       ],
       note: 'Os Correios apenas entregam — quem tributa é a Receita Federal. Você é avisado pelo app/e-mail/SMS dos Correios e paga online (Pix, cartão ou boleto) ANTES da liberação. Nunca se paga em dinheiro ao carteiro. ⚠️ Cuidado com links falsos: confirme sempre no app oficial ou em correios.com.br.',
       flow: [
@@ -677,33 +677,33 @@ const getBizSteps = (lang: string) => {
     { ic: BadgeCheck, t: 'Radar / Siscomex Registration', d: 'The company needs a Radar (Importer Registration) approved by the Federal Revenue to operate in Siscomex — Brazil\'s official foreign trade system.' },
     { ic: Briefcase, t: 'Customs Broker', d: 'A customs broker registers the operation and handles documentation. For large volumes/values, this is practically mandatory.' },
     { ic: FileText, t: 'Import Declaration (DI)', d: 'Formal imports are registered via Import Declaration (DI) in Siscomex, with the NCM tax classification of each product and the customs value.' },
-    { ic: Percent, t: 'Full Taxation', d: 'Instead of the simplified regime, II + IPI + PIS/COFINS-Import + ICMS apply per NCM code. Can total much more than the 60% personal import rate.' },
+    { ic: Percent, t: 'Applicable Taxes and Fees', d: 'Taxes, fees and customs requirements are defined by the competent authorities according to the shipment, destination and each product\'s NCM classification. Amounts and processing times are not guaranteed.' },
   ];
   if (lang === 'ja') return [
     { ic: BadgeCheck, t: 'Radar / Siscomex 登録', d: '企業はブラジルの公式貿易システムSiscomexを利用するため、連邦税務署でRadar（輸入者登録）の承認が必要です。' },
     { ic: Briefcase, t: '通関業者', d: '通関業者が業務登録と書類手続きを行います。大量・高額の輸入にはほぼ必須です。' },
     { ic: FileText, t: '輸入申告書（DI）', d: '正式な輸入はSiscomexの輸入申告書（DI）で登録され、各商品のNCM税分類と関税価格が記載されます。' },
-    { ic: Percent, t: '全税負担', d: '簡易制度の代わりに、NCMコードに応じてII + IPI + PIS/COFINS-Import + ICMSが適用されます。個人輸入の60%を大きく上回る場合があります。' },
+    { ic: Percent, t: '適用される税金・手数料', d: '税金、手数料、通関要件は、発送内容、配送先、各商品のNCM分類に応じて管轄当局が決定します。金額と手続き期間は保証されません。' },
   ];
   return [
     { ic: BadgeCheck, t: 'Habilitação no Radar / Siscomex', d: 'A empresa precisa do Radar (Registro e Rastreamento da Atuação dos Intervenientes Aduaneiros) habilitado na Receita Federal para operar no Siscomex — o sistema oficial de comércio exterior.' },
     { ic: Briefcase, t: 'Despachante aduaneiro', d: 'Um despachante registra a operação e cuida da documentação. Para grandes volumes/valores, é praticamente obrigatório.' },
     { ic: FileText, t: 'Declaração de Importação (DI)', d: 'A importação formal é registrada via DI no Siscomex, com a classificação fiscal (NCM) de cada produto e o valor aduaneiro.' },
-    { ic: Percent, t: 'Tributação completa', d: 'Em vez do regime simplificado, incidem II + IPI + PIS/COFINS-Importação + ICMS, conforme a NCM. Pode somar bem mais que os 60% do regime de pessoa física.' },
+    { ic: Percent, t: 'Tributos e taxas aplicáveis', d: 'Tributos, taxas e exigências aduaneiras são definidos pelas autoridades competentes conforme a remessa, o destino e a classificação NCM de cada produto. Valores e prazos de processamento não são garantidos.' },
   ];
 };
 
 const getBizBody = (lang: string) => {
   if (lang === 'en') return {
-    intro: <>The simplified regime (Remessa Conforme — Correios app) applies to individuals, up to <strong>US$ 3,000</strong> per shipment. Above that, or for resale goods, the operation is a <strong>formal import</strong> with its own rules:</>,
+    intro: <>For commercial goods, competent authorities define when <strong>formal import procedures</strong> apply and what requirements must be met, based on the shipment and destination:</>,
     note: <>⚠️ Notifications and payments do <strong>not</strong> come through the Correios app as in regular purchases — everything goes through Siscomex and the customs broker. Timelines and costs also differ.</>,
   };
   if (lang === 'ja') return {
-    intro: <>簡易制度（Remessa Conforme — Correiosアプリ）は個人向けで、1件あたり最大<strong>US$ 3,000</strong>まで適用されます。それ以上、または転売目的の商品は<strong>正式輸入</strong>として独自のルールが適用されます：</>,
+    intro: <>商用品については、発送内容と配送先に応じて、管轄当局が<strong>正式輸入手続き</strong>の適用と必要要件を決定します：</>,
     note: <>⚠️ 通知と支払いは通常購入のようにCorreiosアプリでは届きません — すべてSiscomexと通関業者を通じて行われます。期間とコストも異なります。</>,
   };
   return {
-    intro: <>O regime simplificado (Remessa Conforme — app dos Correios) vale para pessoa física, até <strong>US$ 3.000</strong> por remessa. Acima disso, ou para mercadoria de revenda, a operação é uma <strong>importação formal</strong> com regras próprias:</>,
+    intro: <>Para bens comerciais, as autoridades competentes definem quando se aplicam <strong>procedimentos formais de importação</strong> e quais requisitos devem ser cumpridos, conforme a remessa e o destino:</>,
     note: <>⚠️ A notificação e o pagamento <strong>não</strong> chegam pelo app dos Correios como nas compras comuns — tudo passa pelo Siscomex e pelo despachante. Os prazos e custos também são diferentes.</>,
   };
 };

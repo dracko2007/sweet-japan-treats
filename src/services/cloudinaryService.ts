@@ -9,6 +9,43 @@ const UPLOAD_PRESET = 'japanexpress';
 const UPLOAD_URL = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`;
 const UPLOAD_URL_VIDEO = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/video/upload`;
 
+// Data URL → Blob sem passar pelo `fetch`.
+//
+// O Safari falha com "load failed" ao dar `fetch()` numa data URL grande, e a
+// foto do admin chega aqui com 2560px de canvas — uns 2 MB de base64, bem
+// dentro da faixa em que o WebKit desiste de alocar. O sintoma era o admin do
+// iPhone não conseguir subir imagem de produto novo nenhuma, com a mensagem
+// "leitura da imagem falhou (load failed)" e MAIS NADA: sem blob, o bloco de
+// upload inteiro é pulado, então nem o Cloudinary nem o Firebase Storage
+// chegavam a ser tentados — parecia falha de CDN sem nunca ter havido request.
+//
+// Decodificar na mão é síncrono, não passa pela pilha de rede e não depende de
+// alocar a URL inteira num loader. `fetch` continua servindo as URLs http, que
+// é o que `urlToCompressedDataURL` devolve quando o CORS barra o canvas.
+function dataUrlToBlob(dataUrl: string): Blob {
+  const virgula = dataUrl.indexOf(',');
+  if (virgula < 0) throw new Error('data URL malformada (sem vírgula)');
+
+  const cabecalho = dataUrl.slice('data:'.length, virgula);
+  const mime = cabecalho.split(';')[0] || 'application/octet-stream';
+  const corpo = dataUrl.slice(virgula + 1);
+
+  // `canvas.toDataURL()` devolve `data:,` quando o navegador não consegue
+  // exportar — no iPhone acontece com foto grande demais para o limite de área
+  // do canvas. Sem isto o upload seguiria com 0 byte e o Cloudinary recusaria
+  // com um 400 genérico, escondendo a causa real.
+  if (!corpo) throw new Error('o navegador não conseguiu exportar a imagem (arquivo muito grande?)');
+
+  if (!/;base64/i.test(cabecalho)) {
+    return new Blob([decodeURIComponent(corpo)], { type: mime });
+  }
+
+  const binario = atob(corpo);
+  const bytes = new Uint8Array(binario.length);
+  for (let i = 0; i < binario.length; i += 1) bytes[i] = binario.charCodeAt(i);
+  return new Blob([bytes], { type: mime });
+}
+
 async function uploadToFirebase(blob: Blob, folder: string): Promise<string> {
   if (!storage) throw new Error('Firebase Storage indisponível.');
   const ext = blob.type.includes('webp') ? 'webp' : blob.type.includes('png') ? 'png' : 'jpg';
@@ -139,8 +176,9 @@ export const cloudinaryService = {
     const motivos: string[] = [];
     let blob: Blob | null = null;
     try {
-      const res = await fetch(dataUrl);
-      blob = await res.blob();
+      blob = dataUrl.startsWith('data:')
+        ? dataUrlToBlob(dataUrl)
+        : await (await fetch(dataUrl)).blob();
     } catch (e) {
       motivos.push(`leitura da imagem falhou (${e instanceof Error ? e.message : String(e)})`);
     }

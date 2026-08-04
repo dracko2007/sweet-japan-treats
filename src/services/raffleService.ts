@@ -1,8 +1,8 @@
-// Sorteio da loja (gerenciado pelo admin) salvo no Firestore.
-// Documento único `raffles/active` — mesmo formato de doc fixo usado em siteContentService.
-// Leitura pública, escrita só admin (regras do Firestore).
+// Configuração/vencedores públicos ficam em `raffles/active`. Dados de contato
+// e verificação social dos ganhadores ficam separados em `raffle_admin/active`,
+// legíveis somente por administradores.
 import { db } from '@/config/firebase';
-import { doc, getDoc, setDoc, getDocs, collection, onSnapshot, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, onSnapshot, runTransaction, serverTimestamp, setDoc } from 'firebase/firestore';
 import { ensureAdminAuth } from '@/utils/adminAuth';
 
 const isDev = import.meta.env.DEV;
@@ -10,6 +10,8 @@ const devWarn = isDev ? console.warn.bind(console) : () => {};
 
 const RAFFLE_DOC = 'active';
 const COL = 'raffles';
+const ADMIN_COL = 'raffle_admin';
+export const MAX_RAFFLE_PRIZES = 100;
 
 export interface RafflePrize {
   rank: number;                 // posição no pódio, começa em 1
@@ -21,13 +23,15 @@ export interface RafflePrize {
   points?: number;
 }
 
+/** Shape público: nunca inclui e-mail, UID ou estado das redes sociais. */
 export interface RaffleWinner {
   rank: number;
-  userId: string;
   userName: string;
+}
+
+export interface RaffleAdminWinner extends RaffleWinner {
+  userId: string;
   userEmail: string;
-  // Snapshot do "segue a loja" no momento do sorteio. Não impede ganhar —
-  // serve só para o admin cobrar depois quem ainda não segue.
   followsInstagram: boolean;
   followsTiktok: boolean;
 }
@@ -67,13 +71,24 @@ const normalize = (data: unknown): Raffle => {
   const record = data as Record<string, unknown>;
   
   const rules = typeof record.rules === 'string' ? record.rules : '';
-  const prizeCount = typeof record.prizeCount === 'number' ? record.prizeCount : 3;
+  const rawCount = Number(record.prizeCount);
+  const prizeCount = Number.isFinite(rawCount)
+    ? Math.max(1, Math.min(MAX_RAFFLE_PRIZES, Math.floor(rawCount)))
+    : 3;
   const prizes = Array.isArray(record.prizes) ? record.prizes : [];
-  const winners = Array.isArray(record.winners) ? record.winners : [];
+  const winners = Array.isArray(record.winners)
+    ? record.winners.flatMap((value) => {
+        if (!value || typeof value !== 'object') return [];
+        const winner = value as Record<string, unknown>;
+        const rank = Math.floor(Number(winner.rank));
+        const userName = typeof winner.userName === 'string' ? winner.userName : '';
+        return rank > 0 && userName ? [{ rank, userName }] : [];
+      })
+    : [];
   const drawnAt = typeof record.drawnAt === 'string' ? record.drawnAt : null;
   const published = Boolean(record.published);
-  
-  return { rules, prizeCount, prizes: prizes as RafflePrize[], winners: winners as RaffleWinner[], drawnAt, published };
+
+  return { rules, prizeCount, prizes: prizes as RafflePrize[], winners, drawnAt, published };
 };
 
 export const raffleService = {
@@ -110,14 +125,51 @@ export const raffleService = {
     );
   },
 
+  async getAdminWinners(): Promise<RaffleAdminWinner[]> {
+    if (!db) return [];
+    await ensureAdminAuth();
+    const snap = await getDoc(doc(db, ADMIN_COL, RAFFLE_DOC));
+    const values = snap.exists() && Array.isArray(snap.data()?.winners) ? snap.data().winners : [];
+    return values.flatMap((value: unknown) => {
+      if (!value || typeof value !== 'object') return [];
+      const winner = value as Record<string, unknown>;
+      const rank = Math.floor(Number(winner.rank));
+      const userId = typeof winner.userId === 'string' ? winner.userId : '';
+      const userName = typeof winner.userName === 'string' ? winner.userName : '';
+      if (!(rank > 0) || !userId || !userName) return [];
+      return [{
+        rank,
+        userId,
+        userName,
+        userEmail: typeof winner.userEmail === 'string' ? winner.userEmail : '',
+        followsInstagram: winner.followsInstagram === true,
+        followsTiktok: winner.followsTiktok === true,
+      }];
+    });
+  },
+
   async saveConfig(partial: Partial<Raffle>): Promise<void> {
     if (!db) throw new Error('Firebase indisponível');
     await ensureAdminAuth();
-    await setDoc(
-      doc(db, COL, RAFFLE_DOC),
-      { ...partial, updatedAt: serverTimestamp() },
-      { merge: true }
-    );
+    const safe: Partial<Raffle> = { ...partial };
+    if (safe.prizeCount !== undefined) {
+      safe.prizeCount = Math.max(1, Math.min(MAX_RAFFLE_PRIZES, Math.floor(Number(safe.prizeCount)) || 1));
+    }
+    if (safe.prizes) safe.prizes = safe.prizes.slice(0, MAX_RAFFLE_PRIZES);
+    const changesPrizes = safe.prizeCount !== undefined || safe.prizes !== undefined;
+    if (!changesPrizes) {
+      await setDoc(doc(db, COL, RAFFLE_DOC), { ...safe, updatedAt: serverTimestamp() }, { merge: true });
+      return;
+    }
+    await runTransaction(db, async (transaction) => {
+      const raffleRef = doc(db, COL, RAFFLE_DOC);
+      const snapshot = await transaction.get(raffleRef);
+      if (snapshot.exists() && (snapshot.data()?.drawnAt
+        || (Array.isArray(snapshot.data()?.winners) && snapshot.data().winners.length > 0))) {
+        throw new Error('Inicie um novo sorteio antes de alterar os prêmios.');
+      }
+      transaction.set(raffleRef, { ...safe, updatedAt: serverTimestamp() }, { merge: true });
+    });
   },
 
   // Todos os cadastrados entram no sorteio. Lê só a coleção `users` — de
@@ -151,29 +203,94 @@ export const raffleService = {
     }
   },
 
-  // Sorteia sem repetição: embaralha os participantes (Fisher-Yates) e fatia
-  // um por prêmio. Com menos participantes que prêmios, sobram posições vazias
-  // em vez de repetir alguém.
-  async draw(prizes: RafflePrize[], participants: RaffleParticipant[]): Promise<RaffleWinner[]> {
+  // Sorteia sem repetição com Web Crypto. O resultado público não carrega PII;
+  // a cópia completa, usada para contato/avisos, vai ao documento privado.
+  async draw(prizes: RafflePrize[], participants: RaffleParticipant[]): Promise<RaffleAdminWinner[]> {
+    if (!db) throw new Error('Firebase indisponível');
+    if (!globalThis.crypto?.getRandomValues) throw new Error('Sorteio seguro indisponível neste navegador');
     const pool = [...participants];
-    for (let i = pool.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
+    const random = new Uint32Array(1);
+    for (let i = pool.length - 1; i > 0; i -= 1) {
+      globalThis.crypto.getRandomValues(random);
+      const j = Math.floor((random[0] / 0x1_0000_0000) * (i + 1));
       [pool[i], pool[j]] = [pool[j], pool[i]];
     }
 
-    const ordered = [...prizes].sort((a, b) => a.rank - b.rank);
-    const winners: RaffleWinner[] = ordered.slice(0, pool.length).map((prize, i) => ({
+    const ordered = [...prizes]
+      .sort((a, b) => a.rank - b.rank)
+      .slice(0, MAX_RAFFLE_PRIZES);
+    const adminWinners: RaffleAdminWinner[] = ordered.slice(0, pool.length).map((prize, index) => ({
       rank: prize.rank,
-      userId: pool[i].id,
-      userName: pool[i].name,
-      userEmail: pool[i].email,
-      followsInstagram: pool[i].followsInstagram,
-      followsTiktok: pool[i].followsTiktok,
+      userId: pool[index].id,
+      userName: pool[index].name,
+      userEmail: pool[index].email,
+      followsInstagram: pool[index].followsInstagram,
+      followsTiktok: pool[index].followsTiktok,
     }));
+    const eligibleWinners = adminWinners.filter(
+      (winner) => winner.followsInstagram && winner.followsTiktok,
+    );
+    const publicWinners: RaffleWinner[] = eligibleWinners.map(
+      ({ rank, userName }) => ({ rank, userName }),
+    );
+    const awards = eligibleWinners.flatMap((winner) => {
+      const prize = ordered.find((entry) => entry.rank === winner.rank);
+      const points = prize?.type === 'points' ? Math.max(0, Math.floor(Number(prize.points || 0))) : 0;
+      return points > 0 ? [{ userId: winner.userId, points }] : [];
+    });
 
-    const drawnAt = new Date().toISOString();
-    await this.saveConfig({ winners, drawnAt });
-    return winners;
+    await ensureAdminAuth();
+    await runTransaction(db, async (transaction) => {
+      const raffleRef = doc(db, COL, RAFFLE_DOC);
+      const adminRef = doc(db, ADMIN_COL, RAFFLE_DOC);
+      const userRefs = awards.map(({ userId }) => doc(db, 'users', userId));
+      const [raffleSnapshot, ...userSnapshots] = await Promise.all([
+        transaction.get(raffleRef),
+        ...userRefs.map((ref) => transaction.get(ref)),
+      ]);
+      if (raffleSnapshot.exists() && (raffleSnapshot.data()?.drawnAt
+        || (Array.isArray(raffleSnapshot.data()?.winners) && raffleSnapshot.data().winners.length > 0))) {
+        throw new Error('Este sorteio já foi realizado. Inicie um novo sorteio antes de sortear novamente.');
+      }
+      const now = new Date().toISOString();
+      for (let index = 0; index < userSnapshots.length; index += 1) {
+        const snapshot = userSnapshots[index];
+        if (!snapshot.exists()) throw new Error(`Usuário do prêmio ${index + 1} não encontrado`);
+        const current = Number(snapshot.data()?.points || 0);
+        transaction.update(userRefs[index], {
+          points: (Number.isFinite(current) ? Math.max(0, current) : 0) + awards[index].points,
+          updatedAt: now,
+        });
+      }
+      transaction.set(
+        raffleRef,
+        { winners: publicWinners, drawnAt: now, updatedAt: serverTimestamp() },
+        { merge: true },
+      );
+      transaction.set(
+        adminRef,
+        { winners: adminWinners, drawnAt: now, updatedAt: serverTimestamp() },
+        { merge: true },
+      );
+    });
+    return adminWinners;
+  },
+
+  async resetDraw(): Promise<void> {
+    if (!db) throw new Error('Firebase indisponível');
+    await ensureAdminAuth();
+    await runTransaction(db, async (transaction) => {
+      transaction.set(
+        doc(db, COL, RAFFLE_DOC),
+        { winners: [], drawnAt: null, published: false, updatedAt: serverTimestamp() },
+        { merge: true },
+      );
+      transaction.set(
+        doc(db, ADMIN_COL, RAFFLE_DOC),
+        { winners: [], drawnAt: null, updatedAt: serverTimestamp() },
+        { merge: true },
+      );
+    });
   },
 
   async publish(flag: boolean): Promise<void> {

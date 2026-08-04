@@ -1,6 +1,6 @@
 import { db } from '@/config/firebase';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { firebaseSyncService } from '@/services/firebaseSyncService';
+import { doc, getDoc } from 'firebase/firestore';
+import { userRewardsService } from '@/services/userRewardsService';
 
 export type SocialNetwork = 'instagram' | 'facebook' | 'tiktok' | 'x';
 
@@ -22,20 +22,12 @@ export const socialFollowService = {
     } catch { return {}; }
   },
 
-  async confirmFollow(userId: string, network: SocialNetwork): Promise<{ ok: boolean; alreadyClaimed: boolean }> {
-    if (!db) return { ok: false, alreadyClaimed: false };
+  async confirmFollow(_userId: string, network: SocialNetwork): Promise<{ ok: boolean; alreadyClaimed: boolean }> {
     try {
-      const snap = await getDoc(doc(db, 'users', userId));
-      const follows = (snap.data()?.socialFollows || {}) as Record<string, boolean>;
-      if (follows[network]) return { ok: false, alreadyClaimed: true };
-      // Mark as followed — setDoc+merge creates the doc if it doesn't exist yet
-      await setDoc(doc(db, 'users', userId), {
-        socialFollows: { [network]: true },
-      }, { merge: true });
-      // Award points via firebaseSyncService
-      const current = snap.data()?.points || 0;
-      await firebaseSyncService.syncUserToFirestore(userId, { points: current + SOCIAL_POINTS });
-      return { ok: true, alreadyClaimed: false };
-    } catch { return { ok: false, alreadyClaimed: false }; }
+      const reward = await userRewardsService.claimSocialFollow(network);
+      return { ok: reward.awarded > 0, alreadyClaimed: reward.alreadyClaimed };
+    } catch {
+      return { ok: false, alreadyClaimed: false };
+    }
   },
 };

@@ -25,7 +25,7 @@ import { effectiveYen } from '@/utils/pricing';
 import { convertYen as fxConvert, yenFromConverted, getRates } from '@/services/fxService';
 import { POINTS } from '@/services/pointsService';
 import { safeStorage } from '@/utils/storage';
-import { psFeeWaiver, PS_FEE_WAIVER_EVENT } from '@/utils/psFeeWaiver';
+import { checkoutPointsCoverage, psFeeWaiver, PS_FEE_WAIVER_EVENT } from '@/utils/psFeeWaiver';
 import { productEnglishName } from '@/utils/productName';
 import { isValidEmail, isValidCPF, isValidPhone, isNonEmpty, maskPhone, runValidations, FieldErrors } from '@/utils/validation';
 import { calcImportTax } from '@/utils/taxRules';
@@ -56,7 +56,7 @@ const Checkout: React.FC = () => {
         item_category: i.product.category,
       })),
     );
-  }, []);
+  }, [items, totalPrice]);
   const { user, isAuthenticated, authReady } = useUser();
   const navigate = useNavigate();
   const location = useLocation();
@@ -122,6 +122,14 @@ const Checkout: React.FC = () => {
   // Quando verdadeiro, taxa PS é cobrada cheia (sem negociação nem isenção de popup).
   const netProductsAfterCouponAndPoints = productSubtotalYen - couponDiscountYen - redeemPoints;
   const pointsCoverAllProducts = productSubtotalYen > 0 && redeemPoints > 0 && netProductsAfterCouponAndPoints <= 0;
+
+  // O popup global precisa conhecer a cobertura líquida (cupom + pontos) antes
+  // de o cliente avançar para a revisão. Sem este sinal ele oferecia zerar a
+  // taxa PS porque `redeem_points` só era persistido no botão de avançar.
+  useEffect(() => {
+    safeStorage.setItem('redeem_points', String(redeemPoints));
+    checkoutPointsCoverage.set(pointsCoverAllProducts);
+  }, [pointsCoverAllProducts, redeemPoints]);
 
   // Erros de validação do formulário
   const [errors, setErrors] = useState<FieldErrors>({});
@@ -200,10 +208,12 @@ const Checkout: React.FC = () => {
         if (neg.type === 'ps_fee') setPsFeeDiscountYen(neg.approvedDiscountYen);
         else setShippingDiscountYen(neg.approvedDiscountYen);
       }
-      // Auto-expire: se o prazo passou e ainda está pending, marca expirado no Firestore
-      if (neg.status === 'pending' && negotiationService.isExpired(neg)) {
-        negotiationService.expire(neg.id).catch(() => {});
-      }
+      // Auto-expire LOCAL: quando o prazo estourou, a UI já trata como expirada
+      // (o clearNeg acima dispara pelo teste de data em neg.expiresAt). A escrita
+      // do status 'expired' no Firestore fica com o painel admin
+      // (NegotiationManager, sob sessão admin): a regra de update de
+      // /negotiations/ proíbe o cliente mudar status (só libera clientSeen), então
+      // tentar gravar 'expired' daqui seria sempre rejeitado pelo Firebase.
     });
   }, [activeNegId]);
 
@@ -242,7 +252,7 @@ const Checkout: React.FC = () => {
       setAppliedCoupon(cartCoupon);
       setCouponDiscount(computeCouponDiscount(cartCoupon, regularSubtotalForCoupon));
     }
-  }, [location.state, baseTotalPrice]);
+  }, [location.state, baseTotalPrice, regularSubtotalForCoupon]);
 
   // Auto-populate from user profile if authenticated
   useEffect(() => {
@@ -473,15 +483,13 @@ const Checkout: React.FC = () => {
       const frozenRate = currency === 'EUR' ? rates.EUR : currency === 'USD' ? rates.USD : currency === 'JPY' ? 1 : rates.BRL;
 
       const neg = await negotiationService.create({
-        userId: user.id || user.email || '',
-        userEmail: user.email || '',
         userName: user.name || '',
         cartItems: items.filter(i => !i.freeGift).map(i => ({
           productId: i.product.id,
           productName: i.product.name || '',
           productImage: i.product.image || '',
           size: i.size || '',
-          variantLabel: i.variantLabel ?? null,  // undefined → null (Firestore rejeita undefined)
+          variantLabel: i.variantLabel || '',
           quantity: i.quantity,
           priceYen: effectiveYen(i.product, i.size),
         })),
@@ -511,14 +519,6 @@ const Checkout: React.FC = () => {
         numUnits: totalQty,
         requestedDiscountYen: requestedYen,
         clientNote: negNote || '',
-        approvedDiscountYen: null,
-        adminNote: '',
-        status: 'pending',
-        autoApproved: false,
-        approvedBy: '',
-        approvedAt: null,
-        clientNotified: false,
-        clientSeen: false,
       });
       setActiveNegId(neg.id);
       setActiveNeg(neg);

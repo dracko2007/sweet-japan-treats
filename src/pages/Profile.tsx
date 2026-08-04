@@ -155,20 +155,25 @@ const Profile: React.FC = () => {
     if (!user) return;
     setConfirmingOrderId(orderNumber);
     try {
+      const confirmed = await orderService.updateOrderStatus(
+        orderNumber,
+        'delivered',
+        { customerConfirmation: true }
+      );
+      if (!confirmed) throw new Error('Não foi possível confirmar o recebimento.');
+
       const now = new Date().toISOString();
 
-      // 1. orders_${userId} — primary store for registered users
       const ordersKey = `orders_${user.id}`;
       const rawOrders = JSON.parse(safeStorage.getItem(ordersKey) || '[]');
-      const updatedOrders = rawOrders.map((o: any) =>
+      const updatedOrders = rawOrders.map((o) =>
         o.orderNumber === orderNumber ? { ...o, status: 'delivered', updatedAt: now } : o
       );
       safeStorage.setItem(ordersKey, JSON.stringify(updatedOrders));
 
-      // 2. japan-express-users — also update here so refreshOrders priority chain is consistent
       const users = JSON.parse(safeStorage.getItem('japan-express-users') || '{}');
       Object.keys(users).forEach((email) => {
-        (users[email].orders || []).forEach((o: any, i: number) => {
+        (users[email].orders || []).forEach((o, i: number) => {
           if (o.orderNumber === orderNumber) {
             users[email].orders[i].status = 'delivered';
             users[email].orders[i].updatedAt = now;
@@ -177,22 +182,20 @@ const Profile: React.FC = () => {
       });
       safeStorage.setItem('japan-express-users', JSON.stringify(users));
 
-      // 3. sakura_orders
       const sakura = JSON.parse(safeStorage.getItem('sakura_orders') || '[]');
-      const updatedSakura = sakura.map((o: any) =>
+      const updatedSakura = sakura.map((o) =>
         o.orderNumber === orderNumber ? { ...o, status: 'delivered', updatedAt: now } : o
       );
       safeStorage.setItem('sakura_orders', JSON.stringify(updatedSakura));
 
-      // 4. Firestore (best-effort — can fail if user isn't admin)
-      orderService.updateOrderStatus(orderNumber, 'delivered').catch(() => {});
-
       refreshOrders();
       toast({ title: '✅ Recebimento confirmado!', description: 'Obrigado por confirmar. Que aproveite!' });
-    } catch {
-      toast({ title: 'Erro ao confirmar', description: 'Tente novamente.', variant: 'destructive' });
+    } catch (error) {
+      const description = error instanceof Error ? error.message : 'Tente novamente.';
+      toast({ title: 'Erro ao confirmar', description, variant: 'destructive' });
+    } finally {
+      setConfirmingOrderId(null);
     }
-    setConfirmingOrderId(null);
   };
 
   // Avaliação a partir do histórico de pedidos

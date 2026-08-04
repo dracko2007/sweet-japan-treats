@@ -5,7 +5,8 @@ import { useUser } from '@/context/UserContext';
 import { useCart } from '@/context/CartContext';
 import { useToast } from '@/hooks/use-toast';
 import { newsletterService } from '@/services/newsletterService';
-import { psFeeWaiver } from '@/utils/psFeeWaiver';
+import { requestPsFeeWaiver } from '@/services/psFeeWaiverService';
+import { checkoutPointsCoverage, psFeeWaiver } from '@/utils/psFeeWaiver';
 import { safeStorage } from '@/utils/storage';
 import { effectiveYen } from '@/utils/pricing';
 import type { CartItem } from '@/types';
@@ -95,6 +96,7 @@ const ExitIntentPopup: React.FC = () => {
   const [variant, setVariant] = useState<Variant>('guide');
   const [email, setEmail] = useState('');
   const [status, setStatus] = useState<'idle' | 'loading' | 'done'>('idle');
+  const [waiverLoading, setWaiverLoading] = useState(false);
 
   // Refs sempre atualizados para uso DENTRO dos listeners (evita stale closure).
   const itemsRef = useRef(items);
@@ -121,7 +123,8 @@ const ExitIntentPopup: React.FC = () => {
       // Ler pontos resgatados do storage (gravado antes de navegar para /order-review)
       const redeemPoints = Number(safeStorage.getItem('redeem_points')) || 0;
       const productSubtotalYen = productSubtotalYenOf(list);
-      const pointsCoverAllProducts = productSubtotalYen > 0 && redeemPoints > 0 && redeemPoints >= productSubtotalYen;
+      const pointsCoverAllProducts = checkoutPointsCoverage.coversAll()
+        || (productSubtotalYen > 0 && redeemPoints > 0 && redeemPoints >= productSubtotalYen);
       // Só oferecemos a isenção da taxa PS se a mercadoria não for coberta por pontos
       if (path.startsWith('/checkout') && psFeeQtyOf(list) > 0 && !psFeeWaiver.isActive() && !pointsCoverAllProducts) return 'ps_offer';
       return 'retention';
@@ -210,7 +213,10 @@ const ExitIntentPopup: React.FC = () => {
   useEffect(() => {
     const prev = prevPathRef.current;
     const cur = location.pathname;
-    if (inFunnel(prev) && !inFunnel(cur)) psFeeWaiver.clear();
+    if (inFunnel(prev) && !inFunnel(cur)) {
+      psFeeWaiver.clear();
+      checkoutPointsCoverage.clear();
+    }
     prevPathRef.current = cur;
   }, [location.pathname]);
 
@@ -218,14 +224,26 @@ const ExitIntentPopup: React.FC = () => {
     setOpen(false);
   }, []);
 
-  // Aceitar a oferta: concede a isenção da taxa PS. A oferta só aparece já no
-  // /checkout, então normalmente basta aplicar (o valor reage via evento); se por
-  // acaso estiver fora do funil, leva ao checkout para finalizar.
-  const acceptPsOffer = useCallback(() => {
-    psFeeWaiver.grant();
-    close();
-    if (!inFunnel(location.pathname)) navigate('/checkout');
-  }, [close, navigate, location.pathname]);
+  // A tela só considera a oferta ativa depois que o servidor devolve uma
+  // autorização assinada. Assim o total exibido é o mesmo que a API cobrará.
+  const acceptPsOffer = useCallback(async () => {
+    if (waiverLoading) return;
+    setWaiverLoading(true);
+    try {
+      const issued = await requestPsFeeWaiver();
+      if (!psFeeWaiver.grant(issued.token, issued.expiresAt)) throw new Error('Não foi possível guardar a autorização.');
+      close();
+      if (!inFunnel(location.pathname)) navigate('/checkout');
+    } catch (error) {
+      toast({
+        title: 'Não foi possível liberar a taxa',
+        description: error instanceof Error ? error.message : 'Tente novamente.',
+        variant: 'destructive',
+      });
+    } finally {
+      setWaiverLoading(false);
+    }
+  }, [close, location.pathname, navigate, toast, waiverLoading]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -310,9 +328,12 @@ const ExitIntentPopup: React.FC = () => {
         <div className="p-6 space-y-3">
           <button
             onClick={acceptPsOffer}
-            className="w-full bg-gradient-to-r from-pink-600 to-amber-500 text-white font-bold py-3 rounded-xl hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
+            disabled={waiverLoading}
+            className="w-full bg-gradient-to-r from-pink-600 to-amber-500 text-white font-bold py-3 rounded-xl hover:opacity-90 transition-opacity flex items-center justify-center gap-2 disabled:opacity-60"
           >
-            {psFeeYen > 0 ? `Finalizar agora e economizar ¥ ${psFeeYen.toLocaleString()}` : 'Finalizar agora'}
+            {waiverLoading
+              ? <><Loader2 className="w-4 h-4 animate-spin" /> Liberando...</>
+              : psFeeYen > 0 ? `Finalizar agora e economizar ¥ ${psFeeYen.toLocaleString()}` : 'Finalizar agora'}
           </button>
           <button
             onClick={close}

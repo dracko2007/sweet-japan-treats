@@ -2,9 +2,11 @@ import { randomInt } from 'node:crypto';
 import Stripe from 'stripe';
 import { requireAdmin, requireUser } from './_lib/auth.js';
 import { buildQuote } from './_lib/commerce.js';
+import { assertCouponEligibility } from './_lib/coupon-eligibility.js';
 import { adminDb } from './_lib/firebase-admin.js';
 import { fulfillOrder } from './_lib/fulfillment.js';
 import { recentProductSpendYen } from './_lib/loyalty-tier.js';
+import { issuePsFeeWaiver, verifyPsFeeWaiver } from './_lib/ps-fee-waiver.js';
 import { getFxRates } from './_lib/fx.js';
 import {
   assertExactKeys,
@@ -73,7 +75,7 @@ function activeByDate(value) {
   return Number.isFinite(timestamp) && timestamp > Date.now();
 }
 
-async function resolveCoupon(db, code, userDoc, customer, productSubtotalHint = 0) {
+async function resolveCoupon(db, code, userDoc, customer, productSubtotalHint = 0, userId = '') {
   if (!code) return null;
   const normalized = code.trim().toUpperCase();
   const personal = Array.isArray(userDoc?.coupons)
@@ -97,14 +99,12 @@ async function resolveCoupon(db, code, userDoc, customer, productSubtotalHint = 
     if (Array.isArray(usageSnap.data()?.usedBy) && usageSnap.data().usedBy.map((email) => String(email).toLowerCase()).includes(customer.email)) {
       throw new HttpError(409, 'coupon_already_used');
     }
-    if (coupon.targetType === 'specific' && !coupon.targetEmails?.map((email) => String(email).toLowerCase()).includes(customer.email)) {
-      throw new HttpError(403, 'coupon_not_eligible');
-    }
-    if (coupon.targetType === 'birthday') {
-      const birthdate = String(userDoc?.birthdate || '');
-      if (!birthdate || new Date(birthdate).getMonth() !== new Date().getMonth()) throw new HttpError(403, 'coupon_not_eligible');
-    }
-    if (coupon.minOrderValue && productSubtotalHint && productSubtotalHint < Number(coupon.minOrderValue)) throw new HttpError(409, 'coupon_minimum_not_met');
+    await assertCouponEligibility(db, coupon, {
+      uid: userId,
+      email: customer.email,
+      userDoc,
+      productSubtotalYen: productSubtotalHint,
+    });
     return { ...coupon, code: normalized, discountType: coupon.type === 'fixed' ? 'fixed' : 'percentage', source: 'global' };
   }
   if (affiliateSnap.exists) {
@@ -146,6 +146,7 @@ function publicOrder(order) {
     shippingCostYen: order.shippingCostYen,
     shipping: order.shipping,
     psFeeYen: order.psFeeYen,
+    psFeeWaiverApplied: order.psFeeWaiverApplied === true,
     shippingAddress: order.shippingAddress,
     items: order.items.map(({ cost, ...item }) => item),
   };
@@ -208,6 +209,68 @@ async function registrarTentativaFraude(db, customer, { attemptType, productId =
   }
 }
 
+async function handleMarkReceived(req, res) {
+  if (!handleCors(req, res, { methods: ['POST'] })) return;
+
+  try {
+    const user = await requireUser(req);
+    const body = parseJsonObject(req.body);
+    assertExactKeys(body, ['orderId']);
+    const orderId = requiredText(body.orderId, { max: 80, pattern: /^[A-Za-z0-9_-]+$/ });
+    const orderRef = adminDb().collection('orders').doc(orderId);
+    const snap = await orderRef.get();
+    if (!snap.exists) throw new HttpError(404, 'order_not_found');
+
+    const order = snap.data();
+    const tokenEmail = typeof user.email === 'string' ? user.email.trim().toLowerCase() : '';
+    const customerEmail = typeof order.customerEmail === 'string' ? order.customerEmail.trim().toLowerCase() : '';
+    const isOwner = order.userId === user.uid
+      || (tokenEmail !== '' && customerEmail !== '' && tokenEmail === customerEmail);
+    if (!isOwner) throw new HttpError(403, 'forbidden');
+
+    if (order.status === 'delivered' && order.customerConfirmedAt) {
+      res.status(200).json({ ok: true, alreadyConfirmed: true });
+      return;
+    }
+    const paid = order.paymentConfirmed === true
+      || order.fulfillmentState === 'fulfilled'
+      || ['confirmed', 'shipped', 'in_transit', 'out_for_delivery'].includes(order.status);
+    if (!paid || order.status === 'cancelled') {
+      throw new HttpError(409, 'order_not_receivable');
+    }
+
+    const now = new Date().toISOString();
+    await orderRef.update({
+      status: 'delivered',
+      updatedAt: now,
+      customerConfirmedAt: now,
+      customerConfirmedBy: tokenEmail || user.uid,
+    });
+    res.status(200).json({ ok: true });
+  } catch (error) {
+    console.error('[mark-received]', error instanceof Error ? error.message : error);
+    sendError(res, error);
+  }
+}
+
+async function handleIssuePsFeeWaiver(req, res) {
+  if (!handleCors(req, res, { methods: ['POST'] })) return;
+  try {
+    const user = await requireUser(req);
+    await enforceRateLimit(req, {
+      scope: 'ps-fee-waiver',
+      limit: 5,
+      windowMs: 60 * 60 * 1000,
+      identity: user.uid,
+    });
+    const issued = issuePsFeeWaiver(user.uid);
+    res.status(200).json({ ok: true, token: issued.token, expiresAt: issued.expiresAt });
+  } catch (error) {
+    console.error('[ps-fee-waiver]', error instanceof Error ? error.message : error);
+    sendError(res, error);
+  }
+}
+
 async function handleCreate(req, res) {
   if (!handleCors(req, res, { methods: ['POST'] })) return;
 
@@ -215,7 +278,7 @@ async function handleCreate(req, res) {
     const user = await requireUser(req);
     await enforceRateLimit(req, { scope: 'create-order', limit: 12, windowMs: 30 * 60 * 1000, identity: user.uid });
     const body = parseJsonObject(req.body);
-    assertExactKeys(body, ['orderId', 'items', 'country', 'prefecture', 'state', 'shippingCarrier', 'paymentMethod', 'couponCode', 'redeemPoints', 'negotiationId', 'promoCode', 'customer']);
+    assertExactKeys(body, ['orderId', 'items', 'country', 'prefecture', 'state', 'shippingCarrier', 'paymentMethod', 'couponCode', 'redeemPoints', 'negotiationId', 'promoCode', 'psFeeWaiverToken', 'customer']);
     const orderId = requiredText(body.orderId, { max: 40, pattern: ORDER_PATTERN });
     const requestedItems = parseItems(body.items);
     const country = requiredText(body.country, { max: 100 });
@@ -237,6 +300,7 @@ async function handleCreate(req, res) {
     const couponCode = optionalText(body.couponCode, { max: 60 }).toUpperCase();
     const promoCode = optionalText(body.promoCode, { max: 60 }).toUpperCase();
     const negotiationId = optionalText(body.negotiationId, { max: 120 });
+    const psFeeWaiverToken = optionalText(body.psFeeWaiverToken, { max: 1200 });
 
     const db = adminDb();
     const orderRef = db.collection('orders').doc(orderId);
@@ -248,6 +312,8 @@ async function handleCreate(req, res) {
       res.status(200).json({ ok: true, order: publicOrder(order), clientSecret: intent?.client_secret || null });
       return;
     }
+    const waiver = psFeeWaiverToken ? verifyPsFeeWaiver(psFeeWaiverToken, user.uid) : null;
+    if (psFeeWaiverToken && !waiver) throw new HttpError(403, 'invalid_ps_fee_waiver');
 
     const campaignSnap = promoCode ? await db.collection('promo_campaigns').doc(promoCode.toLowerCase()).get() : null;
     const campaign = campaignSnap?.exists ? campaignSnap.data() : null;
@@ -269,7 +335,7 @@ async function handleCreate(req, res) {
     ]);
     if (promoUsageSnap?.exists) throw new HttpError(409, 'promotion_already_used');
     const userData = userSnap.exists ? userSnap.data() : null;
-    const coupon = await resolveCoupon(db, couponCode, userData, customer);
+    const coupon = await resolveCoupon(db, couponCode, userData, customer, 0, user.uid);
     const negotiation = negotiationSnap?.exists ? negotiationSnap.data() : null;
     if (negotiation && negotiation.userId && negotiation.userId !== user.uid) throw new HttpError(403, 'invalid_negotiation');
     if (negotiation && negotiation.customerEmail && String(negotiation.customerEmail).toLowerCase() !== customer.email) throw new HttpError(403, 'invalid_negotiation');
@@ -291,6 +357,7 @@ async function handleCreate(req, res) {
       homePromotion: homePromoSnap.exists ? homePromoSnap.data() : null,
       rates,
       recentSpendYen,
+      psFeeWaived: Boolean(waiver),
     });
 
     const stockByProduct = new Map();
@@ -352,6 +419,8 @@ async function handleCreate(req, res) {
       redeemPoints: quote.redeemPoints,
       earnedPoints: quote.earnedPoints,
       pointsMultiplier: quote.pointsMultiplier,
+      psFeeWaiverApplied: quote.psFeeWaiverApplied,
+      psFeeWaiverId: quote.psFeeWaiverApplied ? waiver?.id || '' : '',
       promoCouponCode: campaign?.couponCode || '',
       taxAmount: quote.tax,
       shippingCarrier: carrier,
@@ -377,10 +446,25 @@ async function handleCreate(req, res) {
       customerType: user.firebase?.sign_in_provider === 'anonymous' ? 'guest' : 'registered',
     };
 
+    const waiverClaimRef = quote.psFeeWaiverApplied
+      ? db.collection('ps_fee_waiver_claims').doc(waiver.id)
+      : null;
     await db.runTransaction(async (transaction) => {
-      const current = await transaction.get(orderRef);
+      const [current, waiverClaim] = await Promise.all([
+        transaction.get(orderRef),
+        waiverClaimRef ? transaction.get(waiverClaimRef) : Promise.resolve(null),
+      ]);
       if (current.exists) throw new HttpError(409, 'order_id_conflict');
+      if (waiverClaim?.exists) throw new HttpError(409, 'ps_fee_waiver_already_used');
       transaction.create(orderRef, order);
+      if (waiverClaimRef) {
+        transaction.create(waiverClaimRef, {
+          userId: user.uid,
+          orderId,
+          expiresAt: waiver.expiresAt,
+          consumedAt: now,
+        });
+      }
     });
 
     let intent = null;
@@ -435,9 +519,11 @@ async function handleConfirmManualPayment(req, res) {
 
 export default async function handler(req, res) {
   const { action } = req.query;
+  if (action === 'mark-received') return handleMarkReceived(req, res);
   if (action === 'create') return handleCreate(req, res);
+  if (action === 'ps-fee-waiver') return handleIssuePsFeeWaiver(req, res);
   if (action === 'confirm-manual-payment') return handleConfirmManualPayment(req, res);
   return res.status(400).json({ error: 'invalid_action' });
 }
 
-export { handleCreate, handleConfirmManualPayment };
+export { handleCreate, handleMarkReceived, handleConfirmManualPayment, handleIssuePsFeeWaiver };

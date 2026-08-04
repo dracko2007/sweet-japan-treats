@@ -11,6 +11,8 @@ interface SpendItem { unitYen: number; quantity: number; freeGift?: boolean }
 interface SpendOrder {
   orderDate?: string;
   status?: string;
+  date?: string;
+  fulfillmentState?: string;
   paymentConfirmed?: boolean;
   items?: SpendItem[];
 }
@@ -44,13 +46,22 @@ describe('gasto na janela de níveis', () => {
     expect(recentProductSpendYen(orders, AGORA)).toBe(0);
   });
 
-  // A janela é o mês atual + os 2 anteriores: em agosto, junho ainda conta e
-  // maio não. É o exemplo que a loja usa para explicar o benefício.
-  it('inclui o mês mais antigo da janela e exclui o anterior a ela', () => {
-    const dentro = [pago('2026-06-01T00:00:00Z', [item(50000)])];
-    const fora = [pago('2026-05-31T23:59:59Z', [item(50000)])];
+  // Em agosto no Japão, a janela começa em 1º de junho às 00:00 JST
+  // (31/05 15:00 UTC), e não à meia-noite UTC.
+  it('vira a janela na meia-noite do Japão', () => {
+    const dentro = [pago('2026-05-31T15:00:00Z', [item(50000)])];
+    const fora = [pago('2026-05-31T14:59:59Z', [item(50000)])];
     expect(recentProductSpendYen(dentro, AGORA)).toBe(50000);
     expect(recentProductSpendYen(fora, AGORA)).toBe(0);
+  });
+
+  it('reconhece pedidos pagos antigos por status e data brasileira', () => {
+    const orders: SpendOrder[] = [{
+      date: '01/06/2026',
+      status: 'shipped',
+      items: [item(50000)],
+    }];
+    expect(recentProductSpendYen(orders, AGORA)).toBe(50000);
   });
 
   it('lista vazia ou ausente não quebra', () => {

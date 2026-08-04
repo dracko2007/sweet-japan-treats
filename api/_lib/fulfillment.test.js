@@ -128,6 +128,40 @@ describe('payment fulfillment transaction', () => {
     expect(db.get('fulfillment_events/manual:pix:O1')).toBeUndefined();
   });
 
+  it('bloqueia novo 30% na mesma transação que confirma a compra', async () => {
+    const paidWith30 = order('O1', { couponDiscountYen: 300 });
+    const db = database(paidWith30);
+    injected.db = db;
+    await fulfillOrder('O1', { provider: 'manual', reference: 'cupom30', confirmedBy: 'admin' });
+    expect(db.get('cart_recovery_profiles/user-O1')).toMatchObject({
+      blockedFrom30: true,
+      lastDiscountPercent: 30,
+    });
+  });
+
+  it('só libera o 30% quando a compra usa menos de 15%', async () => {
+    const paidWith10 = order('O1', { couponDiscountYen: 100 });
+    const db = database(paidWith10, 2, {
+      'cart_recovery_profiles/user-O1': { blockedFrom30: true, lastDiscountPercent: 30 },
+    });
+    injected.db = db;
+    await fulfillOrder('O1', { provider: 'manual', reference: 'cupom10', confirmedBy: 'admin' });
+    expect(db.get('cart_recovery_profiles/user-O1').blockedFrom30).toBe(false);
+  });
+
+  it('desconto exatamente de 15% preserva o bloqueio', async () => {
+    const paidWith15 = order('O1', { couponDiscountYen: 150 });
+    const db = database(paidWith15, 2, {
+      'cart_recovery_profiles/user-O1': { blockedFrom30: true, lastDiscountPercent: 30 },
+    });
+    injected.db = db;
+    await fulfillOrder('O1', { provider: 'manual', reference: 'cupom15', confirmedBy: 'admin' });
+    expect(db.get('cart_recovery_profiles/user-O1')).toMatchObject({
+      blockedFrom30: true,
+      lastDiscountPercent: 15,
+    });
+  });
+
   it('prevents two paid orders from exceeding a promotion cap', async () => {
     const first = order('O1', {
       cpf: '11111111111',

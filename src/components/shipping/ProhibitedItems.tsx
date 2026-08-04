@@ -203,7 +203,7 @@ const ProhibitedItems: React.FC = () => {
 
       {/* Fonte */}
       <p className="text-xs text-muted-foreground text-center">
-        Fontes: Japan Post International Restrictions · Receita Federal do Brasil · ANVISA · MAPA · Remessa Conforme 2024
+        Fontes: Japan Post International Restrictions · Receita Federal do Brasil · ANVISA · MAPA
       </p>
     </div>
   );

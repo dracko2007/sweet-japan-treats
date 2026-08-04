@@ -61,7 +61,9 @@ const OrderReview: React.FC = () => {
   const formData = location.state?.formData;
   const shipping = location.state?.shipping;
   const [couponDiscount, setCouponDiscount] = useState<number>(location.state?.couponDiscount || 0);
-  const [appliedCoupon, setAppliedCoupon] = useState<any>(location.state?.coupon || null);
+  const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; freeShipping?: boolean } | null>(
+    (location.state?.coupon as { code: string; freeShipping?: boolean } | null | undefined) ?? null,
+  );
   const psFeeYen: number = location.state?.psFeeYen || 0;
   const psFeeDiscountYen: number = location.state?.psFeeDiscountYen || 0;
   const shippingDiscountYen: number = location.state?.shippingDiscountYen || 0;
@@ -102,7 +104,7 @@ const OrderReview: React.FC = () => {
         return (['wise', 'pix', 'card'] as const).find((m) => enabledByMethod[m]) || current;
       });
     });
-  }, []);
+  }, [formData?.country]);
 
   // Redirect if no form data or shipping
   useEffect(() => {
@@ -110,6 +112,9 @@ const OrderReview: React.FC = () => {
       navigate('/checkout');
     }
   }, [formData, shipping, navigate]);
+
+  // Hook precisa executar mesmo durante o redirecionamento sem estado.
+  const recentSpendYen = useMemo(() => recentProductSpendYen(orders), [orders]);
 
   if (!formData || !shipping) {
     return null;
@@ -139,26 +144,19 @@ const OrderReview: React.FC = () => {
 
   // Gasto dos últimos 3 meses-calendário, para o multiplicador de pontos.
   // A conta mora em `utils/loyaltySpend` porque o perfil mostra o MESMO nível.
-  const recentSpendYen = useMemo(() => recentProductSpendYen(orders), [orders]);
 
   const pointsMultiplier = pointsMultiplierForSpend(recentSpendYen);
 
-  // Resgate de pontos (1 ponto = ¥1). Paga só mercadoria — nunca frete nem a
-  // taxa do personal shopper. O teto desconta o cupom porque o servidor também
-  // desconta (`api/_lib/commerce.js`); sem isso a tela deixaria arrastar até o
-  // subtotal cheio e o total exibido não bateria com o cobrado.
-  //
-  // Com desconto negociado na taxa, o resgate fica travado: o servidor recusa a
-  // combinação com `points_with_ps_negotiation`, e é melhor a trava aparecer
-  // aqui do que o pedido falhar no fim.
+  // Pontos pagam só mercadoria. Resgate parcial convive com desconto na taxa;
+  // apenas quando os pontos zeram toda a mercadoria a taxa PS volta ao valor
+  // cheio, exatamente como a cotação autoritativa do servidor.
   const availablePoints = user?.points || 0;
   const couponDiscountYen = couponDiscount > 0 ? Math.floor(yenFromConverted(couponDiscount, currency)) : 0;
-  const psFeeNegociada = psFeeDiscountYen > 0;
-  const maxRedeemable = psFeeNegociada
-    ? 0
-    : Math.min(availablePoints, Math.max(0, Math.floor((productSubtotalYen - couponDiscountYen) / POINTS.yenPerPoint)));
+  const maxRedeemable = Math.min(
+    availablePoints,
+    Math.max(0, Math.floor((productSubtotalYen - couponDiscountYen) / POINTS.yenPerPoint)),
+  );
   const redeemPoints = Math.max(0, Math.min(pointsToUse, maxRedeemable));
-  // Pedido zerado por pontos: resgate cobre toda a mercadoria após cupom.
   const netProductsAfterCouponAndPoints = productSubtotalYen - couponDiscountYen - redeemPoints;
   const pointsCoverAllProducts = productSubtotalYen > 0 && redeemPoints > 0 && netProductsAfterCouponAndPoints <= 0;
   const pointsDiscount = convertYen(redeemPoints * POINTS.yenPerPoint); // desconto na moeda exibida
@@ -196,7 +194,8 @@ const OrderReview: React.FC = () => {
   const rawShippingCost = appliedCoupon?.freeShipping ? 0 : shipping.cost;
   const shippingDiscountDisplay = convertYen(shippingDiscountYen);
   const finalShippingCost = Math.max(0, rawShippingCost - shippingDiscountDisplay);
-  const psFeeFinalYen = Math.max(0, psFeeYen - psFeeDiscountYen);
+  const effectivePsFeeDiscountYen = pointsCoverAllProducts ? 0 : psFeeDiscountYen;
+  const psFeeFinalYen = Math.max(0, psFeeYen - effectivePsFeeDiscountYen);
   const psFeeDisplay = convertYenExact(psFeeFinalYen);
   // Grand Total only includes products + shipping + PS fee (NO TAXES ADDED!)
   const grandTotal = priceAfterPix + finalShippingCost + psFeeDisplay;
@@ -219,9 +218,9 @@ const OrderReview: React.FC = () => {
     try {
       // 1. Profile coupon
       if (user?.coupons) {
-        const found = user.coupons.find((c: any) => c.code?.toUpperCase() === code && !c.isUsed);
+        const found = user.coupons.find((coupon) => coupon.code?.toUpperCase() === code && !coupon.isUsed);
         if (found) {
-          const isPromoItem = (item: any) => item.product.id.endsWith('_promo');
+          const isPromoItem = (item: (typeof items)[number]) => item.product.id.endsWith('_promo');
           const regularSubtotalYen = items.filter(i => !i.freeGift && !isPromoItem(i))
             .reduce((s, i) => s + effectiveYen(i.product, i.size) * i.quantity, 0);
           const regularSubtotal = items.filter(i => !i.freeGift && !isPromoItem(i))
@@ -237,7 +236,7 @@ const OrderReview: React.FC = () => {
         }
       }
       // 2. Global Firestore coupon
-      const isPromoItem = (item: any) => item.product.id.endsWith('_promo');
+      const isPromoItem = (item: (typeof items)[number]) => item.product.id.endsWith('_promo');
       const regularSubtotalYen = items.filter(i => !i.freeGift && !isPromoItem(i))
         .reduce((s, i) => s + effectiveYen(i.product, i.size) * i.quantity, 0);
       const globalResult = await globalCouponService.validateCouponAsync(code, user?.email || undefined, regularSubtotalYen);
@@ -311,19 +310,20 @@ const OrderReview: React.FC = () => {
         promoCode: safeStorage.getItem('promo_applied') || '',
         pointsToRedeem: redeemPoints,
         negotiationId: negotiationId || '',
+        psFeeWaiverToken: psFeeWaiver.token(),
       });
+      if (result.order.psFeeWaiverApplied === true) psFeeWaiver.clear();
       setPendingOrder(result.order);
       setStripeClientSecret(result.clientSecret || '');
       setPaymentModal(true);
     } catch (error) {
-      // A tela já trava a combinação; este é o caminho de quem chegou aqui com
-      // a página aberta desde antes da negociação ser aprovada. Sem traduzir, o
-      // cliente veria o código cru do servidor.
       const codigo = error instanceof Error ? error.message : '';
+      const waiverInvalid = codigo === 'invalid_ps_fee_waiver' || codigo === 'ps_fee_waiver_already_used';
+      if (waiverInvalid) psFeeWaiver.clear();
       toast({
         title: 'Não foi possível criar o pedido',
-        description: codigo === 'points_with_ps_negotiation'
-          ? 'Este pedido já tem desconto negociado na taxa do Personal Shopper, e os dois benefícios não se somam. Zere os pontos para continuar.'
+        description: waiverInvalid
+          ? 'A isenção da taxa expirou ou já foi usada. O total foi atualizado; tente novamente.'
           : codigo || 'Revise os itens e tente novamente.',
         variant: 'destructive',
       });
@@ -501,38 +501,32 @@ const OrderReview: React.FC = () => {
                         </span>
                         <span className="text-[11px] text-purple-700">1 ponto = ¥1</span>
                       </div>
-                      {psFeeNegociada && !pointsCoverAllProducts ? (
-                        <p className="text-xs text-purple-800 dark:text-purple-300 leading-snug">
-                          Você já tem desconto negociado na taxa do Personal Shopper neste pedido, e os dois
-                          benefícios não se somam. Para usar pontos, refaça o pedido sem o desconto da taxa.
-                        </p>
-                      ) : pointsCoverAllProducts && psFeeNegociada ? (
-                        <p className="text-xs text-orange-700 dark:text-orange-400 leading-snug">
-                          Como o pedido é pago integralmente com pontos, o desconto negociado na taxa será
-                          desconsiderado — ela será cobrada cheia.
-                        </p>
-                      ) : (
-                        <>
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="number" min={0} max={maxRedeemable}
-                              value={pointsToUse || ''}
-                              onChange={(e) => setPointsToUse(Math.max(0, Math.min(maxRedeemable, Number(e.target.value) || 0)))}
-                              placeholder="0"
-                              className="w-24 px-2 py-1.5 rounded-lg border border-purple-300 bg-background text-sm"
-                            />
-                            <button type="button" onClick={() => setPointsToUse(maxRedeemable)}
-                              className="text-xs font-semibold text-purple-700 hover:underline">Usar máx. ({maxRedeemable})</button>
-                            {redeemPoints > 0 && (
-                              <button type="button" onClick={() => setPointsToUse(0)}
-                                className="text-xs text-muted-foreground hover:underline ml-auto">limpar</button>
-                            )}
-                          </div>
-                          <p className="text-[11px] text-purple-700 mt-1.5">
-                            Vale só para os produtos — frete e taxa do Personal Shopper não podem ser pagos com pontos.
+                      <>
+                        {pointsCoverAllProducts && psFeeDiscountYen > 0 && (
+                          <p className="text-xs text-orange-700 dark:text-orange-400 leading-snug mb-2">
+                            Como os pontos cobrem todos os produtos, o desconto ou a isenção da taxa do
+                            Personal Shopper será desconsiderado — a taxa será cobrada integralmente.
                           </p>
-                        </>
-                      )}
+                        )}
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="number" min={0} max={maxRedeemable}
+                            value={pointsToUse || ''}
+                            onChange={(e) => setPointsToUse(Math.max(0, Math.min(maxRedeemable, Number(e.target.value) || 0)))}
+                            placeholder="0"
+                            className="w-24 px-2 py-1.5 rounded-lg border border-purple-300 bg-background text-sm"
+                          />
+                          <button type="button" onClick={() => setPointsToUse(maxRedeemable)}
+                            className="text-xs font-semibold text-purple-700 hover:underline">Usar máx. ({maxRedeemable})</button>
+                          {redeemPoints > 0 && (
+                            <button type="button" onClick={() => setPointsToUse(0)}
+                              className="text-xs text-muted-foreground hover:underline ml-auto">limpar</button>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-purple-700 mt-1.5">
+                          Vale só para os produtos — frete e taxa do Personal Shopper não podem ser pagos com pontos.
+                        </p>
+                      </>
                     </div>
                   )}
 
@@ -583,12 +577,12 @@ const OrderReview: React.FC = () => {
                     <div className="flex justify-between text-muted-foreground">
                       <span>Taxa Personal Shopper</span>
                       <div className="text-right">
-                        {psFeeDiscountYen > 0 && (
+                        {effectivePsFeeDiscountYen > 0 && (
                           <span className="text-xs line-through text-muted-foreground mr-1">
                             {currency === 'JPY' ? `¥ ${psFeeYen.toLocaleString()}` : `${formatPrice(convertYenExact(psFeeYen), currency, true)} (¥ ${psFeeYen.toLocaleString()})`}
                           </span>
                         )}
-                        <span className={psFeeDiscountYen > 0 ? 'text-green-600 font-semibold' : ''}>
+                        <span className={effectivePsFeeDiscountYen > 0 ? 'text-green-600 font-semibold' : ''}>
                           {currency === 'JPY' ? `¥ ${psFeeFinalYen.toLocaleString()}` : `${formatPrice(psFeeDisplay, currency, true)} (¥ ${psFeeFinalYen.toLocaleString()})`}
                         </span>
                       </div>
@@ -943,7 +937,7 @@ const OrderReview: React.FC = () => {
                       {psFeeYen > 0 && (
                         <div className="flex justify-between text-muted-foreground">
                           <span>Taxa PS</span>
-                          <span className={psFeeDiscountYen > 0 ? 'text-green-600 font-semibold' : ''}>
+                          <span className={effectivePsFeeDiscountYen > 0 ? 'text-green-600 font-semibold' : ''}>
                             {currency === 'JPY' ? `¥ ${psFeeFinalYen.toLocaleString()}` : formatPrice(psFeeDisplay, currency, true)}
                           </span>
                         </div>

@@ -1,5 +1,6 @@
 import { safeStorage } from '@/utils/storage';
 import type { Coupon } from '@/types';
+import { authenticatedFetch } from '@/services/authenticatedFetch';
 
 const isDev = import.meta.env.DEV;
 const devLog = isDev ? console.log.bind(console) : () => {};
@@ -192,9 +193,30 @@ export const couponService = {
   // NÃO é conferido aqui: `coupon_usage` é escrito e lido pelo servidor
   // (`api/_lib/fulfillment.js`), que recusa com `coupon_already_used`.
   validateCouponAsync: async (code: string, userEmail?: string, orderTotalYen?: number): Promise<{ valid: boolean; coupon?: Coupon; error?: string }> => {
-    // Carrega os cupons criados no painel antes de validar contra o local.
-    await loadCouponsFromFirestore();
-    return couponService.validateCoupon(code, userEmail, orderTotalYen);
+    try {
+      const request = userEmail ? authenticatedFetch : fetch;
+      const response = await request('/api/coupons', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code, orderTotalYen: orderTotalYen || 0 }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || payload?.ok !== true || !payload.coupon) {
+        return { valid: false, error: payload?.error || 'Cupom inválido ou indisponível.' };
+      }
+      return {
+        valid: true,
+        coupon: {
+          ...payload.coupon,
+          isActive: true,
+          usedCount: 0,
+          createdAt: '',
+        } as Coupon,
+      };
+    } catch (error) {
+      devWarn('[COUPON] Falha ao validar cupom:', error);
+      return { valid: false, error: 'Não foi possível validar o cupom agora.' };
+    }
   },
 
   // Calculate discount

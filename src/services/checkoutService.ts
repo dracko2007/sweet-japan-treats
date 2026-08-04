@@ -27,6 +27,7 @@ export interface CheckoutDraft {
   promoCode?: string;
   pointsToRedeem?: number;
   negotiationId?: string;
+  psFeeWaiverToken?: string;
 }
 
 export interface AuthoritativeCheckoutOrder {
@@ -60,7 +61,7 @@ export interface AuthoritativeCheckoutOrder {
   [key: string]: unknown;
 }
 
-async function checkoutToken(): Promise<string> {
+export async function checkoutToken(): Promise<string> {
   if (!auth) throw new Error('Autenticação indisponível. Recarregue a página.');
   const currentUser = auth.currentUser || (await signInAnonymously(auth)).user;
   return currentUser.getIdToken();
@@ -88,6 +89,7 @@ export async function prepareCheckout(
       redeemPoints: draft.pointsToRedeem || 0,
       negotiationId: draft.negotiationId || '',
       promoCode: draft.promoCode || '',
+      psFeeWaiverToken: draft.psFeeWaiverToken || '',
       customer: {
         ...draft.customer,
         postalCode: draft.shippingAddress.postalCode,

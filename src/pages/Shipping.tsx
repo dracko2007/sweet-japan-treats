@@ -87,8 +87,8 @@ const Shipping: React.FC = () => {
     const zd = daysByZone[zone] || daysByZone[5];
 
     type SimRate = { name: string; cost: number | null; time: string; consultar?: boolean; combinar?: boolean };
+    type SampleRate = { name: string; logo: string; desc: string; rate60: number; rate80: number; time: string; features: string[]; consultar?: boolean; combinar?: boolean };
     const rates: SimRate[] = [];
-
     if (billableWeightG <= 2000) {
       const yen = getELightRate(billableWeightG, zone);
       rates.push({ name: 'Japan Post E-Light ✉️', cost: yen ? fxConvert(yen, cur) : null, time: `${zd.light} ${du}` });
@@ -109,14 +109,8 @@ const Shipping: React.FC = () => {
 
   const getSimulatorTax = () => {
     if (country === 'Brasil') {
-      // Brasil: 20% federal + 17% ICMS for < R$250, 60% federal + 17% ICMS for >= R$250
-      const isBelow50USD = simValue < 250;
-      const federal = isBelow50USD ? simValue * 0.20 : (simValue * 0.60) - 62.50;
-      const icms = (simValue + federal) * 0.17;
-      return {
-        total: Math.max(0, federal + icms),
-        label: isBelow50USD ? 'Federal (20%) + ICMS (17%)' : 'Federal (60%) + ICMS (17%)'
-      };
+      // Brazil import taxes determined by customs authorities — not reliably estimated
+      return { total: 0, label: '' };
     }
     
     const vatRates: Record<string, { rate: number; label: string }> = {
@@ -528,9 +522,9 @@ const Shipping: React.FC = () => {
                       {simRates.map((rate) => (
                         <div key={rate.name} className="p-3 bg-secondary/20 rounded-xl border border-border text-center flex flex-col justify-between">
                           <span className="text-[10px] text-muted-foreground block truncate font-bold">{rate.name}</span>
-                          {(rate as any).combinar ? (
+                          {rate.combinar ? (
                             <span className="text-sm font-black text-amber-600 dark:text-amber-400 block mt-1">A combinar</span>
-                          ) : (rate as any).consultar || rate.cost === null ? (
+                          ) : rate.consultar || rate.cost === null ? (
                             <span className="text-sm font-black text-muted-foreground block mt-1">{t('shippingPage.consultar')}</span>
                           ) : (
                             <span className="text-base font-black text-primary block mt-1">{formatPrice(rate.cost as number, currency)}</span>
@@ -587,34 +581,12 @@ const Shipping: React.FC = () => {
                 
                 {country === 'Brasil' && (
                   <div className="space-y-3 text-xs leading-relaxed text-muted-foreground">
-                    <div className="bg-pink-50 dark:bg-pink-950/20 border border-pink-200 rounded-lg p-3 text-orange-850 dark:text-pink-200 font-medium">
-                      ⚠️ <strong>{t('shippingPage.customsEst')}</strong>
+                    <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 rounded-lg p-3 text-amber-800 dark:text-amber-200 font-medium">
+                      ⚠️ <strong>Aviso sobre Tributação</strong>
                     </div>
                     <p>
-                      {country === 'Brasil'
-                        ? 'International purchases from Japan are subject to customs fees at the Curitiba clearance center. We show estimates in your cart for full transparency.'
-                        : 'As compras internacionais do Japão sofrem taxação na alfândega. Apresentamos as estimativas no carrinho para sua transparência.'}
+                      Produtos enviados do Japão podem estar sujeitos a tributos, taxas e inspeção alfandegária definidos pelas autoridades do país de destino. Valores eventualmente exibidos são estimativas e não garantem cobrança final nem prazo de liberação.
                     </p>
-                    <p className="text-pink-700 dark:text-pink-400 font-semibold bg-pink-50/50 p-2 rounded">
-                      * {t('shippingPage.notaFiscal')}
-                    </p>
-                    <div className="border-t border-primary/10 pt-2.5 space-y-2">
-                      <div className="flex justify-between font-bold text-foreground">
-                        <span>{t('shippingPage.customs.below')}:</span>
-                        <span className="text-pink-600">20% Federal + 17% ICMS</span>
-                      </div>
-                      <p className="text-[10px] pl-2 border-l-2 border-border">
-                        20% simplified federal tax on customs value + 17% ICMS state tax.
-                      </p>
-
-                      <div className="flex justify-between font-bold text-foreground">
-                        <span>{t('shippingPage.customs.above')}:</span>
-                        <span className="text-pink-600">60% Federal + 17% ICMS</span>
-                      </div>
-                      <p className="text-[10px] pl-2 border-l-2 border-border">
-                        60% federal import tax (with R$ 62.50 fixed deduction) + 17% ICMS state tax.
-                      </p>
-                    </div>
                   </div>
                 )}
 
@@ -704,15 +676,15 @@ const Shipping: React.FC = () => {
                       
                       <div className="grid grid-cols-2 gap-3 pt-2.5 border-t border-border/80 text-xs">
                         <div className="bg-secondary/40 p-2 rounded-lg text-center">
-                          <span className="text-muted-foreground block text-[10px]">{(carrier as any).consultar ? t('shippingPage.box60only') : t('shippingPage.avgBox60')}</span>
-                          <span className={cn("font-sans font-black text-sm", (carrier as any).combinar ? "text-amber-600 dark:text-amber-400" : "text-primary")}>
-                            {(carrier as any).combinar ? 'A combinar' : (carrier as any).consultar ? t('shippingPage.consultar') : formatPrice(carrier.rate60, currency)}
+                          <span className="text-muted-foreground block text-[10px]">{carrier.consultar ? t('shippingPage.box60only') : t('shippingPage.avgBox60')}</span>
+                          <span className={cn("font-sans font-black text-sm", carrier.combinar ? "text-amber-600 dark:text-amber-400" : "text-primary")}>
+                            {carrier.combinar ? 'A combinar' : carrier.consultar ? t('shippingPage.consultar') : formatPrice(carrier.rate60, currency)}
                           </span>
                         </div>
                         <div className="bg-secondary/40 p-2 rounded-lg text-center">
-                          <span className="text-muted-foreground block text-[10px]">{(carrier as any).consultar ? t('shippingPage.box80only') : t('shippingPage.avgBox80')}</span>
-                          <span className={cn("font-sans font-black text-sm", (carrier as any).combinar ? "text-amber-600 dark:text-amber-400" : "text-primary")}>
-                            {(carrier as any).combinar ? 'A combinar' : (carrier as any).consultar ? t('shippingPage.consultar') : formatPrice(carrier.rate80, currency)}
+                          <span className="text-muted-foreground block text-[10px]">{carrier.consultar ? t('shippingPage.box80only') : t('shippingPage.avgBox80')}</span>
+                          <span className={cn("font-sans font-black text-sm", carrier.combinar ? "text-amber-600 dark:text-amber-400" : "text-primary")}>
+                            {carrier.combinar ? 'A combinar' : carrier.consultar ? t('shippingPage.consultar') : formatPrice(carrier.rate80, currency)}
                           </span>
                         </div>
                       </div>

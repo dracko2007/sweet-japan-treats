@@ -497,14 +497,16 @@ const KimiClawAssistant: React.FC = () => {
     const catalog = relevant
       .filter((p) => !p.hidden)
       .map((p) => {
-        const wt = packedWeightG(p.weightGrams) || (WEIGHT_BY_CATEGORY[p.category] || DEFAULT_WEIGHT).small;
+        const rawFallback = (WEIGHT_BY_CATEGORY[p.category] || DEFAULT_WEIGHT).small;
+        const wt = packedWeightG(p.weightGrams) || packedWeightG(rawFallback);
         return { id: p.id, name: productEnglishName(p), category: p.category, priceYen: p.prices?.small || 0, discount: p.discountPercent || 0, approxWeightGrams: wt };
       });
 
     if (isAdmin) {
       // Admin recebe o mesmo recorte relevante, mas incluindo ocultos/custo/peso real
       const adminCatalog: AdminCatalogItem[] = relevant.map((p) => {
-        const wt = WEIGHT_BY_CATEGORY[p.category] || DEFAULT_WEIGHT;
+        const rawWeight = WEIGHT_BY_CATEGORY[p.category] || DEFAULT_WEIGHT;
+        const wt = { small: packedWeightG(rawWeight.small), large: packedWeightG(rawWeight.large) };
         return {
           id: p.id,
           name: productEnglishName(p),
@@ -527,8 +529,8 @@ const KimiClawAssistant: React.FC = () => {
   // Calcula o peso total de um produto para uma variante/tamanho específico
   const getProductWeight = (product: Product, size: string): number => {
     if (product.weightGrams) return packedWeightG(product.weightGrams);
-    const wt = WEIGHT_BY_CATEGORY[product.category] || DEFAULT_WEIGHT;
-    return size === 'large' ? wt.large : wt.small;
+    const rawWeight = WEIGHT_BY_CATEGORY[product.category] || DEFAULT_WEIGHT;
+    return packedWeightG(size === 'large' ? rawWeight.large : rawWeight.small);
   };
 
   const handleCommandExecution = async (text: string) => {

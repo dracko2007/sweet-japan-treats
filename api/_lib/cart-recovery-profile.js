@@ -8,8 +8,8 @@ import { adminDb } from './firebase-admin.js';
  * desconto < 15% (exatamente 15% mantém bloqueado).
  *
  * Se o perfil do cliente ainda não existe, retorna `false` (liberado).
- * Erros de leitura também retornam `false` — a trava nunca deve derrubar
- * a campanha inteira.
+ * Erro de leitura retorna `true`: numa indisponibilidade é mais seguro segurar
+ * o desconto máximo do que furar a trava antiabuso.
  */
 export async function isBlockedFrom30(uid) {
   if (!uid) return false;
@@ -17,7 +17,7 @@ export async function isBlockedFrom30(uid) {
     const snap = await adminDb().collection('cart_recovery_profiles').doc(uid).get();
     return snap.data()?.blockedFrom30 === true;
   } catch {
-    return false;
+    return true;
   }
 }
 
@@ -32,27 +32,30 @@ export async function isBlockedFrom30(uid) {
  *   impõe. Usar esse desconto não prova que o cliente parou de esperar o 30%
  *   — prova apenas que está bloqueado e agindo conforme esperado.
  *
- * Sempre atualiza `lastDiscountPercent` e `updatedAt`. Falhas de escrita
- * não lançam — o chamador (fulfillment.js) envolve em try/catch que só loga.
+ * `purchaseDiscountProfileUpdate` também é usado dentro da transação de
+ * fulfillment, para confirmação da compra e trava antiabuso serem atômicas.
  */
+export function purchaseDiscountProfileUpdate(discountPercent, now = new Date()) {
+  const pct = Number.isFinite(discountPercent) ? Number(discountPercent) : 0;
+  const update = {
+    lastDiscountPercent: pct,
+    updatedAt: now.toISOString(),
+  };
+  if (pct >= 30) {
+    update.blockedFrom30 = true;
+  } else if (pct < 15) {
+    update.blockedFrom30 = false;
+  }
+  return update;
+}
+
 export async function recordPurchaseDiscount(uid, discountPercent) {
   if (!uid) return;
   try {
-    const pct = Number.isFinite(discountPercent) ? Number(discountPercent) : 0;
-    const update = {
-      lastDiscountPercent: pct,
-      updatedAt: new Date().toISOString(),
-    };
-    // Preserva o bloqueio na faixa [15, 30): não escreve `blockedFrom30`
-    // quando está nessa faixa, então a chave mantém seu valor anterior com
-    // `merge: true`.
-    if (pct >= 30) {
-      update.blockedFrom30 = true;
-    } else if (pct < 15) {
-      update.blockedFrom30 = false;
-    }
-    // else: 15 <= pct < 30, preserva o estado (omite a chave)
-    await adminDb().collection('cart_recovery_profiles').doc(uid).set(update, { merge: true });
+    await adminDb().collection('cart_recovery_profiles').doc(uid).set(
+      purchaseDiscountProfileUpdate(discountPercent),
+      { merge: true },
+    );
   } catch {
     // Falha não aborta o fluxo — quem chama deve poder ignorar erro.
   }

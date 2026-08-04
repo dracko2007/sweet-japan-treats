@@ -19,6 +19,7 @@ import {
 } from 'firebase/firestore';
 import { ensureAdminAuth } from '@/utils/adminAuth';
 import { submitPublicForm } from '@/services/publicSubmissionService';
+import { authenticatedFetch } from '@/services/authenticatedFetch';
 
 const isDev = import.meta.env.DEV;
 const devLog = isDev ? console.log.bind(console) : () => {};
@@ -85,6 +86,25 @@ export interface Affiliate {
   tierUpdatedAt?: string;          // quando o nível foi atualizado
 }
 
+export type AffiliateDashboard = Pick<
+  Affiliate,
+  | 'code'
+  | 'discountPercent'
+  | 'commissionPercent'
+  | 'active'
+  | 'expiresAt'
+  | 'totalOrders'
+  | 'totalRevenue'
+  | 'totalEarnings'
+  | 'tier'
+  | 'currentMonthRevenue'
+>;
+
+export type PendingCommissionSummary = Pick<
+  PendingCommission,
+  'id' | 'affiliateCode' | 'netYen' | 'commissionYen'
+>;
+
 const normalize = (code: string) => code.trim().toUpperCase();
 
 function monthKey(date = new Date()) {
@@ -120,12 +140,20 @@ export const affiliateService = {
   },
 
   /** Afiliados cujo dono é o e-mail dado (painel do influencer). */
-  async getByOwnerEmail(email: string): Promise<Affiliate[]> {
-    if (!db || !email) return [];
+  async getByOwnerEmail(email: string): Promise<AffiliateDashboard[]> {
+    if (!email) return [];
     try {
-      const q = query(collection(db, COL), where('ownerEmail', '==', email.toLowerCase()));
-      const snap = await getDocs(q);
-      return snap.docs.map((d) => d.data() as Affiliate);
+      const response = await authenticatedFetch('/api/affiliates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'by-owner',
+          ownerEmail: email.trim().toLowerCase(),
+        }),
+      });
+      if (!response.ok) throw new Error(`status ${response.status}`);
+      const payload = await response.json() as { affiliates?: AffiliateDashboard[] };
+      return Array.isArray(payload.affiliates) ? payload.affiliates : [];
     } catch (e) {
       devWarn('affiliateService.getByOwnerEmail falhou:', e);
       return [];
@@ -362,16 +390,20 @@ export const affiliateService = {
   },
 
   /** Comissões pendentes de um afiliado (painel do influencer). */
-  async getPendingByCode(code: string): Promise<PendingCommission[]> {
-    if (!db || !code) return [];
+  async getPendingByCode(code: string): Promise<PendingCommissionSummary[]> {
+    if (!code) return [];
     try {
-      const q = query(
-        collection(db, PENDING_COL),
-        where('affiliateCode', '==', normalize(code)),
-        where('status', '==', 'pending')
-      );
-      const snap = await getDocs(q);
-      return snap.docs.map((d) => d.data() as PendingCommission);
+      const response = await authenticatedFetch('/api/affiliates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'pending-by-code',
+          code: normalize(code),
+        }),
+      });
+      if (!response.ok) throw new Error(`status ${response.status}`);
+      const payload = await response.json() as { pending?: PendingCommissionSummary[] };
+      return Array.isArray(payload.pending) ? payload.pending : [];
     } catch (e) {
       devWarn('affiliateService.getPendingByCode falhou:', e);
       return [];

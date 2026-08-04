@@ -5,7 +5,12 @@ import { useLanguage } from '@/context/LanguageContext';
 import { COMPANY_PROFILE } from '@/config/companyProfile';
 
 const About: React.FC = () => {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const operatorDisclosure = language === 'ja'
+    ? `${COMPANY_PROFILE.brand}は、${COMPANY_PROFILE.contactName}が日本の${COMPANY_PROFILE.fulfillmentOrigin.formattedJa}から運営する海外向けオンラインストアです。`
+    : language === 'en'
+      ? `${COMPANY_PROFILE.brand} is an international store operated by ${COMPANY_PROFILE.contactName} from ${COMPANY_PROFILE.fulfillmentOrigin.formatted}.`
+      : `${COMPANY_PROFILE.brand} é uma loja internacional operada por ${COMPANY_PROFILE.contactName}, estabelecida em ${COMPANY_PROFILE.fulfillmentOrigin.formatted}.`;
 
   const values = [
     { icon: Heart, titleKey: 'aboutPage.value1.title', descKey: 'aboutPage.value1.desc' },
@@ -27,7 +32,7 @@ const About: React.FC = () => {
                 <div className="w-72 h-72 sm:w-80 sm:h-80 lg:w-96 lg:h-96 rounded-3xl overflow-hidden shadow-elevated">
                   <img
                     src="/paula-shiokawa.jpg"
-                    alt="Paula Shiokawa — Japan Express"
+                    alt={`${COMPANY_PROFILE.contactName} — ${COMPANY_PROFILE.brand}`}
                     className="w-full h-full object-cover object-top"
                   />
                 </div>
@@ -50,6 +55,7 @@ const About: React.FC = () => {
               <p className="text-muted-foreground leading-relaxed">{t('aboutPage.hero.p2')}</p>
               <p className="text-muted-foreground leading-relaxed">{t('aboutPage.hero.p3')}</p>
               <p className="text-muted-foreground leading-relaxed">{t('aboutPage.hero.p4')}</p>
+              <p className="text-muted-foreground leading-relaxed font-medium">{operatorDisclosure}</p>
               <p className="font-display font-semibold text-foreground">{t('aboutPage.hero.tagline')}</p>
             </div>
           </div>
@@ -148,13 +154,13 @@ const About: React.FC = () => {
               {t('aboutPage.ctaProducts')}
             </a>
             <a
-              href="mailto:contato@japanexpress-store.com"
+              href={`mailto:${COMPANY_PROFILE.email}`}
               className="px-8 py-3 border-2 border-primary-foreground rounded-full font-semibold hover:bg-primary-foreground/10 transition-colors"
             >
               {t('aboutPage.ctaContact')}
             </a>
             <a
-              href="https://wa.me/817013671679"
+              href={`https://wa.me/${COMPANY_PROFILE.whatsapp.digits}`}
               target="_blank"
               rel="noopener noreferrer"
               className="px-8 py-3 bg-green-500 text-white rounded-full font-semibold hover:bg-green-600 transition-colors inline-flex items-center gap-2"

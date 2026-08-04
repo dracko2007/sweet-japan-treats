@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { COMPANY_PROFILE } from '@/config/companyProfile';
 
 const SITE_URL = 'https://www.japanexpress-store.com';
 
@@ -13,7 +14,7 @@ const OrganizationJsonLd: React.FC = () => {
     const jsonLd = {
       '@context': 'https://schema.org/',
       '@type': 'Organization',
-      name: 'Japan Express',
+      name: COMPANY_PROFILE.brand,
       url: SITE_URL,
       logo: `${SITE_URL}/icons/icon-512x512.png`,
       sameAs: [
@@ -22,6 +23,20 @@ const OrganizationJsonLd: React.FC = () => {
         'https://www.tiktok.com/@japanexpressoficial',
         'https://x.com/japanexpress_of',
       ],
+      address: {
+        '@type': 'PostalAddress',
+        streetAddress: COMPANY_PROFILE.fulfillmentOrigin.addressLine1,
+        addressLocality: COMPANY_PROFILE.fulfillmentOrigin.city,
+        postalCode: COMPANY_PROFILE.fulfillmentOrigin.postalCode,
+        addressRegion: COMPANY_PROFILE.fulfillmentOrigin.prefecture,
+        addressCountry: COMPANY_PROFILE.fulfillmentOrigin.country,
+      },
+      contactPoint: {
+        '@type': 'ContactPoint',
+        contactType: 'Customer Support',
+        email: COMPANY_PROFILE.email,
+        telephone: COMPANY_PROFILE.whatsapp.international,
+      },
     };
 
     const scriptId = 'organization-jsonld';

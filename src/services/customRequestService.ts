@@ -1,7 +1,7 @@
 // Pedidos personalizados ("Faça seu Pedido") — encomendas de produtos que não
 // estão no catálogo. Cliente envia (mesmo sem login); admin lê e responde.
 import { db } from '@/config/firebase';
-import { doc, collection, getDocs, deleteDoc, updateDoc, query, orderBy } from 'firebase/firestore';
+import { doc, collection, getCountFromServer, getDocs, deleteDoc, updateDoc, query, orderBy, where } from 'firebase/firestore';
 import { ensureAdminAuth } from '@/utils/adminAuth';
 import { submitPublicForm } from '@/services/publicSubmissionService';
 
@@ -46,12 +46,19 @@ export const customRequestService = {
         snap = await getDocs(collection(db, COL)); // fallback sem índice
       }
       const list: CustomRequest[] = [];
-      snap.forEach((d) => list.push({ id: d.id, ...(d.data() as any) }));
+      snap.forEach((d) => list.push({ id: d.id, ...(d.data() as Omit<CustomRequest, 'id'>) }));
       return list.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
     } catch (e) {
       devError('[customRequest] getAll falhou:', e);
       return [];
     }
+  },
+
+  async getPendingCount(): Promise<number> {
+    if (!db) throw new Error('Firebase indisponível');
+    await ensureAdminAuth();
+    const snapshot = await getCountFromServer(query(collection(db, COL), where('status', '==', 'new')));
+    return snapshot.data().count;
   },
 
   async updateStatus(id: string, status: CustomRequest['status'], adminNote?: string): Promise<boolean> {

@@ -2,7 +2,8 @@ import { safeStorage } from '@/utils/storage';
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { db as firebaseDb, auth as firebaseAuth } from '@/config/firebase';
-import { collection, doc, setDoc, getDocs } from 'firebase/firestore';
+import { firebaseSyncService } from '@/services/firebaseSyncService';
+import { collection, getDocs } from 'firebase/firestore';
 
 const isDev = import.meta.env.DEV;
 const devLog = isDev ? console.log.bind(console) : () => {};
@@ -83,60 +84,29 @@ export default function FirebaseSync() {
 
   const migrateData = async () => {
     if (!db) {
-      addLog('❌ Firebase não inicializado', '#ef4444');
+      addLog('Firebase não inicializado', '#ef4444');
       return;
     }
 
     try {
-      addLog('🔄 Iniciando migração de dados...', '#3b82f6');
-      showStatus('🔄 Migrando dados...', 'info');
+      addLog('Iniciando migração de dados...', '#3b82f6');
+      showStatus('Migrando dados...', 'info');
+      const result = await firebaseSyncService.migrateLocalStorageToFirestore();
+      if (!result.success) throw result.error;
 
-      const usersData = safeStorage.getItem('japan-express-users');
-      if (!usersData) {
-        addLog('⚠️ Nenhum dado para migrar', '#f59e0b');
-        showStatus('⚠️ Nenhum dado encontrado no safeStorage', 'warning');
-        return;
-      }
-
-      const users = JSON.parse(usersData);
-      const userCount = Object.keys(users).length;
-      addLog(`📊 Migrando ${userCount} usuários...`, '#06b6d4');
-
-      let migratedUsers = 0;
-      let migratedOrders = 0;
-
-      for (const [email, userData] of Object.entries(users) as [string, any][]) {
-        const userId = userData.id || `user-${Date.now()}-${Math.random()}`;
-
-        const userRef = doc(db, 'users', userId);
-        await setDoc(userRef, {
-          ...userData,
-          email,
-          migratedAt: new Date().toISOString()
-        });
-        migratedUsers++;
-        addLog(`✅ Usuário migrado: ${email}`, '#22c55e');
-
-        if (userData.orders && Array.isArray(userData.orders)) {
-          for (const order of userData.orders) {
-            const orderRef = doc(db, 'orders', order.orderNumber || `order-${Date.now()}`);
-            await setDoc(orderRef, {
-              ...order,
-              userId,
-              customerEmail: email,
-              migratedAt: new Date().toISOString()
-            });
-            migratedOrders++;
-            addLog(`  └─ Pedido migrado: ${order.orderNumber}`, '#06b6d4');
-          }
-        }
-      }
-
-      addLog(`✅ Migração completa! ${migratedUsers} usuários, ${migratedOrders} pedidos`, '#22c55e');
-      showStatus(`✅ Migração completa! ${migratedUsers} usuários e ${migratedOrders} pedidos migrados para a nuvem.`, 'success');
+      const migratedUsers = 'migrated' in result ? Number(result.migrated || 0) : 0;
+      const migratedOrders = 'orders' in result ? Number(result.orders || 0) : 0;
+      addLog(
+        `Migração completa: ${migratedUsers} usuários, ${migratedOrders} pedidos`,
+        '#22c55e',
+      );
+      showStatus(
+        `${migratedUsers} usuários e ${migratedOrders} pedidos migrados para a nuvem.`,
+        'success',
+      );
     } catch (error: any) {
-      addLog('❌ Erro na migração: ' + error.message, '#ef4444');
-      showStatus('❌ Erro na migração: ' + error.message, 'error');
+      addLog('Erro na migração: ' + error.message, '#ef4444');
+      showStatus('Erro na migração: ' + error.message, 'error');
       devError(error);
     }
   };

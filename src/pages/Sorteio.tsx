@@ -6,11 +6,10 @@ import { Card, CardContent } from '@/components/ui/card';
 import { raffleService, Raffle } from '@/services/raffleService';
 import { Link } from 'react-router-dom';
 
-// Ícones de troféu personalizáveis — trocar por asset externo se necessário
-const MEDAL_ICONS = {
-  1: '🏆', // Ouro
-  2: '🥈',  // Prata
-  3: '🥉',  // Bronze
+const PODIUM_GIFS: Record<number, string> = {
+  1: '/raffle/trofeu-ouro.gif',
+  2: '/raffle/trofeu-prata.gif',
+  3: '/raffle/trofeu-bronze.gif',
 };
 
 const Sorteio: React.FC = () => {
@@ -18,25 +17,23 @@ const Sorteio: React.FC = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Tenta listener em tempo real; fallback para getRaffle se não estiver disponível
-    const unsub = raffleService.subscribe((r) => {
-      setRaffle(r);
+    let settled = false;
+    const unsub = raffleService.subscribe((value) => {
+      settled = true;
+      setRaffle(value);
       setLoading(false);
     });
-    // Fallback: se o subscribe não dispara em N ms, faz uma leitura única
     const timeout = setTimeout(async () => {
-      if (loading) {
-        const r = await raffleService.getRaffle();
-        setRaffle(r);
-        setLoading(false);
-      }
+      if (settled) return;
+      const value = await raffleService.getRaffle();
+      setRaffle(value);
+      setLoading(false);
     }, 2000);
-
     return () => {
       clearTimeout(timeout);
-      if (unsub) unsub();
+      unsub();
     };
-  }, [loading]);
+  }, []);
 
   if (loading) {
     return (
@@ -96,27 +93,34 @@ const Sorteio: React.FC = () => {
               </div>
             ) : (
               <div className="grid gap-4">
-                {sortedWinners.map((winner, idx) => {
+                {sortedWinners.map((winner) => {
                   const prize = raffle.prizes.find((p) => p.rank === winner.rank);
-                  const medal = MEDAL_ICONS[winner.rank as 1 | 2 | 3] || `#${winner.rank}`;
+                  const trophyGif = PODIUM_GIFS[winner.rank];
 
                   // Estilos para os três primeiros (ouro, prata, bronze)
                   let cardBg = '';
-                  let medalDisplay = medal;
                   if (winner.rank === 1) cardBg = 'bg-gradient-to-br from-yellow-50 to-yellow-100/50 border-yellow-300';
                   else if (winner.rank === 2) cardBg = 'bg-gradient-to-br from-gray-50 to-gray-100/50 border-gray-300';
                   else if (winner.rank === 3) cardBg = 'bg-gradient-to-br from-amber-50 to-amber-100/50 border-amber-300';
                   else cardBg = 'bg-card';
 
                   return (
-                    <Card key={`${winner.rank}-${winner.userId}`} className={cardBg + ' border-2'}>
+                    <Card key={winner.rank} className={cardBg + ' border-2'}>
                       <CardContent className="p-6">
-                        <div className="grid grid-cols-[auto_1fr_auto] gap-6 items-center">
+                        <div className="grid grid-cols-[auto_1fr] gap-6 items-center">
                           {/* Medalha animada */}
                           <div className="flex flex-col items-center">
-                            <div className={`text-6xl ${winner.rank <= 3 ? 'animate-bounce' : ''}`}>
-                              {medalDisplay}
-                            </div>
+                            {trophyGif ? (
+                              <img
+                                src={trophyGif}
+                                alt={`Troféu do ${winner.rank}º lugar`}
+                                className="h-24 w-24 object-contain"
+                              />
+                            ) : (
+                              <div className="flex h-20 w-20 items-center justify-center rounded-full bg-primary/10 text-3xl font-black text-primary">
+                                #{winner.rank}
+                              </div>
+                            )}
                             <p className="text-sm font-semibold text-muted-foreground mt-1">
                               {winner.rank}º lugar
                             </p>
@@ -127,19 +131,6 @@ const Sorteio: React.FC = () => {
                             <h3 className="text-2xl font-bold text-foreground mb-1">
                               {winner.userName}
                             </h3>
-                            <p className="text-sm text-muted-foreground mb-4">
-                              {winner.userEmail}
-                            </p>
-
-                            {/* Aviso: não segue redes */}
-                            {(!winner.followsInstagram || !winner.followsTiktok) && (
-                              <div className="mb-4 p-3 bg-amber-100/50 border border-amber-300 rounded-lg text-sm text-amber-800">
-                                ⚠️ Vencedor ainda não segue{' '}
-                                {!winner.followsInstagram && 'Instagram'}
-                                {!winner.followsInstagram && !winner.followsTiktok ? ' e ' : ''}
-                                {!winner.followsTiktok && 'TikTok'}
-                              </div>
-                            )}
 
                             {/* Prêmio */}
                             {prize && (

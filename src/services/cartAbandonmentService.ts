@@ -15,6 +15,7 @@ interface AbandonedCartSnapshot {
   totalYen: number;
   itemCount: number;
   abandonedAt: number; // epoch ms
+  reminderStage: 0;
 }
 
 /**
@@ -37,7 +38,7 @@ class CartAbandonmentService {
     totalYen: number,
   ) {
     if (!items.length) {
-      this.clear(userId);
+      await this.clear(userId);
       return;
     }
     const snapshot: AbandonedCartSnapshot = {
@@ -50,25 +51,34 @@ class CartAbandonmentService {
       totalYen,
       itemCount: items.reduce((s, i) => s + i.quantity, 0),
       abandonedAt: Date.now(),
+      reminderStage: 0,
     };
+
+    const isValidCartSnapshot =
+      snapshot.items.length >= 1 &&
+      snapshot.items.length <= 100 &&
+      Number.isInteger(snapshot.itemCount) &&
+      snapshot.itemCount > 0;
 
     // Sempre salva localmente (funciona para visitantes e logados).
     safeStorage.setItem(LOCAL_KEY, JSON.stringify(snapshot));
 
     // Logados: também grava na nuvem para o cron poder enviar e-mail.
-    if (userId && db) {
+    if (userId && db && isValidCartSnapshot) {
       try {
+        // Todo snapshot novo começa no estágio 0. O cron consulta esse campo;
+        // sem ele, a desigualdade do Firestore simplesmente omite o documento
+        // e nenhum e-mail é enviado. O set completo também reinicia a sequência
+        // quando o cliente realmente volta a mexer no carrinho.
         await setDoc(doc(db, FIRESTORE_COLL, userId), {
-          ...snapshot,
+          items: snapshot.items,
+          totalYen: snapshot.totalYen,
+          itemCount: snapshot.itemCount,
           abandonedAt: snapshot.abandonedAt,
           updatedAt: serverTimestamp(),
-          // Rearma o ciclo de lembretes: o cron (api/cart-recovery) usa
-          // reminderStage (0 = nenhum lembrete enviado, 1/2/3 = último estágio
-          // já enviado nos 3 toques de recuperação) para decidir o próximo envio.
-          // Como abandonedAt volta a "agora" a cada atualização, os e-mails só
-          // disparam quando o carrinho ficar realmente parado (90min/24h/72h).
+          reminderSent: false,
           reminderStage: 0,
-        }, { merge: true });
+        });
       } catch {
         /* silencioso — o localStorage já garante a recuperação client-side */
       }

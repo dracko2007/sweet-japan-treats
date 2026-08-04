@@ -14,6 +14,7 @@ import {
 } from './_lib/http.js';
 import { MAIL_REPLY_TO, sendMail, siteOrigin, unsubscribeUrl, wrapEmail } from './_lib/mailer.js';
 import { enforceRateLimit } from './_lib/rate-limit.js';
+import { sendPush } from './_lib/push.js';
 
 const SOURCES = new Set(['exit_intent', 'newsletter_footer', 'guide', 'cart_reminder']);
 const SHIPPING = new Set(['aereo', 'maritimo', 'container', 'combinar']);
@@ -129,7 +130,7 @@ async function persistSubmission(type, data) {
 // O formulário "Faça seu Pedido" cai numa coleção que ninguém acompanha: sem
 // aviso ativo a loja só descobre o pedido quando abre o painel por acaso —
 // foi assim que dois ficaram parados sem resposta.
-async function notifyStoreCustomRequest(data) {
+export async function notifyStoreCustomRequest(data) {
   const to = process.env.ORDER_NOTIFICATION_EMAIL || process.env.ADMIN_EMAIL;
   if (!to) return;
   const linha = (rotulo, valor) =>
@@ -145,7 +146,24 @@ async function notifyStoreCustomRequest(data) {
     + `<p style="margin:0;white-space:pre-wrap">${escapeHtml(data.productDesc || '—')}</p>`
     + `<p style="margin:16px 0 0"><a href="${siteOrigin()}/admin">Abrir no painel</a></p>`,
   );
-  await sendMail({ to, subject: `Novo pedido personalizado — ${data.name}`, html });
+  const notifications = await Promise.allSettled([
+    sendMail({ to, subject: `Novo pedido personalizado — ${data.name}`, html }),
+    sendPush({
+      emails: String(to).split(',').map((email) => email.trim()).filter(Boolean),
+      title: 'Novo pedido personalizado',
+      body: `${data.name} enviou uma nova solicitação. Abra o painel para conferir.`,
+      url: '/admin',
+      tag: 'custom-request',
+    }),
+  ]);
+  notifications.forEach((result, index) => {
+    if (result.status === 'rejected') {
+      console.error(`[public-submission] aviso ${index === 0 ? 'por e-mail' : 'push'} falhou:`, result.reason);
+    }
+  });
+  if (notifications.every((result) => result.status === 'rejected')) {
+    throw notifications[0].reason;
+  }
 }
 
 async function handleSubmission(req, res) {
