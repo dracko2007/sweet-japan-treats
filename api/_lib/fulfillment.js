@@ -2,6 +2,7 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { purchaseDiscountProfileUpdate } from './cart-recovery-profile.js';
 import { adminDb } from './firebase-admin.js';
 import { HttpError } from './http.js';
+import { buildPaymentReviewEmail, sendMail } from './mailer.js';
 
 function unique(values) {
   return [...new Set(values.filter(Boolean))];
@@ -251,12 +252,88 @@ export async function fulfillOrder(orderId, { provider, reference, confirmedBy }
   return result;
 }
 
-export async function markFulfillmentReview(orderId, reason) {
+/**
+ * Pedido pago que o `fulfillOrder` recusou.
+ *
+ * O dinheiro já entrou e a mercadoria não vai sair. Até 04/08/2026 isso era
+ * silencioso nas duas pontas: o cliente ficava esperando um pedido morto e a
+ * loja só descobria se alguém filtrasse o painel por `payment_review` — o
+ * caminho normal de descoberta era o chargeback.
+ *
+ * Três coisas acontecem aqui, nesta ordem de importância:
+ *
+ * 1. Grava o estado com o que um estorno precisa (`refundPending`,
+ *    `refundReference`, `refundAmount`). Se esta escrita falhar, o erro sobe:
+ *    é melhor o Stripe repetir o webhook do que perder o registro do único
+ *    pedido cobrado e não atendido.
+ * 2. Avisa o cliente e a loja. E-mail NUNCA derruba o fluxo — SMTP fora do ar
+ *    viraria 500, e 500 no webhook é tempestade de retry do Stripe em cima de
+ *    um pedido que já está com problema.
+ * 3. Só notifica na TRANSIÇÃO para review. O Stripe entrega evento "pelo menos
+ *    uma vez": sem essa trava, cada reentrega mandaria outro par de e-mails
+ *    para o mesmo pedido.
+ */
+export async function markFulfillmentReview(orderId, reason, { paymentIntentId = '', amount = null, currency = '' } = {}) {
   const db = adminDb();
-  await db.collection('orders').doc(orderId).set({
+  const orderRef = db.collection('orders').doc(orderId);
+  const snap = await orderRef.get();
+  const order = snap.exists ? { id: snap.id, ...snap.data() } : null;
+  const jaEstavaEmRevisao = order?.fulfillmentState === 'review';
+  const agora = new Date().toISOString();
+  const codigo = String(reason || 'fulfillment_failed').slice(0, 120);
+  const referencia = String(paymentIntentId || order?.stripePaymentIntentId || '');
+  // Uma fonte só para o banco e para os dois e-mails. Quando valor/moeda
+  // divergem do pedido, o que vale é o que saiu do cartão — é isso que precisa
+  // voltar, e é isso que o cliente vê na fatura dele.
+  const valorCobrado = amount ?? order?.totalPrice ?? null;
+  const moedaCobrada = currency || order?.currency || '';
+
+  await orderRef.set({
     status: 'payment_review',
     fulfillmentState: 'review',
-    fulfillmentError: String(reason || 'fulfillment_failed').slice(0, 120),
-    updatedAt: new Date().toISOString(),
+    fulfillmentError: codigo,
+    // O pedido foi cobrado e não vai ser separado: fica marcado como devendo
+    // estorno até alguém decidir o contrário. É esta flag que um filtro do
+    // painel usa para achar dinheiro parado, em vez de varrer status.
+    refundPending: true,
+    refundReference: referencia,
+    refundAmount: valorCobrado,
+    refundCurrency: moedaCobrada,
+    reviewedAt: jaEstavaEmRevisao ? (order?.reviewedAt || agora) : agora,
+    updatedAt: agora,
   }, { merge: true });
+
+  if (!order || jaEstavaEmRevisao) return { notified: false };
+  const paraEmail = { ...order, stripePaymentIntentId: referencia, totalPrice: valorCobrado, currency: moedaCobrada };
+  return { notified: await notificarRevisao(paraEmail, codigo) };
+}
+
+/**
+ * Os dois e-mails do estado de revisão. Cada envio é isolado: a loja precisa
+ * ser avisada mesmo que o endereço do cliente esteja inválido, e vice-versa.
+ */
+async function notificarRevisao(order, codigo) {
+  let enviados = 0;
+  if (order.customerEmail) {
+    const paraCliente = buildPaymentReviewEmail(order, { reason: codigo });
+    const ok = await sendMail({ to: order.customerEmail, ...paraCliente })
+      .then(() => true)
+      .catch((erro) => {
+        console.error('[fulfillment] falha ao avisar cliente do pedido em revisao:', erro instanceof Error ? erro.message : erro);
+        return false;
+      });
+    if (ok) enviados += 1;
+  }
+  const emailLoja = process.env.ORDER_NOTIFICATION_EMAIL || process.env.ADMIN_EMAIL;
+  if (emailLoja) {
+    const paraLoja = buildPaymentReviewEmail(order, { reason: codigo, store: true });
+    const ok = await sendMail({ to: emailLoja, ...paraLoja })
+      .then(() => true)
+      .catch((erro) => {
+        console.error('[fulfillment] falha ao avisar a loja do pedido em revisao:', erro instanceof Error ? erro.message : erro);
+        return false;
+      });
+    if (ok) enviados += 1;
+  }
+  return enviados > 0;
 }

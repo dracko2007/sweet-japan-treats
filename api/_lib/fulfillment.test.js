@@ -1,9 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const injected = vi.hoisted(() => ({ db: null }));
+const mocks = vi.hoisted(() => ({ sendMail: vi.fn() }));
 vi.mock('./firebase-admin.js', () => ({ adminDb: () => injected.db }));
+vi.mock('./mailer.js', async (importOriginal) => ({
+  // O template real vai junto: se ele quebrar, o teste do aviso quebra também.
+  // Só o envio é trocado, que é o que depende de rede.
+  ...(await importOriginal()),
+  sendMail: mocks.sendMail,
+}));
 
-const { fulfillOrder } = await import('./fulfillment.js');
+const { fulfillOrder, markFulfillmentReview } = await import('./fulfillment.js');
 
 function clone(value) {
   return value === undefined ? undefined : structuredClone(value);
@@ -24,8 +31,21 @@ class FakeDb {
     this.docs = new Map(Object.entries(initial).map(([path, value]) => [path, clone(value)]));
   }
 
+  // `markFulfillmentReview` lê e escreve FORA de transação, direto no doc ref.
+  // O fake precisa dos dois modos para cobrir os dois caminhos do arquivo.
   collection(name) {
-    return { doc: (id) => ({ path: `${name}/${id}`, id: String(id) }) };
+    const banco = this;
+    return {
+      doc: (id) => {
+        const ref = { path: `${name}/${id}`, id: String(id) };
+        ref.get = async () => banco.snapshot(ref);
+        ref.set = async (value, options) => {
+          const anterior = options?.merge ? (banco.docs.get(ref.path) || {}) : {};
+          banco.docs.set(ref.path, { ...clone(anterior), ...clone(value) });
+        };
+        return ref;
+      },
+    };
   }
 
   snapshot(ref, docs = this.docs) {
@@ -183,5 +203,98 @@ describe('payment fulfillment transaction', () => {
     await expect(fulfillOrder('O2', { provider: 'manual', reference: 'second', confirmedBy: 'admin' })).rejects.toMatchObject({ code: 'promotion_unavailable' });
     expect(db.get('siteContent/homePromotion').soldCount).toBe(1);
     expect(db.get('products/p1').stock.quantity).toBe(4);
+  });
+});
+
+// Regressão do ALTO 1 do AUDITORIA.md: o pedido era cobrado, o `fulfillOrder`
+// recusava, e o estado virava `payment_review` sem avisar ninguém e sem deixar
+// registrado o que estornar. O cliente descobria esperando; a loja, no
+// chargeback.
+describe('pedido pago que não pôde ser separado', () => {
+  const cobranca = { paymentIntentId: 'pi_123', amount: 114, currency: 'BRL' };
+
+  beforeEach(() => {
+    mocks.sendMail.mockReset().mockResolvedValue({});
+    process.env.ORDER_NOTIFICATION_EMAIL = 'loja@example.com';
+  });
+
+  it('deixa o pedido pronto para estorno', async () => {
+    const db = database(order('O1', { totalPrice: 114, currency: 'BRL' }));
+    injected.db = db;
+
+    await markFulfillmentReview('O1', 'insufficient_stock', cobranca);
+
+    expect(db.get('orders/O1')).toMatchObject({
+      status: 'payment_review',
+      fulfillmentState: 'review',
+      fulfillmentError: 'insufficient_stock',
+      refundPending: true,
+      refundReference: 'pi_123',
+      refundAmount: 114,
+      refundCurrency: 'BRL',
+    });
+  });
+
+  it('avisa o cliente e a loja', async () => {
+    injected.db = database(order('O1', { totalPrice: 114, currency: 'BRL' }));
+
+    const { notified } = await markFulfillmentReview('O1', 'insufficient_stock', cobranca);
+
+    expect(notified).toBe(true);
+    const destinatarios = mocks.sendMail.mock.calls.map((c) => c[0].to);
+    expect(destinatarios).toEqual(['o1@example.com', 'loja@example.com']);
+
+    // O cliente não pode receber jargão nem promessa que a loja talvez não
+    // cumpra; a loja precisa do motivo exato e do caminho do estorno.
+    const [aoCliente, aLoja] = mocks.sendMail.mock.calls.map((c) => c[0]);
+    expect(aoCliente.subject).toContain('#O1');
+    expect(aoCliente.html).not.toContain('insufficient_stock');
+    expect(aLoja.subject).toContain('ACAO NECESSARIA');
+    expect(aLoja.html).toContain('insufficient_stock');
+    expect(aLoja.html).toContain('dashboard.stripe.com/payments/pi_123');
+  });
+
+  // O Stripe entrega evento "pelo menos uma vez". Sem trava, cada reentrega
+  // mandaria outro par de e-mails sobre o mesmo pedido.
+  it('não repete o aviso quando o mesmo evento chega de novo', async () => {
+    injected.db = database(order('O1', { totalPrice: 114, currency: 'BRL' }));
+
+    const primeira = await markFulfillmentReview('O1', 'insufficient_stock', cobranca);
+    mocks.sendMail.mockClear();
+    const segunda = await markFulfillmentReview('O1', 'insufficient_stock', cobranca);
+
+    expect(primeira.notified).toBe(true);
+    expect(segunda.notified).toBe(false);
+    expect(mocks.sendMail).not.toHaveBeenCalled();
+  });
+
+  // SMTP fora do ar não pode virar 500 no webhook: o Stripe repetiria em cima
+  // de um pedido que já está com problema.
+  it('registra o estorno mesmo se o e-mail falhar', async () => {
+    const db = database(order('O1', { totalPrice: 114, currency: 'BRL' }));
+    injected.db = db;
+    mocks.sendMail.mockRejectedValue(new Error('smtp fora do ar'));
+
+    const { notified } = await markFulfillmentReview('O1', 'insufficient_stock', cobranca);
+
+    expect(notified).toBe(false);
+    expect(db.get('orders/O1')).toMatchObject({ refundPending: true, refundReference: 'pi_123' });
+  });
+
+  // Quando valor/moeda divergem, o pedido e a cobrança são coisas diferentes.
+  // Vale o que saiu do cartão — é isso que precisa voltar.
+  it('guarda o valor cobrado, não o valor do pedido', async () => {
+    const db = database(order('O1', { totalPrice: 114, currency: 'BRL' }));
+    injected.db = db;
+
+    await markFulfillmentReview('O1', 'payment_amount_or_currency_mismatch', {
+      paymentIntentId: 'pi_999', amount: 9999, currency: 'USD',
+    });
+
+    expect(db.get('orders/O1')).toMatchObject({ refundAmount: 9999, refundCurrency: 'USD' });
+    // O e-mail da loja tem de anunciar o que saiu do cartão ($9999.00), nunca
+    // o valor do pedido (R$ 114) — é o número que a pessoa vai estornar.
+    expect(mocks.sendMail.mock.calls[1][0].html).toContain('$9999.00');
+    expect(mocks.sendMail.mock.calls[1][0].html).not.toContain('114');
   });
 });

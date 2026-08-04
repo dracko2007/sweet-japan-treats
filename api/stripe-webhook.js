@@ -39,6 +39,23 @@ async function rawBody(req) {
   return Buffer.concat(chunks);
 }
 
+/**
+ * O que o Stripe realmente cobrou, em unidade de exibição.
+ *
+ * A API trabalha na menor unidade da moeda (centavos), menos nas de zero
+ * decimais como o iene. Guardar o número já convertido evita que o e-mail da
+ * loja anuncie "R$ 11400" quando foram R$ 114.
+ */
+function dadosDaCobranca(intent) {
+  const currency = String(intent.currency || '').toUpperCase();
+  const recebido = Number(intent.amount_received ?? intent.amount ?? 0);
+  return {
+    paymentIntentId: String(intent.id || ''),
+    amount: currency === 'JPY' ? recebido : recebido / 100,
+    currency,
+  };
+}
+
 async function notifyOrder(orderId) {
   const snap = await adminDb().collection('orders').doc(orderId).get();
   if (!snap.exists) return;
@@ -119,7 +136,9 @@ export default async function handler(req, res) {
       || intent.amount_received !== expectedAmount
       || String(intent.currency).toUpperCase() !== order.currency
     ) {
-      await markFulfillmentReview(orderId, 'payment_amount_or_currency_mismatch');
+      // O valor vem do `intent`, não do pedido: neste ramo os dois divergem, e
+      // quem vai estornar precisa saber o que saiu do cartão do cliente.
+      await markFulfillmentReview(orderId, 'payment_amount_or_currency_mismatch', dadosDaCobranca(intent));
       res.status(200).json({ received: true, review: true });
       return;
     }
@@ -134,7 +153,7 @@ export default async function handler(req, res) {
       res.status(200).json({ received: true, replay: result.replay });
     } catch (error) {
       if (error instanceof HttpError && error.statusCode === 409) {
-        await markFulfillmentReview(orderId, error.code);
+        await markFulfillmentReview(orderId, error.code, dadosDaCobranca(intent));
         res.status(200).json({ received: true, review: true });
         return;
       }

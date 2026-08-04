@@ -9,7 +9,7 @@ Estado do disco em **04/08/2026**. Auditoria mecânica (grafo de imports determi
 | Bloco | Achados |
 |---|---|
 | **Críticos** | 3 — ✅ **todos corrigidos**: cupom de recuperação com 0% de desconto; loop infinito no checkout ao escolher frete; promoção da home sem limite de unidades |
-| **Altos** | 4 — webhook Stripe processa sem assinatura; pedido pago morre em `payment_review` sem aviso; e-mail spoofado no checkout anônimo; senha admin legada em texto puro |
+| **Altos** | 4 — ✅ **1 corrigido** (pedido pago que morria em `payment_review` sem aviso); abertos: webhook Stripe processa sem assinatura; e-mail spoofado no checkout anônimo; senha admin legada em texto puro |
 | **Médios** | 4 — pontos de campanha nunca creditados; pontos não reservados; limites de promoção só valem com CPF; bônus de aniversário editável pelo cliente |
 | **Baixos** | 2 — conta de subtotal não bate na tela; admin fallback hardcoded + comparação de cron não constante |
 | **Arquivos mortos** | 52 (5.598 linhas) — ✅ **apagados** |
@@ -18,7 +18,7 @@ Estado do disco em **04/08/2026**. Auditoria mecânica (grafo de imports determi
 
 Os três críticos foram reproduzidos por mim antes de entrarem aqui, e cada
 correção tem teste de regressão provado por reversão (o teste falha sem o fix).
-A suíte saiu de 283 para 289 testes.
+A suíte saiu de 283 para 294 testes.
 
 ---
 
@@ -157,12 +157,20 @@ Não é urgente, mas é dívida: ou o símbolo virou lixo, ou o caller foi apaga
 - **Pendente (menor):** `reservedCount` já entra na conta de `remaining`, mas ainda não é gravado na criação do pedido. Enquanto não for, dois checkouts simultâneos no limite ainda dependem só da trava do fulfillment — que agora é exceção, não regra.
 - **Regressão:** `commerce.test.js` — "recusa a promoção da home quando o estoque promocional acabou", "conta as reservas em aberto no limite da promoção" e "ainda vende enquanto sobra unidade promocional". Provado: revertendo o fix, os dois primeiros falham.
 
-### ALTO 1 — Pedido pago morre em `payment_review` sem aviso nem estorno `[AUDITORIA]`
+### ALTO 1 — Pedido pago morre em `payment_review` sem aviso nem estorno `[AUDITORIA]` — ✅ **CORRIGIDO**
 
 - **Onde:** `api/stripe-webhook.js:136-140`, `api/_lib/fulfillment.js:254-262`
 - **Defeito:** qualquer 409 do `fulfillOrder` (estoque insuficiente, promoção esgotada, cupom indisponível, pontos insuficientes — 8 casos) só marca `status:'payment_review'` e responde 200 ao Stripe. O `payment_intent` **já sucedeu**. Não há estorno, não há e-mail ao cliente, não há alerta à loja.
 - **Impacto:** cliente cobrado, pedido não processado, descoberto só se alguém filtrar o painel por `payment_review`.
-- **Correção:** em `markFulfillmentReview`, notificar cliente e loja + registrar `paymentIntentId` para estorno; considerar `capture_method:'manual'` para capturar só após `fulfillOrder`.
+- **Correção aplicada:** `markFulfillmentReview` (`fulfillment.js`) foi reescrito e passou a receber os dados da cobrança do próprio `intent` (`stripe-webhook.js:dadosDaCobranca`):
+  - grava o que um estorno precisa — `refundPending: true`, `refundReference` (PaymentIntent), `refundAmount`, `refundCurrency`, `reviewedAt`. `refundPending` é a chave de filtro para o painel achar dinheiro parado sem varrer status;
+  - avisa o **cliente** (tom honesto: pedido travou, retorno em 1 dia útil, sem prometer estorno automático — parte dos motivos a loja resolve mantendo a venda) e a **loja** (ordem de serviço: motivo em português + código cru, valor, e link direto `dashboard.stripe.com/payments/<pi>`);
+  - **valor vem do `intent`, não do pedido.** No caso `payment_amount_or_currency_mismatch` os dois divergem por definição, e o que precisa voltar é o que saiu do cartão. Um teste trava essa distinção — foi ele que pegou o furo na primeira versão do meu próprio patch, que ainda lia `totalPrice` do pedido.
+- **Duas decisões de projeto, explícitas:**
+  - *Escrita no Firestore pode lançar; e-mail nunca.* Se nem registrar o estado der, é melhor o Stripe repetir o webhook do que perder o registro do pedido cobrado e não atendido. Já uma queda de SMTP viraria 500 → tempestade de retry em cima de um pedido que já está com problema.
+  - *Só notifica na transição para `review`.* O Stripe entrega evento "pelo menos uma vez"; sem essa trava, cada reentrega mandaria outro par de e-mails.
+- **Regressão:** `fulfillment.test.js`, bloco "pedido pago que não pôde ser separado" — 5 testes (handle de estorno, os dois avisos, idempotência da reentrega, e-mail que falha não derruba, valor cobrado ≠ valor do pedido). Provado: revertendo o fix, os 5 falham e os 7 antigos seguem passando.
+- **Não feito, de propósito:** estorno automático e `capture_method:'manual'`. Ver "Restante" no plano de ação — os dois são decisão de negócio, não de código.
 
 ### ALTO 2 — Webhook Stripe processa evento quando a assinatura falha `[VERIFICADO, severidade ajustada]`
 
@@ -250,10 +258,13 @@ Os arquivos **existem no disco** (são lidos pelo app e pelos scripts locais) ma
 2. ✅ Loop do `ShippingCalculator` — `ShippingCalculator.tsx:40`, com regressão.
 3. ✅ Checagem de `remaining` na promoção da home — `commerce.js:239`, com regressão.
 4. ✅ Limpeza: 52 arquivos mortos e 29 dependências removidos; typecheck, build e suíte verdes após cada corte.
+5. ✅ Aviso + handle de estorno no `payment_review` (ALTO 1) — `fulfillment.js` / `stripe-webhook.js`, com 5 regressões.
 
 ### Restante, por prioridade
 
-1. **Esta semana:** notificação + estorno no `payment_review` (ALTO 1) — hoje o cliente é cobrado e o pedido morre em silêncio. É o maior risco aberto.
+1. **Decisão de negócio, pendente de você (ALTO 1):** o estorno em si continua manual, pelo painel do Stripe — o e-mail da loja já leva o link direto. As duas alternativas, se quiser automatizar:
+   - *Estorno automático* nos 409: resolve na hora, mas é irreversível e tira da loja a chance de salvar a venda (estoque parcial, cupom vencido — casos em que hoje se negocia com o cliente).
+   - *`capture_method: 'manual'`*: autoriza no checkout e só captura depois do `fulfillOrder`. Elimina a classe inteira do problema, mas **quebra métodos assíncronos** — hoje o checkout usa `automatic_payment_methods`, e PIX/konbini não suportam captura manual. Exigiria ramificar por método.
 2. **Esta semana:** e-mail spoofado no checkout anônimo (ALTO 3) e senha admin legada em texto puro (ALTO 4).
 3. **Esta semana:** subir `strict:true` no `tsconfig.app.json` e limpar os erros — vai revelar mais defeitos do tipo "pode ser undefined".
 4. **Quando der:** gravar `reservedCount` na criação do pedido (fecha a corrida que sobra do CRÍTICO 3) e `promoPoints` (MEDIO 1, campanha de pontos credita zero hoje).
