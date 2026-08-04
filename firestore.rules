@@ -1,20 +1,24 @@
-// ⚠️ ESTE ARQUIVO NÃO ESTÁ PUBLICADO POR INTEIRO.
+// Este arquivo É o ruleset que está no ar (medido em 04/08/2026 contra o
+// projeto `localstorage-98492`: o release `cloud.firestore` apontava para o
+// ruleset `295e2b61-614e-4a07-81de-f9481d39c0a6`, byte a byte igual a este
+// arquivo). O aviso anterior — "publicado só em parte, Grupos 2/3/4 pendentes"
+// — descrevia a migração incremental de julho, que terminou em 01/08/2026.
 //
-// O ruleset no ar é uma versão CIRÚRGICA: só os blocos "seguros" deste arquivo
-// foram publicados (Grupo 1 = escrita que já vai pela API vira admin-only;
-// Grupo 5 = `write` -> `create, update, delete`). Os Grupos 2, 3 e 4 AINDA
-// NÃO FORAM publicados — precisam de teste fluxo a fluxo:
-//   - Grupo 2 (abandoned_carts, negotiations, video_reviews, push_subscriptions,
-//     eventos, users, affiliate_requests): validação campo a campo, frágil.
-//   - Grupo 3 (coupons): afrouxa leitura para público.
-//   - Grupo 4 (orders, affiliates, affiliate_pending, admins): remove
-//     capacidade do dono — quebra o "Confirmar Recebimento" do cliente.
+// Para publicar, prefira o script a `firebase deploy`:
 //
-// Rodar `firebase deploy --only firestore:rules` publica TUDO de uma vez e
-// desfaz a abordagem incremental. Não faça isso sem ter testado os fluxos
-// acima. Para publicar blocos avulsos, use o padrão da API de rulesets (ver
-// publish-rules.cjs como referência, atualizando a API para firebase-admin v14:
-// `admin.cert`, não `admin.credential.cert`).
+//   node scripts/rules-history.mjs diff       o que a publicação mudaria
+//   node scripts/rules-history.mjs publish    publica e imprime como desfazer
+//   node scripts/rules-history.mjs rollback <id>
+//
+// `firebase deploy --only firestore:rules` também funciona, mas publica sem
+// dizer o que mudou e sem deixar à mão o id anterior. Um `predeploy` no
+// `firebase.json` obriga a rodar o `diff` antes — veja
+// `scripts/guard-rules-deploy.mjs`.
+//
+// Se algo já foi publicado por engano: nada se perde. O Firebase guarda todo
+// ruleset já publicado com o fonte completo, e reverter é reapontar o release.
+// `node scripts/rules-history.mjs list` mostra o histórico (33 versões em
+// 04/08/2026, a mais antiga de fevereiro).
 rules_version = '2';
 
 service cloud.firestore {
@@ -181,6 +185,14 @@ service cloud.firestore {
     match /siteContent/{docId} {
       allow read: if true;
       allow create, update, delete: if isAdmin();
+    }
+
+    match /promo_state/{docId} {
+      // Estado da promoção da home: lista de holds com prazos por pedido.
+      // Público não pode ler: expõe ids de pedido. Público não pode escrever:
+      // apenas a API (via Admin SDK, que ignora as regras) grava e lê.
+      // Nem mesmo admin UI toca aqui — promoção está em siteContent.
+      allow read, create, update, delete: if false;
     }
 
     match /raffles/{docId} {

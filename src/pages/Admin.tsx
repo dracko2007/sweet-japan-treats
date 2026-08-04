@@ -47,6 +47,7 @@ import { customerService } from '@/services/customerService';
 import { requireAdminPassword } from '@/utils/adminGuard';
 import { negotiationService } from '@/services/negotiationService';
 import { COMPANY_PROFILE } from '@/config/companyProfile';
+import { ADMIN_EMAIL } from '@/config/admin';
 import { auth } from '@/config/firebase';
 
 const isDev = import.meta.env.DEV;
@@ -94,8 +95,10 @@ const Admin: React.FC = () => {
 
   // A lista cresce em páginas reais do Firestore; nenhum carregamento integral é feito no navegador.
 
-  // Admin email - apenas Paula pode acessar
-  const ADMIN_EMAIL = 'dracko2007@gmail.com';
+  // `ADMIN_EMAIL` (de @/config/admin) é só o destinatário do e-mail de teste
+  // desta tela. Quem barra o acesso é o guarda de sessão mais abaixo somado às
+  // regras do Firestore — o comentário antigo dizia que era esta constante, o
+  // que fazia parecer que apagá-la abriria o painel.
 
   useEffect(() => {
     // Espera o SDK resolver o estado inicial antes de qualquer leitura. Pedidos

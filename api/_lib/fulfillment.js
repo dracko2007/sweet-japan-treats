@@ -5,6 +5,7 @@ import { HttpError } from './http.js';
 import { buildPaymentReviewEmail, sendMail } from './mailer.js';
 import { semReserva } from './points-hold.js';
 import { indiceDePessoaId, promoUsageId } from './promo-identity.js';
+import { refEstadoPromo, semReservaPromo } from './promo-reserve.js';
 
 function unique(values) {
   return [...new Set(values.filter(Boolean))];
@@ -66,6 +67,7 @@ export async function fulfillOrder(orderId, { provider, reference, confirmedBy }
     const eventRef = db.collection('fulfillment_events').doc(eventId(provider, reference));
     const userRef = db.collection('users').doc(order.userId);
     const homePromoRef = db.collection('siteContent').doc('homePromotion');
+    const promoStateRef = order.homePromoQuantity ? refEstadoPromo(db) : null;
     // Sem CPF (cliente fora do Brasil) a âncora vira o uid — antes o limite
     // de promoção simplesmente não existia para esse cliente.
     const pessoa = { cpf: order.cpf, userId: order.userId };
@@ -85,6 +87,7 @@ export async function fulfillOrder(orderId, { provider, reference, confirmedBy }
       eventRef,
       userRef,
       ...(order.homePromoQuantity ? [homePromoRef] : []),
+      ...(promoStateRef ? [promoStateRef] : []),
       ...(cpfRef ? [cpfRef] : []),
       ...(promoUsageRef ? [promoUsageRef] : []),
       ...(couponRef ? [couponRef] : []),
@@ -169,6 +172,17 @@ export async function fulfillOrder(orderId, { provider, reference, confirmedBy }
     transaction.create(eventRef, { orderId, provider, reference, createdAt: new Date().toISOString() });
 
     if (nextHomePromo) transaction.set(homePromoRef, nextHomePromo);
+    if (promoStateRef) {
+      const promoStateSnap = byPath.get(promoStateRef.path);
+      const homePromoSnap = byPath.get(homePromoRef.path);
+      const promoStateAgora = promoStateSnap?.exists ? promoStateSnap.data() : null;
+      const homePromoAgora = homePromoSnap?.exists ? homePromoSnap.data() : null;
+      // Pedido pago: remover a reserva (vendido já foi somado acima no nextHomePromo).
+      // Se um checkout simultâneo estiver criando o pedido, ele vai ver o estado
+      // atual sem a unidade, e a recusa 409 acontece na transação, não no checkout.
+      const promoEstadoSemReserva = semReservaPromo(promoStateAgora, homePromoAgora, orderId);
+      transaction.set(promoStateRef, promoEstadoSemReserva);
+    }
     if (cpfRef) {
       transaction.set(cpfRef, {
         productIds: unique([...(cpfData.productIds || []), ...limitedProducts]),
@@ -321,6 +335,10 @@ export async function markFulfillmentReview(orderId, reason, { paymentIntentId =
   await liberarReserva(db, order.userId, orderId).catch((erro) => {
     console.error('[fulfillment] falha ao liberar pontos do pedido em revisao:', erro instanceof Error ? erro.message : erro);
   });
+  // Mesmo para promo state: pedido morto libera a reserva de unidade.
+  await liberarReservaPromo(db, orderId).catch((erro) => {
+    console.error('[fulfillment] falha ao liberar reserva promo do pedido em revisao:', erro instanceof Error ? erro.message : erro);
+  });
   const paraEmail = { ...order, stripePaymentIntentId: referencia, totalPrice: valorCobrado, currency: moedaCobrada };
   return { notified: await notificarRevisao(paraEmail, codigo) };
 }
@@ -341,6 +359,30 @@ async function liberarReserva(db, userId, orderId) {
       pointsHolds: semReserva(dados, orderId),
       updatedAt: new Date().toISOString(),
     });
+  });
+}
+
+/**
+ * Devolve à promoção a unidade que o pedido segurava. Transação porque vários
+ * checkouts estão mexendo no mesmo estado. Diferente de pontos: a promoção é
+ * global, não por usuário.
+ */
+async function liberarReservaPromo(db, orderId) {
+  const orderRef = db.collection('orders').doc(orderId);
+  const homePromoRef = db.collection('siteContent').doc('homePromotion');
+  const promoStateRef = refEstadoPromo(db);
+  const orderSnap = await orderRef.get();
+  if (!orderSnap.exists || !orderSnap.data()?.homePromoQuantity) return;
+  const order = orderSnap.data();
+  const homePromoSnap = await homePromoRef.get();
+  const homePromoData = homePromoSnap.exists ? homePromoSnap.data() : null;
+  if (!homePromoData) return;
+
+  await db.runTransaction(async (transaction) => {
+    const promoStateSnap = await transaction.get(promoStateRef);
+    const promoStateData = promoStateSnap.exists ? promoStateSnap.data() : null;
+    const novoEstado = semReservaPromo(promoStateData, homePromoData, orderId);
+    transaction.set(promoStateRef, novoEstado);
   });
 }
 

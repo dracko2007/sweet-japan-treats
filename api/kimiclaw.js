@@ -4,6 +4,7 @@
 // Sem nenhuma chave configurada, retorna 503 e o KimiClaw responde pelas regras (fallback).
 import { cert, getApps, initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
+import { superAdminEmail } from './_lib/auth.js';
 
 function firebaseAdminAuth() {
   if (!getApps().length) {
@@ -228,11 +229,14 @@ export default async function handler(req, res) {
     const idToken = req.headers['x-firebase-token'];
     if (idToken) {
       try {
-        const adminEmail = process.env.ADMIN_EMAIL || 'dracko2007@gmail.com';
+        // `superAdminEmail()` lança quando ADMIN_EMAIL não está configurado, e o
+        // catch abaixo trata: sem configuração ninguém é admin, que é o mesmo
+        // desfecho de um token inválido.
+        const adminEmail = superAdminEmail();
         const decoded = await firebaseAdminAuth().verifyIdToken(idToken);
         isAdmin = decoded.email?.toLowerCase() === adminEmail.toLowerCase();
       } catch {
-        // token inválido ou expirado → não-admin
+        // token inválido, expirado, ou admin não configurado → não-admin
       }
     }
 

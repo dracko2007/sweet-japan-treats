@@ -10,15 +10,15 @@ Estado do disco em **04/08/2026**. Auditoria mecânica (grafo de imports determi
 |---|---|
 | **Críticos** | 3 — ✅ **todos corrigidos**: cupom de recuperação com 0% de desconto; loop infinito no checkout ao escolher frete; promoção da home sem limite de unidades |
 | **Altos** | 4 — ✅ **todos corrigidos**: pedido pago sem aviso; webhook Stripe que mascarava segredo errado; impersonação por e-mail no checkout de convidado; senha admin em texto puro |
-| **Médios** | 4 — ✅ **todos corrigidos**: pontos de campanha nunca creditados; pontos não reservados; limites de promoção só valem com CPF; bônus de aniversário editável pelo cliente (a trava de API está no ar; a de `firestore.rules` depende de publicar o Grupo 2 — ver MEDIO 4) |
-| **Baixos** | 2 — conta de subtotal não bate na tela; admin fallback hardcoded + comparação de cron não constante |
+| **Médios** | 4 — ✅ **todos corrigidos**: pontos de campanha nunca creditados; pontos não reservados; limites de promoção só valem com CPF; bônus de aniversário editável pelo cliente |
+| **Baixos** | 2 — ✅ **todos corrigidos**: conta de subtotal não batia na tela; admin fallback hardcoded + comparação de cron não constante |
 | **Arquivos mortos** | 52 (5.598 linhas) — ✅ **apagados** |
 | **Dependências** | 29 não usadas — ✅ **removidas** do `package.json` |
 | **Falsos positivos** | 3 — segredos **não** estão commitados (verificado histórico completo, 810 commits) |
 
 Os três críticos foram reproduzidos por mim antes de entrarem aqui, e cada
 correção tem teste de regressão provado por reversão (o teste falha sem o fix).
-A suíte saiu de 283 para 330 testes.
+A suíte saiu de 283 para 374 testes, mais 77 checks de regra no emulador.
 
 ---
 
@@ -116,12 +116,12 @@ Não é urgente, mas é dívida: ou o símbolo virou lixo, ou o caller foi apaga
 
 ---
 
-> **Status (04/08/2026, após esta auditoria):** os 3 CRÍTICOS, os 4 ALTOS e os
-> 4 MÉDIOS foram corrigidos e cobertos por teste de regressão — cada teste foi
-> provado revertendo o fix e conferindo que ele falha. Ficam de fora os 2
-> BAIXOS, as duas decisões de negócio, a publicação do Grupo 2 do
-> `firestore.rules` (metade do MEDIO 4) e o `reservedCount` que sobrou do
-> CRÍTICO 3 — todos no plano de ação. Detalhe em cada item abaixo.
+> **Status (04/08/2026, após esta auditoria):** os 11 bugs de código —
+> 3 CRÍTICOS, 4 ALTOS, 4 MÉDIOS e 2 BAIXOS — estão corrigidos, cada um com
+> teste de regressão provado por reversão. A regra do `birthdate` foi publicada
+> em produção. Ficam abertas só as **duas decisões de negócio** (estorno
+> automático no ALTO 1; cupom para convidado no ALTO 3) e a dívida de
+> `strict:true` no `tsconfig.app.json`. Detalhe em cada item abaixo.
 
 ## 5. Bugs por severidade
 
@@ -157,8 +157,12 @@ Não é urgente, mas é dívida: ou o símbolo virou lixo, ou o caller foi apaga
 - **Onde:** `api/_lib/commerce.js:236-240` (a variável `remaining` aparece **1×** no arquivo — calculada e jogada fora)
 - **Defeito:** a checagem de `maxProducts` só acontece em `fulfillment.js:118`, **depois** do cartão ser cobrado. A promoção vende ilimitado no checkout; os pedidos além do limite caem em `payment_review` (ver ALTO 1).
 - **Correção aplicada:** `commerce.js:239` → `if (quantity > remaining) throw new HttpError(409, 'promotion_unavailable');`, logo após o cálculo de `remaining`. A recusa passa a acontecer na cotação, antes de cobrar. A trava atômica do `fulfillment.js:121` continua como segunda linha de defesa contra corrida.
-- **Pendente (menor):** `reservedCount` já entra na conta de `remaining`, mas ainda não é gravado na criação do pedido. Enquanto não for, dois checkouts simultâneos no limite ainda dependem só da trava do fulfillment — que agora é exceção, não regra.
-- **Regressão:** `commerce.test.js` — "recusa a promoção da home quando o estoque promocional acabou", "conta as reservas em aberto no limite da promoção" e "ainda vende enquanto sobra unidade promocional". Provado: revertendo o fix, os dois primeiros falham.
+- **Corrida fechada em 04/08/2026** (era a última pendência deste item). `reservedCount` entrava na conta de `remaining` mas ninguém gravava, então dois checkouts na última unidade passavam os dois. Agora existe `api/_lib/promo-reserve.js`, no mesmo desenho do `points-hold.js`: lista de holds com prazo, gravada num doc **só do servidor** (`promo_state/homePromotion`, fechado a todo mundo em `firestore.rules`) e revalidada **dentro** da transação que cria o pedido.
+  - **Não dá para guardar isso em `siteContent/homePromotion`**, que é o lugar óbvio: o doc é público para leitura (vazaria ids de pedido) e o painel o sobrescreve inteiro (`PromotionManager.tsx:204,224,261,287`), o que zeraria o contador a cada salvamento do admin.
+  - **Prazo por método de pagamento:** 2h no cartão (o Stripe confirma em minutos) e 24h nos métodos que a loja confirma à mão. Um prazo único de 24h seguraria unidade de flash sale por um dia inteiro a cada checkout abandonado; 2h para todos não cobriria PIX/konbini.
+  - A rodada da promoção entra na chave do estado (`productId|expiresAt`): quando o admin troca a promoção, as reservas da rodada anterior são ignoradas em vez de bloquear a nova.
+- **Regressão da checagem:** `commerce.test.js` — "recusa a promoção da home quando o estoque promocional acabou", "conta as reservas em aberto no limite da promoção" e "ainda vende enquanto sobra unidade promocional". Provado: revertendo o fix, os dois primeiros falham.
+- **Regressão da reserva:** `promo-reserve.test.js` (23 testes, aritmética) e `orders.promo-reserve.test.js` (5 testes, fiação). O que importa é o quinto: **"recusa quando a última unidade é tomada entre a cotação e a transação"** — ele move o estado na janela exata entre a leitura da cotação e a transação, que é a corrida de verdade. Os outros quatro passam já na pré-checagem e, sozinhos, deixavam apagar a revalidação atômica sem a suíte reclamar (verificado: revertendo só a transação, os 4 continuavam verdes). Provado: revertendo só a revalidação atômica, o quinto falha.
 
 ### ALTO 1 — Pedido pago morre em `payment_review` sem aviso nem estorno `[AUDITORIA]` — ✅ **CORRIGIDO**
 
@@ -235,7 +239,7 @@ Não é urgente, mas é dívida: ou o símbolo virou lixo, ou o caller foi apaga
 - **É mais fraco que CPF, e isso é aceito:** conta é de graça, CPF não. Mas "guarda fraco" é incomparavelmente melhor que "guarda nenhum", e não custa nada para quem já informa o CPF. Quem quiser o rigor do CPF fora do Brasil tem que passar a exigi-lo no checkout — decisão de conversão, não de código.
 - **Regressão:** `promo-identity.test.js` (8 testes, a âncora em si — inclusive CPF pontuado, CPF malformado e a não-colisão) e `fulfillment.test.js`, bloco "limite de promoção sem CPF" (4 testes, a fiação). Provado: revertendo a âncora para `order.cpf`, os dois casos sem CPF param de rejeitar e resolvem em vez de estourar 409.
 
-### MEDIO 4 — Bônus de aniversário depende de campo editável pelo cliente `[AUDITORIA]` — ✅ **CORRIGIDO (uma das camadas ainda não está no ar)**
+### MEDIO 4 — Bônus de aniversário depende de campo editável pelo cliente `[AUDITORIA]` — ✅ **CORRIGIDO E PUBLICADO**
 
 - **Onde:** `api/user-rewards.js:88-113` + `firestore.rules:119-124` (`birthdate` na lista `hasOnly` de campos que o dono altera).
 - **Impacto:** qualquer conta muda `birthdate` para hoje e ganha 1.000 pts (≈ ¥1.000) por conta criada.
@@ -244,19 +248,28 @@ Não é urgente, mas é dívida: ou o símbolo virou lixo, ou o caller foi apaga
   - **`api/user-rewards.js`:** idade mínima de conta de 30 dias para resgatar, lida do **Firebase Auth** (`adminAuth().getUser(uid).metadata.creationTime`), não do documento. Um campo que o cliente escreve não serve de trava — e a regra de congelamento sozinha não fecharia o caso da conta nova, criada já com a data certa.
   - **Data ilegível recusa em vez de liberar:** um `NaN` numa comparação de "menor que" passa batido e transformaria a trava em enfeite. Daí o `Number.isFinite` explícito.
 - **Regressão:** `user-rewards.test.js` — 4 testes: recusa conta com menos de 30 dias, recusa quando não dá para saber a idade, credita 1.000 no primeiro resgate do ano de conta antiga, e não credita de novo quando `birthdayBonusYear` já é o ano corrente. Provado: revertendo o fix, os dois primeiros falham.
-- **⚠️ A camada de regra ainda não está publicada.** `validUserUpdate` faz parte do **Grupo 2** do `firestore.rules`, que o cabeçalho do arquivo marca como não publicado (o ruleset no ar é cirúrgico). Ou seja: em produção o `birthdate` continua editável pelo dono. O que **está** no ar depois deste commit é a idade mínima de conta, que é código de API — e é ela que fecha o vetor real ("cria conta, aponta a data para hoje, saca 1.000 pts, repete por conta nova"). O que sobra até a regra subir é uma conta com mais de 30 dias antecipar o próprio bônus mudando a data — `birthdayBonusYear` já limita a 1× por ano civil, então o teto do abuso é adiantar um bônus que a conta ganharia de qualquer forma. Publicar o Grupo 2 exige o teste fluxo a fluxo descrito no cabeçalho do arquivo; até lá, não rode `firebase deploy --only firestore:rules`.
+- **Publicada em 04/08/2026.** O aviso do cabeçalho do `firestore.rules` estava desatualizado: dizia que os Grupos 2/3/4 nunca subiram, mas a migração incremental terminou em 01/08. Medido contra o projeto `localstorage-98492` — o ruleset no ar (`295e2b61`) era **byte a byte igual** ao arquivo, exceto por estas 4 linhas. Publicado como `4da27c2e` via `scripts/rules-history.mjs publish`. Desfazer, se precisar: `node scripts/rules-history.mjs rollback 295e2b61-614e-4a07-81de-f9481d39c0a6`.
+- **Regressão da regra:** `scripts/test-firestore-rules.mjs` roda contra o emulador e ganhou 4 casos — grava `birthdate` uma vez, recusa a troca para hoje, continua deixando editar os outros campos, e o admin ainda corrige uma data errada. Provado: removendo as 4 linhas da regra, "owner cannot move birthdate to today" falha porque a escrita passa.
 
-### BAIXO 1 — Subtotal/descontos exibidos não somam o total cobrado `[AUDITORIA]`
+### BAIXO 1 — Subtotal/descontos exibidos não somam o total cobrado `[AUDITORIA]` — ✅ **CORRIGIDO**
 
 - **Onde:** `api/_lib/fx.js:66-73` (cushion 4% + ¥5) vs `api/_lib/commerce.js:306-314` (descontos convertidos `exact:true`, sem cushion). O `total` soma só as parcelas com cushion.
 - **Impacto:** a conta na tela não bate com o cobrado (~R$2 em pedido típico). Reclamação e chargeback.
-- **Correção:** aplicar cushion uma única vez sobre o total em ienes; derivar as linhas exibidas da mesma taxa efetiva.
+- **Diagnóstico:** o subtotal saía com cushion e os descontos com a taxa exata, então `subtotal − descontos` não dava o valor de produtos que entrou no total: sobravam ~4% do desconto.
+- **A correção que NÃO foi feita, e por quê.** A leitura literal do achado — "aplicar cushion uma única vez sobre o total em ienes" — faz a soma fechar, mas passa a cobrar cushion também sobre as parcelas que hoje vão pela taxa exata. Medido num pedido típico: **R$416,11 → R$419,94, +0,92% em todo pedido**. Subir preço não é corrigir bug; foi descartado.
+- **Correção aplicada:** `total`, `totalYen` e `tax` ficam **byte a byte como eram** (conferido rodando o mesmo pedido antes e depois). O que mudou são só as linhas de cima da conta: cupom, pontos e desconto de pagamento passam a usar a **mesma taxa efetiva que produziu `productsDisplay`**, e o subtotal é derivado de volta a partir dele. O subtotal é quem absorve o arredondamento — mexer num desconto faria a tela anunciar abatimento diferente do aplicado, e mexer em produtos quebraria a soma com o total.
+- **A conta vai gravada no pedido** (`orders.js`, campo `priceBreakdown`), congelando o que o cliente viu. O câmbio muda todo dia; sem isso, uma contestação meses depois não tem como reconstruir por que o total foi aquele.
+- **Regressão:** `commerce.test.js` — "a soma das linhas exibidas fecha com o total" (com cupom, pontos, frete, taxa PS e imposto todos diferentes de zero, senão o teste passaria por vacuidade) e "o caminho do iene fica inteiro e o total exibido é o cobrado".
 
-### BAIXO 2 — Admin fallback hardcoded + cron não constante-time `[AUDITORIA]`
+### BAIXO 2 — Admin fallback hardcoded + cron não constante-time `[AUDITORIA]` — ✅ **CORRIGIDO**
 
 - **Onde:** `api/_lib/auth.js:22-24,57-58`, `api/admin.js`, `api/kimiclaw.js:231`
 - **Defeito:** `'dracko2007@gmail.com'` como fallback em 4 arquivos se `ADMIN_EMAIL` não configurado; `requireCronSecret` compara com `!==` (não `timingSafeEqual`).
-- **Correção:** falhar 503 sem `ADMIN_EMAIL`; trocar comparação por `timingSafeEqual` (já feito em `ps-fee-waiver.js:18-23`).
+- **Correção aplicada:** `superAdminEmail()` em `api/_lib/auth.js` é a única fonte, e **lança 503 `admin_not_configured`** em vez de cair num endereço pessoal — deploy sem `ADMIN_EMAIL` entregava o painel para uma caixa que não é da loja. Os 4 usos de API passaram a consumi-la; no front o literal saiu de `src/config/admin.ts` e o `Admin.tsx` deixou de redeclarar a constante.
+  - Em `requireAdmin` a ausência da variável apenas **pula** o ramo de bootstrap em vez de derrubar a requisição: quem já está gravado em `admins/{uid}` não depende dessa env var para entrar.
+  - Descoberto de quebra: o comentário do `Admin.tsx` dizia que aquela constante controlava o acesso à tela. Não controlava — é só o destinatário do e-mail de teste. Quem barra é o guarda de sessão mais as regras do Firestore. O comentário foi corrigido, porque fazia parecer que apagar a constante abriria o painel.
+- **Correção do cron:** `requireCronSecret` usa `timingSafeEqual` com a checagem de comprimento antes (buffers de tamanhos diferentes fazem a função **lançar**, não devolver `false`) — mesmo cuidado do `ps-fee-waiver.js`.
+- **Regressão:** `api/_lib/auth.test.js`, 14 testes. Provado: com o fallback de volta, 2 falham; e há caso específico para o segredo de comprimento diferente não estourar `ERR_CRYPTO_TIMING_SAFE_EQUAL_LENGTH`.
 
 ---
 
@@ -296,7 +309,11 @@ Os arquivos **existem no disco** (são lidos pelo app e pelos scripts locais) ma
 9. ✅ `promoPoints` gravado no pedido (MEDIO 1) — `commerce.js` / `orders.js`, com 4 regressões.
 10. ✅ Reserva de pontos na transação de criação (MEDIO 2) — `points-hold.js` novo, `orders.js` / `fulfillment.js`, com 11 regressões.
 11. ✅ Âncora de limite de promoção que funciona sem CPF (MEDIO 3) — `promo-identity.js` novo, `orders.js` / `fulfillment.js`, com 12 regressões.
-12. ✅ `birthdate` congelado após a primeira gravação + idade mínima de conta (MEDIO 4) — `firestore.rules` / `user-rewards.js`, com 4 regressões. A metade de API já está no ar; a regra depende de publicar o Grupo 2.
+12. ✅ `birthdate` congelado após a primeira gravação + idade mínima de conta (MEDIO 4) — `firestore.rules` / `user-rewards.js`, com 4 regressões de API e 4 de regra. **Publicado em produção** (ruleset `4da27c2e`).
+13. ✅ Conta exibida que fecha com o total cobrado (BAIXO 1) — `commerce.js`, com 2 regressões. O total cobrado ficou **inalterado**: a variante que "fechava a conta" subindo tudo para o cushion cobraria +0,92% de todo pedido e foi descartada.
+14. ✅ Fim do e-mail de admin hardcoded e comparação constante-time no cron (BAIXO 2) — `auth.js` / `admin.js` / `kimiclaw.js` / `config/admin.ts`, com 14 regressões.
+15. ✅ Reserva de unidade da promoção, fechando a corrida que sobrava do CRÍTICO 3 — `promo-reserve.js` novo, com 28 regressões.
+16. ✅ Ferramenta de regras: `scripts/rules-history.mjs` (`list`/`current`/`diff`/`publish`/`rollback`) e trava `predeploy` contra `firebase deploy` acidental. O `publish-rules.cjs` antigo estava quebrado desde a v14 do `firebase-admin` (`admin.credential.cert` deixou de existir).
 
 ### Restante, por prioridade
 
@@ -304,10 +321,12 @@ Os arquivos **existem no disco** (são lidos pelo app e pelos scripts locais) ma
    - *Estorno automático* nos 409: resolve na hora, mas é irreversível e tira da loja a chance de salvar a venda (estoque parcial, cupom vencido — casos em que hoje se negocia com o cliente).
    - *`capture_method: 'manual'`*: autoriza no checkout e só captura depois do `fulfillOrder`. Elimina a classe inteira do problema, mas **quebra métodos assíncronos** — hoje o checkout usa `automatic_payment_methods`, e PIX/konbini não suportam captura manual. Exigiria ramificar por método.
 2. **Decisão de negócio, pendente de você (ALTO 3):** convidado ainda pode reusar cupom **público** trocando de e-mail, porque o guarda "1× por cliente" é ancorado em endereço. Fechar = **proibir convidado de usar cupom**. A impersonação (cupom nominal / fidelidade de terceiro) já está fechada.
-3. **Publicação pendente (MEDIO 4):** o congelamento do `birthdate` está no `firestore.rules` mas o Grupo 2 (`users`) nunca foi publicado — o ruleset no ar é cirúrgico, e `firebase deploy --only firestore:rules` sobe tudo de uma vez, inclusive o Grupo 4, que quebra o "Confirmar Recebimento" do cliente. Ou se testa fluxo a fluxo, ou se publica só esse bloco pela API de rulesets (`publish-rules.cjs`).
-4. **Esta semana:** subir `strict:true` no `tsconfig.app.json` e limpar os erros — vai revelar mais defeitos do tipo "pode ser undefined".
-5. **Aberto, com o desenho já levantado (resto do CRÍTICO 3):** `buildQuote` já desconta `homePromotion.reservedCount` do saldo da promoção, mas **ninguém grava esse campo** — a corrida entre dois checkouts na última unidade continua existindo, e agora cai no aviso do ALTO 1 em vez de falhar calada. O reparo não é gravar um contador: `siteContent/homePromotion` é **público para leitura** (`firestore.rules:181-184`) e é **sobrescrito inteiro** pelo painel (`PromotionManager.tsx:204,224,261,287`) e por `Promotion.tsx:63`. Um contador ali seria zerado por qualquer salvamento do admin, e uma lista de reservas com prazo — que é o desenho certo, o mesmo de `points-hold.js` — vazaria ids de pedido para o navegador. Fazer direito exige um doc **só do servidor** (ex.: `promo_state/homePromotion`, sem acesso pelas regras), lido junto com a promoção na cotação e escrito na transação de criação, com a mesma poda por prazo dos pontos. Enquanto isso não existe, o campo `reservedCount` fica valendo 0 e a segunda linha de defesa é a trava atômica de `fulfillment.js:129`.
-6. **Quando tocar o arquivo:** remover exports órfãos, não criar novo.
+3. **Dívida técnica, sem prazo forçado:** subir `strict:true` no `tsconfig.app.json` e limpar os erros — vai revelar mais defeitos do tipo "pode ser undefined". Não foi feito nesta leva porque é uma varredura por `src/` inteiro, sem relação com nenhum bug aberto, e misturá-la com correções de pagamento tornaria o diff impossível de revisar.
+4. **Quando tocar o arquivo:** remover exports órfãos, não criar novo.
+
+### Lição desta leva
+
+Três dos itens acima chegaram "prontos" com teste verde que **não defendia nada**: a fiação da reserva de pontos, a âncora sem CPF e a corrida da promoção passavam com o fix revertido. O teste unitário do módulo puro dá a sensação de cobertura e não pega a remoção da chamada. Reversão isolada de **cada camada** — não só do conjunto — é o que separa teste de enfeite. Na promoção, as duas camadas mascaravam uma à outra: só reverter as duas juntas falhava, e foi preciso um teste que movesse o estado na janela entre a cotação e a transação para prender a camada atômica sozinha.
 
 ---
 

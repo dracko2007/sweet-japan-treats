@@ -143,4 +143,48 @@ describe('authoritative checkout quote', () => {
   it('pedido sem campanha não gera ponto promocional', () => {
     expect(quote().promoPoints).toBe(0);
   });
+
+  // Regressão do BAIXO 1 do AUDITORIA.md: produtos, frete e subtotal eram
+  // convertidos cada um por conta própria, com cushion de 4% mais ¥5 de buffer
+  // por linha, enquanto cupom, pontos e taxa PS iam pela taxa exata. O cushion
+  // nunca alcançava os descontos, então a conta da tela ficava 4% dos descontos
+  // acima do total cobrado — cerca de R$2 num pedido com ¥1.500 de cupom.
+  // A prova é que a soma das linhas exibidas agora fecha com o total.
+  it('a soma das linhas exibidas fecha com o total', () => {
+    const result = quote({
+      requestedItems: [{ productId: 'p1', variantId: 'small', quantity: 3 }],
+      coupon: { code: 'GLOBAL10', discountType: 'percentage', discount: 10 },
+      redeemPoints: 500,
+    });
+    const { products, shipping, psFee, tax } = result.display;
+
+    // Sem estas parcelas o teste passaria por vacuidade.
+    expect(shipping).toBeGreaterThan(0);
+    expect(psFee).toBeGreaterThan(0);
+    expect(tax).toBeGreaterThan(0);
+
+    // A invariante essencial: as linhas exibidas devem somar exatamente o total,
+    // em centavos inteiros (para evitar ruído de float).
+    const centavos = (valor) => Math.round(valor * 100);
+    expect(centavos(products) + centavos(shipping) + centavos(psFee) + centavos(tax))
+      .toBe(centavos(result.total));
+  });
+
+  // Iene não tem centavo: a taxa efetiva é 1 e cada linha exibida é o próprio
+  // valor em iene, sem sobra de arredondamento para realocar.
+  it('o caminho do iene fica inteiro e o total exibido é o cobrado', () => {
+    const result = quote({
+      country: 'Japão', prefecture: 'Tokyo', carrier: 'yuubin',
+      coupon: { code: 'GLOBAL10', discountType: 'percentage', discount: 10 },
+    });
+    const { subtotal, couponDiscount, pointsDiscount, paymentDiscount, products, shipping, psFee, tax } = result.display;
+
+    for (const valor of [subtotal, couponDiscount, products, shipping, psFee, tax, result.total]) {
+      expect(Number.isInteger(valor)).toBe(true);
+    }
+    expect(tax).toBe(0);
+    expect(result.total).toBe(result.totalYen);
+    expect(subtotal - couponDiscount - pointsDiscount - paymentDiscount).toBe(products);
+    expect(products + shipping + psFee + tax).toBe(result.total);
+  });
 });

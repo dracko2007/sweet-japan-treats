@@ -304,17 +304,37 @@ export function buildQuote({ requestedItems, products, country, prefecture, stat
   const shippingDiscountYen = approved && negotiation.type === 'shipping' ? Math.min(shipping.amount, Number(negotiation.approvedDiscountYen || 0)) : 0;
   const finalShippingYen = Math.max(0, shipping.amount - shippingDiscountYen);
   const currency = currencyForCountry(country);
-  const subtotal = normalizeMoney(convertYen(productSubtotalYen, currency, rates), currency);
-  const couponDiscount = normalizeMoney(convertYen(couponDiscountYen, currency, rates, { exact: true }), currency);
-  const pointsDiscount = normalizeMoney(convertYen(pointsDiscountYen, currency, rates, { exact: true }), currency);
-  const paymentDiscount = normalizeMoney(convertYen(paymentDiscountYen, currency, rates, { exact: true }), currency);
+
+  // O total e as parcelas que o compõem ficam EXATAMENTE como eram: este achado
+  // é de conta que não fecha na tela, não de preço. Passar tudo pelo cushion de
+  // uma vez "arrumaria" a soma, mas subiria ~0,9% o valor cobrado de todo
+  // pedido (medido: R$416,11 → R$419,94), o que é decisão de preço, não de bug.
   const productsDisplay = normalizeMoney(convertYen(netProductsYen, currency, rates), currency);
   const shippingDisplay = normalizeMoney(convertYen(finalShippingYen, currency, rates), currency);
   const psFeeDisplay = normalizeMoney(convertYen(psFeeYen - psDiscountYen, currency, rates, { exact: true }), currency);
   const taxDisplay = country === 'Japão' ? 0 : normalizeMoney(displayTax(productsDisplay, country, state || prefecture), currency);
   const total = normalizeMoney(productsDisplay + shippingDisplay + psFeeDisplay + taxDisplay, currency);
   if (!(total > 0)) throw new HttpError(400, 'invalid_total');
-  
+
+  // O defeito era só nas linhas de cima da conta: subtotal saía com cushion e
+  // os descontos com a taxa exata, então "subtotal − descontos" não dava o valor
+  // de produtos que entrou no total — sobravam ~4% do desconto (uns R$2 num
+  // cupom de ¥1.500). Agora os descontos usam a MESMA taxa efetiva que produziu
+  // `productsDisplay`, e o subtotal é derivado de volta a partir dele.
+  const taxaEfetiva = netProductsYen > 0 ? productsDisplay / netProductsYen : 0;
+  const linha = (valorYen) => normalizeMoney(valorYen * taxaEfetiva, currency);
+  const couponDiscountDisplay = linha(couponDiscountYen);
+  const pointsDiscountDisplay = linha(pointsDiscountYen);
+  const paymentDiscountDisplay = linha(paymentDiscountYen);
+  // O subtotal absorve o arredondamento porque é a única linha da conta que não
+  // é uma promessa: mexer num desconto faria a tela anunciar um abatimento
+  // diferente do que foi de fato aplicado, e mexer em produtos quebraria a soma
+  // com o total.
+  const subtotalDisplay = normalizeMoney(
+    productsDisplay + couponDiscountDisplay + pointsDiscountDisplay + paymentDiscountDisplay,
+    currency,
+  );
+
   // Pontos da campanha "Compre e Ganhe pontos". Até 04/08/2026 o
   // `fulfillment.js` somava `order.promoPoints` no saldo, mas ninguém gravava
   // esse campo — a campanha era anunciada por e-mail/push e creditava zero.
@@ -347,6 +367,22 @@ export function buildQuote({ requestedItems, products, country, prefecture, stat
     psFeeYen: psFeeYen - psDiscountYen,
     psFeeWaiverApplied,
     tax: normalizeMoney(taxDisplay, currency),
+    // A conta decomposta, com as linhas já coerentes entre si:
+    // `subtotal - couponDiscount - pointsDiscount - paymentDiscount == products`
+    // e `products + shipping + psFee + tax == total`. Vai gravada no pedido
+    // (`orders.js`, campo `priceBreakdown`) para congelar o que o cliente viu no
+    // momento da compra — sem isso, uma variação de câmbio depois torna
+    // impossível reconstruir a conta numa contestação.
+    display: {
+      subtotal: subtotalDisplay,
+      couponDiscount: couponDiscountDisplay,
+      pointsDiscount: pointsDiscountDisplay,
+      paymentDiscount: paymentDiscountDisplay,
+      products: productsDisplay,
+      shipping: shippingDisplay,
+      psFee: psFeeDisplay,
+      tax: taxDisplay,
+    },
     homePromoQuantity,
     items: lineItems.map((item) => ({
       productId: item.productId,
@@ -358,7 +394,6 @@ export function buildQuote({ requestedItems, products, country, prefecture, stat
       quantity: item.quantity,
       unitYen: item.unitYen,
       price: normalizeMoney(convertYen(item.unitYen, currency, rates), currency),
-      cost: Number(item.product.cost || 0),
       freeGift: item.freeGift,
       homePromo: item.homePromo,
       stockUnlimited: item.product.stock?.unlimited !== false,

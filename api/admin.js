@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { FieldPath, Timestamp } from 'firebase-admin/firestore';
-import { requireAdmin } from './_lib/auth.js';
+import { requireAdmin, superAdminEmail } from './_lib/auth.js';
 import { adminAuth, adminDb } from './_lib/firebase-admin.js';
 import {
   assertExactKeys,
@@ -189,7 +189,7 @@ async function handleCouponUsage(req, res) {
 
 // ── admin-session.js ─────────────────────────────────────────────────
 // Autentica exclusivamente SUB-ADMINS (username + senha, migrados para conta
-// Firebase Auth real). O super-admin (dracko2007@gmail.com) autentica direto
+// Firebase Auth real). O super-admin (o e-mail de `ADMIN_EMAIL`) autentica direto
 // no Identity Toolkit a partir do client (src/services/adminService.ts) —
 // sem depender desta função serverless, então login continua funcionando
 // mesmo sem `vercel dev`/API local.
@@ -292,7 +292,7 @@ function authEmail(username) {
 async function effectiveRole(user) {
   if (Number(user.adminRole) === 3) return 3;
   const email = String(user.email || '').toLowerCase();
-  const superEmail = String(process.env.ADMIN_EMAIL || process.env.VITE_ADMIN_EMAIL || 'dracko2007@gmail.com').toLowerCase();
+  const superEmail = superAdminEmail().toLowerCase();
   if (email && email === superEmail) return 3;
   const snap = await adminDb().collection('admins').doc(user.uid).get();
   return snap.exists && snap.data()?.active === true ? Number(snap.data()?.role) || 0 : 0;
@@ -370,7 +370,7 @@ async function removeAdmin(body, manager) {
   if (document.id === manager.uid) throw new HttpError(409, 'cannot_remove_self');
 
   const data = document.data() || {};
-  if (String(data.username || document.id).toLowerCase() === String(process.env.ADMIN_EMAIL || process.env.VITE_ADMIN_EMAIL || 'dracko2007@gmail.com').toLowerCase()) {
+  if (String(data.username || document.id).toLowerCase() === superAdminEmail().toLowerCase()) {
     throw new HttpError(403, 'cannot_remove_super_admin');
   }
   if (document.id.startsWith('admin_')) {

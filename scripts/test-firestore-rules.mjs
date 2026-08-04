@@ -100,6 +100,29 @@ try {
     updateDoc(doc(userDb, 'users', 'u1'), { socialFollows: { instagram: true } }),
     'owner cannot edit social reward state',
   );
+
+  // MEDIO 4 do AUDITORIA.md: `birthdate` decide um bônus de 1.000 pontos, mas
+  // está na lista de campos que o dono edita. Sem congelar, a mesma conta
+  // aponta a data para hoje quantas vezes quiser. A regra deixa gravar UMA vez
+  // (o cadastro normal continua funcionando) e recusa a troca depois disso.
+  await succeeds(
+    updateDoc(doc(userDb, 'users', 'u1'), { birthdate: '1990-05-10' }),
+    'owner sets birthdate once',
+  );
+  await fails(
+    updateDoc(doc(userDb, 'users', 'u1'), { birthdate: '2026-08-04' }),
+    'owner cannot move birthdate to today',
+  );
+  // A trava não pode pegar quem só edita o resto do cadastro.
+  await succeeds(
+    updateDoc(doc(userDb, 'users', 'u1'), { phone: '09012345678' }),
+    'owner still edits other fields after birthdate is frozen',
+  );
+  // Correção legítima continua possível pelo admin, que é quem atende o cliente.
+  await succeeds(
+    updateDoc(doc(adminDb, 'users', 'u1'), { birthdate: '1991-06-11' }),
+    'admin fixes a wrong birthdate',
+  );
   await fails(getDoc(doc(otherDb, 'users', 'u1')), 'other user cannot read profile');
   await succeeds(getDoc(doc(userDb, 'users', 'u1')), 'owner reads profile');
   await succeeds(
@@ -284,6 +307,13 @@ try {
   await succeeds(getDoc(doc(anonymousDb, 'affiliates', 'CODE1')), 'public validates one affiliate code');
   await fails(getDocs(collection(anonymousDb, 'affiliates')), 'public cannot list affiliates');
 
+
+  // promo_state é fechado: holds de pedido não devem vazar para clientes.
+  // Admin SDK ignora as regras, então só testamos leitura/escrita de clientes.
+  await fails(getDoc(doc(userDb, 'promo_state', 'homePromotion')), 'user cannot read promo_state');
+  await fails(setDoc(doc(userDb, 'promo_state', 'homePromotion'), { holds: [] }), 'user cannot write promo_state');
+  await fails(getDoc(doc(anonymousDb, 'promo_state', 'homePromotion')), 'anonymous cannot read promo_state');
+  await fails(setDoc(doc(anonymousDb, 'promo_state', 'homePromotion'), { holds: [] }), 'anonymous cannot write promo_state');
   console.log(`Firestore rules preflight passed: ${checks} checks`);
 } finally {
   await environment.cleanup();

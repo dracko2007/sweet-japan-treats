@@ -5,6 +5,7 @@ import { buildQuote } from './_lib/commerce.js';
 import { assertCouponEligibility } from './_lib/coupon-eligibility.js';
 import { adminDb } from './_lib/firebase-admin.js';
 import { comReserva, pontosDisponiveis } from './_lib/points-hold.js';
+import { comReservaPromo, quantidadeReservada, refEstadoPromo, semReservaPromo } from './_lib/promo-reserve.js';
 import { indiceDePessoaId, promoUsageId } from './_lib/promo-identity.js';
 import { fulfillOrder } from './_lib/fulfillment.js';
 import { recentProductSpendYen } from './_lib/loyalty-tier.js';
@@ -331,9 +332,10 @@ async function handleCreate(req, res) {
     const pessoa = { cpf: customer.cpf, userId: user.uid };
     const cpfIndexId = indiceDePessoaId(pessoa);
     const usoPromoId = promoUsageId(promoCode, pessoa);
-    const [userSnap, homePromoSnap, negotiationSnap, cpfSnap, promoUsageSnap, recentSpendYen] = await Promise.all([
+    const [userSnap, homePromoSnap, promoStateSnap, negotiationSnap, cpfSnap, promoUsageSnap, recentSpendYen] = await Promise.all([
       db.collection('users').doc(user.uid).get(),
       db.collection('siteContent').doc('homePromotion').get(),
+      refEstadoPromo(db).get(),
       negotiationId ? db.collection('negotiations').doc(negotiationId).get() : Promise.resolve(null),
       // Mesma âncora do `fulfillment.js`: CPF quando existe, senão a conta.
       // Sem isso a pré-checagem olhava um documento diferente do que a
@@ -357,6 +359,9 @@ async function handleCreate(req, res) {
     // antes de qualquer cobrança. A palavra final continua sendo a da transação.
     if (requestedPoints > pontosDisponiveis(userData)) throw new HttpError(409, 'insufficient_points');
     const rates = await getFxRates();
+    const homePromoData = homePromoSnap.exists ? homePromoSnap.data() : null;
+    const promoStateData = promoStateSnap.exists ? promoStateSnap.data() : null;
+    const reservedCount = homePromoData ? quantidadeReservada(promoStateData, homePromoData) : 0;
     const quote = buildQuote({
       requestedItems,
       products,
@@ -369,7 +374,7 @@ async function handleCreate(req, res) {
       redeemPoints: requestedPoints,
       negotiation,
       campaign,
-      homePromotion: homePromoSnap.exists ? homePromoSnap.data() : null,
+      homePromotion: homePromoData ? { ...homePromoData, reservedCount } : null,
       rates,
       recentSpendYen,
       psFeeWaived: Boolean(waiver),
@@ -439,6 +444,10 @@ async function handleCreate(req, res) {
       psFeeWaiverId: quote.psFeeWaiverApplied ? waiver?.id || '' : '',
       promoCouponCode: campaign?.couponCode || '',
       taxAmount: quote.tax,
+      // A conta decomposta como o cliente viu, congelada. O câmbio muda todo
+      // dia; sem isso, uma contestação meses depois não tem como reconstruir
+      // por que o total foi aquele.
+      priceBreakdown: quote.display,
       shippingCarrier: carrier,
       shippingCostYen: quote.shippingYen,
       shipping: { carrier, cost: quote.shippingYen, weightG: quote.shippingWeightG },
@@ -469,11 +478,15 @@ async function handleCreate(req, res) {
     // A reserva só entra quando há resgate: pedido sem pontos não paga o custo
     // de ler e reescrever o documento do usuário.
     const userRefParaReserva = quote.redeemPoints > 0 ? db.collection('users').doc(user.uid) : null;
+    // Reserva da unidade da promoção da home: só quando há quantidade promocional
+    // e a promoção está ativa.
+    const promoStateRef = quote.homePromoQuantity > 0 ? refEstadoPromo(db) : null;
     await db.runTransaction(async (transaction) => {
-      const [current, waiverClaim, userAtual] = await Promise.all([
+      const [current, waiverClaim, userAtual, promoStateAtual] = await Promise.all([
         transaction.get(orderRef),
         waiverClaimRef ? transaction.get(waiverClaimRef) : Promise.resolve(null),
         userRefParaReserva ? transaction.get(userRefParaReserva) : Promise.resolve(null),
+        promoStateRef ? transaction.get(promoStateRef) : Promise.resolve(null),
       ]);
       if (current.exists) throw new HttpError(409, 'order_id_conflict');
       if (waiverClaim?.exists) throw new HttpError(409, 'ps_fee_waiver_already_used');
@@ -487,6 +500,30 @@ async function handleCreate(req, res) {
           pointsHolds: comReserva(userAgora, orderId, quote.redeemPoints),
           updatedAt: now,
         });
+      }
+      // Revalidação atômica do saldo da promoção: a checagem lá em cima roda
+      // fora de transação. Se dois checkouts saem da checagem e chegam aqui, um
+      // deles vai ver o saldo já reservado e ser recusado. Mesma defesa dos
+      // pontos, mas para unidades em vez de saldo numérico.
+      if (promoStateRef) {
+        const promoStateAgora = promoStateAtual?.exists ? promoStateAtual.data() : null;
+        const promoAgora = promoStateAgora ? quantidadeReservada(promoStateAgora, homePromoData) : 0;
+        // Retentativa do MESMO pedido não pode competir consigo mesma: o hold
+        // anterior dele já está contado em `promoAgora`, e gravar de novo apenas
+        // substitui aquele espaço em vez de pedir um novo.
+        const holdDestePedido = (promoStateAgora?.holds || [])
+          .find((hold) => hold.orderId === orderId && Number(hold.expiresAt || 0) > Date.now());
+        const promoAgoraExcluindoEste = promoAgora - Number(holdDestePedido?.quantity || 0);
+        const remaining = homePromoData.maxProducts == null
+          ? Infinity
+          : Number(homePromoData.maxProducts) - Number(homePromoData.soldCount || 0) - promoAgoraExcluindoEste;
+        if (quote.homePromoQuantity > remaining) throw new HttpError(409, 'promotion_unavailable');
+        const novoEstado = comReservaPromo(promoStateAgora, homePromoData, {
+          orderId,
+          quantity: quote.homePromoQuantity,
+          paymentMethod,
+        });
+        transaction.set(promoStateRef, novoEstado);
       }
       transaction.create(orderRef, order);
       if (waiverClaimRef) {
