@@ -74,9 +74,12 @@ export default async function handler(req, res) {
       : [];
     if (email && usedBy.includes(email)) throw new HttpError(409, 'coupon_already_used');
 
+    // Mesma régua do `orders.js`: se o pedido vai recusar por identidade não
+    // provada, a tela não pode anunciar o desconto antes.
     await assertCouponEligibility(db, coupon, {
       uid: user?.uid || '',
       email,
+      emailVerified: user?.email_verified === true && Boolean(user?.email),
       userDoc,
       productSubtotalYen: orderTotalYen,
     });

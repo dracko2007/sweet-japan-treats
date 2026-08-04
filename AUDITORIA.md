@@ -9,7 +9,7 @@ Estado do disco em **04/08/2026**. Auditoria mecânica (grafo de imports determi
 | Bloco | Achados |
 |---|---|
 | **Críticos** | 3 — ✅ **todos corrigidos**: cupom de recuperação com 0% de desconto; loop infinito no checkout ao escolher frete; promoção da home sem limite de unidades |
-| **Altos** | 4 — ✅ **1 corrigido** (pedido pago que morria em `payment_review` sem aviso); abertos: webhook Stripe processa sem assinatura; e-mail spoofado no checkout anônimo; senha admin legada em texto puro |
+| **Altos** | 4 — ✅ **3 corrigidos** (pedido pago sem aviso; impersonação por e-mail no checkout de convidado; senha admin em texto puro); aberto: webhook Stripe processa sem assinatura |
 | **Médios** | 4 — pontos de campanha nunca creditados; pontos não reservados; limites de promoção só valem com CPF; bônus de aniversário editável pelo cliente |
 | **Baixos** | 2 — conta de subtotal não bate na tela; admin fallback hardcoded + comparação de cron não constante |
 | **Arquivos mortos** | 52 (5.598 linhas) — ✅ **apagados** |
@@ -18,7 +18,7 @@ Estado do disco em **04/08/2026**. Auditoria mecânica (grafo de imports determi
 
 Os três críticos foram reproduzidos por mim antes de entrarem aqui, e cada
 correção tem teste de regressão provado por reversão (o teste falha sem o fix).
-A suíte saiu de 283 para 294 testes.
+A suíte saiu de 283 para 297 testes.
 
 ---
 
@@ -178,18 +178,27 @@ Não é urgente, mas é dívida: ou o símbolo virou lixo, ou o caller foi apaga
 - **Defeito:** o fallback é intencional e documentado — busca o evento na API do Stripe pelo `id` quando `constructEvent` falha (Vercel entrega o body já parseado, HMAC quebra). É mais fraco que assinatura: quem souber um `evt_...` real (vazado em log/export) dispara reprocessamento. **O defeito real é mascarar config errada**: `STRIPE_WEBHOOK_SECRET` errado faz todo o tráfego cair no fallback e ninguém percebe.
 - **Correção:** usar `req.rawBody`/stream para validar HMAC de verdade; alertar se o fallback disparar mais que % do volume.
 
-### ALTO 3 — Checkout anônimo deixa o cliente escolher o e-mail do pedido `[VERIFICADO o mecanismo]`
+### ALTO 3 — Checkout anônimo deixa o cliente escolher o e-mail do pedido `[VERIFICADO o mecanismo]` — ✅ **CORRIGIDO (impersonação); resta 1 item de política**
 
 - **Onde:** `api/orders.js:43-45` + `src/services/checkoutService.ts:66` (`signInAnonymously`)
 - **Defeito:** token anônimo não tem `email` → `tokenEmail=''` → a checagem `if (tokenEmail && ...)` é pulada → `customer.email` vem do corpo. Esse e-mail é usado em `assertCouponEligibility` (cupom nominal) e no guarda `coupon_usage.usedBy` (cupom "1× por cliente").
 - **Impacto:** cupom global de uso único vira ilimitado; cupom nominal de terceiro é resgatável por quem saber o endereço.
-- **Correção:** exigir e-mail verificado (não anônimo) para pedido com cupom/pontos, ou vincular `specific` ao `uid`.
+- **Correção aplicada:** `assertCouponEligibility` passou a receber `emailVerified` (padrão `false` — quem não passar falha fechado), alimentado por `user.email_verified` do token em `orders.js` e `coupons.js`:
+  - **`specific`** (cupom nominal) exige e-mail **provado**. Era o vetor concreto: `cart-recovery.js:59` emite os cupons de 10/15/30% como `targetType: 'specific'`, então bastava digitar o e-mail da vítima para levar o desconto dela.
+  - **`loyalty`** conta o histórico do `uid` **sempre**, e o do e-mail **só quando verificado**. Assim o convidado não herda a fidelidade de um cliente antigo, e quem tem histórico real no próprio uid não é punido.
+  - A trava vale também para **conta registrada com e-mail não verificado** — dava para se cadastrar com o endereço de outra pessoa sem nunca abrir a caixa dela. Por isso a régua é `email_verified`, não "tem e-mail".
+  - `birthday` já falhava fechado (depende de `userDoc`, buscado por uid) e `usageLimit` (teto **total**) nunca foi burlável por e-mail.
+  - `coupons.js` usa a mesma régua, para a tela não anunciar desconto que o pedido vai recusar.
+- **Não corrigido, por ser decisão de negócio:** o guarda `coupon_usage.usedBy` ("1× por cliente") continua ancorado em e-mail, então um convidado ainda pode reusar um cupom **público** trocando de endereço. Fechar isso significa **proibir convidado de usar cupom** — decisão de receita, não de código. Vale notar que a mesma reutilização já era possível com contas descartáveis, e que o guarda por CPF (`cpf_index`) continua valendo em qualquer caso.
+- **Regressão:** `coupon-eligibility.test.js` — "recusa cupom nominal quando o e-mail não foi provado", "não deixa herdar fidelidade digitando o e-mail de um cliente antigo" e "mantém a fidelidade pelo histórico do próprio uid". Provado: revertendo o fix, os dois primeiros falham.
 
-### ALTO 4 — Senha de admin legada em texto puro no Firestore `[AUDITORIA]`
+### ALTO 4 — Senha de admin legada em texto puro no Firestore `[AUDITORIA]` — ✅ **CORRIGIDO**
 
 - **Onde:** `api/admin.js:207-210,255-260` (`passwordMatches` faz SHA-256 dos dois lados, o que só funciona se `admins/{user}.password` for a senha em claro)
 - **Impacto:** dump do Firestore entrega o painel. Documentos legados só migram quando o admin loga.
-- **Correção:** migrar todos de uma vez (script único), remover `passwordMatches`, apagar o campo `password` dos docs.
+- **Medição antes de mexer:** a coleção `admins` foi consultada em produção (`localstorage-98492`, 04/08/2026): **0 documentos**. E `createAdmin` nunca gravou `password` — cria a conta no Firebase Auth e guarda só `authEmail`. Ou seja, não havia senha em claro para migrar: o caminho já era **código morto**.
+- **Correção aplicada:** corte limpo, sem script de migração (não havia o que migrar). Removidos `passwordMatches`, `digest`, `migrateLegacyAdmin` e o import de `timingSafeEqual`; `authenticate` ficou só com `migratedAdmin`. Saiu junto `adminEmail`, que era byte a byte igual a `authEmail`. O que restava de pé era um leitor de senha em claro esperando alguém restaurar um backup antigo por cima.
+- **Regressão:** `admin-session.test.js` — o teste que exercitava a migração legada foi **substituído** por dois que defendem o contrato novo: doc legado com senha em claro é recusado **mesmo com a senha certa**, sem criar conta no Firebase Auth e sem escrever nada.
 
 ### MEDIO 1 — Campanha com mecânica `points` nunca credita ponto nenhum `[VERIFICADO]`
 
@@ -259,16 +268,19 @@ Os arquivos **existem no disco** (são lidos pelo app e pelos scripts locais) ma
 3. ✅ Checagem de `remaining` na promoção da home — `commerce.js:239`, com regressão.
 4. ✅ Limpeza: 52 arquivos mortos e 29 dependências removidos; typecheck, build e suíte verdes após cada corte.
 5. ✅ Aviso + handle de estorno no `payment_review` (ALTO 1) — `fulfillment.js` / `stripe-webhook.js`, com 5 regressões.
+6. ✅ Impersonação por e-mail em cupom nominal e de fidelidade (ALTO 3) — `coupon-eligibility.js`, com 3 regressões.
+7. ✅ Remoção do caminho de senha em claro do admin (ALTO 4) — `admin.js`, com 2 regressões substituindo a do fluxo antigo.
 
 ### Restante, por prioridade
 
 1. **Decisão de negócio, pendente de você (ALTO 1):** o estorno em si continua manual, pelo painel do Stripe — o e-mail da loja já leva o link direto. As duas alternativas, se quiser automatizar:
    - *Estorno automático* nos 409: resolve na hora, mas é irreversível e tira da loja a chance de salvar a venda (estoque parcial, cupom vencido — casos em que hoje se negocia com o cliente).
    - *`capture_method: 'manual'`*: autoriza no checkout e só captura depois do `fulfillOrder`. Elimina a classe inteira do problema, mas **quebra métodos assíncronos** — hoje o checkout usa `automatic_payment_methods`, e PIX/konbini não suportam captura manual. Exigiria ramificar por método.
-2. **Esta semana:** e-mail spoofado no checkout anônimo (ALTO 3) e senha admin legada em texto puro (ALTO 4).
-3. **Esta semana:** subir `strict:true` no `tsconfig.app.json` e limpar os erros — vai revelar mais defeitos do tipo "pode ser undefined".
-4. **Quando der:** gravar `reservedCount` na criação do pedido (fecha a corrida que sobra do CRÍTICO 3) e `promoPoints` (MEDIO 1, campanha de pontos credita zero hoje).
-5. **Quando tocar o arquivo:** remover exports órfãos, não criar novo.
+2. **Decisão de negócio, pendente de você (ALTO 3):** convidado ainda pode reusar cupom **público** trocando de e-mail, porque o guarda "1× por cliente" é ancorado em endereço. Fechar = **proibir convidado de usar cupom**. A impersonação (cupom nominal / fidelidade de terceiro) já está fechada.
+3. **Aberto (ALTO 2):** validar HMAC do webhook com os bytes crus e alertar quando o fallback disparar acima de um % do volume — hoje um `STRIPE_WEBHOOK_SECRET` errado passa despercebido.
+4. **Esta semana:** subir `strict:true` no `tsconfig.app.json` e limpar os erros — vai revelar mais defeitos do tipo "pode ser undefined".
+5. **Quando der:** gravar `reservedCount` na criação do pedido (fecha a corrida que sobra do CRÍTICO 3) e `promoPoints` (MEDIO 1, campanha de pontos credita zero hoje).
+6. **Quando tocar o arquivo:** remover exports órfãos, não criar novo.
 
 ---
 

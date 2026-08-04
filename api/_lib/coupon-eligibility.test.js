@@ -56,12 +56,59 @@ describe('coupon eligibility', () => {
       targetEmails: ['allowed@example.com'],
     };
 
-    await expect(assertCouponEligibility(new FakeDb(), coupon, { email: 'other@example.com' }))
+    await expect(assertCouponEligibility(new FakeDb(), coupon, { email: 'other@example.com', emailVerified: true }))
       .rejects.toMatchObject({ statusCode: 403, code: 'coupon_not_eligible' });
-    await expect(assertCouponEligibility(new FakeDb(), coupon, { email: 'allowed@example.com' }))
+    await expect(assertCouponEligibility(new FakeDb(), coupon, { email: 'allowed@example.com', emailVerified: true }))
       .resolves.toBeUndefined();
 
     expect(publicCoupon('PRIVATE10', coupon)).not.toHaveProperty('targetEmails');
+  });
+
+  // Regressão do ALTO 3 do AUDITORIA.md. O checkout aceita convidado
+  // (`signInAnonymously`), e aí o e-mail vem do formulário, não do token.
+  // Sem esta trava bastava digitar o endereço da vítima para levar o cupom
+  // nominal dela — inclusive os 10/15/30% de recuperação de carrinho, que
+  // `cart-recovery.js` emite como `targetType: 'specific'`.
+  it('recusa cupom nominal quando o e-mail não foi provado', async () => {
+    const coupon = { targetType: 'specific', targetEmails: ['vitima@example.com'] };
+
+    // Convidado digitando o endereço certo da vítima: e-mail bate, identidade não.
+    await expect(assertCouponEligibility(new FakeDb(), coupon, { email: 'vitima@example.com' }))
+      .rejects.toMatchObject({ statusCode: 403, code: 'coupon_not_eligible' });
+    // Conta registrada que nunca verificou o e-mail cai no mesmo lugar: dá para
+    // se cadastrar com o endereço de outra pessoa sem abrir a caixa dela.
+    await expect(assertCouponEligibility(new FakeDb(), coupon, { email: 'vitima@example.com', emailVerified: false }))
+      .rejects.toMatchObject({ statusCode: 403, code: 'coupon_not_eligible' });
+  });
+
+  it('não deixa herdar fidelidade digitando o e-mail de um cliente antigo', async () => {
+    const db = new FakeDb({
+      'orders/O1': { userId: 'antigo', customerEmail: 'antigo@example.com', paymentConfirmed: true },
+      'orders/O2': { userId: 'antigo', customerEmail: 'antigo@example.com', paymentConfirmed: true },
+    });
+    const coupon = { targetType: 'loyalty', minOrders: 2 };
+
+    // Convidado (uid sem histórico) digitando o e-mail de quem tem histórico.
+    await expect(assertCouponEligibility(db, coupon, { uid: 'convidado', email: 'antigo@example.com' }))
+      .rejects.toMatchObject({ statusCode: 403, code: 'coupon_not_eligible' });
+
+    // O dono, com o e-mail provado, continua passando.
+    await expect(assertCouponEligibility(db, coupon, { uid: 'antigo', email: 'antigo@example.com', emailVerified: true }))
+      .resolves.toBeUndefined();
+  });
+
+  // O histórico do próprio uid veio do login, então vale mesmo sem e-mail
+  // verificado — senão a trava puniria cliente real com pedido antigo.
+  it('mantém a fidelidade pelo histórico do próprio uid', async () => {
+    const db = new FakeDb({
+      'orders/O1': { userId: 'u1', customerEmail: 'u@example.com', paymentConfirmed: true },
+    });
+
+    await expect(assertCouponEligibility(
+      db,
+      { targetType: 'loyalty', minOrders: 1 },
+      { uid: 'u1', email: 'u@example.com', emailVerified: false },
+    )).resolves.toBeUndefined();
   });
 
   it('fails closed for an unknown targeting mode', async () => {

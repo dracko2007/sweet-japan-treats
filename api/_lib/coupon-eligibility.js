@@ -44,23 +44,41 @@ function birthMonth(value) {
   return match ? Number(match[1]) : 0;
 }
 
+/**
+ * `emailVerified` separa e-mail PROVADO de e-mail DIGITADO.
+ *
+ * O checkout aceita convidado (`signInAnonymously`), e nesse caso o token não
+ * tem e-mail nenhum: o endereço vem do formulário. Até 04/08/2026 os dois
+ * casos eram tratados igual, então bastava digitar o endereço da vítima para
+ * levar um cupom nominal dela — inclusive os 10/15/30% de recuperação de
+ * carrinho, que `cart-recovery.js` emite como `targetType: 'specific'`.
+ *
+ * A mesma brecha valia para conta registrada com e-mail NÃO verificado: dava
+ * para se cadastrar com o endereço de outra pessoa sem nunca abrir a caixa
+ * dela. Por isso a checagem é `email_verified`, não "tem e-mail".
+ *
+ * O padrão é `false` de propósito: quem não passar o parâmetro falha fechado.
+ */
 export async function assertCouponEligibility(
   db,
   coupon,
-  { uid = '', email = '', userDoc = null, productSubtotalYen = 0 } = {},
+  { uid = '', email = '', emailVerified = false, userDoc = null, productSubtotalYen = 0 } = {},
 ) {
   const targetType = String(coupon?.targetType || 'all');
   if (!['all', 'specific', 'birthday', 'loyalty'].includes(targetType)) {
     throw new HttpError(403, 'coupon_not_eligible');
   }
 
+  // Cupom nominal: o endereço É a credencial. Sem prova de posse, não passa.
   if (targetType === 'specific') {
     const targets = Array.isArray(coupon.targetEmails)
       ? coupon.targetEmails.map((entry) => String(entry).trim().toLowerCase())
       : [];
-    if (!email || !targets.includes(email)) throw new HttpError(403, 'coupon_not_eligible');
+    if (!emailVerified || !email || !targets.includes(email)) throw new HttpError(403, 'coupon_not_eligible');
   }
 
+  // `birthday` já falhava fechado para convidado: depende de `userDoc`, que é
+  // buscado por uid e não existe para conta anônima.
   if (targetType === 'birthday') {
     const currentMonth = Number(TOKYO_MONTH_FORMAT.format(new Date()));
     if (!userDoc || birthMonth(userDoc.birthdate) !== currentMonth) {
@@ -68,9 +86,13 @@ export async function assertCouponEligibility(
     }
   }
 
+  // O histórico do `uid` é sempre confiável — veio do login. O do e-mail, só
+  // quando verificado; senão bastaria digitar o endereço de um cliente antigo
+  // para herdar a fidelidade dele.
   if (targetType === 'loyalty') {
     const requiredCount = Math.max(1, Math.min(500, Math.floor(Number(coupon.minOrders || 1))));
-    if ((await paidOrderCount(db, uid, email, requiredCount)) < requiredCount) {
+    const emailConfiavel = emailVerified ? email : '';
+    if ((await paidOrderCount(db, uid, emailConfiavel, requiredCount)) < requiredCount) {
       throw new HttpError(403, 'coupon_not_eligible');
     }
   }

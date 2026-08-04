@@ -128,40 +128,41 @@ describe('admin-session endpoint (sub-admin auth only)', () => {
     expect(globalThis.fetch).not.toHaveBeenCalled();
   });
 
-  it('migrates a legacy plaintext-password sub-admin on first login and returns a custom token', async () => {
-    const legacyDoc = { active: true, password: 'legacy-plain-pass', name: 'Legacy Joao', role: 1, addedAt: '2024-01-01' };
-    const legacyGet = vi.fn(async () => ({ exists: true, data: () => legacyDoc }));
-    const newDocSet = vi.fn();
-    const batch = { set: newDocSet, delete: vi.fn(), commit: vi.fn(async () => undefined) };
-
+  // Regressão do ALTO 4 do AUDITORIA.md. Antes, um doc `admins/{username}` com
+  // o campo `password` em CLARO era aceito no login e migrado para o Firebase
+  // Auth. Isso obrigava o servidor a saber ler senha em claro, e qualquer dump
+  // (ou restauração de backup antigo) do Firestore entregava o painel.
+  //
+  // Agora o caminho não existe: só autentica quem tem `authEmail` e conta no
+  // Firebase Auth. Estes dois testes existem para impedir que ele volte.
+  it('recusa doc legado com senha em claro, mesmo com a senha certa', async () => {
+    const docLegado = { active: true, password: 'senha-em-claro', name: 'Legacy Joao', role: 1 };
     mocks.adminDb.collection.mockImplementation(() => ({
+      // Nenhum registro migrado: só existe o doc legado, indexado por username.
       where: vi.fn(() => ({ limit: vi.fn(() => ({ get: vi.fn(async () => ({ empty: true, docs: [] })) })) })),
-      doc: vi.fn((id) => ({ get: legacyGet, path: `admins/${id}` })),
+      doc: vi.fn((id) => ({ get: vi.fn(async () => ({ exists: true, data: () => docLegado })), path: `admins/${id}` })),
     }));
-    mocks.adminDb.batch.mockReturnValue(batch);
-    mocks.adminAuth.createUser.mockResolvedValue(undefined);
 
-    const req = mockReq('POST', { identifier: 'legacy-joao', password: 'legacy-plain-pass' });
+    const req = mockReq('POST', { identifier: 'legacy-joao', password: 'senha-em-claro' });
     const res = mockRes();
     await adminSessionHandler(req, res);
 
-    expect(res.statusCode).toBe(200);
-    expect(res.body.customToken).toBe('custom-token-abc');
-    expect(mocks.adminAuth.createUser).toHaveBeenCalledTimes(1);
-    expect(mocks.adminAuth.setCustomUserClaims).toHaveBeenCalledTimes(1);
-    // Never persists the plaintext password in the new admin record.
-    const persisted = newDocSet.mock.calls[0][1];
-    expect(persisted.password).toBeUndefined();
+    expect(res.statusCode).toBe(401);
+    // O ponto do teste: a senha batia. Ainda assim não entra, não cria conta no
+    // Firebase Auth e não escreve nada.
+    expect(mocks.adminAuth.createUser).not.toHaveBeenCalled();
+    expect(mocks.adminAuth.setCustomUserClaims).not.toHaveBeenCalled();
+    expect(mocks.adminDb.batch).not.toHaveBeenCalled();
   });
 
-  it('rejects a legacy sub-admin with the wrong password without creating a Firebase user', async () => {
-    const legacyDoc = { active: true, password: 'real-password', name: 'Legacy Joao', role: 1 };
+  it('recusa doc legado com senha errada', async () => {
+    const docLegado = { active: true, password: 'senha-real', name: 'Legacy Joao', role: 1 };
     mocks.adminDb.collection.mockImplementation(() => ({
       where: vi.fn(() => ({ limit: vi.fn(() => ({ get: vi.fn(async () => ({ empty: true, docs: [] })) })) })),
-      doc: vi.fn(() => ({ get: vi.fn(async () => ({ exists: true, data: () => legacyDoc })) })),
+      doc: vi.fn(() => ({ get: vi.fn(async () => ({ exists: true, data: () => docLegado })) })),
     }));
 
-    const req = mockReq('POST', { identifier: 'legacy-joao', password: 'wrong-password' });
+    const req = mockReq('POST', { identifier: 'legacy-joao', password: 'senha-errada' });
     const res = mockRes();
     await adminSessionHandler(req, res);
 

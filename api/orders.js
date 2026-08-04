@@ -75,7 +75,7 @@ function activeByDate(value) {
   return Number.isFinite(timestamp) && timestamp > Date.now();
 }
 
-async function resolveCoupon(db, code, userDoc, customer, productSubtotalHint = 0, userId = '') {
+async function resolveCoupon(db, code, userDoc, customer, productSubtotalHint = 0, userId = '', emailVerified = false) {
   if (!code) return null;
   const normalized = code.trim().toUpperCase();
   const personal = Array.isArray(userDoc?.coupons)
@@ -102,6 +102,7 @@ async function resolveCoupon(db, code, userDoc, customer, productSubtotalHint = 
     await assertCouponEligibility(db, coupon, {
       uid: userId,
       email: customer.email,
+      emailVerified,
       userDoc,
       productSubtotalYen: productSubtotalHint,
     });
@@ -335,7 +336,11 @@ async function handleCreate(req, res) {
     ]);
     if (promoUsageSnap?.exists) throw new HttpError(409, 'promotion_already_used');
     const userData = userSnap.exists ? userSnap.data() : null;
-    const coupon = await resolveCoupon(db, couponCode, userData, customer, 0, user.uid);
+    // Só o token prova o e-mail. Convidado (`signInAnonymously`) não tem
+    // nenhum, e conta registrada sem verificar pode ter se cadastrado com o
+    // endereço de outra pessoa — os dois casos não valem como identidade.
+    const emailVerificado = user.email_verified === true && Boolean(user.email);
+    const coupon = await resolveCoupon(db, couponCode, userData, customer, 0, user.uid, emailVerificado);
     const negotiation = negotiationSnap?.exists ? negotiationSnap.data() : null;
     if (negotiation && negotiation.userId && negotiation.userId !== user.uid) throw new HttpError(403, 'invalid_negotiation');
     if (negotiation && negotiation.customerEmail && String(negotiation.customerEmail).toLowerCase() !== customer.email) throw new HttpError(403, 'invalid_negotiation');

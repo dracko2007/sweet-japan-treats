@@ -1,4 +1,4 @@
-import { createHash, timingSafeEqual } from 'node:crypto';
+import { createHash } from 'node:crypto';
 import { FieldPath, Timestamp } from 'firebase-admin/firestore';
 import { requireAdmin } from './_lib/auth.js';
 import { adminAuth, adminDb } from './_lib/firebase-admin.js';
@@ -198,14 +198,16 @@ function slug(value) {
   return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase().replace(/\s+/g, ' ');
 }
 
-function digest(value) {
-  return createHash('sha256').update(String(value)).digest();
-}
-
-function passwordMatches(received, expected) {
-  return typeof expected === 'string' && expected.length > 0
-    && timingSafeEqual(digest(received), digest(expected));
-}
+// Até 04/08/2026 existia aqui um `passwordMatches` que comparava SHA-256 dos
+// dois lados — o que só funciona se `admins/{username}.password` guardar a
+// senha em CLARO. Junto vinha `migrateLegacyAdmin`, que lia esse campo para
+// criar a conta no Firebase Auth na primeira vez que o admin logasse.
+//
+// Os dois foram removidos. A coleção `admins` está vazia (conferida em
+// 04/08/2026) e `createAdmin` nunca gravou `password`: ela cria a conta no
+// Firebase Auth e guarda só `authEmail`. Ou seja, o caminho já era morto —
+// mantê-lo só deixava de pé um leitor de senha em claro esperando alguém
+// restaurar um backup antigo por cima.
 
 function firebaseApiKey() {
   const key = process.env.FIREBASE_WEB_API_KEY || process.env.VITE_FIREBASE_API_KEY;
@@ -232,10 +234,8 @@ function adminUid(username) {
   return `admin_${createHash('sha256').update(username).digest('hex').slice(0, 24)}`;
 }
 
-function adminEmail(username) {
-  const id = createHash('sha256').update(username).digest('hex').slice(0, 32);
-  return `admin-${id}@auth.japanexpress-store.com`;
-}
+// `adminEmail` foi removida junto com a migração legada: era byte a byte igual
+// a `authEmail` (mais abaixo), a única que sobrou.
 
 async function migratedAdmin(username, password) {
   const db = adminDb();
@@ -249,49 +249,8 @@ async function migratedAdmin(username, password) {
   return { uid, username, name: data.name || username, role: Number(data.role) || 1 };
 }
 
-async function migrateLegacyAdmin(username, password) {
-  const db = adminDb();
-  const legacyRef = db.collection('admins').doc(username);
-  const legacy = await legacyRef.get();
-  if (!legacy.exists) return null;
-  const data = legacy.data() || {};
-  if (data.active === false || !passwordMatches(password, data.password)) {
-    throw new HttpError(401, 'invalid_credentials');
-  }
-
-  const uid = adminUid(username);
-  const authEmail = adminEmail(username);
-  const role = Math.max(1, Math.min(3, Math.floor(Number(data.role) || 1)));
-  const auth = adminAuth();
-  try {
-    await auth.createUser({ uid, email: authEmail, password, displayName: data.name || username });
-  } catch (error) {
-    if (error?.code !== 'auth/uid-already-exists' && error?.code !== 'auth/email-already-exists') throw error;
-    await auth.updateUser(uid, { password, displayName: data.name || username });
-  }
-  await auth.setCustomUserClaims(uid, { admin: true, role: 'admin', adminRole: role });
-
-  const adminRef = db.collection('admins').doc(uid);
-  const batch = db.batch();
-  batch.set(adminRef, {
-    username,
-    name: data.name || username,
-    role,
-    active: true,
-    authEmail,
-    addedAt: data.addedAt || new Date().toISOString(),
-    addedBy: data.addedBy || 'legacy-migration',
-    migratedAt: new Date().toISOString(),
-  });
-  if (legacyRef.path !== adminRef.path) batch.delete(legacyRef);
-  await batch.commit();
-  return { uid, username, name: data.name || username, role };
-}
-
 async function authenticate(identifier, password) {
-  const normalized = slug(identifier);
-  return await migratedAdmin(normalized, password)
-    || await migrateLegacyAdmin(normalized, password);
+  return await migratedAdmin(slug(identifier), password);
 }
 
 async function handleSession(req, res) {
