@@ -14,7 +14,8 @@ import { buildOrderEmail, sendMail } from './_lib/mailer.js';
 export const config = { api: { bodyParser: false } };
 
 /**
- * Devolve os bytes exatos do corpo, na ordem de preferência:
+ * Devolve `{ bytes, autentico }`: os bytes do corpo e se eles são os ORIGINAIS
+ * que o Stripe assinou. Ordem de preferência:
  *
  * 1. `rawBody`, quando a plataforma o expõe (Buffer intacto — o ideal)
  * 2. corpo já cru, como Buffer ou string
@@ -24,19 +25,28 @@ export const config = { api: { bodyParser: false } };
  * O caso 3 é o que salva a Vercel hoje. `JSON.stringify` reproduz os bytes
  * originais porque o Stripe envia JSON compacto, sem espaços, e o JavaScript
  * preserva a ordem das chaves de string. Não é garantido pelo padrão, por isso
- * vem depois das opções que usam os bytes de verdade — e, se a reconstrução
- * divergir num único caractere, a assinatura falha de forma visível em vez de
- * aceitar um evento adulterado.
+ * vem depois das opções que usam os bytes de verdade — e é o único caso que
+ * volta com `autentico: false`, porque é uma reconstrução, não a mensagem.
+ *
+ * A distinção existe porque ela é a única forma de interpretar uma falha de
+ * HMAC. Com bytes reconstruídos, falhar é esperado (basta um byte de diferença
+ * num PaymentIntent real) e o handler confirma o evento na API do Stripe. Com
+ * os bytes verdadeiros em mãos não sobra outra explicação além de segredo errado
+ * ou requisição forjada — e aí cair no fallback apagaria a verificação de
+ * assinatura em silêncio, para sempre, inclusive depois de rotacionar o
+ * `STRIPE_WEBHOOK_SECRET` sem atualizar a variável de ambiente.
  */
 async function rawBody(req) {
-  if (Buffer.isBuffer(req.rawBody)) return req.rawBody;
-  if (typeof req.rawBody === 'string') return Buffer.from(req.rawBody, 'utf8');
-  if (Buffer.isBuffer(req.body)) return req.body;
-  if (typeof req.body === 'string') return Buffer.from(req.body, 'utf8');
-  if (req.body && typeof req.body === 'object') return Buffer.from(JSON.stringify(req.body), 'utf8');
+  if (Buffer.isBuffer(req.rawBody)) return { bytes: req.rawBody, autentico: true };
+  if (typeof req.rawBody === 'string') return { bytes: Buffer.from(req.rawBody, 'utf8'), autentico: true };
+  if (Buffer.isBuffer(req.body)) return { bytes: req.body, autentico: true };
+  if (typeof req.body === 'string') return { bytes: Buffer.from(req.body, 'utf8'), autentico: true };
+  if (req.body && typeof req.body === 'object') {
+    return { bytes: Buffer.from(JSON.stringify(req.body), 'utf8'), autentico: false };
+  }
   const chunks = [];
   for await (const chunk of req) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-  return Buffer.concat(chunks);
+  return { bytes: Buffer.concat(chunks), autentico: true };
 }
 
 /**
@@ -93,29 +103,42 @@ export default async function handler(req, res) {
     // já parseado — era engolido e reportado como `invalid_stripe_signature`.
     // Os dois problemas devolvem 400, então a causa real ficava invisível e a
     // investigação ia atrás do segredo errado.
-    const corpoCru = await rawBody(req);
+    const { bytes, autentico } = await rawBody(req);
 
     let event;
     try {
-      event = stripe.webhooks.constructEvent(corpoCru, signature, endpointSecret);
+      event = stripe.webhooks.constructEvent(bytes, signature, endpointSecret);
     } catch (erroAssinatura) {
       // A verificação por assinatura exige os bytes EXATOS que o Stripe enviou.
       // Em função avulsa na Vercel o corpo chega já parseado, e reconstruí-lo
       // com `JSON.stringify` acerta em payloads simples mas não sobrevive a um
       // objeto real de PaymentIntent — basta um byte diferente e o HMAC muda.
       //
-      // Em vez de depender dessa sorte, buscamos o evento na própria API do
-      // Stripe pelo `id`. Isso é MAIS forte que a assinatura: em vez de provar
-      // que a mensagem não foi adulterada, lemos o original na fonte, com a
-      // nossa chave secreta. Quem forjar um POST só consegue fazer o servidor
-      // reprocessar um evento que existe de verdade.
-      const idEvento = String(JSON.parse(corpoCru.toString('utf8'))?.id || '');
+      // Se os bytes são AUTENTICOS (vêm direto da plataforma ou do stream) e a
+      // assinatura mesmo assim falha, a causa só pode ser segredo errado ou
+      // requisição forjada — não há como a reconstrução ter falhado. Nessa
+      // hipótese é crítico avisar o operador, porque a verificação cai num
+      // fallback que valida só na API do Stripe, deixando a assinatura
+      // completamente ignorada em silêncio e para sempre (inclusive após
+      // rotacionar o STRIPE_WEBHOOK_SECRET sem atualizar a env var).
+      if (autentico) {
+        console.error('[stripe-webhook] assinatura falhou com bytes autênticos — ' +
+          'STRIPE_WEBHOOK_SECRET provavelmente está errado ou rotacionado:',
+          erroAssinatura instanceof Error ? erroAssinatura.message : erroAssinatura);
+        throw new HttpError(400, 'invalid_stripe_signature');
+      }
+
+      // Corpo foi reconstruído pela plataforma. Fallback para a API do Stripe,
+      // que valida a assinatura pela chave secreta — mais forte que a versão
+      // de HMAC em cima de bytes reconstruídos.
+      const idEvento = String(JSON.parse(bytes.toString('utf8'))?.id || '');
       if (!/^evt_[A-Za-z0-9]+$/.test(idEvento)) {
         console.error('[stripe-webhook] assinatura recusada e sem id de evento:',
           erroAssinatura instanceof Error ? erroAssinatura.message : erroAssinatura);
         throw new HttpError(400, 'invalid_stripe_signature');
       }
-      console.warn('[stripe-webhook] assinatura falhou, confirmando na API:', idEvento);
+      console.warn('[stripe-webhook] assinatura falhou (corpo reconstruído pela plataforma), ' +
+        'confirmando na API:', idEvento);
       event = await stripe.events.retrieve(idEvento);
     }
 

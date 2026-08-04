@@ -109,4 +109,38 @@ describe('authoritative checkout quote', () => {
     });
     expect(result.homePromoQuantity).toBe(2);
   });
+
+  // Regressão do MEDIO 1 do AUDITORIA.md: o `fulfillment.js` somava
+  // `order.promoPoints` no saldo do cliente, mas nenhum lugar gravava esse
+  // campo. A campanha "Compre e Ganhe pontos" era anunciada por e-mail e push
+  // e creditava zero.
+  it('credita os pontos da campanha quando o produto dela está no carrinho', () => {
+    const result = quote({
+      campaign: { mechanic: 'points', productId: 'p1', points: 250 },
+    });
+    expect(result.promoPoints).toBe(250);
+  });
+
+  // As outras mecânicas são todas presas ao produto da campanha. Sem isto
+  // bastava colar o código com qualquer carrinho para levar os pontos.
+  it('não credita se o produto da campanha não está no carrinho', () => {
+    const outro = { ...product, id: 'p2' };
+    const result = quote({
+      requestedItems: [{ productId: 'p2', variantId: 'small', quantity: 1 }],
+      products: new Map([['p2', outro]]),
+      campaign: { mechanic: 'points', productId: 'p1', points: 250 },
+    });
+    expect(result.promoPoints).toBe(0);
+  });
+
+  it('não credita ponto em campanha de outra mecânica', () => {
+    const result = quote({
+      campaign: { mechanic: 'discount', productId: 'p1', discountPct: 10, points: 250 },
+    });
+    expect(result.promoPoints).toBe(0);
+  });
+
+  it('pedido sem campanha não gera ponto promocional', () => {
+    expect(quote().promoPoints).toBe(0);
+  });
 });

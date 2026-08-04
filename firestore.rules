@@ -129,7 +129,10 @@ service cloud.firestore {
         && validAddress(request.resource.data.address)
         && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['referredBy'])
           || (!resource.data.keys().hasAny(['referredBy'])
-            && validText(request.resource.data.referredBy, 1, 128)));
+            && validText(request.resource.data.referredBy, 1, 128)))
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['birthdate'])
+          || (!resource.data.keys().hasAny(['birthdate'])
+            && validText(request.resource.data.birthdate, 1, 40)));
     }
 
     function ownsByEmail(data, field) {

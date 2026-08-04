@@ -3,6 +3,8 @@ import { purchaseDiscountProfileUpdate } from './cart-recovery-profile.js';
 import { adminDb } from './firebase-admin.js';
 import { HttpError } from './http.js';
 import { buildPaymentReviewEmail, sendMail } from './mailer.js';
+import { semReserva } from './points-hold.js';
+import { indiceDePessoaId, promoUsageId } from './promo-identity.js';
 
 function unique(values) {
   return [...new Set(values.filter(Boolean))];
@@ -64,8 +66,13 @@ export async function fulfillOrder(orderId, { provider, reference, confirmedBy }
     const eventRef = db.collection('fulfillment_events').doc(eventId(provider, reference));
     const userRef = db.collection('users').doc(order.userId);
     const homePromoRef = db.collection('siteContent').doc('homePromotion');
-    const cpfRef = order.cpf ? db.collection('cpf_index').doc(order.cpf) : null;
-    const promoUsageRef = order.promoCode && order.cpf ? db.collection('promo_usage').doc(`${order.promoCode}_${order.cpf}`) : null;
+    // Sem CPF (cliente fora do Brasil) a âncora vira o uid — antes o limite
+    // de promoção simplesmente não existia para esse cliente.
+    const pessoa = { cpf: order.cpf, userId: order.userId };
+    const pessoaId = indiceDePessoaId(pessoa);
+    const usoPromoId = promoUsageId(order.promoCode, pessoa);
+    const cpfRef = pessoaId ? db.collection('cpf_index').doc(pessoaId) : null;
+    const promoUsageRef = usoPromoId ? db.collection('promo_usage').doc(usoPromoId) : null;
     const couponRef = order.couponSource === 'global' && order.couponCode ? db.collection('coupons').doc(order.couponCode) : null;
     const couponUsageRef = order.couponSource === 'global' && order.couponCode ? db.collection('coupon_usage').doc(order.couponCode) : null;
     const affiliateRef = order.affiliateCode ? db.collection('affiliates').doc(order.affiliateCode) : null;
@@ -171,7 +178,10 @@ export async function fulfillOrder(orderId, { provider, reference, confirmedBy }
     if (promoUsageRef) {
       transaction.create(promoUsageRef, {
         code: order.promoCode,
-        cpf: order.cpf,
+        cpf: order.cpf || '',
+        // Guarda qual âncora trancou o uso, para auditoria: nem todo registro
+        // tem CPF desde que o limite passou a valer também por conta.
+        pessoaId,
         email: order.customerEmail,
         orderId,
         usedAt: Date.now(),
@@ -203,6 +213,8 @@ export async function fulfillOrder(orderId, { provider, reference, confirmedBy }
       transaction.update(userRef, {
         points: currentPoints - Number(order.redeemPoints || 0) + Number(order.earnedPoints || 0) + Number(order.promoPoints || 0),
         coupons: nextCoupons,
+        // Pagou: a reserva vira débito de verdade na linha acima e sai da lista.
+        pointsHolds: semReserva(userData, orderId),
         updatedAt: new Date().toISOString(),
       });
     }
@@ -304,8 +316,32 @@ export async function markFulfillmentReview(orderId, reason, { paymentIntentId =
   }, { merge: true });
 
   if (!order || jaEstavaEmRevisao) return { notified: false };
+  // Pedido morto não pode continuar segurando os pontos do cliente. Falhar
+  // aqui não derruba nada: a reserva tem prazo e cai sozinha em 24h.
+  await liberarReserva(db, order.userId, orderId).catch((erro) => {
+    console.error('[fulfillment] falha ao liberar pontos do pedido em revisao:', erro instanceof Error ? erro.message : erro);
+  });
   const paraEmail = { ...order, stripePaymentIntentId: referencia, totalPrice: valorCobrado, currency: moedaCobrada };
   return { notified: await notificarRevisao(paraEmail, codigo) };
+}
+
+/**
+ * Devolve ao cliente os pontos que o pedido segurava. Transação porque um
+ * checkout simultâneo do mesmo cliente pode estar mexendo na mesma lista.
+ */
+async function liberarReserva(db, userId, orderId) {
+  if (!userId) return;
+  const userRef = db.collection('users').doc(userId);
+  await db.runTransaction(async (transaction) => {
+    const snap = await transaction.get(userRef);
+    if (!snap.exists) return;
+    const dados = snap.data();
+    if (!Array.isArray(dados.pointsHolds) || dados.pointsHolds.length === 0) return;
+    transaction.update(userRef, {
+      pointsHolds: semReserva(dados, orderId),
+      updatedAt: new Date().toISOString(),
+    });
+  });
 }
 
 /**

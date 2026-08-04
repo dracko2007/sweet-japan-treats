@@ -4,6 +4,8 @@ import { requireAdmin, requireUser } from './_lib/auth.js';
 import { buildQuote } from './_lib/commerce.js';
 import { assertCouponEligibility } from './_lib/coupon-eligibility.js';
 import { adminDb } from './_lib/firebase-admin.js';
+import { comReserva, pontosDisponiveis } from './_lib/points-hold.js';
+import { indiceDePessoaId, promoUsageId } from './_lib/promo-identity.js';
 import { fulfillOrder } from './_lib/fulfillment.js';
 import { recentProductSpendYen } from './_lib/loyalty-tier.js';
 import { issuePsFeeWaiver, verifyPsFeeWaiver } from './_lib/ps-fee-waiver.js';
@@ -326,12 +328,18 @@ async function handleCreate(req, res) {
     const productSnaps = await db.getAll(...uniqueProductIds.map((id) => db.collection('products').doc(id)));
     const products = new Map(productSnaps.filter((snap) => snap.exists).map((snap) => [snap.id, { id: snap.id, ...snap.data() }]));
 
+    const pessoa = { cpf: customer.cpf, userId: user.uid };
+    const cpfIndexId = indiceDePessoaId(pessoa);
+    const usoPromoId = promoUsageId(promoCode, pessoa);
     const [userSnap, homePromoSnap, negotiationSnap, cpfSnap, promoUsageSnap, recentSpendYen] = await Promise.all([
       db.collection('users').doc(user.uid).get(),
       db.collection('siteContent').doc('homePromotion').get(),
       negotiationId ? db.collection('negotiations').doc(negotiationId).get() : Promise.resolve(null),
-      customer.cpf ? db.collection('cpf_index').doc(customer.cpf).get() : Promise.resolve(null),
-      promoCode && customer.cpf ? db.collection('promo_usage').doc(`${promoCode}_${customer.cpf}`).get() : Promise.resolve(null),
+      // Mesma âncora do `fulfillment.js`: CPF quando existe, senão a conta.
+      // Sem isso a pré-checagem olhava um documento diferente do que a
+      // transação de baixa iria travar, e cliente sem CPF passava direto.
+      cpfIndexId ? db.collection('cpf_index').doc(cpfIndexId).get() : Promise.resolve(null),
+      usoPromoId ? db.collection('promo_usage').doc(usoPromoId).get() : Promise.resolve(null),
       recentProductSpendYen(db, user.uid),
     ]);
     if (promoUsageSnap?.exists) throw new HttpError(409, 'promotion_already_used');
@@ -345,7 +353,9 @@ async function handleCreate(req, res) {
     if (negotiation && negotiation.userId && negotiation.userId !== user.uid) throw new HttpError(403, 'invalid_negotiation');
     if (negotiation && negotiation.customerEmail && String(negotiation.customerEmail).toLowerCase() !== customer.email) throw new HttpError(403, 'invalid_negotiation');
     const requestedPoints = Math.max(0, Math.floor(Number(body.redeemPoints || 0)));
-    if (requestedPoints > Number(userData?.points || 0)) throw new HttpError(409, 'insufficient_points');
+    // Recusa cedo, com a mesma conta da transação, para o cliente ver o erro
+    // antes de qualquer cobrança. A palavra final continua sendo a da transação.
+    if (requestedPoints > pontosDisponiveis(userData)) throw new HttpError(409, 'insufficient_points');
     const rates = await getFxRates();
     const quote = buildQuote({
       requestedItems,
@@ -424,6 +434,7 @@ async function handleCreate(req, res) {
       redeemPoints: quote.redeemPoints,
       earnedPoints: quote.earnedPoints,
       pointsMultiplier: quote.pointsMultiplier,
+      promoPoints: quote.promoPoints,
       psFeeWaiverApplied: quote.psFeeWaiverApplied,
       psFeeWaiverId: quote.psFeeWaiverApplied ? waiver?.id || '' : '',
       promoCouponCode: campaign?.couponCode || '',
@@ -454,13 +465,29 @@ async function handleCreate(req, res) {
     const waiverClaimRef = quote.psFeeWaiverApplied
       ? db.collection('ps_fee_waiver_claims').doc(waiver.id)
       : null;
+
+    // A reserva só entra quando há resgate: pedido sem pontos não paga o custo
+    // de ler e reescrever o documento do usuário.
+    const userRefParaReserva = quote.redeemPoints > 0 ? db.collection('users').doc(user.uid) : null;
     await db.runTransaction(async (transaction) => {
-      const [current, waiverClaim] = await Promise.all([
+      const [current, waiverClaim, userAtual] = await Promise.all([
         transaction.get(orderRef),
         waiverClaimRef ? transaction.get(waiverClaimRef) : Promise.resolve(null),
+        userRefParaReserva ? transaction.get(userRefParaReserva) : Promise.resolve(null),
       ]);
       if (current.exists) throw new HttpError(409, 'order_id_conflict');
       if (waiverClaim?.exists) throw new HttpError(409, 'ps_fee_waiver_already_used');
+      if (userRefParaReserva) {
+        // Aqui dentro o saldo é o de verdade: a checagem lá em cima roda fora
+        // de transação e não enxerga um checkout simultâneo do mesmo cliente.
+        const userAgora = userAtual?.exists ? userAtual.data() : null;
+        if (!userAgora) throw new HttpError(409, 'insufficient_points');
+        if (quote.redeemPoints > pontosDisponiveis(userAgora)) throw new HttpError(409, 'insufficient_points');
+        transaction.update(userRefParaReserva, {
+          pointsHolds: comReserva(userAgora, orderId, quote.redeemPoints),
+          updatedAt: now,
+        });
+      }
       transaction.create(orderRef, order);
       if (waiverClaimRef) {
         transaction.create(waiverClaimRef, {

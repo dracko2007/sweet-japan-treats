@@ -298,3 +298,80 @@ describe('pedido pago que não pôde ser separado', () => {
     expect(mocks.sendMail.mock.calls[1][0].html).not.toContain('114');
   });
 });
+
+// Regressão do MEDIO 3 do AUDITORIA.md: a âncora do limite de promoção era só o
+// CPF, que a aduana brasileira exige mas o checkout não. Quem compra de fora do
+// Brasil não preenche, então `cpf_index` e `promo_usage` nunca eram gravados
+// nem consultados para esse cliente — a mesma conta repetia a promoção quantas
+// vezes quisesse. A âncora agora cai para `uid_<uid>` quando não há CPF.
+describe('limite de promoção sem CPF', () => {
+  const CODE = 'JAPAO10';
+
+  function pedidoPromocional(id, overrides = {}) {
+    return order(id, {
+      promoCode: CODE,
+      homePromoQuantity: 1,
+      items: [{ productId: 'p1', quantity: 1, unitYen: 500, freeGift: false, homePromo: true }],
+      ...overrides,
+    });
+  }
+
+  // `maxProducts: null` isola o limite por pessoa do limite global da campanha:
+  // sem isso a segunda compra bateria em `promotion_unavailable` antes.
+  const promocaoNoAr = {
+    'siteContent/homePromotion': { productId: 'p1', soldCount: 0, maxProducts: null, nextPromo: null },
+  };
+
+  it('tranca a promoção pela conta quando o pedido não tem CPF', async () => {
+    const db = database(pedidoPromocional('O1', { cpf: '' }), 5, promocaoNoAr);
+    injected.db = db;
+    await fulfillOrder('O1', { provider: 'manual', reference: 'sem-cpf-1', confirmedBy: 'admin' });
+    expect(db.get(`promo_usage/${CODE}_uid_user-O1`)).toMatchObject({
+      code: CODE,
+      pessoaId: 'uid_user-O1',
+      cpf: '',
+      orderId: 'O1',
+    });
+    expect(db.get('cpf_index/uid_user-O1').productIds).toContain('p1');
+  });
+
+  it('recusa a segunda tentativa do mesmo cliente sem CPF', async () => {
+    // O uso anterior está gravado sob o uid. Ancorado só no CPF, o
+    // `fulfillOrder` não teria onde olhar e liberaria a promoção outra vez.
+    const db = database(pedidoPromocional('O2', { cpf: '' }), 5, {
+      ...promocaoNoAr,
+      [`promo_usage/${CODE}_uid_user-O2`]: { code: CODE, cpf: '', pessoaId: 'uid_user-O2', orderId: 'O0' },
+    });
+    injected.db = db;
+    await expect(fulfillOrder('O2', { provider: 'manual', reference: 'sem-cpf-2', confirmedBy: 'admin' }))
+      .rejects.toMatchObject({ code: 'promotion_already_used' });
+    expect(db.get('orders/O2').fulfillmentState).toBe('pending');
+    expect(db.get('products/p1').stock.quantity).toBe(5);
+  });
+
+  it('continua usando o CPF como âncora quando ele existe', async () => {
+    const db = database(pedidoPromocional('O1', { cpf: '12345678901' }), 5, promocaoNoAr);
+    injected.db = db;
+    await fulfillOrder('O1', { provider: 'manual', reference: 'com-cpf', confirmedBy: 'admin' });
+    expect(db.get(`promo_usage/${CODE}_12345678901`)).toMatchObject({
+      pessoaId: '12345678901',
+      cpf: '12345678901',
+    });
+    expect(db.get('cpf_index/12345678901').productIds).toContain('p1');
+    // Nenhuma chave `uid_` quando há CPF: os documentos já gravados em produção
+    // continuam sendo os mesmos, sem migração.
+    expect(db.get(`promo_usage/${CODE}_uid_user-O1`)).toBeUndefined();
+    expect(db.get('cpf_index/uid_user-O1')).toBeUndefined();
+  });
+
+  it('limite por produto da promoção também vale sem CPF', async () => {
+    const db = database(pedidoPromocional('O1', { cpf: '' }), 5, {
+      ...promocaoNoAr,
+      'cpf_index/uid_user-O1': { productIds: ['p1'], affiliateCodes: [] },
+    });
+    injected.db = db;
+    await expect(fulfillOrder('O1', { provider: 'manual', reference: 'sem-cpf-limite', confirmedBy: 'admin' }))
+      .rejects.toMatchObject({ code: 'promotion_limit' });
+    expect(db.get('products/p1').stock.quantity).toBe(5);
+  });
+});

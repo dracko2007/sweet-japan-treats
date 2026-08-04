@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { requireUser } from './_lib/auth.js';
-import { adminDb } from './_lib/firebase-admin.js';
+import { adminAuth, adminDb } from './_lib/firebase-admin.js';
 import {
   assertExactKeys,
   handleCors,
@@ -15,6 +15,11 @@ const BIRTHDAY_POINTS = 1000;
 const REVIEW_POINTS = 1;
 const SOCIAL_NETWORKS = new Set(['instagram', 'facebook', 'tiktok', 'x']);
 const PAID_STATUSES = new Set(['confirmed', 'processing', 'shipped', 'delivered']);
+// Impede exploração: contas recém-criadas não podem setar birthdate para hoje e sacar
+// 1.000 pontos na hora, repetindo por conta nova. O Firebase Auth `creationTime`
+// é controlado pelo servidor, logo não-forjável; o campo de documento não serve pois
+// é escrito pelo cliente.
+const IDADE_MINIMA_CONTA_DIAS = 30;
 const TOKYO_DATE_FORMAT = new Intl.DateTimeFormat('en-US', {
   timeZone: 'Asia/Tokyo',
   year: 'numeric',
@@ -86,9 +91,22 @@ async function claimSocialFollow(db, user, body) {
 
 async function claimBirthday(db, user, body) {
   assertExactKeys(body, ['action']);
+
+  // A data de criação vem do Firebase Auth, não do documento: o cliente escreve
+  // o documento, e um campo que ele controla não serve de trava. Sem esta
+  // idade mínima bastava criar conta, apontar `birthdate` para hoje e sacar os
+  // 1.000 pontos na hora — repetindo por conta nova.
+  //
+  // Data ilegível recusa em vez de liberar: um `NaN` numa comparação de
+  // "menor que" passaria batido, e a trava viraria enfeite.
+  const contaCriadaEm = new Date((await adminAuth().getUser(user.uid))?.metadata?.creationTime ?? NaN).getTime();
+  const idadeEmDias = (Date.now() - contaCriadaEm) / 86_400_000;
+  if (!Number.isFinite(idadeEmDias) || idadeEmDias < IDADE_MINIMA_CONTA_DIAS) {
+    throw new HttpError(409, 'birthday_unavailable');
+  }
+
   const userRef = db.collection('users').doc(user.uid);
   const { year, month, day } = tokyoDateParts();
-
   return db.runTransaction(async (transaction) => {
     const snapshot = await transaction.get(userRef);
     if (!snapshot.exists) throw new HttpError(404, 'user_not_found');

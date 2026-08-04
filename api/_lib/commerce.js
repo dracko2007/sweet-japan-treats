@@ -315,6 +315,19 @@ export function buildQuote({ requestedItems, products, country, prefecture, stat
   const total = normalizeMoney(productsDisplay + shippingDisplay + psFeeDisplay + taxDisplay, currency);
   if (!(total > 0)) throw new HttpError(400, 'invalid_total');
   
+  // Pontos da campanha "Compre e Ganhe pontos". Até 04/08/2026 o
+  // `fulfillment.js` somava `order.promoPoints` no saldo, mas ninguém gravava
+  // esse campo — a campanha era anunciada por e-mail/push e creditava zero.
+  //
+  // Exige o produto da campanha no carrinho, como as outras mecânicas já
+  // fazem (`discount` casa por `productId`, `bogo` procura o item gatilho):
+  // senão bastava colar o código com qualquer carrinho para levar os pontos.
+  // Brinde não conta como gatilho, pelo mesmo motivo.
+  const promoPoints = campaign?.mechanic === 'points'
+    && lineItems.some((item) => !item.freeGift && item.productId === campaign.productId)
+    ? Math.max(0, Math.floor(Number(campaign.points || 0)))
+    : 0;
+
   const pointsMultiplier = pointsMultiplierForSpend(recentSpendYen);
 
   return {
@@ -328,6 +341,7 @@ export function buildQuote({ requestedItems, products, country, prefecture, stat
     redeemPoints: pointsDiscountYen,
     earnedPoints: earnedPointsForOrder(productSubtotalYen, pointsDiscountYen, pointsMultiplier),
     pointsMultiplier,
+    promoPoints,
     shippingYen: finalShippingYen,
     shippingWeightG: shipping.weightG,
     psFeeYen: psFeeYen - psDiscountYen,

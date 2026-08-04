@@ -5,6 +5,14 @@ import {
   claimSocialFollow,
 } from '../user-rewards.js';
 
+const mocks = vi.hoisted(() => ({
+  getUser: vi.fn(),
+}));
+
+vi.mock('./firebase-admin.js', () => ({
+  adminAuth: () => ({ getUser: mocks.getUser }),
+  adminDb: vi.fn(),
+}));
 function clone(value) {
   return value === undefined ? undefined : structuredClone(value);
 }
@@ -83,6 +91,13 @@ const user = { uid: 'u1', email: 'buyer@example.com' };
 
 afterEach(() => {
   vi.useRealTimers();
+  vi.clearAllMocks();
+});
+
+beforeEach(() => {
+  // Por padrão, conta criada há 365 dias (passa na validação de idade mínima)
+  const oldTime = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString();
+  mocks.getUser.mockResolvedValue({ metadata: { creationTime: oldTime } });
 });
 
 describe('server-defined user rewards', () => {
@@ -121,6 +136,63 @@ describe('server-defined user rewards', () => {
     await expect(claimBirthday(db, user, { action: 'birthday' }))
       .rejects.toMatchObject({ statusCode: 409, code: 'birthday_unavailable' });
     expect(db.get('users/u1').points).toBe(10);
+  });
+
+  it('recusa o bônus de aniversário quando a conta tem menos de 30 dias', async () => {
+    vi.useFakeTimers();
+    // UTC time que resulta em 2026-01-15 em Tóquio (UTC+9)
+    vi.setSystemTime(new Date('2026-01-14T15:30:00.000Z'));
+    // Conta criada há apenas 10 dias
+    const recentTime = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString();
+    mocks.getUser.mockResolvedValue({ metadata: { creationTime: recentTime } });
+    const db = new FakeDb({ 'users/u1': { points: 10, birthdate: '1990-01-15' } });
+
+    await expect(claimBirthday(db, user, { action: 'birthday' }))
+      .rejects.toMatchObject({ statusCode: 409, code: 'birthday_unavailable' });
+    // Garante que nenhum ponto foi creditado
+    expect(db.get('users/u1').points).toBe(10);
+  });
+
+  // A primeira versão desta trava comparava `NaN < 30`, que é `false` — ou
+  // seja, conta sem data de criação legível passava direto e ganhava o bônus.
+  // Checagem de segurança precisa recusar quando não consegue decidir.
+  it('recusa quando não dá para saber a idade da conta', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-01-14T15:30:00.000Z'));
+    const db = new FakeDb({ 'users/u1': { points: 10, birthdate: '1990-01-15' } });
+
+    for (const metadata of [{}, { creationTime: undefined }, { creationTime: 'nao-e-data' }]) {
+      mocks.getUser.mockResolvedValue({ metadata });
+      await expect(claimBirthday(db, user, { action: 'birthday' }))
+        .rejects.toMatchObject({ statusCode: 409, code: 'birthday_unavailable' });
+    }
+    expect(db.get('users/u1').points).toBe(10);
+  });
+
+  it('credita 1000 pontos no primeiro resgate do ano para conta antiga', async () => {
+    vi.useFakeTimers();
+    // UTC time que resulta em 2026-03-20 em Tóquio (UTC+9)
+    vi.setSystemTime(new Date('2026-03-19T15:30:00.000Z'));
+    const db = new FakeDb({ 'users/u1': { points: 10, birthdate: '1990-03-20' } });
+
+    const first = await claimBirthday(db, user, { action: 'birthday' });
+
+    expect(first).toEqual({ ok: true, awarded: 1000, total: 1010, alreadyClaimed: false });
+    expect(db.get('users/u1')).toMatchObject({ points: 1010, birthdayBonusYear: 2026 });
+  });
+
+  it('não credita de novo quando birthdayBonusYear já é o ano corrente', async () => {
+    vi.useFakeTimers();
+    // UTC time que resulta em 2026-05-22 em Tóquio (UTC+9)
+    vi.setSystemTime(new Date('2026-05-21T15:30:00.000Z'));
+    const db = new FakeDb({
+      'users/u1': { points: 1010, birthdate: '1990-05-22', birthdayBonusYear: 2026 },
+    });
+
+    const replay = await claimBirthday(db, user, { action: 'birthday' });
+
+    expect(replay).toEqual({ ok: true, awarded: 0, total: 1010, alreadyClaimed: true });
+    expect(db.get('users/u1').points).toBe(1010);
   });
 
   it('requires a paid product order and credits one review point once', async () => {

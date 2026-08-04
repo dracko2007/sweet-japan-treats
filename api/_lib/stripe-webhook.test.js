@@ -130,15 +130,16 @@ describe('Stripe webhook signature boundary', () => {
 
   it('com assinatura falha mas id válido, usa o evento da API e IGNORA o corpo', async () => {
     // O corpo mente: diz que o pedido é outro. Só o que a API devolver vale.
-    const corpoForjado = JSON.stringify({
+    // Passar como objeto (nao Buffer) marca autentico: false, permitindo fallback.
+    const corpo = {
       id: 'evt_test123',
       type: 'payment_intent.succeeded',
       data: { object: { id: 'pi_falso', metadata: { orderId: 'PEDIDO-FORJADO' }, amount_received: 1, currency: 'brl' } },
-    });
+    };
     mocks.retrieveEvent.mockResolvedValue(JSON.parse(eventPayload()));
 
     const res = response();
-    await webhook({ method: 'POST', headers: { 'stripe-signature': 'invalid' }, body: Buffer.from(corpoForjado) }, res);
+    await webhook({ method: 'POST', headers: { 'stripe-signature': 'invalid' }, body: corpo }, res);
 
     expect(mocks.retrieveEvent).toHaveBeenCalledWith('evt_test123');
     // Faturou o pedido que a API confirmou, não o que o corpo alegava.
@@ -160,5 +161,59 @@ describe('Stripe webhook signature boundary', () => {
       reference: 'pi_test',
       confirmedBy: 'stripe-webhook',
     });
+  });
+
+  it('rejeita com 400 quando os bytes são autênticos e a assinatura não confere', async () => {
+    // Com bytes autenticos, nao sobra outra explicacao alem de segredo errado.
+    // Nao deve usar o fallback — o 400 alerta o operador que precisa verificar
+    // a variavel STRIPE_WEBHOOK_SECRET. Se usasse o fallback, a falha de
+    // assinatura seria silenciada para sempre.
+    const payload = eventPayload();
+    const corpoAutentico = Buffer.from(payload);
+
+    // Assinatura gerada com segredo *diferente* — nao vai conferir com whsec_test
+    const stripe = new Stripe('sk_test_placeholder');
+    const assinaturaBrabo = stripe.webhooks.generateTestHeaderString({
+      payload,
+      secret: 'whsec_wrong', // segredo diferente!
+    });
+
+    const res = response();
+    await webhook({
+      method: 'POST',
+      headers: { 'stripe-signature': assinaturaBrabo },
+      rawBody: corpoAutentico, // bytes autenticos!
+    }, res);
+
+    // Deve rejeitar com 400 sem chamar retrieveEvent (nao usa fallback)
+    expect(res.statusCode).toBe(400);
+    expect(res.body).toEqual({ error: 'invalid_stripe_signature' });
+    expect(mocks.retrieveEvent).not.toHaveBeenCalled();
+    expect(mocks.fulfillOrder).not.toHaveBeenCalled();
+  });
+
+  it('usa o fallback da API quando o corpo foi reconstruído pela plataforma', async () => {
+    // Corpo como objeto, nao Buffer — sera reconstruido com JSON.stringify,
+    // marcado como autentico: false. Assinatura invalida, mas id valido,
+    // entao o fallback roda e processa o evento da API (que esta correto).
+    const payload = eventPayload();
+    const corpo = JSON.parse(payload); // Objeto, nao string/Buffer
+
+    // Assinatura invalida (qualquer coisa serve porque vai falhar mesmo)
+    const res = response();
+    mocks.retrieveEvent.mockResolvedValue(JSON.parse(payload));
+
+    await webhook({
+      method: 'POST',
+      headers: { 'stripe-signature': 'invalid' },
+      body: corpo, // Objeto — sera reconstruido, autentico: false
+    }, res);
+
+    // Deve usar o fallback: chamar retrieveEvent com o id
+    expect(mocks.retrieveEvent).toHaveBeenCalledWith('evt_test');
+    // E processar normalmente o evento da API
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toEqual({ received: true, replay: false });
+    expect(mocks.fulfillOrder).toHaveBeenCalledWith('SE-BR-123456', expect.anything());
   });
 });
