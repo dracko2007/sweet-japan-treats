@@ -1143,15 +1143,26 @@ const KimiClawAssistant: React.FC = () => {
       const ai = await aiAnswer(text);
       setIsTyping(false);
       if (ai) {
-        // Extrai os IDs dos produtos recomendados pela tag |||PRODUCT_IDS: id1,id2 → mostra cards
+        // Extrai os IDs dos produtos recomendados pela tag |||PRODUCT_IDS → mostra
+        // cards. O prompt pede o formato exato "|||PRODUCT_IDS: id1,id2", mas o
+        // modelo às vezes desvia (sem os dois-pontos, IDs entre colchetes, ou
+        // separados por espaço em vez de vírgula) — sem tolerância a isso, a tag
+        // não batia, o card não aparecia E o texto cru da tag vazava pro cliente
+        // (o "|||PRODUCT_IDS [id] [id]" ficava visível). O regex casa qualquer uma
+        // dessas variações; os tokens extraídos só viram card se baterem com um ID
+        // real do catálogo — lixo residual (ex.: uma palavra solta) nunca gera card.
         let responseText = ai;
         let recommendedProducts: Product[] | undefined;
-        const marker = '|||PRODUCT_IDS:';
-        const idx = responseText.indexOf(marker);
-        if (idx !== -1) {
-          const idsPart = responseText.slice(idx + marker.length).trim();
-          responseText = responseText.slice(0, idx).trim();
-          const ids = idsPart.split(',').map((s) => s.trim()).filter(Boolean).slice(0, 5);
+        const markerMatch = responseText.match(/\|\|\|\s*PRODUCT_IDS\s*:?\s*/i);
+        if (markerMatch && markerMatch.index !== undefined) {
+          const afterMarker = responseText.slice(markerMatch.index + markerMatch[0].length);
+          const idsLine = afterMarker.split('\n')[0]; // só a linha da tag, ignora texto solto depois
+          responseText = responseText.slice(0, markerMatch.index).trim();
+          const ids = idsLine
+            .split(/[,\s]+/)
+            .map((s) => s.replace(/[[\]]/g, '').trim())
+            .filter(Boolean)
+            .slice(0, 5);
           recommendedProducts = products.filter((p) => ids.includes(p.id));
         }
         setMessages((prev) => [
