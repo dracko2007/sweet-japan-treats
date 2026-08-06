@@ -3,7 +3,7 @@ import { Users, ShoppingBag, DollarSign, TrendingUp, Package, Calendar, Mail, Ph
 import { affiliateService, AffiliateRequest } from '@/services/affiliateService';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { customerService, CustomerStats } from '@/services/customerService';
+import { customerService, CustomerStats, CustomerVerification } from '@/services/customerService';
 import { useToast } from '@/hooks/use-toast';
 import { usePagination } from '@/hooks/usePagination';
 import Pagination from '@/components/Pagination';
@@ -20,6 +20,7 @@ import { resendVerificationAsAdmin } from '@/services/mailService';
 const CustomerList: React.FC = () => {
   const [customers, setCustomers] = useState<CustomerStats[]>([]);
   const [overview, setOverview] = useState<any>(null);
+  const [verification, setVerification] = useState<Map<string, CustomerVerification>>(new Map());
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerStats | null>(null);
   const { toast } = useToast();
   const { permissions } = useUser();
@@ -177,12 +178,14 @@ const CustomerList: React.FC = () => {
 
   const loadCustomers = async () => {
     try {
-      const [allCustomers, stats] = await Promise.all([
+      const [allCustomers, stats, verifyMap] = await Promise.all([
         withTimeout(customerService.getAllCustomersAsync(), 8_000, []),
         withTimeout(customerService.getCustomerOverviewAsync(), 8_000, null),
+        withTimeout(customerService.getCustomerVerificationAsync(), 8_000, new Map()),
       ]);
       setCustomers(allCustomers);
       setOverview(stats);
+      setVerification(verifyMap);
     } catch {
       setCustomers([]);
       setOverview(null);
@@ -408,6 +411,30 @@ const CustomerList: React.FC = () => {
     averageOrdersPerCustomer: 0,
   };
 
+  // Selo de verificação de e-mail: o Firestore não guarda emailVerified, então
+  // o status vem do Firebase Auth (via /api/admin?action=customers-verification).
+  // Sem o mapa (ex.: vite dev puro) o selo é omitido em vez de mostrar dado falso.
+  const verifiedCount = customers.filter((c) => verification.get(c.email.toLowerCase())?.verified).length;
+  const verificationBadge = (email: string) => {
+    const v = verification.get(email.toLowerCase());
+    if (!v) return null;
+    return v.verified ? (
+      <span
+        title="E-mail confirmado no Firebase Auth"
+        className="inline-flex items-center gap-0.5 shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30"
+      >
+        <MailCheck className="w-3 h-3" /> Verificado
+      </span>
+    ) : (
+      <span
+        title="E-mail ainda NÃO confirmado — o cadastro não foi concluído e o cliente não consegue entrar"
+        className="inline-flex items-center gap-0.5 shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30"
+      >
+        <AlertTriangle className="w-3 h-3" /> Não confirmado
+      </span>
+    );
+  };
+
   return (
     <div className="space-y-6">
       {/* Solicitações de afiliado pendentes */}
@@ -499,7 +526,9 @@ const CustomerList: React.FC = () => {
           <CardContent>
             <div className="text-2xl font-bold">{ov.totalCustomers}</div>
             <p className="text-xs text-muted-foreground">
-              {ov.activeCustomers} ativos · {ov.inactiveCustomers} inativos
+              {verification.size > 0
+                ? `${verifiedCount} verificados · ${ov.activeCustomers} ativos · ${ov.inactiveCustomers} inativos`
+                : `${ov.activeCustomers} ativos · ${ov.inactiveCustomers} inativos`}
             </p>
           </CardContent>
         </Card>
@@ -569,7 +598,10 @@ const CustomerList: React.FC = () => {
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-base sm:text-lg truncate">{customer.name}</h3>
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-semibold text-base sm:text-lg truncate">{customer.name}</h3>
+                          {verificationBadge(customer.email)}
+                        </div>
                         <p className="text-xs sm:text-sm text-muted-foreground flex items-center gap-1 truncate">
                           <Mail className="h-3 w-3 flex-shrink-0" />
                           <span className="truncate">{customer.email}</span>

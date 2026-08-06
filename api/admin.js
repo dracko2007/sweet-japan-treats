@@ -410,6 +410,48 @@ async function handleUsers(req, res) {
   }
 }
 
+// ── admin-customer-verification.js ──────────────────────────────────
+// O Firestore (de onde vem a lista de clientes) NÃO guarda o flag
+// emailVerified — ele vive só no Firebase Auth. Sem este endpoint o painel
+// não consegue saber quem confirmou o e-mail, e cadastros iniciados mas não
+// concluídos aparecem iguais a clientes reais. Devolve um mapa email→status
+// para o front cruzar com a lista de clientes.
+const MAX_AUTH_PAGES = 20; // 20 × 1000 = 20.000 usuários (teto generoso)
+
+async function handleCustomerVerification(req, res) {
+  if (!handleCors(req, res, { methods: ['GET'] })) return;
+  try {
+    const adminUser = await requireAdmin(req);
+    await enforceRateLimit(req, {
+      scope: 'admin-customer-verification:GET',
+      limit: 60,
+      windowMs: 60 * 60 * 1000,
+      identity: adminUser.uid,
+    });
+
+    const users = {};
+    let pageToken;
+    let pages = 0;
+    do {
+      const result = await adminAuth().listUsers(1000, pageToken);
+      for (const record of result.users) {
+        if (!record.email) continue;
+        users[record.email.toLowerCase()] = {
+          verified: !!record.emailVerified,
+          createdAt: record.metadata?.creationTime || null,
+          lastSignIn: record.metadata?.lastSignInTime || null,
+        };
+      }
+      pageToken = result.pageToken;
+    } while (pageToken && ++pages < MAX_AUTH_PAGES);
+
+    res.status(200).json({ ok: true, users, truncated: Boolean(pageToken) });
+  } catch (error) {
+    console.error('[admin-customer-verification]', error instanceof Error ? error.message : error);
+    sendError(res, error);
+  }
+}
+
 // ── dispatcher ──────────────────────────────────────────────────────
 export default async function handler(req, res) {
   const { action } = req.query;
@@ -417,7 +459,8 @@ export default async function handler(req, res) {
   if (action === 'coupon-usage') return handleCouponUsage(req, res);
   if (action === 'session') return handleSession(req, res);
   if (action === 'users') return handleUsers(req, res);
+  if (action === 'customers-verification') return handleCustomerVerification(req, res);
   return res.status(400).json({ error: 'invalid_action' });
 }
 
-export { handleDashboard, handleCouponUsage, handleSession, handleUsers };
+export { handleDashboard, handleCouponUsage, handleSession, handleUsers, handleCustomerVerification };

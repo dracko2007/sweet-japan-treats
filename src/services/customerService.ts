@@ -5,6 +5,12 @@ import { collection, getCountFromServer, getDocs } from 'firebase/firestore';
 import { db } from '@/config/firebase';
 import { ensureAdminAuth } from '@/utils/adminAuth';
 import { toYen } from '@/utils/currency';
+import { authenticatedFetch } from '@/services/authenticatedFetch';
+
+export interface CustomerVerification {
+  verified: boolean;
+  lastSignIn: string | null;
+}
 
 const isDev = import.meta.env.DEV;
 const devLog = isDev ? console.log.bind(console) : () => {};
@@ -177,6 +183,30 @@ export const customerService = {
     if (!db) throw new Error('Firestore not available');
     const snap = await getCountFromServer(collection(db, 'users'));
     return snap.data().count;
+  },
+
+  /** Mapa email(lower) → { verified, lastSignIn } vindo do Firebase Auth.
+   *
+   *  O Firestore não guarda emailVerified; o endpoint /api/admin?action=
+   *  customers-verification é a única fonte. Retorna Map vazio em caso de
+   *  falha (ex.: vite dev puro sem API) — o painel simplesmente omite o selo. */
+  async getCustomerVerificationAsync(): Promise<Map<string, CustomerVerification>> {
+    try {
+      const res = await authenticatedFetch('/api/admin?action=customers-verification');
+      if (!res.ok) {
+        devWarn('⚠️ [CUSTOMER] verification fetch failed:', res.status);
+        return new Map();
+      }
+      const data = await res.json() as { users?: Record<string, { verified?: boolean; lastSignIn?: string | null }> };
+      const map = new Map<string, CustomerVerification>();
+      for (const [email, v] of Object.entries(data.users || {})) {
+        map.set(String(email).toLowerCase(), { verified: !!v.verified, lastSignIn: v.lastSignIn ?? null });
+      }
+      return map;
+    } catch (error) {
+      devWarn('⚠️ [CUSTOMER] verification unavailable:', error);
+      return new Map();
+    }
   },
 
   // Async version: fetches all users from Firestore + merges with safeStorage
