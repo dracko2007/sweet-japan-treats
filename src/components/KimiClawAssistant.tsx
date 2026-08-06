@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { packedWeightG } from '../../shared/weight.js';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { Send, X, Bot, Sparkles, Loader2, MessageSquare, Trash, CornerDownLeft, Command, HelpCircle, Smartphone, ShoppingCart } from 'lucide-react';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
+import { Send, X, Bot, Sparkles, Loader2, MessageSquare, Trash, CornerDownLeft, Command, HelpCircle, Smartphone, ShoppingCart, ChevronRight } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { useUser } from '@/context/UserContext';
@@ -499,7 +499,14 @@ const KimiClawAssistant: React.FC = () => {
     const symbol = code === 'JPY' ? '¥' : code === 'EUR' ? '€' : 'R$';
     const locale = { country: selectedCountry, currencyCode: code, currencySymbol: symbol };
 
-    const relevant = relevantCatalogForAI(userText, isAdmin ? 60 : 30);
+    // Fixa no catálogo os produtos que o assistente acabou de mostrar (foco da
+    // conversa) mesmo que a pergunta atual ("manda o link", "e o preço?") não
+    // bata em nenhum termo de produto — sem isso, `relevantCatalogForAI` caía
+    // no recorte genérico do catálogo (fallback por ordem, não por assunto) e a
+    // IA ficava sem o ID real pra citar, arriscando inventar um link falso.
+    const relevantRaw = relevantCatalogForAI(userText, isAdmin ? 60 : 30);
+    const pinned = focusRef.current.filter((p) => !relevantRaw.some((r) => r.id === p.id));
+    const relevant = [...pinned, ...relevantRaw].slice(0, isAdmin ? 60 : 30);
     const catalog = relevant
       .filter((p) => !p.hidden)
       .map((p) => {
@@ -1355,7 +1362,7 @@ const KimiClawAssistant: React.FC = () => {
                 )}
                 <div className="max-w-[78%] flex flex-col gap-2">
                   <div
-                    className={`rounded-2xl px-3.5 py-2.5 text-xs shadow-soft leading-relaxed ${
+                    className={`rounded-2xl px-3.5 py-2.5 text-xs shadow-soft leading-relaxed whitespace-pre-line ${
                       msg.sender === 'user'
                         ? 'bg-primary text-white rounded-br-none'
                         : 'bg-card text-card-foreground border border-border rounded-bl-none'
@@ -1391,15 +1398,18 @@ const KimiClawAssistant: React.FC = () => {
                     <div className="flex flex-col gap-2 mt-2">
                       {msg.products.map((product) => (
                         <div key={product.id} className="bg-muted/40 border border-border rounded-lg p-2.5 hover:bg-muted/60 transition-colors">
-                          <div className="flex gap-2 items-start">
-                            <img src={product.image} alt={productEnglishName(product)} className="w-12 h-12 rounded object-cover" />
-                            <div className="flex-1 min-w-0">
-                              <p className="text-[11px] font-semibold text-foreground truncate">{productEnglishName(product)}</p>
-                              <p className="text-[10px] text-muted-foreground">{product.category}</p>
-                              <p className="text-[11px] font-bold text-primary mt-1">
-                                {formatPrice(fxConvert(effectiveYen(product, 'small'), getCurrencyByCountry(selectedCountry)), getCurrencyByCountry(selectedCountry))}
-                              </p>
-                            </div>
+                          <div className="flex gap-2 items-center">
+                            <Link to={`/produto/${product.id}`} className="group flex flex-1 min-w-0 items-center gap-2">
+                              <img src={product.image} alt={productEnglishName(product)} className="w-12 h-12 rounded object-cover shrink-0" />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-[11px] font-semibold text-foreground truncate group-hover:text-primary transition-colors">{productEnglishName(product)}</p>
+                                <p className="text-[10px] text-muted-foreground">{product.category}</p>
+                                <p className="text-[11px] font-bold text-primary mt-1">
+                                  {formatPrice(fxConvert(effectiveYen(product, 'small'), getCurrencyByCountry(selectedCountry)), getCurrencyByCountry(selectedCountry))}
+                                </p>
+                              </div>
+                              <ChevronRight className="w-3.5 h-3.5 text-muted-foreground shrink-0 group-hover:text-primary group-hover:translate-x-0.5 transition-all" />
+                            </Link>
                             <button
                               onClick={() => {
                                 addToCart(product, 'small', 1);
