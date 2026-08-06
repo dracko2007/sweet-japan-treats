@@ -48,6 +48,8 @@ export interface Product {
   noPsFee?: boolean;         // true = isenta a taxa de Personal Shopper (¥1000/un) deste produto
   featured?: boolean;        // true = aparece na seção "Em Destaque" da home (máx 4 por vez, rotação semanal)
   featuredAt?: string;       // ISO timestamp de quando foi marcado como destaque (ordena a rotação)
+  heroCarousel?: boolean;    // true = elegível para o hero cinematográfico da home (sorteio de 4 + promo de início sempre)
+  heroCarouselAt?: string;   // ISO timestamp de quando foi marcado (ordenação estável do sorteio)
   isNew?: boolean;           // Marca como lançamento (aparece em destaque no filtro "Lançamento")
   salesCount?: number;       // Quantidade vendida (usado no filtro "Mais Vendidos"); atualizado manualmente pelo admin
   rating?: number;           // Avaliação de 0 a 5 (curada manualmente pelo admin); ausente = não mostra estrelas

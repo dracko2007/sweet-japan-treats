@@ -9,6 +9,11 @@ import { getLenis } from '@/lib/smoothScroll';
 import { useLanguage } from '@/context/LanguageContext';
 import { formatPrice, getCurrencyByCountry } from '@/utils/currency';
 import { convertYen } from '@/services/fxService';
+import { useProducts } from '@/context/ProductsContext';
+import type { Product } from '@/types';
+import type { ActivePromo } from '@/types/promotion';
+import { db } from '@/config/firebase';
+import { doc, getDoc } from 'firebase/firestore';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -16,14 +21,20 @@ gsap.registerPlugin(ScrollTrigger);
 interface ShelfProduct {
   id: string;
   brand: string;
-  nameKey: string;
-  nameJa: string;
-  descriptionKey: string;
+  // Para a curadoria fixa (fallback) usamos chaves de tradução; para produtos
+  // do catálogo/promo usamos nome/descrição reais já localizados.
+  nameKey?: string;
+  nameJa?: string;
+  descriptionKey?: string;
+  name?: string;
+  description?: string;
   priceYen: number;
+  originalPriceYen?: number; // preço cheio (promo) → riscado
   image: string;
   bgKanji: string;
   accent: string;
   link: string;
+  isPromo?: boolean;
 }
 
 /**
@@ -70,7 +81,65 @@ const PRODUCTS: ShelfProduct[] = [
   },
 ];
 
-const TOTAL_PANELS = PRODUCTS.length + 2; // intro + produtos + encerramento
+// Kanji + acento decorativos por categoria (fundo do painel). Default cai num
+// rosa neutro com o kanji 美 (beleza) — cobre categorias personalizadas.
+const HERO_CATEGORY_STYLE: Record<string, { kanji: string; accent: string }> = {
+  cosmeticos: { kanji: '髪', accent: '#a16207' },
+  doces:      { kanji: '甘', accent: '#db2777' },
+  acessorios: { kanji: '飾', accent: '#7c3aed' },
+  papelaria:  { kanji: '紙', accent: '#2563eb' },
+  eletronicos:{ kanji: '電', accent: '#0d9488' },
+  masculino:  { kanji: '男', accent: '#1e40af' },
+  vestuario:  { kanji: '着', accent: '#be185d' },
+  higiene:    { kanji: '潔', accent: '#0891b2' },
+  pet:        { kanji: '愛', accent: '#ca8a04' },
+};
+const DEFAULT_HERO_STYLE = { kanji: '美', accent: '#db2777' };
+const PROMO_HERO_STYLE   = { kanji: '特', accent: '#dc2626' };
+const CATEGORY_LABEL: Record<string, string> = {
+  cosmeticos: 'Cosméticos', doces: 'Doces & Chás', acessorios: 'Acessórios',
+  papelaria: 'Papelaria', eletronicos: 'Eletrônicos', masculino: 'Masculino',
+  vestuario: 'Vestuário', higiene: 'Higiene & Saúde', pet: 'Pet',
+};
+const HERO_MAX_PRODUCTS = 4; // produtos sorteados por visita (além da promo)
+
+const heroStyleFor = (category?: string) =>
+  (category && HERO_CATEGORY_STYLE[category]) || DEFAULT_HERO_STYLE;
+
+function productToShelf(p: Product, language: string): ShelfProduct {
+  const { kanji, accent } = heroStyleFor(p.category);
+  const loc = p.i18n?.[language];
+  const priceYen = p.variants?.length
+    ? Math.min(...p.variants.map((v) => Number(v.price) || 0))
+    : (p.prices?.small ?? 0);
+  return {
+    id: p.id,
+    brand: CATEGORY_LABEL[p.category] || p.category || 'Japan Express',
+    name: loc?.name || p.name,
+    description: loc?.description || p.description,
+    priceYen,
+    image: p.gallery?.[0] || p.image || p.thumbnail || '',
+    bgKanji: kanji,
+    accent,
+    link: `/produto/${p.id}`,
+  };
+}
+
+function promoToShelf(promo: ActivePromo): ShelfProduct {
+  return {
+    id: `promo-${promo.productId}`,
+    brand: '✨ Promoção de Início',
+    name: `${promo.productName} ✨`,
+    description: promo.discountPct > 0 ? `${promo.discountPct}% OFF — preço promocional por tempo limitado.` : 'Preço promocional por tempo limitado.',
+    priceYen: promo.promoPriceYen ?? 0,
+    originalPriceYen: promo.originalPriceYen ?? undefined,
+    image: promo.productImage || '',
+    bgKanji: PROMO_HERO_STYLE.kanji,
+    accent: PROMO_HERO_STYLE.accent,
+    link: '/promocao',
+    isPromo: true,
+  };
+}
 
 export type CinematicIntroVariant = 'original' | 'transition';
 
@@ -136,6 +205,54 @@ const CinematicHeroShelf: React.FC<CinematicHeroShelfProps> = ({
   const { language, t, selectedCountry } = useLanguage();
   const currency = getCurrencyByCountry(selectedCountry);
   const introVideo = INTRO_VIDEOS[introVariant];
+
+  // Prateleira dinâmica: promo ativa (siteContent/homePromotion, sempre 1º
+  // painel quando existe) + até 4 produtos marcados no admin (heroCarousel),
+  // sorteados uma vez por visita — sem repetir. Sem nada marcado e sem promo
+  // ativa, mantém a curadoria fixa (PRODUCTS) como fallback. A resolução é
+  // assíncrona (Firestore) mas acontece durante o vídeo de intro — o cliente
+  // só alcança os painéis de produto depois, então a troca é invisível.
+  const { products, loading: productsLoading } = useProducts();
+  const [shelf, setShelf] = useState<ShelfProduct[]>(PRODUCTS);
+  const shelfResolved = useRef(false);
+  useEffect(() => {
+    if (shelfResolved.current || productsLoading) return;
+    let cancelled = false;
+    (async () => {
+      let activePromo: ActivePromo | null = null;
+      try {
+        if (db) {
+          const snap = await getDoc(doc(db, 'siteContent', 'homePromotion'));
+          if (snap.exists()) {
+            const data = snap.data() as ActivePromo;
+            const expired = data.expiresAt ? data.expiresAt < Date.now() : false;
+            if (!expired) activePromo = data;
+          }
+        }
+      } catch {
+        // offline/sem permissão — segue sem promo no hero
+      }
+      if (cancelled || shelfResolved.current) return;
+
+      const flagged = products.filter((p) => !p.hidden && p.heroCarousel);
+      if (flagged.length === 0 && !activePromo) return; // nada marcado: mantém fallback
+
+      const chosen = [...flagged]
+        .sort(() => Math.random() - 0.5)
+        .slice(0, HERO_MAX_PRODUCTS);
+      const built: ShelfProduct[] = [
+        ...(activePromo ? [promoToShelf(activePromo)] : []),
+        ...chosen.map((p) => productToShelf(p, language)),
+      ];
+      shelfResolved.current = true;
+      if (!cancelled) setShelf(built);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [products, productsLoading, language]);
+
+  const totalPanels = shelf.length + 2; // intro + produtos + encerramento
   const sectionRef = useRef<HTMLElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
   const progressRef = useRef<HTMLDivElement>(null);
@@ -223,10 +340,10 @@ const CinematicHeroShelf: React.FC<CinematicHeroShelfProps> = ({
             }
             if (counterRef.current) {
               const idx = Math.min(
-                TOTAL_PANELS,
-                Math.floor(self.progress * TOTAL_PANELS) + 1,
+                totalPanels,
+                Math.floor(self.progress * totalPanels) + 1,
               );
-              counterRef.current.textContent = `${String(idx).padStart(2, '0')} / ${String(TOTAL_PANELS).padStart(2, '0')}`;
+              counterRef.current.textContent = `${String(idx).padStart(2, '0')} / ${String(totalPanels).padStart(2, '0')}`;
             }
           },
         },
@@ -283,7 +400,7 @@ const CinematicHeroShelf: React.FC<CinematicHeroShelfProps> = ({
       const SLIDE_DURATION_S = 1.6; // duração do deslize entre painéis
 
       const targetFor = (i: number) =>
-        st ? Math.max(0, st.start + ((st.end - st.start) * i) / (TOTAL_PANELS - 1)) : 0;
+        st ? Math.max(0, st.start + ((st.end - st.start) * i) / (totalPanels - 1)) : 0;
 
       const schedule = (ms: number) => {
         if (manual || !st) return;
@@ -299,11 +416,11 @@ const CinematicHeroShelf: React.FC<CinematicHeroShelfProps> = ({
           toManual();
           return;
         }
-        const current = Math.round(st.progress * (TOTAL_PANELS - 1));
-        const next = Math.min(current + 1, TOTAL_PANELS - 1);
+        const current = Math.round(st.progress * (totalPanels - 1));
+        const next = Math.min(current + 1, totalPanels - 1);
         if (next === current) return; // chegou ao fim, autoplay encerra
         const done = () => {
-          if (next < TOTAL_PANELS - 1) schedule(PANEL_DWELL_MS);
+          if (next < totalPanels - 1) schedule(PANEL_DWELL_MS);
         };
         const lenis = getLenis();
         if (lenis) {
@@ -347,7 +464,7 @@ const CinematicHeroShelf: React.FC<CinematicHeroShelfProps> = ({
     // cruzar o breakpoint de 768px (iPad/iPhone grande em landscape). Sem isto
     // o pin e o translateX da versão desktop sobreviveriam à virada para o
     // layout vertical — o mesmo estado quebrado, só que por outro caminho.
-    { scope: sectionRef, dependencies: [simplified], revertOnUpdate: true },
+    { scope: sectionRef, dependencies: [simplified, totalPanels], revertOnUpdate: true },
   );
 
   const handleSkip = () => {
@@ -472,7 +589,10 @@ const CinematicHeroShelf: React.FC<CinematicHeroShelfProps> = ({
     </div>
   );
 
-  const renderProductPanel = (p: ShelfProduct, i: number) => (
+  const renderProductPanel = (p: ShelfProduct, i: number) => {
+    const name = p.name ?? (p.nameKey ? t(p.nameKey) : '');
+    const description = p.description ?? (p.descriptionKey ? t(p.descriptionKey) : '');
+    return (
     <div
       key={p.id}
       className={cn(
@@ -499,7 +619,7 @@ const CinematicHeroShelf: React.FC<CinematicHeroShelfProps> = ({
         <div className="cinematic-reveal flex flex-1 justify-center">
           <img
             src={p.image}
-            alt={`${p.brand} ${t(p.nameKey)}`}
+            alt={`${p.brand} ${name}`}
             loading="lazy"
             className="cinematic-product-img h-[18vh] max-h-[165px] w-auto object-contain md:h-[58vh] md:max-h-[440px]"
           />
@@ -515,19 +635,29 @@ const CinematicHeroShelf: React.FC<CinematicHeroShelfProps> = ({
             </span>
           </div>
           <h2 className="cinematic-reveal mb-1 font-display text-2xl font-light leading-tight text-pink-950 md:mb-3 md:text-5xl">
-            {t(p.nameKey)}
+            {name}
           </h2>
-          {language !== 'ja' && (
+          {language !== 'ja' && p.nameJa && (
             <p className="cinematic-reveal font-jp mb-2 text-sm text-pink-700/70 md:mb-5 md:text-lg">
               {p.nameJa}
             </p>
           )}
           <p className="cinematic-reveal mb-3 text-xs leading-relaxed text-pink-950/60 line-clamp-2 md:mb-7 md:text-base md:line-clamp-none">
-            {t(p.descriptionKey)}
+            {description}
           </p>
           <div className="cinematic-reveal flex items-center gap-4 md:gap-6">
-            <span className="font-display text-xl text-pink-950 md:text-2xl">
-              {formatPrice(convertYen(p.priceYen, currency), currency)}
+            <span className="flex items-baseline gap-2">
+              <span
+                className="font-display text-xl md:text-2xl"
+                style={{ color: p.isPromo ? p.accent : undefined }}
+              >
+                {formatPrice(convertYen(p.priceYen, currency), currency)}
+              </span>
+              {p.isPromo && p.originalPriceYen ? (
+                <span className="text-sm text-pink-950/40 line-through">
+                  {formatPrice(convertYen(p.originalPriceYen, currency), currency)}
+                </span>
+              ) : null}
             </span>
             <Link
               to={p.link}
@@ -540,7 +670,8 @@ const CinematicHeroShelf: React.FC<CinematicHeroShelfProps> = ({
         </div>
       </div>
     </div>
-  );
+    );
+  };
 
   const renderOutro = () => (
     <div
@@ -616,7 +747,7 @@ const CinematicHeroShelf: React.FC<CinematicHeroShelfProps> = ({
               ref={counterRef}
               className="font-jp text-[10px] tracking-[0.3em] text-white/80 mix-blend-difference md:text-xs md:tracking-[0.35em]"
             >
-              {`01 / ${String(TOTAL_PANELS).padStart(2, '0')}`}
+              {`01 / ${String(totalPanels).padStart(2, '0')}`}
             </span>
             <button
               type="button"
@@ -635,7 +766,7 @@ const CinematicHeroShelf: React.FC<CinematicHeroShelfProps> = ({
         className={cn('will-change-transform', simplified ? 'flex flex-col' : 'flex h-full')}
       >
         {renderIntro()}
-        {PRODUCTS.map(renderProductPanel)}
+        {shelf.map(renderProductPanel)}
         {renderOutro()}
       </div>
 

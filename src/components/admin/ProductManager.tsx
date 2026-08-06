@@ -985,6 +985,42 @@ const ProductManager: React.FC = () => {
                   })()}
                 </div>
 
+                {/* Hero Carrossel (topo da home) */}
+                <div className="bg-secondary/40 border border-border rounded-lg p-3 flex flex-col justify-center col-span-2">
+                  <label className="text-sm font-semibold block mb-2 flex items-center gap-1.5">🎬 Hero Carrossel (topo da home)</label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const turningOn = !editing.heroCarousel;
+                      setEditing({
+                        ...editing,
+                        heroCarousel: turningOn,
+                        heroCarouselAt: turningOn ? (editing.heroCarouselAt || new Date().toISOString()) : undefined,
+                      });
+                    }}
+                    className={`flex items-center justify-between gap-2 px-3 py-2 rounded-lg border text-sm font-semibold transition-colors ${
+                      editing.heroCarousel
+                        ? 'bg-rose-100 dark:bg-rose-950/30 text-rose-700 dark:text-rose-300 border-rose-300'
+                        : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 border-gray-300'
+                    }`}
+                  >
+                    <span>{editing.heroCarousel ? '🎬 No hero' : '☆ Fora do hero'}</span>
+                    <span className={`w-9 h-5 rounded-full relative transition-colors ${editing.heroCarousel ? 'bg-rose-500' : 'bg-gray-400'}`}>
+                      <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-all ${editing.heroCarousel ? 'left-4' : 'left-0.5'}`} />
+                    </span>
+                  </button>
+                  {(() => {
+                    const heroCount = products.filter(p => p.heroCarousel && p.id !== editing.id).length + (editing.heroCarousel ? 1 : 0);
+                    return (
+                      <p className="text-[11px] text-muted-foreground mt-1.5 leading-snug">
+                        {heroCount === 0
+                          ? 'O hero mostra a curadoria fixa padrão quando nada está marcado.'
+                          : <>{heroCount} marcado(s). O hero exibe <strong>4 por vez</strong> + a <strong>promoção de início</strong> (sempre). Acima de 4, <strong>sorteia 4 diferentes</strong> a cada visita, sem repetir.</>}
+                      </p>
+                    );
+                  })()}
+                </div>
+
                 {/* Restrição de destino + Origem */}
                 <div className="space-y-2">
                   <label className="text-sm font-semibold block">Restrição de venda por destino</label>
