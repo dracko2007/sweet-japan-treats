@@ -47,15 +47,17 @@ function orderShippingYen(order) {
   return toYen(shipping, order?.currency);
 }
 
+// `orders.js` grava `couponDiscountYen` (já em ¥, congelado no checkout) —
+// nunca gravou `couponDiscount` (bare). Ler o campo errado fazia este total
+// e o relatório de cupons (`couponRow` abaixo) ficarem sempre zerados.
 function orderDiscountYen(order) {
-  const discount = number(order?.couponDiscount);
-  if (!discount) return 0;
-  const currency = String(order?.currency || 'BRL').toUpperCase();
-  const localTotal = number(order?.totalPrice ?? order?.totalAmount);
-  const grandTotalYen = number(order?.grandTotalYen);
-  if (currency === 'JPY') return Math.round(discount);
-  if (grandTotalYen > 0 && localTotal > 0) return Math.round(discount * (grandTotalYen / localTotal));
-  return toYen(discount, currency);
+  return number(order?.couponDiscountYen);
+}
+
+// `redeemPoints` já sai do checkout em ¥ (1 ponto = ¥1 — ver shared/points.js),
+// gravado direto no pedido por `orders.js`. Sem conversão de moeda.
+function orderPointsYen(order) {
+  return number(order?.redeemPoints);
 }
 
 function productCostLookup(products) {
@@ -108,6 +110,7 @@ export function buildDashboardAnalytics(orders, products = [], now = new Date())
   let receitaPS = 0;
   let custo = 0;
   let descontosCupomYen = 0;
+  let pontosResgatadosYen = 0;
   const productCount = new Map();
   const paymentRevenue = new Map();
 
@@ -119,6 +122,7 @@ export function buildDashboardAnalytics(orders, products = [], now = new Date())
     receitaPS += number(order?.psFeeFinalYen);
     custo += orderCostYen(order, costs);
     descontosCupomYen += orderDiscountYen(order);
+    pontosResgatadosYen += orderPointsYen(order);
 
     for (const item of Array.isArray(order?.items) ? order.items : []) {
       const name = String(item?.productName || item?.name || 'Produto');
@@ -184,6 +188,7 @@ export function buildDashboardAnalytics(orders, products = [], now = new Date())
       custo,
       lucro: receitaProduto - custo,
       descontosCupomYen,
+      pontosResgatadosYen,
     },
     monthlyData,
     topProducts: [...productCount.entries()]
@@ -195,7 +200,7 @@ export function buildDashboardAnalytics(orders, products = [], now = new Date())
 }
 
 export function couponRow(order) {
-  const couponDiscount = number(order?.couponDiscount);
+  const couponDiscount = number(order?.couponDiscountYen);
   const couponCode = String(order?.couponCode || '');
   const affiliateCode = String(order?.affiliateCode || '');
   const epoch = orderEpoch(order);

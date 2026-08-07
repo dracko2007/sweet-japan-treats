@@ -32,7 +32,8 @@ describe('order analytics', () => {
         currency: 'BRL',
         shippingCost: 2,
         psFeeFinalYen: 50,
-        couponDiscount: 5,
+        couponDiscountYen: 5,
+        redeemPoints: 30,
         paymentMethod: 'pix',
         items: [{ productId: 'p1', productName: 'Produto', quantity: 2 }],
       },
@@ -56,6 +57,8 @@ describe('order analytics', () => {
     expect(result.stats.totalRevenue).toBe(1200);
     expect(result.finance.custo).toBe(200);
     expect(result.finance.receitaPS).toBe(50);
+    expect(result.finance.descontosCupomYen).toBe(5);
+    expect(result.finance.pontosResgatadosYen).toBe(30);
     expect(result.topProducts).toEqual([{ name: 'Produto', count: 2 }]);
     expect(result.paymentMethods).toEqual([{ method: 'PIX', revenue: 1200 }]);
     expect(result.monthlyData.at(-1)).toMatchObject({ orders: 1, receitaComFrete: 1200 });
@@ -66,7 +69,7 @@ describe('order analytics', () => {
       id: 'order-1',
       orderDate: '2026-07-20T00:00:00.000Z',
       couponCode: 'VERAO10',
-      couponDiscount: 100,
+      couponDiscountYen: 100,
       currency: 'JPY',
       status: 'delivered',
     });

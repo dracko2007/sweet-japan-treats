@@ -1,7 +1,7 @@
 import { safeStorage } from '@/utils/storage';
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Package, Printer, ShoppingBag, User, MapPin, Phone, Mail, Calendar, TestTube, Tag, Truck, CheckCircle, XCircle, Trash2, BarChart3, Users, PackagePlus, Video, Megaphone, Clapperboard, Building2, Sparkles, ShieldCheck, Calculator, CloudUpload, FileText, Handshake, Flag, TrendingDown, MessageCircle, Trophy } from 'lucide-react';
+import { Package, Printer, ShoppingBag, User, MapPin, Phone, Mail, Calendar, TestTube, Tag, Truck, CheckCircle, XCircle, Trash2, BarChart3, Users, PackagePlus, Video, Megaphone, Clapperboard, Building2, Sparkles, ShieldCheck, Calculator, CloudUpload, FileText, Handshake, Flag, TrendingDown, MessageCircle, Trophy, Landmark } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { useUser } from '@/context/UserContext';
@@ -36,6 +36,7 @@ import WhatsAppSettings from '@/components/admin/WhatsAppSettings';
 import VisitorStats from '@/components/admin/VisitorStats';
 import ReviewModeration from '@/components/admin/ReviewModeration';
 import MarginAudit from '@/components/admin/MarginAudit';
+import FinanceDetailManager from '@/components/admin/FinanceDetailManager';
 import CN23Modal from '@/components/admin/CN23Modal';
 import PromoNotificationModal from '@/components/admin/PromoNotificationModal';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
@@ -60,7 +61,7 @@ type AdminTab =
   | 'orders' | 'coupons' | 'dashboard' | 'customers' | 'products'
   | 'home' | 'vlog' | 'sorteio' | 'affiliates' | 'requests' | 'b2b' | 'admins' | 'videos'
   | 'calculator' | 'migration' | 'promotion' | 'negotiations' | 'marketing' | 'employees' | 'coupon-usage' | 'fraud'
-  | 'thermal-printer' | 'whatsapp' | 'review-moderation' | 'margin-audit' | 'visitors';
+  | 'thermal-printer' | 'whatsapp' | 'review-moderation' | 'margin-audit' | 'visitors' | 'finance-detail';
 
 interface AdminTabItem {
   id: AdminTab;
@@ -769,6 +770,7 @@ _This is an automated test message_
       { id: 'coupon-usage', label: 'Gastos c/ Cupons', icon: Tag },
       { id: 'fraud', label: 'Anti-Fraude', icon: ShieldCheck },
       { id: 'margin-audit', label: 'Auditoria de Margem', icon: TrendingDown },
+      { id: 'finance-detail', label: 'Impostos & Importação', icon: Landmark },
     ] },
     { title: 'Ferramentas', items: [
       { id: 'promotion', label: 'Promoção Início', icon: Sparkles },
@@ -1294,6 +1296,8 @@ _This is an automated test message_
               <ReviewModeration />
             ) : activeTab === 'margin-audit' ? (
               <MarginAudit />
+            ) : activeTab === 'finance-detail' ? (
+              <FinanceDetailManager />
             ) : (
               <CustomerList />
             )}

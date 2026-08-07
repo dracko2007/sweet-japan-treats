@@ -17,7 +17,7 @@ import { buildDashboardAnalytics, couponRow, matchesCouponFilters, orderEpoch } 
 const ORDER_FIELDS = [
   'orderDate', 'date', 'syncedAt', 'status', 'paymentMethod', 'currency',
   'grandTotalYen', 'totalPrice', 'totalAmount', 'shippingCost', 'shipping',
-  'psFeeFinalYen', 'couponDiscount', 'items',
+  'psFeeFinalYen', 'couponDiscountYen', 'redeemPoints', 'items',
 ];
 
 async function handleDashboard(req, res) {

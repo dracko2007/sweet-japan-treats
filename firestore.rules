@@ -260,6 +260,10 @@ service cloud.firestore {
       allow read, create, update, delete: if isAdmin();
     }
 
+    match /finance_expenses/{id} {
+      allow read, create, update, delete: if isAdmin();
+    }
+
     match /admins/{adminId} {
       allow read, create, update, delete: if isAdmin();
     }
