@@ -134,7 +134,7 @@
     width: 100%;
     max-width: 100%;
     overflow-x: hidden;
-    font-family: 'Inter', sans-serif;
+    font-family: 'Inter', 'Noto Sans JP', sans-serif;
   }
 
   #root {
@@ -159,7 +159,25 @@
   }
 
   h1, h2, h3, h4, h5, h6 {
-    font-family: 'Outfit', sans-serif;
+    font-family: 'Outfit', 'Noto Serif JP', sans-serif;
+    letter-spacing: -0.02em;
+  }
+
+  /* Professional Typography */
+  h1 { @apply text-4xl sm:text-5xl font-bold leading-tight; }
+  h2 { @apply text-3xl sm:text-4xl font-bold leading-snug; }
+  h3 { @apply text-2xl font-semibold leading-snug; }
+  h4 { @apply text-xl font-semibold leading-snug; }
+  h5 { @apply text-lg font-semibold leading-snug; }
+  h6 { @apply text-base font-semibold leading-snug; }
+
+  p { @apply text-base sm:text-lg leading-relaxed; }
+  .label { @apply text-sm font-medium tracking-normal; }
+  .caption { @apply text-xs font-medium text-muted-foreground; }
+
+  /* Focus states para accessibility */
+  *:focus-visible {
+    @apply outline-none ring-2 ring-primary ring-offset-2;
   }
 
   /* Marquee da barra de confiança no mobile (rola sem cortar as pontas) */
@@ -217,6 +235,25 @@
   .text-gradient {
     @apply bg-clip-text text-transparent;
     background-image: var(--gradient-caramel);
+  }
+
+  /* Professional interaction states */
+  .glass-card {
+    @apply backdrop-blur-md bg-white/5 border border-white/10 rounded-2xl;
+  }
+
+  .glass-card-strong {
+    @apply backdrop-blur-xl bg-white/10 border border-white/20 rounded-2xl;
+  }
+
+  /* Enhanced button styles */
+  button:not(:disabled), a[role="button"]:not(:disabled) {
+    @apply transition-all duration-200;
+  }
+
+  /* Form focus states */
+  input:focus, textarea:focus, select:focus {
+    @apply ring-2 ring-primary/30 border-primary;
   }
 }
 

@@ -64,15 +64,15 @@ const FeaturedProducts: React.FC = () => {
     <section className="relative overflow-hidden bg-gradient-to-b from-white via-pink-50/25 to-white py-10 sm:py-14">
       <div className="pointer-events-none absolute -left-28 top-20 h-72 w-72 rounded-full bg-fuchsia-200/20 blur-3xl" />
       <div className="container relative mx-auto px-4">
-        <div className="mb-7 flex flex-col justify-between gap-5 md:flex-row md:items-end">
+        <div className="mb-8 flex flex-col justify-between gap-5 md:flex-row md:items-end">
           <div className="max-w-2xl">
             <p className="text-[11px] font-black uppercase tracking-[0.2em] text-pink-500">{t('featured.badge')}</p>
-            <h2 className="mt-1.5 text-3xl font-black tracking-[-0.035em] text-slate-950 md:text-4xl">{t('featured.title')}</h2>
-            <p className="mt-2 text-sm leading-relaxed text-slate-500 md:text-base">{t('featured.subtitle')}</p>
+            <h2 className="mt-2 text-3xl font-bold tracking-tight text-slate-950 md:text-4xl">{t('featured.title')}</h2>
+            <p className="mt-3 text-base leading-relaxed text-slate-600 md:text-lg">{t('featured.subtitle')}</p>
           </div>
           <Link
             to="/produtos"
-            className="group inline-flex w-fit items-center gap-2 rounded-2xl border border-pink-100 bg-white px-4 py-2.5 text-sm font-extrabold text-pink-600 shadow-sm transition-all hover:-translate-y-0.5 hover:border-pink-200 hover:shadow-md"
+            className="group inline-flex w-fit items-center gap-2 rounded-xl border border-pink-200 bg-gradient-to-r from-pink-50 to-white px-5 py-2.5 text-sm font-bold text-pink-600 shadow-sm transition-all duration-300 hover:scale-105 hover:border-pink-300 hover:shadow-md hover:from-pink-100 focus-visible:ring-2 focus-visible:ring-pink-500 focus-visible:ring-offset-2"
           >
             {t('featured.viewAll')}
             <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />

@@ -88,7 +88,7 @@ const CompactProductCard: React.FC<CompactProductCardProps> = ({ product }) => {
       role="link"
       tabIndex={0}
       aria-label={`${name} — ${formatPrice(price, currency)}`}
-      className="product-depth-card group cursor-pointer overflow-hidden rounded-2xl border border-pink-100/80 bg-white shadow-sm transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-500 focus-visible:ring-offset-2 hover:-translate-y-1.5 hover:border-pink-200 hover:shadow-2xl hover:shadow-pink-200/40 flex flex-col"
+      className="product-depth-card group cursor-pointer overflow-hidden rounded-2xl border border-pink-100/60 bg-white shadow-sm transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-500 focus-visible:ring-offset-2 hover:scale-105 hover:-translate-y-2 hover:border-pink-200 hover:shadow-xl hover:shadow-pink-200/50 flex flex-col"
     >
       <div
         className="aspect-square bg-gradient-to-br from-white via-pink-50/35 to-fuchsia-50/50 relative overflow-hidden"
