@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { useGSAP } from '@gsap/react';
-import { ArrowRight, ArrowDown, PlaneTakeoff, ShoppingBag } from 'lucide-react';
+import { ArrowRight, ArrowDown, PlaneTakeoff, ShoppingBag, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getLenis } from '@/lib/smoothScroll';
 import { useLanguage } from '@/context/LanguageContext';
@@ -35,6 +35,7 @@ interface ShelfProduct {
   accent: string;
   link: string;
   isPromo?: boolean;
+  expiresAt?: number | null;
 }
 
 /**
@@ -138,7 +139,24 @@ function promoToShelf(promo: ActivePromo): ShelfProduct {
     accent: PROMO_HERO_STYLE.accent,
     link: '/promocao',
     isPromo: true,
+    expiresAt: promo.expiresAt,
   };
+}
+
+/** Dias inteiros restantes até `expiresAt` (arredonda para cima; null se sem prazo). */
+function daysRemaining(expiresAt?: number | null): number | null {
+  if (!expiresAt) return null;
+  const diffMs = expiresAt - Date.now();
+  if (diffMs <= 0) return 0;
+  return Math.ceil(diffMs / (24 * 60 * 60 * 1000));
+}
+
+function promoCountdownLabel(days: number, language: string): string {
+  if (days <= 0) return language === 'en' ? 'Ends today' : language === 'ja' ? '本日終了' : 'Termina hoje';
+  if (days === 1) return language === 'en' ? 'Ends tomorrow' : language === 'ja' ? '明日終了' : 'Termina amanhã';
+  if (language === 'en') return `${days} days left`;
+  if (language === 'ja') return `残り${days}日`;
+  return `${days} dias restantes`;
 }
 
 export type CinematicIntroVariant = 'original' | 'transition';
@@ -605,6 +623,7 @@ const CinematicHeroShelf: React.FC<CinematicHeroShelfProps> = ({
   const renderProductPanel = (p: ShelfProduct, i: number) => {
     const name = p.name ?? (p.nameKey ? t(p.nameKey) : '');
     const description = p.description ?? (p.descriptionKey ? t(p.descriptionKey) : '');
+    const promoDays = p.isPromo ? daysRemaining(p.expiresAt) : null;
     return (
     <div
       key={p.id}
@@ -647,6 +666,15 @@ const CinematicHeroShelf: React.FC<CinematicHeroShelfProps> = ({
               {p.brand}
             </span>
           </div>
+          {promoDays !== null && (
+            <div
+              className="cinematic-reveal mb-2 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-bold md:mb-3 md:text-xs"
+              style={{ backgroundColor: `${p.accent}18`, color: p.accent }}
+            >
+              <Clock className="h-3 w-3" />
+              {promoCountdownLabel(promoDays, language)}
+            </div>
+          )}
           <h2 className="cinematic-reveal mb-1 font-display text-2xl font-light leading-tight text-pink-950 md:mb-3 md:text-5xl">
             {name}
           </h2>
