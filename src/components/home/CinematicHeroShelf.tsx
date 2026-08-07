@@ -655,7 +655,7 @@ const CinematicHeroShelf: React.FC<CinematicHeroShelfProps> = ({
               {p.nameJa}
             </p>
           )}
-          <p className="cinematic-reveal mb-3 text-xs leading-relaxed text-pink-950/60 line-clamp-2 md:mb-7 md:text-base md:line-clamp-none">
+          <p className="cinematic-reveal mb-3 text-xs leading-relaxed text-pink-950/60 line-clamp-2 md:mb-7 md:text-base md:line-clamp-3">
             {description}
           </p>
           <div className="cinematic-reveal flex items-center gap-4 md:gap-6">
