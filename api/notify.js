@@ -293,7 +293,6 @@ async function handlePromoCampaign(req, res) {
       createdBy: admin.uid,
       expiresAt: now + campaign.expiresInDays * 86400000,
       active: true,
-      perCpfLimit: 1,
     };
     delete stored.expiresInDays;
 
@@ -339,8 +338,9 @@ async function handlePromoCampaign(req, res) {
         try {
           await sendMail({ to, ...template, unsubscribe: unsub });
           results.push({ email: to, channel: 'email', ok: true });
-        } catch {
-          results.push({ email: to, channel: 'email', ok: false });
+        } catch (erro) {
+          console.error('[promo-campaign] falha ao enviar e-mail:', to, erro instanceof Error ? erro.message : erro);
+          results.push({ email: to, channel: 'email', ok: false, reason: erro instanceof Error ? erro.message : 'send_failed' });
         }
       }
     }

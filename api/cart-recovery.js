@@ -210,7 +210,8 @@ export default async function handler(req, res) {
           reminderClaimedAt: null,
         });
         sent += 1;
-      } catch {
+      } catch (erro) {
+        console.error('[cart-recovery] falha ao enviar lembrete de carrinho abandonado:', erro instanceof Error ? erro.message : erro);
         await document.ref.update({ reminderClaimId: null, reminderClaimedAt: null }).catch(() => undefined);
         skipped += 1;
       }

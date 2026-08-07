@@ -581,9 +581,15 @@ async function handleConfirmManualPayment(req, res) {
     if (!result.replay) {
       const refreshed = await orderRef.get();
       const fulfilled = { id: refreshed.id, ...refreshed.data() };
-      await sendMail({ to: fulfilled.customerEmail, ...buildOrderEmail(fulfilled) }).catch(() => undefined);
+      await sendMail({ to: fulfilled.customerEmail, ...buildOrderEmail(fulfilled) }).catch((erro) => {
+        console.error('[confirm-manual-payment] falha ao enviar e-mail de confirmação ao cliente:', erro instanceof Error ? erro.message : erro);
+      });
       const storeEmail = process.env.ORDER_NOTIFICATION_EMAIL || process.env.ADMIN_EMAIL;
-      if (storeEmail) await sendMail({ to: storeEmail, ...buildOrderEmail(fulfilled, { store: true }) }).catch(() => undefined);
+      if (storeEmail) {
+        await sendMail({ to: storeEmail, ...buildOrderEmail(fulfilled, { store: true }) }).catch((erro) => {
+          console.error('[confirm-manual-payment] falha ao enviar e-mail de confirmação à loja:', erro instanceof Error ? erro.message : erro);
+        });
+      }
     }
     res.status(200).json({ ok: true, replay: result.replay });
   } catch (error) {

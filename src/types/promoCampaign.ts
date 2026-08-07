@@ -22,5 +22,4 @@ export interface PromoCampaign {
   createdAt: number;       // ms
   expiresAt?: number;      // ms (opcional)
   active: boolean;
-  perCpfLimit?: number;    // padrão 1
 }

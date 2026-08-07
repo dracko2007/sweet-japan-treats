@@ -71,11 +71,15 @@ async function notifyOrder(orderId) {
   if (!snap.exists) return;
   const order = { id: snap.id, ...snap.data() };
   const ownerTemplate = buildOrderEmail(order);
-  await sendMail({ to: order.customerEmail, ...ownerTemplate }).catch(() => undefined);
+  await sendMail({ to: order.customerEmail, ...ownerTemplate }).catch((erro) => {
+    console.error('[stripe-webhook] falha ao enviar e-mail de confirmação ao cliente:', erro instanceof Error ? erro.message : erro);
+  });
   const storeEmail = process.env.ORDER_NOTIFICATION_EMAIL || process.env.ADMIN_EMAIL;
   if (storeEmail) {
     const storeTemplate = buildOrderEmail(order, { store: true });
-    await sendMail({ to: storeEmail, ...storeTemplate }).catch(() => undefined);
+    await sendMail({ to: storeEmail, ...storeTemplate }).catch((erro) => {
+      console.error('[stripe-webhook] falha ao enviar e-mail de confirmação à loja:', erro instanceof Error ? erro.message : erro);
+    });
   }
 }
 
