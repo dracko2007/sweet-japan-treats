@@ -508,6 +508,19 @@ const CinematicHeroShelf: React.FC<CinematicHeroShelfProps> = ({
         onEnded={handleIntroEnded}
         aria-hidden
       />
+      {/* O painel de vídeo não tem fundo próprio (só o `<video>` cobrindo
+          `inset-0`) — a borda direita dele encosta direto no painel de produto
+          seguinte, que é claro/rosa. Como o carrossel é scrub contínuo (sem
+          scroll-snap), qualquer posição de rolagem entre painéis mostra os
+          dois ao mesmo tempo, e sem transição essa borda vira um corte duro
+          escuro→rosa que parece uma linha cortando a foto. Este degradê
+          suaviza só a borda de saída, sem mexer no vídeo nem no painel seguinte.
+          Some sozinho quando o vídeo chega na cena final rosa (os dois lados
+          já ficam parecidos). */}
+      <div
+        className="pointer-events-none absolute inset-y-0 right-0 w-[18%] bg-gradient-to-r from-transparent to-pink-50"
+        aria-hidden
+      />
       {/* Os overlays preservam a leitura no travelling e saem para revelar a
           vinheta rosa sem alterar a aparência da versão original. */}
       <div
