@@ -78,7 +78,30 @@ const CompactProductCard: React.FC<CompactProductCardProps> = ({ product }) => {
 
   return (
     <article
-      onClick={() => navigate(`/produto/${product.id}`)}
+      onClick={() => {
+        // Animação de clique
+        const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+        const x = event.clientX - rect.left;
+        const y = event.clientY - rect.top;
+
+        // Criar ripple effect
+        const ripple = document.createElement('div');
+        ripple.style.position = 'absolute';
+        ripple.style.left = x + 'px';
+        ripple.style.top = y + 'px';
+        ripple.style.width = '20px';
+        ripple.style.height = '20px';
+        ripple.style.backgroundColor = 'rgba(255, 105, 180, 0.6)';
+        ripple.style.borderRadius = '50%';
+        ripple.style.pointerEvents = 'none';
+        ripple.style.animation = 'ripple-expand 0.6s ease-out forwards';
+        ripple.className = 'ripple-effect';
+
+        (event.currentTarget as HTMLElement).appendChild(ripple);
+
+        setTimeout(() => ripple.remove(), 600);
+        navigate(`/produto/${product.id}`);
+      }}
       onKeyDown={(event) => {
         if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) {
           event.preventDefault();
@@ -88,12 +111,19 @@ const CompactProductCard: React.FC<CompactProductCardProps> = ({ product }) => {
       role="link"
       tabIndex={0}
       aria-label={`${name} — ${formatPrice(price, currency)}`}
-      className="product-depth-card group cursor-pointer overflow-hidden rounded-2xl border border-pink-100/60 bg-white shadow-sm transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-500 focus-visible:ring-offset-2 hover:scale-105 hover:-translate-y-2 hover:border-pink-200 hover:shadow-xl hover:shadow-pink-200/50 flex flex-col"
+      className="product-depth-card group relative cursor-pointer overflow-hidden rounded-2xl border border-pink-100/60 bg-white shadow-sm transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-500 focus-visible:ring-offset-2 hover:scale-110 hover:-translate-y-3 hover:border-pink-300 hover:shadow-2xl hover:shadow-pink-300/60 flex flex-col hover:z-10"
+      style={{
+        perspective: '1000px',
+      } as React.CSSProperties}
     >
       <div
-        className="aspect-square bg-gradient-to-br from-white via-pink-50/35 to-fuchsia-50/50 relative overflow-hidden"
+        className="aspect-square bg-gradient-to-br from-white via-pink-50/35 to-fuchsia-50/50 relative overflow-hidden group-hover:bg-gradient-to-br group-hover:from-pink-50 group-hover:via-fuchsia-50 group-hover:to-pink-100/80 transition-all duration-500"
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
+        style={{
+          transform: 'perspective(1000px) rotateX(0deg)',
+          transformStyle: 'preserve-3d',
+        } as React.CSSProperties}
       >
         {product.video && product.videoCover ? (
           /* Vídeo é a capa — toca direto, sem precisar de hover. Poster cobre
@@ -138,7 +168,7 @@ const CompactProductCard: React.FC<CompactProductCardProps> = ({ product }) => {
             src={product.thumbnail || product.image}
             alt={name}
             loading="lazy"
-            className="absolute inset-0 w-full h-full object-contain p-3 group-hover:scale-[1.06] group-hover:-rotate-1 transition-transform duration-500"
+            className="absolute inset-0 w-full h-full object-contain p-3 group-hover:scale-125 group-hover:-rotate-3 transition-all duration-500"
           />
         )}
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-tr from-transparent via-white/0 to-white/40 opacity-0 transition-opacity duration-300 group-hover:opacity-100" aria-hidden="true" />
@@ -150,14 +180,14 @@ const CompactProductCard: React.FC<CompactProductCardProps> = ({ product }) => {
         <button
           onClick={handleToggleFavorite}
           className={cn(
-            'absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-xl backdrop-blur-md transition-all duration-300',
+            'absolute right-2 top-2 flex h-9 w-9 items-center justify-center rounded-xl backdrop-blur-lg transition-all duration-300 hover:scale-110 active:scale-95',
             isFavorite
-              ? 'bg-pink-500 text-white shadow-lg shadow-pink-500/25'
-              : 'bg-white/85 text-slate-500 shadow-sm ring-1 ring-white/80 hover:scale-105 hover:text-pink-500'
+              ? 'bg-gradient-to-br from-pink-500 to-pink-600 text-white shadow-lg shadow-pink-500/40 animate-pulse'
+              : 'bg-white/90 text-slate-600 shadow-md ring-1 ring-white/90 hover:bg-white hover:text-pink-500 hover:shadow-lg'
           )}
           aria-label={isFavorite ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
         >
-          <Heart className={cn('w-4 h-4', isFavorite && 'fill-current')} />
+          <Heart className={cn('w-5 h-5 transition-all', isFavorite && 'fill-current animate-bounce')} />
         </button>
         {isSoldOut && (
           <div className="absolute inset-0 bg-white/70 flex items-center justify-center">
@@ -166,8 +196,8 @@ const CompactProductCard: React.FC<CompactProductCardProps> = ({ product }) => {
         )}
       </div>
 
-      <div className="flex flex-1 flex-col p-3 sm:p-3.5">
-        <p className="mb-1.5 min-h-[2.5em] text-[13px] font-bold leading-snug text-slate-700 line-clamp-2">{name}</p>
+      <div className="flex flex-1 flex-col p-3 sm:p-3.5 gap-2 bg-gradient-to-b from-transparent to-pink-50/30 group-hover:to-pink-100/50 transition-all duration-300">
+        <p className="mb-1 min-h-[2.5em] text-[13px] font-bold leading-snug text-slate-800 line-clamp-2 group-hover:text-pink-700 transition-colors">{name}</p>
         {(product.rating || product.salesCount) ? (
           <div className="mb-2 flex items-center gap-1 text-[10px] text-slate-500">
             {product.rating ? (
@@ -196,10 +226,10 @@ const CompactProductCard: React.FC<CompactProductCardProps> = ({ product }) => {
           {!isSoldOut && (
             <button
               onClick={handleAddToCart}
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-pink-500 to-fuchsia-500 text-white shadow-md shadow-pink-500/20 transition-all duration-300 hover:scale-105 hover:rotate-3 hover:shadow-lg"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-pink-500 via-pink-600 to-fuchsia-600 text-white shadow-lg shadow-pink-500/30 transition-all duration-300 hover:scale-125 hover:-rotate-6 hover:shadow-2xl active:scale-95 group-hover:translate-y-1 group-hover:animate-bounce"
               aria-label="Adicionar ao carrinho"
             >
-              <Plus className="w-4 h-4" />
+              <Plus className="w-5 h-5 transition-all" />
             </button>
           )}
         </div>

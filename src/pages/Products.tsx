@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useParams, Link, useSearchParams } from 'react-router-dom';
 import { Search, X, SlidersHorizontal, ChevronDown, Eye, EyeOff, Menu } from 'lucide-react';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import Layout from '@/components/layout/Layout';
 import CompactProductCard from '@/components/products/CompactProductCard';
 import SidebarFilters from '@/components/products/SidebarFilters';
@@ -30,6 +31,7 @@ const Products: React.FC = () => {
   const [searchParams] = useSearchParams();
   const { t, language } = useLanguage();
   const [showFiltersPanel, setShowFiltersPanel] = useState(false);
+  const prefersReducedMotion = useReducedMotion();
 
   const SORT_OPTIONS = [
     { key: 'preco-menor' as SortKey, label: t('productsPage.sortPriceAsc') || 'Menor preço' },
@@ -355,9 +357,24 @@ const Products: React.FC = () => {
                 <>
                   <ItemListJsonLd products={pageItems} />
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 md:gap-4">
-                    {pageItems.map((product) => (
-                      <CompactProductCard key={product.id} product={product} />
-                    ))}
+                    <AnimatePresence mode="popLayout" initial={false}>
+                      {pageItems.map((product, idx) => (
+                        <motion.div
+                          key={product.id}
+                          layout
+                          initial={prefersReducedMotion ? false : { opacity: 0, scale: 0.9, y: 16 }}
+                          animate={{ opacity: 1, scale: 1, y: 0 }}
+                          exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.9 }}
+                          transition={{
+                            duration: prefersReducedMotion ? 0.15 : 0.35,
+                            delay: prefersReducedMotion ? 0 : (idx % 12) * 0.03,
+                            ease: [0.22, 1, 0.36, 1],
+                          }}
+                        >
+                          <CompactProductCard product={product} />
+                        </motion.div>
+                      ))}
+                    </AnimatePresence>
                   </div>
 
                   {displayProducts.length > 0 && (
