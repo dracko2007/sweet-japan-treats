@@ -3,15 +3,7 @@ import { Play, Calendar, Clock, Eye, X } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import { useLanguage } from '@/context/LanguageContext';
 import { siteContentService, VlogContent, VlogVideo } from '@/services/siteContentService';
-
-// Extrai o ID do YouTube de um link ou retorna o próprio se já for ID (11 chars)
-const getYouTubeId = (s: string): string => {
-  if (!s) return '';
-  const m = s.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([\w-]{11})/);
-  if (m) return m[1];
-  if (/^[\w-]{11}$/.test(s.trim())) return s.trim();
-  return '';
-};
+import { getYouTubeId } from '@/utils/youtube';
 
 interface DisplayVideo {
   id: string;

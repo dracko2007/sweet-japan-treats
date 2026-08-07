@@ -5,12 +5,7 @@ import { useUser } from '@/context/UserContext';
 import { reviewService } from '@/services/reviewService';
 import { Review, ProductRating } from '@/types/review';
 import { cn } from '@/lib/utils';
-
-// Converte um link de vídeo (YouTube) em URL embutível; senão devolve null.
-function getYouTubeEmbed(url: string): string | null {
-  const m = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([\w-]{11})/);
-  return m ? `https://www.youtube.com/embed/${m[1]}` : null;
-}
+import { getYouTubeEmbed } from '@/utils/youtube';
 
 interface ProductReviewsProps {
   productId: string;

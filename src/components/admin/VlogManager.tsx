@@ -3,18 +3,7 @@ import { Plus, Trash2, Save, Loader2, Video, Star, Film } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { siteContentService, VlogContent, VlogVideo, DEFAULT_VLOG_CONTENT } from '@/services/siteContentService';
 import { useToast } from '@/hooks/use-toast';
-
-function getYouTubeId(s: string): string {
-  if (!s) return '';
-  const m = s.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([\w-]{11})/);
-  if (m) return m[1];
-  if (/^[\w-]{11}$/.test(s.trim())) return s.trim();
-  return '';
-}
-function getYouTubeEmbed(url: string): string | null {
-  const id = getYouTubeId(url);
-  return id ? `https://www.youtube.com/embed/${id}` : null;
-}
+import { getYouTubeEmbed } from '@/utils/youtube';
 
 // Editor de UM vídeo (usado no principal e em cada secundário)
 const VideoFields: React.FC<{

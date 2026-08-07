@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Star, Camera, X, Video, Gift } from 'lucide-react';
+import { Star, Camera, X, Video, Gift, Link2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { useUser } from '@/context/UserContext';
@@ -9,6 +9,7 @@ import { uploadMedia } from '@/services/uploadService';
 import { userRewardsService } from '@/services/userRewardsService';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { getYouTubeId, getYouTubeEmbed } from '@/utils/youtube';
 
 const MAX_VIDEO_MB = 60;
 
@@ -27,9 +28,11 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ productId, productName, onClo
   const [hoverRating, setHoverRating] = useState(0);
   const [comment, setComment] = useState('');
   const [images, setImages] = useState<string[]>([]);
+  const [videoMode, setVideoMode] = useState<'file' | 'link'>('file');
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [videoPreview, setVideoPreview] = useState('');
   const [videoProgress, setVideoProgress] = useState(0);
+  const [videoLink, setVideoLink] = useState('');
   const [alreadyHasVideo, setAlreadyHasVideo] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -65,9 +68,17 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ productId, productName, onClo
 
     setSaving(true);
 
-    // Faz upload do vídeo (se houver) para o Firebase Storage antes de salvar.
+    // Vídeo: link colado não sobe nada (é só o texto do link); arquivo
+    // continua indo para o Firebase Storage como antes.
     let videoUrl = '';
-    if (videoFile && !alreadyHasVideo) {
+    if (!alreadyHasVideo && videoMode === 'link' && videoLink.trim()) {
+      if (!getYouTubeId(videoLink.trim())) {
+        toast({ title: 'Link inválido', description: 'Cole um link do YouTube (youtube.com ou youtu.be).', variant: 'destructive' });
+        setSaving(false);
+        return;
+      }
+      videoUrl = videoLink.trim();
+    } else if (!alreadyHasVideo && videoFile) {
       try {
         const { url } = await uploadMedia(videoFile, `review-videos/${productId}`, setVideoProgress);
         videoUrl = url;
@@ -184,7 +195,7 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ productId, productName, onClo
             </div>
           </div>
 
-          {/* Vídeo — upload direto no site */}
+          {/* Vídeo — upload direto no site OU link colado (YouTube) */}
           <div>
             <label className="block text-sm font-medium mb-2 flex items-center gap-1.5">
               <Video className="w-4 h-4" /> Vídeo de review <span className="text-amber-600 font-bold">(+{POINTS.perVideoMinute} pts/min, após validação)</span>
@@ -192,27 +203,65 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ productId, productName, onClo
 
             {alreadyHasVideo ? (
               <p className="text-xs text-muted-foreground">Você já enviou um vídeo deste produto.</p>
-            ) : videoFile ? (
-              <div className="relative">
-                <video src={videoPreview} controls className="w-full max-h-48 rounded-lg bg-black" />
-                <button type="button" onClick={() => { setVideoFile(null); setVideoPreview(''); setVideoProgress(0); }}
-                  className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1"><X className="w-4 h-4" /></button>
-                <p className="text-xs text-muted-foreground mt-1 truncate">{videoFile.name} · {(videoFile.size / 1024 / 1024).toFixed(1)}MB</p>
-                {saving && videoProgress > 0 && (
-                  <div className="mt-2">
-                    <div className="h-2 bg-secondary rounded-full overflow-hidden">
-                      <div className="h-full bg-primary transition-all" style={{ width: `${videoProgress}%` }} />
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1">Enviando vídeo... {videoProgress}%</p>
-                  </div>
-                )}
-              </div>
             ) : (
-              <label className="flex flex-col items-center justify-center gap-1 border-2 border-dashed border-border rounded-lg py-6 cursor-pointer hover:border-primary">
-                <Video className="w-6 h-6 text-muted-foreground" />
-                <span className="text-xs text-muted-foreground">Toque para gravar/enviar um vídeo (até {MAX_VIDEO_MB}MB)</span>
-                <input type="file" accept="video/*" className="hidden" onChange={handleVideoSelect} />
-              </label>
+              <>
+                <div className="flex gap-2 mb-2">
+                  <button type="button" onClick={() => setVideoMode('file')}
+                    className={cn('flex-1 flex items-center justify-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors',
+                      videoMode === 'file' ? 'border-primary bg-primary/5 text-primary' : 'border-border text-muted-foreground hover:border-primary/50')}>
+                    <Video className="w-3.5 h-3.5" /> Enviar arquivo
+                  </button>
+                  <button type="button" onClick={() => setVideoMode('link')}
+                    className={cn('flex-1 flex items-center justify-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors',
+                      videoMode === 'link' ? 'border-primary bg-primary/5 text-primary' : 'border-border text-muted-foreground hover:border-primary/50')}>
+                    <Link2 className="w-3.5 h-3.5" /> Colar link do YouTube
+                  </button>
+                </div>
+
+                {videoMode === 'link' ? (
+                  <div>
+                    <input
+                      type="url"
+                      value={videoLink}
+                      onChange={(e) => setVideoLink(e.target.value)}
+                      placeholder="https://www.youtube.com/watch?v=..."
+                      className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                    />
+                    {videoLink.trim() && (
+                      getYouTubeEmbed(videoLink) ? (
+                        <div className="relative mt-2 w-full aspect-video rounded-lg overflow-hidden border border-border">
+                          <iframe src={getYouTubeEmbed(videoLink)!} title="Prévia do vídeo"
+                            className="absolute inset-0 w-full h-full" allowFullScreen />
+                        </div>
+                      ) : (
+                        <p className="text-xs text-destructive mt-1">Isso não parece um link do YouTube.</p>
+                      )
+                    )}
+                    <p className="text-xs text-muted-foreground mt-1">Já postou o vídeo no seu YouTube? Cole o link em vez de enviar o arquivo.</p>
+                  </div>
+                ) : videoFile ? (
+                  <div className="relative">
+                    <video src={videoPreview} controls className="w-full max-h-48 rounded-lg bg-black" />
+                    <button type="button" onClick={() => { setVideoFile(null); setVideoPreview(''); setVideoProgress(0); }}
+                      className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1"><X className="w-4 h-4" /></button>
+                    <p className="text-xs text-muted-foreground mt-1 truncate">{videoFile.name} · {(videoFile.size / 1024 / 1024).toFixed(1)}MB</p>
+                    {saving && videoProgress > 0 && (
+                      <div className="mt-2">
+                        <div className="h-2 bg-secondary rounded-full overflow-hidden">
+                          <div className="h-full bg-primary transition-all" style={{ width: `${videoProgress}%` }} />
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">Enviando vídeo... {videoProgress}%</p>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <label className="flex flex-col items-center justify-center gap-1 border-2 border-dashed border-border rounded-lg py-6 cursor-pointer hover:border-primary">
+                    <Video className="w-6 h-6 text-muted-foreground" />
+                    <span className="text-xs text-muted-foreground">Toque para gravar/enviar um vídeo (até {MAX_VIDEO_MB}MB)</span>
+                    <input type="file" accept="video/*" className="hidden" onChange={handleVideoSelect} />
+                  </label>
+                )}
+              </>
             )}
           </div>
         </div>
