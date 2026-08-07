@@ -738,14 +738,19 @@ const CinematicHeroShelf: React.FC<CinematicHeroShelfProps> = ({
       )}
       aria-label={t('cinematicHero.ariaLabel')}
     >
-      {/* Superfície da prateleira — persiste enquanto os produtos deslizam */}
+      {/* Superfície da prateleira — persiste enquanto os produtos deslizam.
+          Na versão 'transition' ela nasce OCULTA: antes do vídeo chegar no
+          momento-logo (~5,6s) o painel em cena ainda é o travelling puro, sem
+          prateleira nenhuma — a linha cortando o vídeo aí parecia um risco de
+          renderização. Ela entra junto com a cena rosa final, quando a
+          metáfora de "prateleira" passa a fazer sentido. */}
       {!simplified && (
         <>
           <div className="cinematic-shelf-glow" aria-hidden />
           <div
             className={cn(
               'cinematic-shelf-line transition-opacity duration-1000',
-              introVariant === 'transition' && logoMoment && 'opacity-0',
+              introVariant === 'transition' && (logoMoment ? 'opacity-100' : 'opacity-0'),
             )}
             aria-hidden
           />
