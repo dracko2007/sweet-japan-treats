@@ -1,27 +1,42 @@
 rules_version = '2';
 
-// Regras do Firebase Storage.
-// Os clientes da loja NÃO têm sessão Firebase Auth (só o admin autentica),
-// então a escrita nas pastas de mídia de avaliação é liberada, mas com limites
-// rígidos de tamanho e tipo para evitar abuso. Leitura é pública (mostrar mídia).
 service firebase.storage {
   match /b/{bucket}/o {
 
-    // Vídeos de avaliação: até 60MB, só content-type de vídeo.
-    match /review-videos/{productId}/{fileName} {
+    // Imagens dos produtos: leitura pública para a loja.
+    // Upload, alteração e exclusão somente para usuários autenticados.
+    match /japanexpress/products/{productId}/{fileName} {
       allow read: if true;
-      allow write: if request.resource.size < 60 * 1024 * 1024
-                   && request.resource.contentType.matches('video/.*');
-    }
-
-    // Fotos de avaliação (caso passem a subir aqui): até 8MB, só imagem.
-    match /review-photos/{productId}/{fileName} {
-      allow read: if true;
-      allow write: if request.resource.size < 8 * 1024 * 1024
+      allow write: if request.auth != null
+                   && request.resource != null
+                   && request.resource.size < 10 * 1024 * 1024
                    && request.resource.contentType.matches('image/.*');
     }
 
-    // Qualquer outro caminho: bloqueado.
+    // Fotos de avaliações: leitura pública e upload limitado a imagens.
+    match /review-photos/{productId}/{fileName} {
+      allow read: if true;
+      allow write: if request.resource != null
+                   && request.resource.size < 8 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+    }
+
+    match /japanexpress/__test__/{fileName} {
+      allow read: if true;
+      allow write: if request.auth != null
+                   && request.resource != null
+                   && request.resource.size < 1 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+    }
+    // Vídeos de avaliações: leitura pública e upload limitado a vídeos.
+    match /review-videos/{productId}/{fileName} {
+      allow read: if true;
+      allow write: if request.resource != null
+                   && request.resource.size < 60 * 1024 * 1024
+                   && request.resource.contentType.matches('video/.*');
+    }
+
+    // Bloqueia qualquer caminho não declarado acima.
     match /{allPaths=**} {
       allow read, write: if false;
     }

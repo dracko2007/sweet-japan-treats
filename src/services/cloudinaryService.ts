@@ -1,6 +1,5 @@
-// Tenta Cloudinary primeiro. Se falhar por limite de banda/quota (4xx), faz
-// fallback para Firebase Storage. Se AMBOS falharem, LANÇA — nunca grava a
-// imagem dentro do documento do Firestore.
+// Usa Firebase Storage como destino principal. Cloudinary fica apenas como fallback.
+// Assim a migração continua funcionando mesmo quando a conta Cloudinary está desativada.
 import { storage } from '@/config/firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
@@ -183,6 +182,16 @@ export const cloudinaryService = {
       motivos.push(`leitura da imagem falhou (${e instanceof Error ? e.message : String(e)})`);
     }
 
+    // 1) Firebase Storage (destino principal)
+    if (blob) {
+      try {
+        return await uploadToFirebase(blob, folder);
+      } catch (e) {
+        console.warn('Firebase Storage indisponível, tentando Cloudinary:', e);
+      }
+    }
+
+    // 2) Cloudinary (fallback)
     if (blob) {
       // 1) Cloudinary
       try {
