@@ -750,6 +750,7 @@ _This is an automated test message_
   const tabGroups: { title: string; items: AdminTabItem[] }[] = [
     { title: 'Visão geral', items: [{ id: 'dashboard', label: 'Dashboard', icon: BarChart3 }] },
     { title: 'Vendas', items: [
+      { id: 'orders', label: 'Pedidos', icon: Package, badge: ordersHasMore ? undefined : pendingOrdersCount },
       { id: 'affiliates', label: 'Afiliados', icon: Megaphone, badge: Math.max(affiliatePendingCount, pendingAffiliateRequestsCount) },
       { id: 'negotiations', label: 'Negociações', icon: Handshake, badge: pendingNegotiationsCount || 0 },
       { id: 'customers', label: 'Clientes', icon: Users, badge: Math.max(newCustomers, pendingAffiliateRequestsCount) },
