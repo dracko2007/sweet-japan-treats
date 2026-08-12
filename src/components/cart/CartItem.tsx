@@ -7,7 +7,7 @@ import { useCart } from '@/context/CartContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { getTranslatedProductFlavor } from '@/data/translations';
 import { formatPrice, getCurrencyByCountry } from '@/utils/currency';
-import { effectiveYen } from '@/utils/pricing';
+import { effectiveYen, baseYen, hasDiscount } from '@/utils/pricing';
 import { convertYen as fxConvert } from '@/services/fxService';
 import { productEnglishName } from '@/utils/productName';
 
@@ -20,7 +20,7 @@ const CartItemComponent: React.FC<CartItemProps> = ({ item, couponDiscount = 0 }
   const { updateQuantity, removeFromCart } = useCart();
   const { t, selectedCountry } = useLanguage();
   const isPromo = item.product.id.endsWith('_promo');
-  const basePrice = effectiveYen(item.product, item.size);
+  const hasProductDiscount = hasDiscount(item.product);
 
   // Compute translated values
   const productName = productEnglishName(item.product);
@@ -29,9 +29,12 @@ const CartItemComponent: React.FC<CartItemProps> = ({ item, couponDiscount = 0 }
   // Determine display price and currency
   const isEuro = ['Portugal', 'França', 'Itália', 'Espanha'].includes(selectedCountry);
   const currency = getCurrencyByCountry(selectedCountry);
+  const basePrice = effectiveYen(item.product, item.size);
   const unitPrice = fxConvert(basePrice, currency);
+  const originalPrice = fxConvert(baseYen(item.product, item.size), currency);
 
   const finalPrice = unitPrice * item.quantity;
+  const originalTotalPrice = originalPrice * item.quantity;
   const stockMax = item.product.stock && !item.product.stock.unlimited ? item.product.stock.quantity : Infinity;
   const promoMax = isPromo ? ((item.product as any).promoLimit ?? 1) : Infinity;
   const maxQty = Math.min(stockMax, promoMax);
@@ -151,6 +154,12 @@ const CartItemComponent: React.FC<CartItemProps> = ({ item, couponDiscount = 0 }
 
           {/* Price */}
           <div className="text-right">
+            {hasProductDiscount && (
+              <p className="text-xs text-muted-foreground line-through">{formatPrice(originalTotalPrice, currency)}</p>
+            )}
+            {hasProductDiscount && (
+              <p className="text-[11px] font-bold text-red-600">−{item.product.discountPercent}% promoção</p>
+            )}
             {couponDiscount > 0 && (
               <p className="text-xs text-muted-foreground line-through">{formatPrice(finalPrice, currency)}</p>
             )}

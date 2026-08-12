@@ -8,19 +8,22 @@ import { useProducts } from '@/context/ProductsContext';
 import { useToast } from '@/hooks/use-toast';
 import { affiliateService, TIER_CONFIG } from '@/services/affiliateService';
 import type { AffiliateDashboard, AffiliateTier } from '@/services/affiliateService';
+import { convertYen as fxConvert, loadFxRates } from '@/services/fxService';
 
 const SITE_URL = 'https://japanexpress-store.com';
 
 const AffiliatePage: React.FC = () => {
   const { user, isAuthenticated } = useUser();
   const { products } = useProducts();
-  const { toast } = useToast();
   const [affiliates, setAffiliates] = useState<AffiliateDashboard[]>([]);
   const [pendingByCode, setPendingByCode] = useState<Record<string, { commissionYen: number; netYen: number; orders: number }>>({});
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState<string | null>(null);
   const [selectedProductId, setSelectedProductId] = useState('');
   const [showTierModal, setShowTierModal] = useState(false);
+  useEffect(() => {
+    loadFxRates().catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (!user?.email) {
@@ -48,11 +51,11 @@ const AffiliatePage: React.FC = () => {
   const copy = (text: string, key: string) => {
     navigator.clipboard.writeText(text);
     setCopied(key);
-    toast({ title: 'Copiado!', description: text });
     setTimeout(() => setCopied(null), 2000);
   };
 
   const yen = (v: number) => `¥${(v || 0).toLocaleString()}`;
+  const brl = (v: number) => `R$ ${fxConvert(v || 0, 'BRL').toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   return (
     <Layout>
@@ -138,13 +141,15 @@ const AffiliatePage: React.FC = () => {
                       <div className="bg-secondary/30 rounded-xl p-4">
                         <p className="text-xs text-muted-foreground flex items-center gap-1 mb-1"><TrendingUp className="w-3 h-3" /> Receita gerada</p>
                         <p className="text-xl font-bold">{yen(totalReceita)}</p>
+                        <p className="text-xs font-semibold text-muted-foreground">{brl(totalReceita)}</p>
                         {pend.netYen > 0 && (
-                          <p className="text-[10px] text-amber-600">{yen(pend.netYen)} pendente</p>
+                          <p className="text-[10px] text-amber-600">{yen(pend.netYen)} · {brl(pend.netYen)} pendente</p>
                         )}
                       </div>
                       <div className="bg-primary/10 rounded-xl p-4 border border-primary/20">
                         <p className="text-xs text-primary flex items-center gap-1 mb-1"><DollarSign className="w-3 h-3" /> Comissão liberada</p>
                         <p className="text-xl font-bold text-primary">{yen(aff.totalEarnings)}</p>
+                        <p className="text-xs font-semibold text-primary/80">{brl(aff.totalEarnings)}</p>
                         <p className="text-[10px] text-muted-foreground">{aff.commissionPercent}% das vendas</p>
                         {/* Badge de nível */}
                         {(() => {
@@ -162,8 +167,8 @@ const AffiliatePage: React.FC = () => {
                               }`}>{cfg.emoji} {cfg.label}</span>
                               <div>
                                 <div className="flex justify-between text-[10px] text-muted-foreground mb-0.5">
-                                  <span>Este mês: ¥{monthRev.toLocaleString()}</span>
-                                  <span>Meta: ¥{cfg.goalYen.toLocaleString()}</span>
+                                  <span>Este mês: {yen(monthRev)} · {brl(monthRev)}</span>
+                                  <span>Meta: {yen(cfg.goalYen)} · {brl(cfg.goalYen)}</span>
                                 </div>
                                 <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
                                   <div className={`h-full rounded-full ${progress >= 100 ? 'bg-green-500' : progress >= 60 ? 'bg-amber-400' : 'bg-red-400'}`}
@@ -181,7 +186,7 @@ const AffiliatePage: React.FC = () => {
                         {pend.commissionYen > 0 && (
                           <div className="mt-2 bg-amber-50 dark:bg-amber-950/30 rounded-lg p-2 border border-amber-200 dark:border-amber-800">
                             <p className="text-[11px] text-amber-700 dark:text-amber-400 flex items-center gap-1 font-semibold">
-                              <Clock className="w-3 h-3" /> {yen(pend.commissionYen)} a liberar
+                              <Clock className="w-3 h-3" /> {yen(pend.commissionYen)} · {brl(pend.commissionYen)} a liberar
                             </p>
                             <p className="text-[10px] text-amber-600/80 dark:text-amber-500/80">
                               Liberado após confirmação de entrega

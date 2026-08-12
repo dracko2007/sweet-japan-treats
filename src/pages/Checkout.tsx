@@ -21,7 +21,7 @@ import { useToast } from '@/hooks/use-toast';
 import { usePostalCodeLookup } from '@/hooks/usePostalCodeLookup';
 import { useLanguage, CountryType } from '@/context/LanguageContext';
 import { formatPrice, getCurrencyByCountry } from '@/utils/currency';
-import { effectiveYen } from '@/utils/pricing';
+import { effectiveYen, baseYen, hasDiscount } from '@/utils/pricing';
 import { convertYen as fxConvert, yenFromConverted, getRates } from '@/services/fxService';
 import { POINTS } from '@/services/pointsService';
 import { safeStorage } from '@/utils/storage';
@@ -1105,12 +1105,17 @@ const Checkout: React.FC = () => {
 
                 <div className="space-y-4">
                   {items.map((item) => {
-                    const displayItemPrice = item.freeGift ? 0 : fxConvert(effectiveYen(item.product, item.size), currency) * item.quantity;
+                    const itemIsPromo = item.product.id.endsWith('_promo');
+                    const currentUnitPrice = item.freeGift ? 0 : fxConvert(effectiveYen(item.product, item.size), currency);
+                    const originalUnitPrice = item.freeGift ? 0 : fxConvert(baseYen(item.product, item.size), currency);
+                    const displayItemPrice = currentUnitPrice * item.quantity;
+                    const originalItemPrice = originalUnitPrice * item.quantity;
                     const productName = productEnglishName(item.product);
+                    const hasProductDiscount = hasDiscount(item.product);
                     return (
                       <div
-                        key={`${item.product.id}-${item.size}${item.freeGift ? '-gift' : ''}`}
-                        className={`flex items-center gap-3 pb-3 border-b border-border${item.freeGift ? ' bg-purple-50 dark:bg-purple-950/20 rounded-lg px-2 pt-2' : ''}`}
+                        key={`${item.product.id}-${item.size}`}
+                        className="flex items-center gap-3 py-2"
                       >
                         <img
                           src={item.product.image}
@@ -1119,8 +1124,13 @@ const Checkout: React.FC = () => {
                         />
                         <div className="flex-1 min-w-0">
                           <p className="font-bold text-xs text-gray-800 truncate">{productName}</p>
-                          {(item.product.id.endsWith('_promo') || (item.product.discountPercent || 0) > 0) && (
-                            <p className="text-[10px] text-amber-700 font-bold mt-0.5">🏷️ Preço promocional — não acumula cupom de afiliado</p>
+                          {hasProductDiscount && (
+                            <p className="text-[10px] text-muted-foreground line-through">{formatPrice(originalItemPrice, currency)}</p>
+                          )}
+                          {(itemIsPromo || hasProductDiscount) && (
+                            <p className="text-[10px] text-red-600 font-bold">
+                              {hasProductDiscount ? `−${item.product.discountPercent}% desconto da loja` : 'Preço promocional da loja'}
+                            </p>
                           )}
                           <p className="text-[10px] text-gray-400 font-semibold mt-0.5">
                             {item.freeGift ? '🎁 Presente da promoção' : (item.variantLabel || (item.size === 'small' ? 'Pequeno' : 'Grande'))} • {item.quantity}x
