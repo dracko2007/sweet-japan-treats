@@ -130,21 +130,25 @@ async function remigrateProductHD(p: Product): Promise<Product> {
 
   return { ...p, image: coverUrl, thumbnail: thumbUrl || coverUrl, gallery: galleryUrls.filter(Boolean) };
 }
+interface MigState { status: 'idle' | 'running' | 'done' | 'error'; total: number; done: number; success: number; errors: string[]; }
 
-async function runWithConcurrency<T>(
-  items: T[], concurrency: number, fn: (item: T) => Promise<void>
-): Promise<void> {
-  let idx = 0;
-  const worker = async () => { while (idx < items.length) { const i = idx++; await fn(items[i]); } };
-  await Promise.all(Array.from({ length: concurrency }, worker));
+interface CoverSearchState {
+  status: 'idle' | 'running' | 'done' | 'error';
+  total: number;
+  done: number;
+  success: number;
+  skipped: number;
+  errors: string[];
 }
 
-interface MigState { status: 'idle' | 'running' | 'done' | 'error'; total: number; done: number; errors: string[]; }
+const emptyMigState = (): MigState => ({ status: 'idle', total: 0, done: 0, success: 0, errors: [] });
+const emptyCoverSearchState = (): CoverSearchState => ({ status: 'idle', total: 0, done: 0, success: 0, skipped: 0, errors: [] });
 
 const ImageMigration: React.FC = () => {
   const { products, refresh } = useProducts();
-  const [state, setState] = useState<MigState>({ status: 'idle', total: 0, done: 0, errors: [] });
-  const [hdState, setHdState] = useState<MigState>({ status: 'idle', total: 0, done: 0, errors: [] });
+  const [state, setState] = useState<MigState>(emptyMigState());
+  const [hdState, setHdState] = useState<MigState>(emptyMigState());
+  const [coverSearchState, setCoverSearchState] = useState<CoverSearchState>(emptyCoverSearchState());
   const [tested, setTested] = useState<'checking' | 'ok' | 'fail'>('checking');
   const [testError, setTestError] = useState('');
 
@@ -180,22 +184,54 @@ const ImageMigration: React.FC = () => {
   const runMigration = useCallback(async () => {
     if (toMigrate.length === 0) return;
     const errors: string[] = [];
-    setState({ status: 'running', total: toMigrate.length, done: 0, errors: [] });
-
+    setState({ status: 'running', total: toMigrate.length, done: 0, success: 0, errors: [] });
     await runWithConcurrency(toMigrate, CONCURRENCY, async (p) => {
       try {
         const migrated = await migrateProduct(p);
         await productService.save(migrated);
-      } catch (e: any) {
-        errors.push(`${p.name}: ${e?.message || 'erro'}`);
+        setState((s) => ({ ...s, done: s.done + 1, success: s.success + 1 }));
+      } catch (e: unknown) {
+        const message = e instanceof Error ? e.message : String(e);
+        errors.push(`${p.name}: ${message}`);
+        setState((s) => ({ ...s, done: s.done + 1, errors: [...errors] }));
       }
-      setState((s) => ({ ...s, done: s.done + 1, errors: [...errors] }));
     });
-
     await refresh();
     setState((s) => ({ ...s, status: errors.length > 0 ? 'error' : 'done', errors }));
   }, [toMigrate, refresh]);
 
+  const runCoverSearch = useCallback(async () => {
+    const pending = products.filter((p) => p.name.trim() && !cloudinaryService.isFirebaseUrl(p.image || ''));
+    if (!pending.length) return;
+    const errors: string[] = [];
+    setCoverSearchState({ status: 'running', total: pending.length, done: 0, success: 0, skipped: 0, errors: [] });
+    await runWithConcurrency(pending, 2, async (p) => {
+      try {
+        const response = await fetch('/api/product-enrich', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ productName: p.name, isAdmin: true, fields: { images: true, description: false, price: false, weight: false } }),
+        });
+        const data: unknown = await response.json();
+        const images = data && typeof data === 'object' && 'images' in data && Array.isArray(data.images)
+          ? data.images.filter((url): url is string => typeof url === 'string')
+          : [];
+        const source = images.find((url) => url.startsWith('data:'));
+        if (!response.ok || !source) throw new Error('nenhuma capa encontrada');
+        const image = await cloudinaryService.uploadDataUrl(source, `japanexpress/products/${p.id}`);
+        await productService.save({ ...p, image, thumbnail: image, gallery: [image] });
+        setCoverSearchState((s) => ({ ...s, done: s.done + 1, success: s.success + 1 }));
+      } catch (e: unknown) {
+        const message = e instanceof Error ? e.message : String(e);
+        errors.push(`${p.name}: ${message}`);
+        setCoverSearchState((s) => ({ ...s, done: s.done + 1, skipped: s.skipped + 1, errors: [...errors] }));
+      }
+    });
+    await refresh();
+    setCoverSearchState((s) => ({ ...s, status: errors.length ? 'error' : 'done', errors }));
+  }, [products, refresh]);
+
+  const coverSearchPending = products.filter((p) => p.name.trim() && !cloudinaryService.isFirebaseUrl(p.image || '')).length;
   const pct = state.total > 0 ? Math.round((state.done / state.total) * 100) : 0;
 
   return (
@@ -309,6 +345,33 @@ const ImageMigration: React.FC = () => {
           </div>
         </div>
       )}
+
+      <div className="border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 rounded-xl p-5 space-y-3">
+        <div>
+          <h3 className="font-bold text-amber-800 dark:text-amber-300">Buscar capas ausentes na Rakuten/Yahoo</h3>
+          <p className="text-xs text-amber-700 dark:text-amber-400 mt-1">
+            Busca uma capa por produto, envia ao Firebase Storage e atualiza somente image, thumbnail e gallery.
+          </p>
+        </div>
+        {coverSearchState.status === 'running' && (
+          <p className="text-sm text-amber-700">
+            Processando {coverSearchState.done}/{coverSearchState.total} · encontradas {coverSearchState.success}
+          </p>
+        )}
+        {coverSearchState.status !== 'idle' && coverSearchState.status !== 'running' && (
+          <p className="text-sm text-amber-700">
+            Concluído: {coverSearchState.success} migradas · {coverSearchState.skipped} sem capa
+          </p>
+        )}
+        <Button
+          onClick={runCoverSearch}
+          disabled={coverSearchState.status === 'running' || coverSearchPending === 0 || state.status === 'running' || hdState.status === 'running'}
+          className="gap-2 bg-amber-600 hover:bg-amber-700 text-white"
+        >
+          <CloudUpload className="w-4 h-4" />
+          {coverSearchState.status === 'running' ? 'Buscando capas...' : `Buscar capas de ${coverSearchPending} produto(s)`}
+        </Button>
+      </div>
 
       <div className="flex gap-3">
         {!allMigrated && state.status !== 'running' && tested === 'ok' && (
