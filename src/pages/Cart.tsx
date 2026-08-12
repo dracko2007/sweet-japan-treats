@@ -137,6 +137,16 @@ const Cart: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    const clearAffiliateCoupon = () => {
+      safeStorage.removeItem('affiliate_ref');
+      safeStorage.removeItem('affiliate_ref_product');
+      setActiveCoupon((current) => current?.affiliateCode ? null : current);
+    };
+    window.addEventListener('japan-express:logout', clearAffiliateCoupon);
+    return () => window.removeEventListener('japan-express:logout', clearAffiliateCoupon);
+  }, []);
+
   // Produto do link da campanha (?add=ID): entra no carrinho sozinho. Sem isto o
   // e-mail levava para a página do produto e ainda era preciso achar "adicionar
   // ao carrinho" — degrau em que a campanha morria.

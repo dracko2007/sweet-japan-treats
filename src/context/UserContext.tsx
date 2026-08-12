@@ -1045,7 +1045,10 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     // Logout from Firebase Auth
     await firebaseSyncService.logoutUser();
     
-    // Remove only current session, keep users database intact
+    // Referências de afiliado pertencem à sessão de navegação do usuário.
+    // Não podem reaplicar automaticamente um cupom depois do logout.
+    safeStorage.removeItem('affiliate_ref');
+    safeStorage.removeItem('affiliate_ref_product');
     clearCurrentSession();
     devLog('User logged out successfully');
   };
