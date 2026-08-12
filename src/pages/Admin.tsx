@@ -82,8 +82,8 @@ const Admin: React.FC = () => {
   const [ordersLoadingMore, setOrdersLoadingMore] = useState(false);
   const [customerCount, setCustomerCount] = useState(0);
   const [affiliatePendingCount, setAffiliatePendingCount] = useState(0);
-  const [newCustomers, setNewCustomers] = useState(0);
   const [newRequests, setNewRequests] = useState(0);
+  const [pendingAffiliateRequestsCount, setPendingAffiliateRequestsCount] = useState(0);
   const [isTesting, setIsTesting] = useState(false);
   const [activeTab, setActiveTab] = useState<AdminTab>('dashboard');
   const [trackingModalOpen, setTrackingModalOpen] = useState(false);
@@ -129,10 +129,12 @@ const Admin: React.FC = () => {
       if (now - lastRefresh < MIN_INTERVAL_MS) return; // throttle
       loadOrders();
       loadCustomers();
-      loadCustomRequests();
       affiliateService.getPendingCommissions()
         .then((items) => setAffiliatePendingCount(items.length))
         .catch(() => setAffiliatePendingCount(0));
+      affiliateService.getRequests('pending')
+        .then((items) => setPendingAffiliateRequestsCount(items.length))
+        .catch(() => setPendingAffiliateRequestsCount(0));
     };
 
     const debouncedRefresh = () => {
@@ -747,10 +749,9 @@ _This is an automated test message_
   const tabGroups: { title: string; items: AdminTabItem[] }[] = [
     { title: 'Visão geral', items: [{ id: 'dashboard', label: 'Dashboard', icon: BarChart3 }] },
     { title: 'Vendas', items: [
-      { id: 'orders', label: 'Pedidos', icon: Package, badge: ordersHasMore ? undefined : pendingOrdersCount },
+      { id: 'affiliates', label: 'Afiliados', icon: Megaphone, badge: Math.max(affiliatePendingCount, pendingAffiliateRequestsCount) },
       { id: 'negotiations', label: 'Negociações', icon: Handshake, badge: pendingNegotiationsCount || 0 },
-      { id: 'customers', label: 'Clientes', icon: Users, badge: 0 },
-      { id: 'affiliates', label: 'Afiliados', icon: Megaphone, badge: affiliatePendingCount },
+      { id: 'customers', label: 'Clientes', icon: Users, badge: Math.max(newCustomers, pendingAffiliateRequestsCount) },
       { id: 'visitors', label: 'Visitantes', icon: BarChart3 },
     ] },
     { title: 'Catálogo', items: [
