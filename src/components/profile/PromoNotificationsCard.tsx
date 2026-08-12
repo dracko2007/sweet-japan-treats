@@ -37,8 +37,9 @@ const PromoNotificationsCard: React.FC = () => {
         const raw: unknown = snap.data();
         const arr = raw && typeof raw === 'object' && 'items' in raw && Array.isArray(raw.items) ? raw.items : [];
         const list = arr as PromoFeedItem[];
-        const now = Date.now();
-        setItems(list.filter((i) => i && i.code && Number.isFinite(i.expiresAt) && i.expiresAt > now));
+        const legacyNotificationCutoff = new Date('2026-08-12T00:00:00').getTime();
+        setItems(list.filter((i) => i && i.code && Number.isFinite(i.expiresAt)
+          && i.expiresAt > now && i.createdAt >= legacyNotificationCutoff));
       })
       .catch(() => { /* feed indisponível — mantém vazio */ });
     return () => { cancelled = true; };
