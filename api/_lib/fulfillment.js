@@ -254,7 +254,8 @@ export async function fulfillOrder(orderId, { provider, reference, confirmedBy }
 
     if (affiliateRef && pendingCommissionRef) {
       const affiliate = affiliateSnap.data();
-      const netYen = Number(order.items.filter((item) => !item.freeGift).reduce((sum, item) => sum + Number(item.unitYen || 0) * Number(item.quantity || 0), 0));
+      const netYen = Number(order.items.filter((item) => !item.freeGift)
+        .reduce((sum, item) => sum + Number(item.unitYen || 0) * Number(item.quantity || 0), 0));
       transaction.set(pendingCommissionRef, {
         id: pendingCommissionRef.id,
         affiliateCode: order.affiliateCode,

@@ -258,7 +258,14 @@ export function buildQuote({ requestedItems, products, country, prefecture, stat
   }
 
   const productSubtotalYen = lineItems.reduce((sum, item) => sum + item.unitYen * item.quantity, 0);
-  const regularSubtotalYen = lineItems.filter((item) => !item.homePromo && !item.freeGift).reduce((sum, item) => sum + item.unitYen * item.quantity, 0);
+  // Affiliate codes never stack with an existing product/site discount. In a
+  // mixed cart, calculate the affiliate discount only over eligible lines.
+  const affiliateCoupon = Boolean(coupon?.affiliateCode);
+  const regularItems = lineItems.filter((item) => !item.homePromo && !item.freeGift);
+  const regularSubtotalYen = regularItems.reduce((sum, item) => {
+    if (affiliateCoupon && Number(item.product.discountPercent || 0) > 0) return sum;
+    return sum + item.unitYen * item.quantity;
+  }, 0);
   let couponDiscountYen = 0;
   if (coupon) {
     if (coupon.minOrderValue && productSubtotalYen < Number(coupon.minOrderValue)) throw new HttpError(409, 'coupon_minimum_not_met');

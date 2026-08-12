@@ -61,9 +61,9 @@ export const TIER_CONFIG: Record<AffiliateTier, {
   nextTier: AffiliateTier | null;
   prevTier: AffiliateTier | null;
 }> = {
-  bronze: { label: 'Bronze', emoji: '🥉', commissionPercent: 10, goalYen: 200_000, nextTier: 'silver', prevTier: null },
-  silver: { label: 'Prata',  emoji: '🥈', commissionPercent: 15, goalYen: 500_000, nextTier: 'gold',   prevTier: 'bronze' },
-  gold:   { label: 'Ouro',   emoji: '🥇', commissionPercent: 20, goalYen: 500_000, nextTier: null,     prevTier: 'silver' },
+  bronze: { label: 'Bronze', emoji: '🥉', commissionPercent: 10, goalYen: 100_000, nextTier: 'silver', prevTier: null },
+  silver: { label: 'Prata',  emoji: '🥈', commissionPercent: 15, goalYen: 200_000, nextTier: 'gold',   prevTier: 'bronze' },
+  gold:   { label: 'Ouro',   emoji: '🥇', commissionPercent: 20, goalYen: 201_000, nextTier: null,     prevTier: 'silver' },
 };
 
 export interface Affiliate {
@@ -75,15 +75,23 @@ export interface Affiliate {
   active: boolean;
   expiresAt: string;
   createdAt: string;
-  // métricas acumuladas
   totalOrders: number;
   totalRevenue: number;
   totalEarnings: number;
-  // sistema de níveis
-  tier: AffiliateTier;             // nível atual
-  currentMonthRevenue: number;     // vendas acumuladas no mês corrente (¥)
-  currentMonthKey: string;         // "YYYY-MM" do mês sendo acumulado
-  tierUpdatedAt?: string;          // quando o nível foi atualizado
+  tier: AffiliateTier;
+  currentMonthRevenue: number;
+  currentMonthKey: string;
+  tierUpdatedAt?: string;
+  tierSettings?: AffiliateTierSettings;
+}
+
+export interface AffiliateTierSettings {
+  bronzeGoalYen: number;
+  bronzePercent: number;
+  silverGoalYen: number;
+  silverPercent: number;
+  goldGoalYen: number;
+  goldPercent: number;
 }
 
 export type AffiliateDashboard = Pick<
@@ -114,25 +122,32 @@ function monthKey(date = new Date()) {
 /** Calcula o próximo tier com base nas vendas do mês. */
 function computeNextTier(_currentTier: AffiliateTier, monthRevenue: number): AffiliateTier {
   const { bronze, silver } = TIER_CONFIG;
-
-  // < ¥200k → Bronze direto, independente do nível atual
   if (monthRevenue < bronze.goalYen) return 'bronze';
-
-  // ≥ ¥500k → Ouro direto, independente do nível atual
   if (monthRevenue >= silver.goalYen) return 'gold';
-
-  // ¥200k–¥499k → Prata
   return 'silver';
 }
 
 export const affiliateService = {
-  /** Lista todos os afiliados (admin). */
+  /** Lista todos os afiliados (admin) e inicia o novo ciclo mensal. */
   async getAll(): Promise<Affiliate[]> {
     if (!db) return [];
     try {
       const snap = await getDocs(collection(db, COL));
-      // Usa o ID real do documento como `code` (fonte da verdade p/ deletar/editar)
-      return snap.docs.map((d) => ({ ...(d.data() as Affiliate), code: d.id }));
+      const mk = monthKey();
+      await Promise.all(snap.docs.map(async (d) => {
+        const data = d.data() as Affiliate;
+        if (data.currentMonthKey && data.currentMonthKey !== mk) {
+          await updateDoc(doc(db!, COL, d.id), {
+            tier: 'bronze',
+            commissionPercent: data.tierSettings?.bronzePercent ?? TIER_CONFIG.bronze.commissionPercent,
+            currentMonthRevenue: 0,
+            currentMonthKey: mk,
+            tierUpdatedAt: new Date().toISOString(),
+          });
+        }
+      }));
+      const refreshed = await getDocs(collection(db, COL));
+      return refreshed.docs.map((d) => ({ ...(d.data() as Affiliate), code: d.id }));
     } catch (e) {
       devWarn('affiliateService.getAll falhou:', e);
       return [];
@@ -277,6 +292,7 @@ export const affiliateService = {
         currentMonthRevenue: prev?.currentMonthRevenue ?? 0,
         currentMonthKey: prev?.currentMonthKey ?? monthKey(),
         tierUpdatedAt: prev?.tierUpdatedAt,
+        tierSettings: input.tierSettings || prev?.tierSettings,
       };
       await setDoc(ref, affiliate);
       return true;
@@ -291,7 +307,16 @@ export const affiliateService = {
     if (!db) return { ok: false, error: 'Firebase indisponível' };
     try {
       await ensureAdminAuth();
-      await deleteDoc(doc(db, COL, normalize(code)));
+      const affiliateSnap = await getDoc(ref);
+      await deleteDoc(ref);
+      if (affiliateSnap.exists()) {
+        const ownerEmail = String((affiliateSnap.data() as Affiliate).ownerEmail || '').trim().toLowerCase();
+        if (ownerEmail) {
+          const requests = await getDocs(query(collection(db, REQ_COL), where('email', '==', ownerEmail)));
+          await Promise.all(requests.docs.map((request) => deleteDoc(request.ref)));
+          await deleteDoc(doc(db, REQ_COL, ownerEmail));
+        }
+      }
       return { ok: true };
     } catch (e: any) {
       devError('affiliateService.remove falhou:', e);
@@ -312,11 +337,6 @@ export const affiliateService = {
         const snap = await tx.get(ref);
         if (!snap.exists()) return;
         const aff = snap.data() as Affiliate;
-
-        const now = new Date();
-        const mk = monthKey(now);
-        const currentTier: AffiliateTier = aff.tier || 'bronze';
-
         // Virou o mês? Avalia tier com base no mês anterior e zera contador
         let tier = currentTier;
         let monthRevenue = (aff.currentMonthRevenue || 0) + netValue;
@@ -326,7 +346,13 @@ export const affiliateService = {
           monthRevenue = netValue; // zera e começa o novo mês com esta venda
         }
 
-        const commissionPercent = TIER_CONFIG[tier].commissionPercent;
+        const settings = aff.tierSettings;
+        const tierConfig = settings ? {
+          bronze: { commissionPercent: settings.bronzePercent },
+          silver: { commissionPercent: settings.silverPercent },
+          gold: { commissionPercent: settings.goldPercent },
+        } : TIER_CONFIG;
+        const commissionPercent = tierConfig[tier].commissionPercent;
         const earning = Math.round((netValue * commissionPercent) / 100);
 
         tx.update(ref, {
@@ -336,7 +362,6 @@ export const affiliateService = {
           tier,
           commissionPercent,
           currentMonthRevenue: monthRevenue,
-          currentMonthKey: mk,
           ...(tier !== currentTier ? { tierUpdatedAt: now.toISOString() } : {}),
         });
       });
@@ -372,6 +397,36 @@ export const affiliateService = {
       return { updated, errors };
     } catch (e) {
       devError('evaluateAllTiers falhou:', e);
+      return { updated: 0, errors: 1 };
+    }
+  },
+
+  /** Zera o ciclo mensal e retorna todos os afiliados ao Bronze. */
+  async resetAllAffiliates(): Promise<{ updated: number; errors: number }> {
+    if (!db) return { updated: 0, errors: 0 };
+    try {
+      await ensureAdminAuth();
+      const snap = await getDocs(collection(db, COL));
+      let updated = 0;
+      let errors = 0;
+      const mk = monthKey();
+      await Promise.all(snap.docs.map(async (d) => {
+        try {
+          await updateDoc(doc(db!, COL, d.id), {
+            tier: 'bronze',
+            commissionPercent: TIER_CONFIG.bronze.commissionPercent,
+            currentMonthRevenue: 0,
+            currentMonthKey: mk,
+            tierUpdatedAt: new Date().toISOString(),
+          });
+          updated++;
+        } catch {
+          errors++;
+        }
+      }));
+      return { updated, errors };
+    } catch (e) {
+      devError('resetAllAffiliates falhou:', e);
       return { updated: 0, errors: 1 };
     }
   },

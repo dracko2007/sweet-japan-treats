@@ -56,6 +56,7 @@ export interface Coupon {
   freeShipping?: boolean;
   affiliateCode?: string;     // se preenchido, é um código de influencer (gera comissão)
   affiliateProductId?: string; // se preenchido, cupom vinculado a produto específico (permite reuso por CPF)
+  affiliateSource?: 'link' | 'code';
   minOrderValue?: number;     // valor mínimo do pedido em ¥ para usar o cupom
 }
 

@@ -112,7 +112,16 @@ async function persistSubmission(type, data) {
   if (type === 'affiliate_request') {
     const ref = db.collection('affiliate_requests').doc(data.email);
     const existing = await ref.get();
-    if (existing.exists) throw new HttpError(409, 'already_requested');
+    if (existing.exists) {
+      const request = existing.data() || {};
+      const code = String(request.code || '').trim().toUpperCase();
+      const affiliate = code ? await db.collection('affiliates').doc(code).get() : null;
+      if (request.status === 'rejected' || !affiliate?.exists) {
+        await ref.delete();
+      } else {
+        throw new HttpError(409, 'already_requested');
+      }
+    }
     await ref.create({ ...data, status: 'pending', requestedAt: now });
     return;
   }

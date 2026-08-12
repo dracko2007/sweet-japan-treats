@@ -82,14 +82,22 @@ const Checkout: React.FC = () => {
   const isUsa = formData.country === 'Estados Unidos';
   const currency = getCurrencyByCountry(formData.country);
 
+  // Coupon state must be available to determine affiliate-eligible lines.
+  const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
+  const [couponDiscount, setCouponDiscount] = useState(0);
   const baseTotalPrice = items.reduce(
     (sum, item) => item.freeGift ? sum : sum + fxConvert(effectiveYen(item.product, item.size), currency) * item.quantity, 0
   );
-  // Cupom não se aplica a itens com preço promocional
+  // Cupons de afiliado não podem empilhar com desconto do produto/site.
+  // Em carrinho misto, a base inclui somente itens elegíveis.
   const regularSubtotalForCoupon = items.reduce(
-    (sum, item) => (!item.freeGift && !item.product.id.endsWith('_promo'))
-      ? sum + fxConvert(effectiveYen(item.product, item.size), currency) * item.quantity
-      : sum, 0
+    (sum, item) => {
+      const hasProductDiscount = (item.product.discountPercent || 0) > 0;
+      const affiliateCoupon = Boolean(appliedCoupon?.affiliateCode);
+      return (!item.freeGift && !item.product.id.endsWith('_promo') && (!affiliateCoupon || !hasProductDiscount))
+        ? sum + fxConvert(effectiveYen(item.product, item.size), currency) * item.quantity
+        : sum;
+    }, 0
   );
 
   const [selectedShipping, setSelectedShipping] = useState<{
@@ -101,18 +109,12 @@ const Checkout: React.FC = () => {
 
   const [deliveryTime, setDeliveryTime] = useState<string>('');
 
-  // Coupon state
-  const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
-  const [couponDiscount, setCouponDiscount] = useState(0);
-
   // Points redemption
   const availablePoints = user?.points || 0;
   const canRedeem = availablePoints >= POINTS.minRedeem;
   const [pointsToUse, setPointsToUse] = useState(0);
   const productSubtotalYen = items.reduce((s, i) => i.freeGift ? s : s + effectiveYen(i.product, i.size) * i.quantity, 0);
   const convertYen = (yen: number) => fxConvert(yen, currency);
-  // Sem buffer para taxas fixas em ¥ (ex.: taxa PS): evita exibir ¥2.050 em vez de ¥2.000
-  const convertYenExact = (yen: number) => fxConvert(yen, currency, true);
   const maxRedeemable = canRedeem ? Math.min(availablePoints, Math.floor(productSubtotalYen / POINTS.yenPerPoint)) : 0;
   const redeemPoints = Math.max(0, Math.min(pointsToUse, maxRedeemable));
   const pointsDiscount = convertYen(redeemPoints * POINTS.yenPerPoint);

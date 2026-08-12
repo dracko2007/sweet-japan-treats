@@ -21,7 +21,7 @@ import WelcomeCouponBanner from '@/components/WelcomeCouponBanner';
 import { taxDisclosure } from '../../shared/tax-disclosure.js';
 
 // Converte um afiliado num "cupom" aplicável (carrega o código para gerar comissão)
-const affiliateToCoupon = (aff: Affiliate, productId?: string | null): Coupon => ({
+const affiliateToCoupon = (aff: Affiliate, productId?: string | null, source: 'link' | 'code' = 'code'): Coupon => ({
   id: `aff-${aff.code}`,
   code: aff.code,
   description: `Indicação de ${aff.ownerName} — ${aff.discountPercent}% OFF`,
@@ -31,6 +31,7 @@ const affiliateToCoupon = (aff: Affiliate, productId?: string | null): Coupon =>
   isUsed: false,
   affiliateCode: aff.code,
   affiliateProductId: productId || undefined,
+  affiliateSource: source,
 });
 
 const Cart: React.FC = () => {
@@ -129,7 +130,7 @@ const Cart: React.FC = () => {
       const productId = safeStorage.getItem('affiliate_ref_product') || null;
       affiliateService.validate(ref).then((res) => {
         if (res.valid && res.affiliate) {
-          setActiveCoupon(affiliateToCoupon(res.affiliate, productId));
+          setActiveCoupon(affiliateToCoupon(res.affiliate, productId, 'link'));
         }
       });
     }

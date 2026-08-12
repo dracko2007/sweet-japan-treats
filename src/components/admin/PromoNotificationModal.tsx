@@ -5,9 +5,8 @@ import { customerService, CustomerStats } from '@/services/customerService';
 import { useProducts } from '@/context/ProductsContext';
 import { Product } from '@/types';
 import { ActivePromo, PROMO_TYPES } from '@/types/promotion';
+import { collection, getDocs, doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '@/config/firebase';
-import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
-import { authenticatedFetch } from '@/services/authenticatedFetch';
 import { promoOffer } from '../../../shared/promo-offer.js';
 
 const STORE_URL = 'https://japanexpress-store.com';
@@ -58,6 +57,7 @@ const PromoNotificationModal: React.FC<Props> = ({ onClose }) => {
   const [ctaLabel, setCtaLabel] = useState('Ver Oferta Agora');
 
   // Filters
+  const [notificationExpiresAt, setNotificationExpiresAt] = useState('');
   const [genderFilter, setGenderFilter] = useState<GenderFilter>('todos');
   const [birthdayMonths, setBirthdayMonths] = useState<string[]>([]); // ["01","03"]
   const [channel, setChannel] = useState<Channel>('app');
@@ -293,7 +293,10 @@ const PromoNotificationModal: React.FC<Props> = ({ onClose }) => {
             discountPct: Math.max(1, Math.min(90, discountPct || 0)),
             keepProductDiscount: keepInitialDiscount,
             points: Math.max(1, pointsCount || 0),
-            expiresInDays: 30,
+            expiresInDays: notificationExpiresAt
+              ? Math.max(1, Math.ceil((new Date(`${notificationExpiresAt}T23:59:59`).getTime() - Date.now()) / 86400000))
+              : 30,
+            expiresAt: notificationExpiresAt ? new Date(`${notificationExpiresAt}T23:59:59`).getTime() : undefined,
           },
           recipients: targets.map((customer) => customer.email),
           channel,
@@ -324,6 +327,12 @@ const PromoNotificationModal: React.FC<Props> = ({ onClose }) => {
     }
   };
 
+  const clearNotifications = async () => {
+    if (!db || !window.confirm('Apagar todas as notificações promocionais do perfil dos clientes?')) return;
+    await setDoc(doc(db, 'siteContent', 'promoNotifications'), { items: [], updatedAt: Date.now() });
+    alert('Notificações apagadas.');
+  };
+
   const successCount = results.filter(r => r.ok).length;
   const failCount = results.filter(r => !r.ok).length;
 
@@ -347,6 +356,9 @@ const PromoNotificationModal: React.FC<Props> = ({ onClose }) => {
             >
               <Eye className="w-3.5 h-3.5" />
               {tab === 'compose' ? 'Preview' : 'Editar'}
+            </button>
+            <button onClick={clearNotifications} className="text-xs text-destructive hover:underline">
+              Apagar notificações
             </button>
             <button onClick={onClose} className="p-1 rounded-full hover:bg-secondary">
               <X className="w-5 h-5" />
@@ -634,6 +646,13 @@ const PromoNotificationModal: React.FC<Props> = ({ onClose }) => {
                 <label className="block text-sm font-semibold mb-1">Assunto do e-mail</label>
                 <input value={subject} onChange={e => setSubject(e.target.value)}
                   className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary" />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold mb-1">Validade da notificação</label>
+                <input type="date" value={notificationExpiresAt} onChange={e => setNotificationExpiresAt(e.target.value)}
+                  min={new Date().toISOString().slice(0, 10)}
+                  className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary" />
+                <p className="text-xs text-muted-foreground mt-1">Depois desta data, a notificação deixa de aparecer no perfil do cliente.</p>
               </div>
               <div>
                 <label className="block text-sm font-semibold mb-1">Título principal</label>

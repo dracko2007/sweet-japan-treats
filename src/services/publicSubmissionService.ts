@@ -15,7 +15,10 @@ export async function submitPublicForm<T extends object>(
   data: T,
 ): Promise<PublicSubmissionResult> {
   try {
-    const response = await fetch('/api/public-submission', {
+    const endpoint = import.meta.env.DEV
+      ? 'https://japanexpress-store.com/api/public-submission'
+      : '/api/public-submission';
+    const response = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ type, data }),

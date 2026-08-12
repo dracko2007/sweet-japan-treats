@@ -38,7 +38,7 @@ const PromoNotificationsCard: React.FC = () => {
         const arr = raw && typeof raw === 'object' && 'items' in raw && Array.isArray(raw.items) ? raw.items : [];
         const list = arr as PromoFeedItem[];
         const now = Date.now();
-        setItems(list.filter((i) => i && i.code && (!i.expiresAt || i.expiresAt > now)));
+        setItems(list.filter((i) => i && i.code && Number.isFinite(i.expiresAt) && i.expiresAt > now));
       })
       .catch(() => { /* feed indisponível — mantém vazio */ });
     return () => { cancelled = true; };

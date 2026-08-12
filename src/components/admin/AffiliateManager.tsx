@@ -23,6 +23,12 @@ const AffiliateManager: React.FC = () => {
     commissionPercent: 10,
     validityDays: 90,
     active: true,
+    bronzeGoalYen: 100000,
+    bronzePercent: 10,
+    silverGoalYen: 200000,
+    silverPercent: 15,
+    goldGoalYen: 201000,
+    goldPercent: 20,
   });
 
   const load = async () => {
@@ -48,6 +54,18 @@ const AffiliateManager: React.FC = () => {
     toast({
       title: '🏆 Níveis atualizados',
       description: `${res.updated} afiliado(s) processado(s)${res.errors ? ` · ${res.errors} erro(s)` : ''}`,
+    });
+    setEvaluating(false);
+    load();
+  };
+
+  const handleResetAllAffiliates = async () => {
+    if (!confirm('ATENÇÃO: resetar todos os afiliados?\n\nIsso apagará o nível e as vendas do mês atual de todos, retornando-os ao Bronze. O histórico total de vendas e ganhos será preservado.')) return;
+    setEvaluating(true);
+    const res = await affiliateService.resetAllAffiliates();
+    toast({
+      title: 'Afiliados resetados',
+      description: `${res.updated} afiliado(s) retornaram ao Bronze${res.errors ? ` · ${res.errors} erro(s)` : ''}`,
     });
     setEvaluating(false);
     load();
@@ -81,18 +99,22 @@ const AffiliateManager: React.FC = () => {
     setSaving(true);
     const ok = await affiliateService.save({
       code: form.code.toUpperCase(),
-      ownerName: form.ownerName.trim() || form.code.toUpperCase(),
+      commissionPercent: Number(form.bronzePercent),
       ownerEmail: form.ownerEmail.trim(),
       discountPercent: Number(form.discountPercent),
       commissionPercent: Number(form.commissionPercent),
+      tierSettings: {
+        bronzeGoalYen: Number(form.bronzeGoalYen), bronzePercent: Number(form.bronzePercent),
+        silverGoalYen: Number(form.silverGoalYen), silverPercent: Number(form.silverPercent),
+        goldGoalYen: Number(form.goldGoalYen), goldPercent: Number(form.goldPercent),
+      },
       active: form.active,
       expiresAt: new Date(Date.now() + form.validityDays * 86400000).toISOString(),
     });
     setSaving(false);
     if (ok) {
-      toast({ title: '✅ Afiliado salvo', description: `Código ${form.code.toUpperCase()}` });
+      setForm({ code: '', ownerName: '', ownerEmail: '', discountPercent: 10, commissionPercent: 10, validityDays: 90, active: true, bronzeGoalYen: 100000, bronzePercent: 10, silverGoalYen: 200000, silverPercent: 15, goldGoalYen: 201000, goldPercent: 20 });
       setCreating(false);
-      setForm({ code: '', ownerName: '', ownerEmail: '', discountPercent: 10, commissionPercent: 10, validityDays: 90, active: true });
       load();
     } else {
       toast({ title: 'Erro ao salvar afiliado', variant: 'destructive' });
@@ -143,6 +165,43 @@ const AffiliateManager: React.FC = () => {
         </Button>
       </div>
 
+      <div className="bg-card rounded-xl border border-primary/20 p-5">
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <h3 className="font-semibold">Níveis de comissão dos afiliados</h3>
+            <p className="text-xs text-muted-foreground">
+              A meta é acumulada no mês corrente e reiniciada no primeiro dia do mês seguinte.
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={handleResetAllAffiliates} disabled={evaluating} className="gap-2 text-destructive border-destructive/30">
+              Resetar todos
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleEvaluateTiers} disabled={evaluating} className="gap-2">
+              <RefreshCw className={`w-4 h-4 ${evaluating ? 'animate-spin' : ''}`} />
+              {evaluating ? 'Avaliando...' : 'Atualizar níveis'}
+            </Button>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          {(Object.entries(TIER_CONFIG) as [AffiliateTier, typeof TIER_CONFIG[AffiliateTier]][]).map(([key, cfg]) => (
+            <div key={key} className={`rounded-lg border p-4 ${
+              key === 'gold' ? 'border-yellow-300 bg-yellow-50/60 dark:bg-yellow-950/20' :
+              key === 'silver' ? 'border-gray-300 bg-gray-50/60 dark:bg-gray-900/30' :
+              'border-orange-300 bg-orange-50/60 dark:bg-orange-950/20'
+            }`}>
+              <div className="flex items-center justify-between">
+                <strong>{cfg.emoji} {cfg.label}</strong>
+                <span className="font-bold text-primary">{cfg.commissionPercent}%</span>
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                Meta mensal: <strong className="text-foreground">¥{cfg.goalYen.toLocaleString()}</strong>
+              </p>
+            </div>
+          ))}
+        </div>
+      </div>
+
       {creating && (
         <div className="bg-card rounded-xl border border-border p-6">
           <h3 className="font-semibold mb-4">Cadastrar Influencer</h3>
@@ -164,9 +223,23 @@ const AffiliateManager: React.FC = () => {
               <Label>Desconto ao comprador (%)</Label>
               <Input type="number" min="0" max="100" value={form.discountPercent} onChange={(e) => setForm({ ...form, discountPercent: Number(e.target.value) })} />
             </div>
-            <div className="space-y-1">
-              <Label>Comissão do influencer (%)</Label>
-              <Input type="number" min="0" max="100" value={form.commissionPercent} onChange={(e) => setForm({ ...form, commissionPercent: Number(e.target.value) })} />
+            <div className="md:col-span-2 border-t pt-4">
+              <p className="font-semibold mb-1">Metas e comissão por nível</p>
+              <p className="text-xs text-muted-foreground mb-3">Até a meta 1: Bronze · até a meta 2: Prata · acima: Ouro.</p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                {([
+                  ['Nível 1 · Bronze', 'bronzeGoalYen', 'bronzePercent'],
+                  ['Nível 2 · Prata', 'silverGoalYen', 'silverPercent'],
+                  ['Nível 3 · Ouro', 'goldGoalYen', 'goldPercent'],
+                ] as const).map(([label, goal, percent]) => (
+                  <div key={goal} className="rounded-lg border p-3 space-y-2">
+                    <Label>{label} · Meta (¥)</Label>
+                    <Input type="number" min="0" value={form[goal]} onChange={(e) => setForm({ ...form, [goal]: Number(e.target.value) })} />
+                    <Label>Comissão (%)</Label>
+                    <Input type="number" min="0" max="100" value={form[percent]} onChange={(e) => setForm({ ...form, [percent]: Number(e.target.value) })} />
+                  </div>
+                ))}
+              </div>
             </div>
             <div className="space-y-1">
               <Label>Validade (dias)</Label>
