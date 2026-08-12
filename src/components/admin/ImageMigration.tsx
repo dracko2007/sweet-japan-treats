@@ -213,29 +213,25 @@ const ImageMigration: React.FC = () => {
     setCoverSearchState({ status: 'running', total: pending.length, done: 0, success: 0, skipped: 0, errors: [] });
     await runWithConcurrency(pending, 2, async (p) => {
       try {
-        const { promise, resolve, reject } = Promise.withResolvers<unknown>();
-        const timeout = window.setTimeout(() => reject(new Error('tempo limite excedido')), 30000);
-        (async () => {
-          try {
-            const response = await fetch('/api/product-enrich', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ productName: p.name, isAdmin: true, fields: { images: true, description: false, price: false, weight: false } }),
-            });
-            const data: unknown = await response.json();
-            resolve({ response, data });
-          } catch (error) {
-            reject(error);
-          } finally {
-            window.clearTimeout(timeout);
-          }
-        })();
-        const result = await promise as { response: Response; data: unknown };
-        const images = result.data && typeof result.data === 'object' && 'images' in result.data && Array.isArray(result.data.images)
-          ? result.data.images.filter((url): url is string => typeof url === 'string')
+        const controller = new AbortController();
+        const timer = window.setTimeout(() => controller.abort(), 30000);
+        let response: Response;
+        try {
+          response = await fetch('/api/product-enrich', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            signal: controller.signal,
+            body: JSON.stringify({ productName: p.name, isAdmin: true, fields: { images: true, description: false, price: false, weight: false } }),
+          });
+        } finally {
+          window.clearTimeout(timer);
+        }
+        const data: unknown = await response.json();
+        const images = data && typeof data === 'object' && 'images' in data && Array.isArray(data.images)
+          ? data.images.filter((url): url is string => typeof url === 'string')
           : [];
         const source = images.find((url) => url.startsWith('data:'));
-        if (!result.response.ok || !source) throw new Error('nenhuma capa encontrada');
+        if (!response.ok || !source) throw new Error('nenhuma capa encontrada');
         const image = await cloudinaryService.uploadDataUrl(source, `japanexpress/products/${p.id}`);
         await productService.save({ ...p, image, thumbnail: image, gallery: [image] });
         setCoverSearchState((s) => ({ ...s, done: s.done + 1, success: s.success + 1 }));
@@ -248,6 +244,7 @@ const ImageMigration: React.FC = () => {
     await refresh();
     setCoverSearchState((s) => ({ ...s, status: errors.length ? 'error' : 'done', errors }));
   }, [products, refresh]);
+
   const coverSearchPending = products.filter((p) => p.name.trim() && !cloudinaryService.isFirebaseUrl(p.image || '')).length;
   const pct = state.total > 0 ? Math.round((state.done / state.total) * 100) : 0;
 
