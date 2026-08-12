@@ -748,7 +748,7 @@ _This is an automated test message_
     { title: 'Vendas', items: [
       { id: 'orders', label: 'Pedidos', icon: Package, badge: ordersHasMore ? undefined : pendingOrdersCount },
       { id: 'negotiations', label: 'Negociações', icon: Handshake, badge: pendingNegotiationsCount || 0 },
-      { id: 'customers', label: 'Clientes', icon: Users, badge: newCustomers },
+      { id: 'customers', label: 'Clientes', icon: Users, badge: 0 },
       { id: 'affiliates', label: 'Afiliados', icon: Megaphone, badge: affiliatePendingCount },
       { id: 'visitors', label: 'Visitantes', icon: BarChart3 },
     ] },
