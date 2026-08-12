@@ -230,7 +230,7 @@ export const affiliateService = {
     if (!db) return { ok: false, error: 'Indisponível' };
     try {
       await ensureAdminAuth();
-      const ok = await this.save({
+      const ok = await affiliateService.save({
         code: opts.code,
         ownerName: req.name,
         ownerEmail: req.email,
@@ -239,8 +239,8 @@ export const affiliateService = {
         active: true,
         expiresAt: new Date(Date.now() + (opts.validityDays || 365) * 86400000).toISOString(),
       });
-      if (!ok) return { ok: false, error: 'Falha ao criar afiliado' };
-      await updateDoc(doc(db, REQ_COL, req.email), { status: 'approved', code: opts.code.trim().toUpperCase() });
+      if (!ok) return { ok: false, error: 'Falha ao criar afiliado. Verifique se o código já existe ou se a sessão de administrador expirou.' };
+      await updateDoc(doc(db, REQ_COL, req.email.trim().toLowerCase()), { status: 'approved', code: opts.code.trim().toUpperCase() });
       return { ok: true };
     } catch (e: any) {
       return { ok: false, error: e?.message };
