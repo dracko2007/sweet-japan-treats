@@ -159,6 +159,26 @@ const AffiliateManager: React.FC = () => {
     });
     setCreating(true);
   };
+  const startAdditionalCode = (affiliate: Affiliate) => {
+    const settings = affiliate.tierSettings;
+    setEditingCode(null);
+    setForm({
+      code: '',
+      ownerName: affiliate.ownerName,
+      ownerEmail: affiliate.ownerEmail,
+      discountPercent: affiliate.discountPercent,
+      commissionPercent: affiliate.commissionPercent,
+      validityDays: Math.max(1, Math.ceil((new Date(affiliate.expiresAt).getTime() - Date.now()) / 86400000)),
+      active: affiliate.active,
+      bronzeGoalYen: settings?.bronzeGoalYen || 100000,
+      bronzePercent: settings?.bronzePercent || 10,
+      silverGoalYen: settings?.silverGoalYen || 200000,
+      silverPercent: settings?.silverPercent || 15,
+      goldGoalYen: settings?.goldGoalYen || 201000,
+      goldPercent: settings?.goldPercent || 20,
+    });
+    setCreating(true);
+  };
 
   const copyLink = (code: string) => {
     const link = `${SITE_URL}/?ref=${code}`;
@@ -209,8 +229,8 @@ const AffiliateManager: React.FC = () => {
           {(Object.entries(TIER_CONFIG) as [AffiliateTier, typeof TIER_CONFIG[AffiliateTier]][]).map(([key, cfg]) => (
             <div key={key} className={`rounded-lg border p-4 ${
               key === 'gold' ? 'border-yellow-300 bg-yellow-50/60 dark:bg-yellow-950/20' :
-              key === 'silver' ? 'border-gray-300 bg-gray-50/60 dark:bg-gray-900/30' :
-              'border-orange-300 bg-orange-50/60 dark:bg-orange-950/20'
+              key === 'silver' ? 'border-gray-300 bg-gray-50 dark:bg-gray-900/30' :
+              'border-pink-200 bg-pink-50 dark:bg-pink-950/20'
             }`}>
               <div className="flex items-center justify-between">
                 <strong>{cfg.emoji} {cfg.label}</strong>
@@ -229,8 +249,14 @@ const AffiliateManager: React.FC = () => {
           <h3 className="font-semibold mb-4">Cadastrar Influencer</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-1">
-              <Label>Código anunciado *</Label>
+              <div className="flex items-center justify-between">
+                <Label>Código anunciado *</Label>
+                <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs text-primary" onClick={() => setForm({ ...form, code: '' })} disabled={Boolean(editingCode)}>
+                  <Plus className="w-3 h-3 mr-1" /> Outro código
+                </Button>
+              </div>
               <Input value={form.code} disabled={Boolean(editingCode)} onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })} placeholder="Ex: JUNIOR10" className="uppercase font-bold" />
+              <p className="text-[11px] text-muted-foreground">Cada código é independente e pode ter sua própria validade e desconto.</p>
             </div>
             <div className="space-y-1">
               <Label>Validade do código (dias)</Label>
@@ -405,6 +431,9 @@ const AffiliateManager: React.FC = () => {
                         <div><p className="text-muted-foreground text-xs flex items-center gap-1"><TrendingUp className="w-3 h-3" /> Receita total</p><p className="font-semibold">{yen(aff.totalRevenue)}</p></div>
                       <Button variant="outline" size="sm" onClick={() => startEdit(aff)} title="Editar afiliado">
                         Editar
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => startAdditionalCode(aff)} title="Adicionar outro código">
+                        <Plus className="w-3 h-3 mr-1" /> Código
                       </Button>
                         <div><p className="text-muted-foreground text-xs flex items-center gap-1"><DollarSign className="w-3 h-3" /> Comissão acum.</p><p className="font-semibold text-green-600">{yen(aff.totalEarnings)}</p></div>
                       </div>
