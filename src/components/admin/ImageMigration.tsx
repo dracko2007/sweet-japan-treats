@@ -78,20 +78,26 @@ async function migrateProduct(p: Product): Promise<Product> {
   return { ...p, image: coverUrl, thumbnail: thumbUrl || undefined, gallery: galleryUrls.filter(Boolean) };
 }
 
-// Baixa qualquer URL (inclusive Cloudinary) como base64 via fetch — sem restrição CORS do canvas
+// Baixa uma imagem com limite para que um item indisponível não trave o lote.
 async function fetchAsDataUrl(src: string): Promise<string> {
   if (src.startsWith('data:')) return src;
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), 20000);
   try {
-    const res = await fetch(src);
-    if (!res.ok) return '';
-    const blob = await res.blob();
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result as string || '');
-      reader.onerror = () => resolve('');
-      reader.readAsDataURL(blob);
-    });
-  } catch { return ''; }
+    const response = await fetch(src, { signal: controller.signal });
+    if (!response.ok) return '';
+    const blob = await response.blob();
+    const { promise, resolve } = Promise.withResolvers<string>();
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(typeof reader.result === 'string' ? reader.result : '');
+    reader.onerror = () => resolve('');
+    reader.readAsDataURL(blob);
+    return await promise;
+  } catch {
+    return '';
+  } finally {
+    window.clearTimeout(timer);
+  }
 }
 
 // Re-envia TODAS as imagens (inclusive Cloudinary) em alta qualidade usando fetch
@@ -207,11 +213,19 @@ const ImageMigration: React.FC = () => {
     setCoverSearchState({ status: 'running', total: pending.length, done: 0, success: 0, skipped: 0, errors: [] });
     await runWithConcurrency(pending, 2, async (p) => {
       try {
-        const response = await fetch('/api/product-enrich', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ productName: p.name, isAdmin: true, fields: { images: true, description: false, price: false, weight: false } }),
-        });
+        const controller = new AbortController();
+        const timer = window.setTimeout(() => controller.abort(), 30000);
+        let response: Response;
+        try {
+          response = await fetch('/api/product-enrich', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            signal: controller.signal,
+            body: JSON.stringify({ productName: p.name, isAdmin: true, fields: { images: true, description: false, price: false, weight: false } }),
+          });
+        } finally {
+          window.clearTimeout(timer);
+        }
         const data: unknown = await response.json();
         const images = data && typeof data === 'object' && 'images' in data && Array.isArray(data.images)
           ? data.images.filter((url): url is string => typeof url === 'string')
