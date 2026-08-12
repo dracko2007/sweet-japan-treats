@@ -37,7 +37,7 @@ import VisitorStats from '@/components/admin/VisitorStats';
 import ReviewModeration from '@/components/admin/ReviewModeration';
 import MarginAudit from '@/components/admin/MarginAudit';
 import FinanceDetailManager from '@/components/admin/FinanceDetailManager';
-import CN23Modal from '@/components/admin/CN23Modal';
+import CheckoutSandbox from '@/components/admin/CheckoutSandbox';
 import PromoNotificationModal from '@/components/admin/PromoNotificationModal';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { orderService } from '@/services/orderService';
@@ -60,9 +60,8 @@ const devError = isDev ? console.error.bind(console) : () => {};
 
 type AdminTab =
   | 'orders' | 'coupons' | 'dashboard' | 'customers' | 'products'
-  | 'home' | 'vlog' | 'sorteio' | 'affiliates' | 'requests' | 'b2b' | 'admins' | 'videos'
   | 'calculator' | 'migration' | 'promotion' | 'negotiations' | 'marketing' | 'employees' | 'coupon-usage' | 'fraud'
-  | 'thermal-printer' | 'whatsapp' | 'review-moderation' | 'margin-audit' | 'visitors' | 'finance-detail';
+  | 'thermal-printer' | 'whatsapp' | 'review-moderation' | 'margin-audit' | 'visitors' | 'finance-detail' | 'sandbox';
 
 interface AdminTabItem {
   id: AdminTab;
@@ -752,6 +751,7 @@ _This is an automated test message_
     { title: 'Vendas', items: [
       { id: 'orders', label: 'Pedidos', icon: Package, badge: ordersHasMore ? undefined : pendingOrdersCount },
       { id: 'affiliates', label: 'Afiliados', icon: Megaphone, badge: Math.max(affiliatePendingCount, pendingAffiliateRequestsCount) },
+      { id: 'sandbox', label: 'Sandbox', icon: TestTube },
       { id: 'negotiations', label: 'Negociações', icon: Handshake, badge: pendingNegotiationsCount || 0 },
       { id: 'customers', label: 'Clientes', icon: Users, badge: Math.max(newCustomers, pendingAffiliateRequestsCount) },
       { id: 'visitors', label: 'Visitantes', icon: BarChart3 },
@@ -1305,6 +1305,8 @@ _This is an automated test message_
               <MarginAudit />
             ) : activeTab === 'finance-detail' ? (
               <FinanceDetailManager />
+            ) : activeTab === 'sandbox' ? (
+              <CheckoutSandbox />
             ) : (
               <CustomerList />
             )}
