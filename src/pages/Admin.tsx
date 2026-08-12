@@ -50,6 +50,7 @@ import { negotiationService } from '@/services/negotiationService';
 import { COMPANY_PROFILE } from '@/config/companyProfile';
 import { ADMIN_EMAIL } from '@/config/admin';
 import { auth } from '@/config/firebase';
+import { affiliateService } from '@/services/affiliateService';
 
 const isDev = import.meta.env.DEV;
 const devLog = isDev ? console.log.bind(console) : () => {};
@@ -80,7 +81,7 @@ const Admin: React.FC = () => {
   const [ordersHasMore, setOrdersHasMore] = useState(false);
   const [ordersLoadingMore, setOrdersLoadingMore] = useState(false);
   const [customerCount, setCustomerCount] = useState(0);
-  const [newCustomers, setNewCustomers] = useState(0);
+  const [affiliatePendingCount, setAffiliatePendingCount] = useState(0);
   const [newRequests, setNewRequests] = useState(0);
   const [isTesting, setIsTesting] = useState(false);
   const [activeTab, setActiveTab] = useState<AdminTab>('dashboard');
@@ -125,10 +126,12 @@ const Admin: React.FC = () => {
     const refresh = () => {
       const now = Date.now();
       if (now - lastRefresh < MIN_INTERVAL_MS) return; // throttle
-      lastRefresh = now;
       loadOrders();
       loadCustomers();
       loadCustomRequests();
+      affiliateService.getPendingCommissions()
+        .then((items) => setAffiliatePendingCount(items.length))
+        .catch(() => setAffiliatePendingCount(0));
     };
 
     const debouncedRefresh = () => {
@@ -746,7 +749,7 @@ _This is an automated test message_
       { id: 'orders', label: 'Pedidos', icon: Package, badge: ordersHasMore ? undefined : pendingOrdersCount },
       { id: 'negotiations', label: 'Negociações', icon: Handshake, badge: pendingNegotiationsCount || 0 },
       { id: 'customers', label: 'Clientes', icon: Users, badge: newCustomers },
-      { id: 'affiliates', label: 'Afiliados', icon: Megaphone },
+      { id: 'affiliates', label: 'Afiliados', icon: Megaphone, badge: affiliatePendingCount },
       { id: 'visitors', label: 'Visitantes', icon: BarChart3 },
     ] },
     { title: 'Catálogo', items: [
