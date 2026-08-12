@@ -230,17 +230,33 @@ export const affiliateService = {
     if (!db) return { ok: false, error: 'Indisponível' };
     try {
       await ensureAdminAuth();
-      const ok = await affiliateService.save({
-        code: opts.code,
+      const code = normalize(opts.code);
+      const ref = doc(db, COL, code);
+      const existing = await getDoc(ref);
+      const previous = existing.exists() ? existing.data() as Affiliate : null;
+      const now = new Date().toISOString();
+      await setDoc(ref, {
+        code,
         ownerName: req.name,
-        ownerEmail: req.email,
+        ownerEmail: req.email.trim().toLowerCase(),
         discountPercent: opts.discountPercent,
         commissionPercent: opts.commissionPercent,
         active: true,
         expiresAt: new Date(Date.now() + (opts.validityDays || 365) * 86400000).toISOString(),
+        createdAt: previous?.createdAt || now,
+        totalOrders: previous?.totalOrders || 0,
+        totalRevenue: previous?.totalRevenue || 0,
+        totalEarnings: previous?.totalEarnings || 0,
+        tier: previous?.tier || 'bronze',
+        currentMonthRevenue: previous?.currentMonthRevenue || 0,
+        currentMonthKey: previous?.currentMonthKey || monthKey(),
+        tierSettings: previous?.tierSettings || {
+          bronzeGoalYen: 100000, bronzePercent: opts.commissionPercent,
+          silverGoalYen: 200000, silverPercent: 15,
+          goldGoalYen: 201000, goldPercent: 20,
+        },
       });
-      if (!ok) return { ok: false, error: 'Falha ao criar afiliado. Verifique se o código já existe ou se a sessão de administrador expirou.' };
-      await updateDoc(doc(db, REQ_COL, req.email.trim().toLowerCase()), { status: 'approved', code: opts.code.trim().toUpperCase() });
+      await updateDoc(doc(db, REQ_COL, req.email.trim().toLowerCase()), { status: 'approved', code });
       return { ok: true };
     } catch (e: any) {
       return { ok: false, error: e?.message };
