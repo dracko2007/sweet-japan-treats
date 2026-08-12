@@ -314,8 +314,8 @@ export const affiliateService = {
         tier,
         currentMonthRevenue: prev?.currentMonthRevenue ?? 0,
         currentMonthKey: prev?.currentMonthKey ?? monthKey(),
-        tierUpdatedAt: prev?.tierUpdatedAt,
-        tierSettings: input.tierSettings || prev?.tierSettings,
+        ...(prev?.tierUpdatedAt ? { tierUpdatedAt: prev.tierUpdatedAt } : {}),
+        ...(input.tierSettings || prev?.tierSettings ? { tierSettings: input.tierSettings || prev?.tierSettings } : {}),
       };
       await setDoc(ref, affiliate);
       return true;
