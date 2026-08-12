@@ -13,6 +13,7 @@ const AffiliateManager: React.FC = () => {
   const [affiliates, setAffiliates] = useState<Affiliate[]>([]);
   const [pending, setPending] = useState<PendingCommission[]>([]);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [creating, setCreating] = useState(false);
   const [editingCode, setEditingCode] = useState<string | null>(null);
   const [form, setForm] = useState({
