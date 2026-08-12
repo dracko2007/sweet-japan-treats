@@ -82,6 +82,7 @@ const Admin: React.FC = () => {
   const [ordersLoadingMore, setOrdersLoadingMore] = useState(false);
   const [customerCount, setCustomerCount] = useState(0);
   const [affiliatePendingCount, setAffiliatePendingCount] = useState(0);
+  const [newCustomers, setNewCustomers] = useState(0);
   const [newRequests, setNewRequests] = useState(0);
   const [pendingAffiliateRequestsCount, setPendingAffiliateRequestsCount] = useState(0);
   const [isTesting, setIsTesting] = useState(false);
