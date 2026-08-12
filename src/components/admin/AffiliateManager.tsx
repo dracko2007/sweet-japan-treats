@@ -233,6 +233,11 @@ const AffiliateManager: React.FC = () => {
               <Input value={form.code} disabled={Boolean(editingCode)} onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })} placeholder="Ex: JUNIOR10" className="uppercase font-bold" />
             </div>
             <div className="space-y-1">
+              <Label>Validade do código (dias)</Label>
+              <Input type="number" min="1" value={form.validityDays} onChange={(e) => setForm({ ...form, validityDays: Number(e.target.value) })} />
+              <p className="text-[11px] text-muted-foreground">Define por quantos dias o código poderá ser usado. O link do afiliado não expira.</p>
+            </div>
+            <div className="space-y-1">
               <Label>Nome do influencer</Label>
               <Input value={form.ownerName} onChange={(e) => setForm({ ...form, ownerName: e.target.value })} placeholder="Ex: Junior Vox" />
             </div>
@@ -262,10 +267,6 @@ const AffiliateManager: React.FC = () => {
                   </div>
                 ))}
               </div>
-            </div>
-            <div className="space-y-1">
-              <Label>Validade (dias)</Label>
-              <Input type="number" min="1" value={form.validityDays} onChange={(e) => setForm({ ...form, validityDays: Number(e.target.value) })} />
             </div>
             <div className="flex items-center gap-2 pt-6">
               <input type="checkbox" checked={form.active} onChange={(e) => setForm({ ...form, active: e.target.checked })} className="w-4 h-4" />
