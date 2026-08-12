@@ -99,7 +99,9 @@ const Checkout: React.FC = () => {
         : sum;
     }, 0
   );
-
+  const discountedItemCount = items.filter((item) =>
+    !item.freeGift && (item.product.id.endsWith('_promo') || (item.product.discountPercent || 0) > 0)
+  ).length;
   const [selectedShipping, setSelectedShipping] = useState<{
     carrier: string;
     cost: number;
@@ -1117,6 +1119,9 @@ const Checkout: React.FC = () => {
                         />
                         <div className="flex-1 min-w-0">
                           <p className="font-bold text-xs text-gray-800 truncate">{productName}</p>
+                          {(item.product.id.endsWith('_promo') || (item.product.discountPercent || 0) > 0) && (
+                            <p className="text-[10px] text-amber-700 font-bold mt-0.5">🏷️ Preço promocional — não acumula cupom de afiliado</p>
+                          )}
                           <p className="text-[10px] text-gray-400 font-semibold mt-0.5">
                             {item.freeGift ? '🎁 Presente da promoção' : (item.variantLabel || (item.size === 'small' ? 'Pequeno' : 'Grande'))} • {item.quantity}x
                           </p>
@@ -1127,6 +1132,15 @@ const Checkout: React.FC = () => {
                       </div>
                     );
                   })}
+                  {discountedItemCount > 0 && (
+                    <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-800">
+                      <p className="font-bold">🏷️ Produto(s) com desconto promocional</p>
+                      <p className="mt-0.5">
+                        {discountedItemCount} item(ns) já tem desconto da loja. O cupom de afiliado só será aplicado aos produtos fora da promoção; não há acúmulo de descontos.
+                      </p>
+                    </div>
+                  )}
+
 
                   {/* Coupon Selector Widget */}
                   <CouponSelector

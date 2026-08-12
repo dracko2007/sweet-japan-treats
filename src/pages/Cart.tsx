@@ -248,6 +248,12 @@ const Cart: React.FC = () => {
         ? sum + fxConvert(effectiveYen(item.product, item.size), currency) * item.quantity
         : sum, 0)
     : regularSubtotal;
+  const discountedItemCount = items.filter((item) =>
+    !item.freeGift && (isPromoItem(item) || (item.product.discountPercent || 0) > 0)
+  ).length;
+  const affiliateDiscountedItemCount = affiliateCoupon
+    ? items.filter((item) => !item.freeGift && !isPromoItem(item) && (item.product.discountPercent || 0) > 0).length
+    : 0;
   const discountAmount = activeCoupon ? computeDiscount(activeCoupon, baseDoCupom) : 0;
 
   // Resgate de pontos: 1 ponto = ¥1, limitado ao valor dos produtos (em ¥)
@@ -336,6 +342,14 @@ const Cart: React.FC = () => {
                     </Button>
                   </div>
                 </div>
+                {discountedItemCount > 0 && (
+                  <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-800">
+                    <p className="font-bold">🏷️ Produto(s) com desconto promocional</p>
+                    <p className="mt-0.5">
+                      {discountedItemCount} item(ns) já está(ão) com desconto da loja. O cupom de afiliado só é aplicado nos produtos fora da promoção; descontos não são acumulados.
+                    </p>
+                  </div>
+                )}
 
 
 
