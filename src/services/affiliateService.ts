@@ -119,11 +119,11 @@ function monthKey(date = new Date()) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
 }
 
-/** Calcula o próximo tier com base nas vendas do mês. */
-function computeNextTier(_currentTier: AffiliateTier, monthRevenue: number): AffiliateTier {
-  if (monthRevenue <= TIER_CONFIG.bronze.goalYen) return 'bronze';
-  if (monthRevenue <= TIER_CONFIG.silver.goalYen) return 'silver';
-  return 'gold';
+/** Mantém o nível se a meta anterior foi atingida; caso contrário recalcula o nível. */
+function tierForRevenue(revenue: number, settings?: AffiliateTierSettings): AffiliateTier {
+  const bronzeGoal = settings?.bronzeGoalYen ?? TIER_CONFIG.bronze.goalYen;
+  const silverGoal = settings?.silverGoalYen ?? TIER_CONFIG.silver.goalYen;
+  return revenue <= bronzeGoal ? 'bronze' : revenue <= silverGoal ? 'silver' : 'gold';
 }
 
 export const affiliateService = {
@@ -136,9 +136,17 @@ export const affiliateService = {
       await Promise.all(snap.docs.map(async (d) => {
         const data = d.data() as Affiliate;
         if (data.currentMonthKey && data.currentMonthKey !== mk) {
+          const previousRevenue = Number(data.currentMonthRevenue || 0);
+          const nextTier = tierForRevenue(previousRevenue, data.tierSettings);
+          const settings = data.tierSettings;
+          const commissionPercent = nextTier === 'bronze'
+            ? (settings?.bronzePercent ?? TIER_CONFIG.bronze.commissionPercent)
+            : nextTier === 'silver'
+              ? (settings?.silverPercent ?? TIER_CONFIG.silver.commissionPercent)
+              : (settings?.goldPercent ?? TIER_CONFIG.gold.commissionPercent);
           await updateDoc(doc(db!, COL, d.id), {
-            tier: 'bronze',
-            commissionPercent: data.tierSettings?.bronzePercent ?? TIER_CONFIG.bronze.commissionPercent,
+            tier: nextTier,
+            commissionPercent,
             currentMonthRevenue: 0,
             currentMonthKey: mk,
             tierUpdatedAt: new Date().toISOString(),

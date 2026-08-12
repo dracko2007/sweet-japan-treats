@@ -280,13 +280,12 @@ const AffiliatePage: React.FC = () => {
               {/* Como funciona */}
               <div className="bg-secondary/40 rounded-xl p-4 text-sm space-y-2">
                 <p className="font-semibold text-base">Como funciona?</p>
-                <p className="text-muted-foreground">Sua comissão aumenta conforme você vende mais a cada mês. Existem 3 níveis:</p>
+                <p className="text-muted-foreground">O ciclo de vendas fecha no último dia do mês e reinicia automaticamente no dia 1º. O nível do mês anterior define a comissão do novo mês:</p>
                 <ul className="text-muted-foreground space-y-1 list-disc list-inside">
-                  <li>No início você está no nível <strong>Bronze</strong> com <strong>10%</strong> de comissão</li>
-                  <li>Até <strong>¥100.000</strong> → 🥉 <strong>Bronze (10%)</strong></li>
-                  <li>De <strong>¥101.000 até ¥200.000</strong> → 🥈 <strong>Prata (15%)</strong></li>
-                  <li>Acima de <strong>¥201.000</strong> → 🥇 <strong>Ouro (20%)</strong></li>
-                  <li>As metas consideram somente lucro líquido dos produtos, sem frete e taxa do Personal Shopper.</li>
+                  <li>Se atingir a meta do seu nível, você mantém esse nível no mês seguinte.</li>
+                  <li>Se não atingir a meta, desce para o nível correspondente ao lucro obtido.</li>
+                  <li>A nova porcentagem vale para cada venda confirmada durante o novo mês.</li>
+                  <li>As metas consideram somente o lucro líquido dos produtos, sem frete e taxa do Personal Shopper.</li>
                 </ul>
               </div>
 
@@ -330,11 +329,12 @@ const AffiliatePage: React.FC = () => {
                 ))}
               </div>
               <div className="text-sm space-y-2">
-                <p className="font-semibold">Exemplo prático:</p>
-                <p className="text-muted-foreground">Lucro mensal de ¥100.000 → Bronze (10%).</p>
-                <p className="text-muted-foreground">Lucro mensal de ¥150.000 → Prata (15%).</p>
-                <p className="text-muted-foreground">Lucro mensal de ¥250.000 → Ouro (20%).</p>
-                <p className="text-muted-foreground">O cálculo considera lucro dos produtos, sem frete e taxa do Personal Shopper.</p>
+                <p className="font-semibold">Exemplos práticos:</p>
+                <p className="text-muted-foreground">Se no mês anterior você estava no Bronze e lucrou ¥100.000, atingiu a meta e continua no Bronze; cada venda do novo mês gera 10% de comissão.</p>
+                <p className="text-muted-foreground">Se estava no Bronze e lucrou ¥150.000, ultrapassou ¥100.000 e começa o novo mês no Prata; cada venda confirmada passa a gerar 15%.</p>
+                <p className="text-muted-foreground">Se estava no Prata e lucrou ¥180.000, não atingiu ¥200.000; cai para Prata conforme a faixa alcançada. Se lucrou ¥80.000, cai para Bronze e recebe 10% nas vendas do novo mês.</p>
+                <p className="text-muted-foreground">Se estava no Ouro e lucrou ¥250.000, mantém Ouro e recebe 20% sobre cada venda confirmada do novo mês. Se lucrou ¥150.000, começa o novo mês no Prata e recebe 15%.</p>
+                <p className="text-muted-foreground">O valor da comissão é calculado sobre o lucro líquido de cada venda, sem frete e taxa do Personal Shopper.</p>
               </div>
 
               <p className="text-xs text-muted-foreground text-center">
