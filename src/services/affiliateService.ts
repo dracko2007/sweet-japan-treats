@@ -106,8 +106,8 @@ export type AffiliateDashboard = Pick<
   | 'totalEarnings'
   | 'tier'
   | 'currentMonthRevenue'
+  | 'tierSettings'
 >;
-
 export type PendingCommissionSummary = Pick<
   PendingCommission,
   'id' | 'affiliateCode' | 'netYen' | 'commissionYen'

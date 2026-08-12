@@ -40,6 +40,7 @@ function affiliateSummary(document) {
     totalEarnings: numberOrZero(data.totalEarnings),
     tier: ['bronze', 'silver', 'gold'].includes(data.tier) ? data.tier : 'bronze',
     currentMonthRevenue: numberOrZero(data.currentMonthRevenue),
+    tierSettings: data.tierSettings || null,
   };
 }
 

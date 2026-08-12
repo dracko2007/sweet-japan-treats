@@ -320,7 +320,6 @@ const AffiliateManager: React.FC = () => {
         </div>
       ) : (
         <div className="space-y-3">
-          {/* Botão avaliar tiers */}
           <div className="flex justify-end">
             <Button variant="outline" size="sm" onClick={handleEvaluateTiers} disabled={evaluating} className="gap-2">
               <RefreshCw className={`w-4 h-4 ${evaluating ? 'animate-spin' : ''}`} />
