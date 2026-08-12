@@ -283,9 +283,10 @@ const AffiliatePage: React.FC = () => {
                 <p className="text-muted-foreground">Sua comissão aumenta conforme você vende mais a cada mês. Existem 3 níveis:</p>
                 <ul className="text-muted-foreground space-y-1 list-disc list-inside">
                   <li>No início você está no nível <strong>Bronze</strong> com <strong>10%</strong> de comissão</li>
-                  <li>Menos de <strong>¥200.000</strong> → 🥉 <strong>Bronze (10%)</strong>, seja qual for o nível</li>
-                  <li>Entre <strong>¥200.000 e ¥499.999</strong> → 🥈 <strong>Prata (15%)</strong></li>
-                  <li><strong>¥500.000 ou mais</strong> → 🥇 <strong>Ouro (20%)</strong> direto, mesmo que esteja no Bronze</li>
+                  <li>Até <strong>¥100.000</strong> → 🥉 <strong>Bronze (10%)</strong></li>
+                  <li>De <strong>¥101.000 até ¥200.000</strong> → 🥈 <strong>Prata (15%)</strong></li>
+                  <li>Acima de <strong>¥201.000</strong> → 🥇 <strong>Ouro (20%)</strong></li>
+                  <li>As metas consideram somente lucro líquido dos produtos, sem frete e taxa do Personal Shopper.</li>
                 </ul>
               </div>
 
@@ -313,32 +314,27 @@ const AffiliatePage: React.FC = () => {
                     </div>
                     <div className="text-xs text-muted-foreground space-y-0.5">
                       {key === 'bronze' && <>
-                        <p>✅ ¥200k–¥499k → sobe para 🥈 <strong>Prata (15%)</strong></p>
-                        <p>✅ ¥500k ou mais → sobe direto para 🥇 <strong>Ouro (20%)</strong></p>
+                        <p>✅ Até ¥100k → mantém Bronze; acima disso sobe conforme a próxima meta.</p>
                         <p>🥉 Nível inicial — não cai abaixo daqui.</p>
                       </>}
                       {key === 'silver' && <>
-                        <p>✅ ¥500k ou mais → sobe para 🥇 <strong>Ouro (20%)</strong></p>
-                        <p>❌ ¥200k–¥499k → mantém 🥈 <strong>Prata (15%)</strong></p>
-                        <p>⚠️ Menos de ¥200k → cai para 🥉 <strong>Bronze (10%)</strong></p>
+                        <p>✅ Acima de ¥200k → sobe para 🥇 <strong>Ouro (20%)</strong></p>
+                        <p>⚠️ Até ¥100k → cai para 🥉 <strong>Bronze (10%)</strong></p>
                       </>}
                       {key === 'gold' && <>
-                        <p>✅ ¥500k ou mais → mantém 🥇 <strong>Ouro (20%)</strong></p>
-                        <p>❌ ¥200k–¥499k → cai para 🥈 <strong>Prata (15%)</strong></p>
-                        <p>⚠️ Menos de ¥200k → cai direto para 🥉 <strong>Bronze (10%)</strong></p>
+                        <p>✅ Acima de ¥200k → mantém 🥇 <strong>Ouro (20%)</strong></p>
+                        <p>⚠️ Até ¥200k → retorna ao nível correspondente no próximo ciclo</p>
                       </>}
                     </div>
                   </div>
                 ))}
               </div>
-
-              {/* Exemplo prático */}
-              <div className="bg-primary/5 border border-primary/20 rounded-xl p-4 text-sm space-y-1">
+              <div className="text-sm space-y-2">
                 <p className="font-semibold">Exemplo prático:</p>
-                <p className="text-muted-foreground">🥉 Bronze + <strong>¥250.000</strong> em vendas → 🥈 <strong>Prata (15%)</strong> no mês seguinte.</p>
-                <p className="text-muted-foreground">🥉 Bronze + <strong>¥550.000</strong> em vendas → 🥇 <strong>Ouro (20%) direto</strong> no mês seguinte.</p>
-                <p className="text-muted-foreground">🥇 Ouro + <strong>¥350.000</strong> em vendas → 🥈 <strong>Prata (15%)</strong> no mês seguinte.</p>
-                <p className="text-muted-foreground">🥇 Ouro + <strong>¥150.000</strong> em vendas → 🥉 <strong>Bronze (10%) direto</strong> no mês seguinte.</p>
+                <p className="text-muted-foreground">Lucro mensal de ¥100.000 → Bronze (10%).</p>
+                <p className="text-muted-foreground">Lucro mensal de ¥150.000 → Prata (15%).</p>
+                <p className="text-muted-foreground">Lucro mensal de ¥250.000 → Ouro (20%).</p>
+                <p className="text-muted-foreground">O cálculo considera lucro dos produtos, sem frete e taxa do Personal Shopper.</p>
               </div>
 
               <p className="text-xs text-muted-foreground text-center">

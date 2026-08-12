@@ -121,10 +121,9 @@ function monthKey(date = new Date()) {
 
 /** Calcula o próximo tier com base nas vendas do mês. */
 function computeNextTier(_currentTier: AffiliateTier, monthRevenue: number): AffiliateTier {
-  const { bronze, silver } = TIER_CONFIG;
-  if (monthRevenue < bronze.goalYen) return 'bronze';
-  if (monthRevenue >= silver.goalYen) return 'gold';
-  return 'silver';
+  if (monthRevenue <= TIER_CONFIG.bronze.goalYen) return 'bronze';
+  if (monthRevenue <= TIER_CONFIG.silver.goalYen) return 'silver';
+  return 'gold';
 }
 
 export const affiliateService = {
@@ -297,7 +296,7 @@ export const affiliateService = {
         ownerName: input.ownerName,
         ownerEmail: input.ownerEmail.toLowerCase(),
         discountPercent: input.discountPercent,
-        commissionPercent: TIER_CONFIG[tier].commissionPercent, // sempre sincroniza com o tier
+        commissionPercent: input.commissionPercent,
         active: input.active,
         expiresAt: input.expiresAt,
         createdAt: prev?.createdAt || input.createdAt || new Date().toISOString(),
@@ -322,7 +321,7 @@ export const affiliateService = {
   async remove(code: string): Promise<{ ok: boolean; error?: string }> {
     if (!db) return { ok: false, error: 'Firebase indisponível' };
     try {
-      await ensureAdminAuth();
+      const ref = doc(db, COL, normalize(code));
       const affiliateSnap = await getDoc(ref);
       await deleteDoc(ref);
       if (affiliateSnap.exists()) {
@@ -353,21 +352,25 @@ export const affiliateService = {
         const snap = await tx.get(ref);
         if (!snap.exists()) return;
         const aff = snap.data() as Affiliate;
-        // Virou o mês? Avalia tier com base no mês anterior e zera contador
+        const now = new Date();
+        const mk = monthKey(now);
+        const currentTier: AffiliateTier = aff.tier || 'bronze';
+        const settings = aff.tierSettings;
+        const tierConfig = settings ? {
+          bronze: { commissionPercent: settings.bronzePercent, goalYen: settings.bronzeGoalYen },
+          silver: { commissionPercent: settings.silverPercent, goalYen: settings.silverGoalYen },
+          gold: { commissionPercent: settings.goldPercent, goalYen: settings.goldGoalYen },
+        } : TIER_CONFIG;
+        const tierForRevenue = (revenue: number): AffiliateTier =>
+          revenue <= tierConfig.bronze.goalYen ? 'bronze' :
+          revenue <= tierConfig.silver.goalYen ? 'silver' : 'gold';
         let tier = currentTier;
         let monthRevenue = (aff.currentMonthRevenue || 0) + netValue;
         if (aff.currentMonthKey && aff.currentMonthKey !== mk) {
-          // Avalia com as vendas do mês anterior
-          tier = computeNextTier(currentTier, aff.currentMonthRevenue || 0);
-          monthRevenue = netValue; // zera e começa o novo mês com esta venda
+          tier = tierForRevenue(aff.currentMonthRevenue || 0);
+          monthRevenue = netValue;
         }
 
-        const settings = aff.tierSettings;
-        const tierConfig = settings ? {
-          bronze: { commissionPercent: settings.bronzePercent },
-          silver: { commissionPercent: settings.silverPercent },
-          gold: { commissionPercent: settings.goldPercent },
-        } : TIER_CONFIG;
         const commissionPercent = tierConfig[tier].commissionPercent;
         const earning = Math.round((netValue * commissionPercent) / 100);
 

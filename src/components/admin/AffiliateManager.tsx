@@ -14,7 +14,7 @@ const AffiliateManager: React.FC = () => {
   const [pending, setPending] = useState<PendingCommission[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
-  const [saving, setSaving] = useState(false);
+  const [editingCode, setEditingCode] = useState<string | null>(null);
   const [form, setForm] = useState({
     code: '',
     ownerName: '',
@@ -99,10 +99,10 @@ const AffiliateManager: React.FC = () => {
     setSaving(true);
     const ok = await affiliateService.save({
       code: form.code.toUpperCase(),
-      commissionPercent: Number(form.bronzePercent),
+      ownerName: form.ownerName.trim() || form.code.toUpperCase(),
       ownerEmail: form.ownerEmail.trim(),
       discountPercent: Number(form.discountPercent),
-      commissionPercent: Number(form.commissionPercent),
+      commissionPercent: Number(form.bronzePercent),
       tierSettings: {
         bronzeGoalYen: Number(form.bronzeGoalYen), bronzePercent: Number(form.bronzePercent),
         silverGoalYen: Number(form.silverGoalYen), silverPercent: Number(form.silverPercent),
@@ -113,8 +113,9 @@ const AffiliateManager: React.FC = () => {
     });
     setSaving(false);
     if (ok) {
-      setForm({ code: '', ownerName: '', ownerEmail: '', discountPercent: 10, commissionPercent: 10, validityDays: 90, active: true, bronzeGoalYen: 100000, bronzePercent: 10, silverGoalYen: 200000, silverPercent: 15, goldGoalYen: 201000, goldPercent: 20 });
+      setEditingCode(null);
       setCreating(false);
+      setForm({ code: '', ownerName: '', ownerEmail: '', discountPercent: 10, commissionPercent: 10, validityDays: 90, active: true, bronzeGoalYen: 100000, bronzePercent: 10, silverGoalYen: 200000, silverPercent: 15, goldGoalYen: 201000, goldPercent: 20 });
       load();
     } else {
       toast({ title: 'Erro ao salvar afiliado', variant: 'destructive' });
@@ -136,6 +137,26 @@ const AffiliateManager: React.FC = () => {
         variant: 'destructive',
       });
     }
+  };
+  const startEdit = (affiliate: Affiliate) => {
+    const settings = affiliate.tierSettings;
+    setEditingCode(affiliate.code);
+    setForm({
+      code: affiliate.code,
+      ownerName: affiliate.ownerName,
+      ownerEmail: affiliate.ownerEmail,
+      discountPercent: affiliate.discountPercent,
+      commissionPercent: affiliate.commissionPercent,
+      validityDays: Math.max(1, Math.ceil((new Date(affiliate.expiresAt).getTime() - Date.now()) / 86400000)),
+      active: affiliate.active,
+      bronzeGoalYen: settings?.bronzeGoalYen || 100000,
+      bronzePercent: settings?.bronzePercent || 10,
+      silverGoalYen: settings?.silverGoalYen || 200000,
+      silverPercent: settings?.silverPercent || 15,
+      goldGoalYen: settings?.goldGoalYen || 201000,
+      goldPercent: settings?.goldPercent || 20,
+    });
+    setCreating(true);
   };
 
   const copyLink = (code: string) => {
@@ -208,7 +229,7 @@ const AffiliateManager: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-1">
               <Label>Código anunciado *</Label>
-              <Input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })} placeholder="Ex: JUNIOR10" className="uppercase font-bold" />
+              <Input value={form.code} disabled={Boolean(editingCode)} onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })} placeholder="Ex: JUNIOR10" className="uppercase font-bold" />
             </div>
             <div className="space-y-1">
               <Label>Nome do influencer</Label>
@@ -381,6 +402,9 @@ const AffiliateManager: React.FC = () => {
                         <div><p className="text-muted-foreground text-xs">Comissão</p><p className="font-semibold">{aff.commissionPercent}%</p></div>
                         <div><p className="text-muted-foreground text-xs flex items-center gap-1"><Package className="w-3 h-3" /> Pedidos</p><p className="font-semibold">{aff.totalOrders || 0}</p></div>
                         <div><p className="text-muted-foreground text-xs flex items-center gap-1"><TrendingUp className="w-3 h-3" /> Receita total</p><p className="font-semibold">{yen(aff.totalRevenue)}</p></div>
+                      <Button variant="outline" size="sm" onClick={() => startEdit(aff)} title="Editar afiliado">
+                        Editar
+                      </Button>
                         <div><p className="text-muted-foreground text-xs flex items-center gap-1"><DollarSign className="w-3 h-3" /> Comissão acum.</p><p className="font-semibold text-green-600">{yen(aff.totalEarnings)}</p></div>
                       </div>
                     </div>

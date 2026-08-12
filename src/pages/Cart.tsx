@@ -231,17 +231,17 @@ const Cart: React.FC = () => {
   const promoSubtotal = items.reduce(
     (sum, item) => (!item.freeGift && isPromoItem(item)) ? sum + fxConvert(effectiveYen(item.product, item.size), currency) * item.quantity : sum, 0
   );
-  // Subtotal dos itens regulares (base do cupom)
+  const affiliateCoupon = Boolean(activeCoupon?.affiliateCode);
   const regularSubtotal = items.reduce(
-    (sum, item) => (!item.freeGift && !isPromoItem(item)) ? sum + fxConvert(effectiveYen(item.product, item.size), currency) * item.quantity : sum, 0
+    (sum, item) => {
+      const hasPageDiscount = (item.product.discountPercent || 0) > 0;
+      return (!item.freeGift && !isPromoItem(item) && (!affiliateCoupon || !hasPageDiscount))
+        ? sum + fxConvert(effectiveYen(item.product, item.size), currency) * item.quantity
+        : sum;
+    }, 0
   );
-
   const baseTotalPrice = promoSubtotal + regularSubtotal;
   const hasPromoItems = promoSubtotal > 0;
-
-  // Base do desconto. Campanha de produto (`promo-`) incide SÓ sobre o produto
-  // dela, igual ao servidor faz em `api/_lib/commerce.js`. Cupom comum — e o de
-  // recuperação de carrinho — incide sobre todos os itens sem preço promocional.
   const baseDoCupom = promoProductId
     ? items.reduce(
       (sum, item) => (!item.freeGift && item.product.id === promoProductId)
@@ -344,7 +344,8 @@ const Cart: React.FC = () => {
                   const itemIsPromo = item.product.id.endsWith('_promo');
                   const itemSubtotal = item.freeGift || itemIsPromo ? 0
                     : fxConvert(effectiveYen(item.product, item.size), currency) * item.quantity;
-                  const itemDiscount = (!itemIsPromo && activeCoupon && regularSubtotal > 0)
+                  const itemDiscount = (!itemIsPromo && activeCoupon && regularSubtotal > 0
+                    && (!activeCoupon.affiliateCode || !(item.product.discountPercent || 0)))
                     ? discountAmount * (itemSubtotal / regularSubtotal)
                     : 0;
                   return (
