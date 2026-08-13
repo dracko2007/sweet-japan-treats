@@ -12,6 +12,7 @@ import { effectiveYen, baseYen, hasDiscount, getVariants } from '@/utils/pricing
 import { convertYen as fxConvert } from '@/services/fxService';
 import { productEnglishName } from '@/utils/productName';
 import { cdnVideo } from '@/services/cloudinaryService';
+import { wishlistService } from '@/services/wishlistService';
 
 interface CompactProductCardProps {
   product: Product;
