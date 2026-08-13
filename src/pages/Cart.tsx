@@ -352,7 +352,7 @@ const Cart: React.FC = () => {
                     </Button>
                   </div>
                 </div>
-                {discountedItemCount > 0 && (
+                {affiliateCoupon && discountedItemCount > 0 && (
                   <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-800">
                     <p className="font-bold">🏷️ Produto(s) com desconto promocional</p>
                     <p className="mt-0.5">
@@ -546,12 +546,12 @@ const Cart: React.FC = () => {
                             🎁 {promoBreakdown}
                           </p>
                         )}
-                        {hasPromoItems && regularSubtotal === 0 && (
+                        {affiliateCoupon && hasPromoItems && regularSubtotal === 0 && (
                           <p className="text-[11px] text-pink-600 font-semibold bg-pink-50 border border-pink-200 rounded-lg px-2 py-1.5 leading-snug">
                             ⚠️ Todos os itens já têm desconto promocional. O cupom não foi aplicado.
                           </p>
                         )}
-                        {hasPromoItems && regularSubtotal > 0 && (
+                        {affiliateCoupon && hasPromoItems && regularSubtotal > 0 && (
                           <p className="text-[11px] text-blue-600 font-medium bg-blue-50 border border-blue-200 rounded-lg px-2 py-1.5 leading-snug">
                             ℹ️ Cupom aplicado apenas aos itens sem promoção ({formatPrice(regularSubtotal, currency)}). Itens com preço promocional não acumulam desconto.
                           </p>
