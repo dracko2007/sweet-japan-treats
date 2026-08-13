@@ -84,45 +84,33 @@ const CheckoutSandbox: React.FC = () => {
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <div className="rounded-xl border bg-card p-5 space-y-4">
-          <h3 className="font-semibold">Afiliado</h3>
-          <div className="space-y-1">
-            <Label>Código de teste</Label>
-            <Input value={affiliateCode} onChange={(e) => setAffiliateCode(e.target.value.toUpperCase())} placeholder="JUNIOR10" />
-          </div>
-          <div className="space-y-1">
-            <Label>Origem da indicação</Label>
-            <div className="flex gap-2">
-              <Button type="button" variant={affiliateSource === 'link' ? 'default' : 'outline'} onClick={() => setAffiliateSource('link')}>Link ?ref=</Button>
-              <Button type="button" variant={affiliateSource === 'code' ? 'default' : 'outline'} onClick={() => setAffiliateSource('code')}>Código no cupom</Button>
+      <div className="grid gap-6 lg:grid-cols-[0.85fr_1.15fr]">
+        <div className="space-y-6">
+          <div className="rounded-2xl border bg-card p-5 shadow-sm space-y-5">
+            <div className="flex items-center justify-between">
+              <div><h3 className="font-semibold">Afiliado de teste</h3><p className="text-xs text-muted-foreground">Configure a origem e as regras da venda.</p></div>
+              <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary">{affiliateCode || 'SEM CÓDIGO'}</span>
             </div>
+            <div className="space-y-1"><Label>Código de teste</Label><Input value={affiliateCode} onChange={(e) => setAffiliateCode(e.target.value.toUpperCase())} placeholder="JUNIOR10" /></div>
+            <div className="space-y-1"><Label>Origem da indicação</Label><div className="grid grid-cols-2 gap-2"><Button type="button" variant={affiliateSource === 'link' ? 'default' : 'outline'} onClick={() => setAffiliateSource('link')}>Link ?ref=</Button><Button type="button" variant={affiliateSource === 'code' ? 'default' : 'outline'} onClick={() => setAffiliateSource('code')}>Código</Button></div></div>
+            <div className="grid grid-cols-2 gap-3"><div className="space-y-1"><Label>Desconto (%)</Label><Input type="number" min="0" max="100" value={discountPercent} onChange={(e) => setDiscountPercent(Number(e.target.value))} /></div><div className="space-y-1"><Label>Comissão base (%)</Label><Input type="number" min="0" max="100" value={commissionPercent} onChange={(e) => setCommissionPercent(Number(e.target.value))} /></div></div>
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1"><Label>Desconto (%)</Label><Input type="number" min="0" max="100" value={discountPercent} onChange={(e) => setDiscountPercent(Number(e.target.value))} /></div>
-            <div className="space-y-1"><Label>Comissão (%)</Label><Input type="number" min="0" max="100" value={commissionPercent} onChange={(e) => setCommissionPercent(Number(e.target.value))} /></div>
+          <div className="rounded-2xl border bg-card p-5 shadow-sm space-y-4">
+            <div><h3 className="font-semibold">Metas do mês</h3><p className="text-xs text-muted-foreground">A próxima compra usa o novo nível após a meta ser atingida.</p></div>
+            <div className="grid grid-cols-2 gap-3"><div className="space-y-1"><Label>Meta Prata (¥)</Label><Input type="number" min="0" value={bronzeGoal} onChange={(e) => setBronzeGoal(Number(e.target.value))} /></div><div className="space-y-1"><Label>Meta Ouro (¥)</Label><Input type="number" min="0" value={silverGoal} onChange={(e) => setSilverGoal(Number(e.target.value))} /></div></div>
+            <div className="rounded-xl bg-secondary/50 p-3 text-sm"><div className="flex justify-between"><span>Nível atual</span><strong>{tierForRevenue(monthRevenue)} · {percentForTier(tierForRevenue(monthRevenue))}%</strong></div><div className="mt-2 h-2 overflow-hidden rounded-full bg-background"><div className="h-full rounded-full bg-primary transition-all" style={{ width: `${Math.min(100, Math.round((monthRevenue / Math.max(silverGoal, 1)) * 100))}%` }} /></div><p className="mt-2 text-xs text-muted-foreground">Vendas no mês: ¥{monthRevenue.toLocaleString()}</p></div>
           </div>
-          <p className="rounded-lg bg-muted p-3 text-xs">Link e código usam a mesma regra de comissão neste teste. A comissão é calculada sobre o lucro: produtos após desconto − custo dos produtos.</p>
         </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1"><Label>Meta Bronze (¥)</Label><Input type="number" min="0" value={bronzeGoal} onChange={(e) => setBronzeGoal(Number(e.target.value))} /></div>
-            <div className="space-y-1"><Label>Meta Prata (¥)</Label><Input type="number" min="0" value={silverGoal} onChange={(e) => setSilverGoal(Number(e.target.value))} /></div>
-          </div>
-          <p className="rounded-lg bg-muted p-3 text-xs">A porcentagem da venda usa o nível atual. Se uma compra atingir a meta, a próxima compra usa a nova porcentagem.</p>
-        <div className="rounded-xl border bg-card p-5 space-y-4">
-          <h3 className="font-semibold">Itens simulados</h3>
+        <div className="rounded-2xl border bg-card p-5 shadow-sm space-y-4">
+          <div className="flex items-center justify-between"><div><h3 className="font-semibold">Carrinho da simulação</h3><p className="text-xs text-muted-foreground">Desconto somente nos produtos sem promoção.</p></div><span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">{items.length} itens</span></div>
           {items.map((item, index) => (
-            <div key={item.name} className="rounded-lg border p-3 space-y-2">
-              <div className="flex items-center gap-3">
-                <div className="min-w-0 flex-1"><p className="text-sm font-semibold">{item.name}</p><p className="text-xs text-muted-foreground">Quantidade: {item.quantity}</p></div>
-                <label className="flex items-center gap-1 text-xs"><input type="checkbox" checked={item.discounted} onChange={(e) => setItems((current) => current.map((value, i) => i === index ? { ...value, discounted: e.target.checked } : value))} /> Promoção</label>
-              </div>
+            <div key={item.name} className="rounded-xl border p-3 space-y-2">
+              <div className="flex items-center gap-3"><div className="min-w-0 flex-1"><p className="text-sm font-semibold">{item.name}</p><p className="text-xs text-muted-foreground">Quantidade: {item.quantity}</p></div><label className="flex items-center gap-1 text-xs"><input type="checkbox" checked={item.discounted} onChange={(e) => setItems((current) => current.map((value, i) => i === index ? { ...value, discounted: e.target.checked } : value))} /> Promoção</label></div>
               <div className="grid grid-cols-2 gap-2"><Input type="number" min="0" aria-label="Preço do item" value={item.price} onChange={(e) => setItems((current) => current.map((value, i) => i === index ? { ...value, price: Number(e.target.value) } : value))} /><Input type="number" min="0" aria-label="Custo do item" value={item.cost} onChange={(e) => setItems((current) => current.map((value, i) => i === index ? { ...value, cost: Number(e.target.value) } : value))} /></div>
               <p className="text-[11px] text-muted-foreground">Preço de venda · custo usado na comissão</p>
             </div>
           ))}
-          <p className="text-xs text-blue-700">O cupom não acumula no produto promocional. O lucro e a comissão consideram todos os produtos pagos.</p>
+          <div className="rounded-xl border border-blue-200 bg-blue-50 p-3 text-xs text-blue-800">O cupom não acumula no produto promocional. O lucro e a comissão consideram todos os produtos pagos.</div>
         </div>
       </div>
 
