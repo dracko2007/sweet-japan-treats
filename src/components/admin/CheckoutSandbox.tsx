@@ -16,25 +16,38 @@ const CheckoutSandbox: React.FC = () => {
   const [affiliateCode, setAffiliateCode] = useState('JUNIOR10');
   const [discountPercent, setDiscountPercent] = useState(10);
   const [commissionPercent, setCommissionPercent] = useState(10);
+  const [bronzeGoal, setBronzeGoal] = useState(100000);
+  const [silverGoal, setSilverGoal] = useState(200000);
   const [affiliateSource, setAffiliateSource] = useState<'link' | 'code'>('link');
   const [paymentMethod, setPaymentMethod] = useState('card');
+  const [purchaseCount, setPurchaseCount] = useState(0);
+  const [monthRevenue, setMonthRevenue] = useState(0);
+  const [simulatedCommission, setSimulatedCommission] = useState(0);
   const [result, setResult] = useState('');
 
   const totals = useMemo(() => {
     const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
-    const eligibleForDiscount = items.reduce((sum, item) => (
-      !item.discounted ? sum + item.price * item.quantity : sum
-    ), 0);
+    const eligibleForDiscount = items.reduce((sum, item) => !item.discounted ? sum + item.price * item.quantity : sum, 0);
     const discount = Math.round(eligibleForDiscount * (Math.max(0, Math.min(100, discountPercent)) / 100));
     const netProducts = subtotal - discount;
     const productCost = items.reduce((sum, item) => sum + item.cost * item.quantity, 0);
     const profit = Math.max(0, netProducts - productCost);
-    const commission = Math.round(profit * (Math.max(0, Math.min(100, commissionPercent)) / 100));
-    return { subtotal, eligibleForDiscount, discount, netProducts, productCost, profit, commission, total: netProducts };
-  }, [commissionPercent, discountPercent, items]);
+    return { subtotal, eligibleForDiscount, discount, netProducts, productCost, profit, total: netProducts };
+  }, [discountPercent, items]);
+
+  const tierForRevenue = (revenue: number) => revenue > silverGoal ? 'Ouro' : revenue > bronzeGoal ? 'Prata' : 'Bronze';
+  const percentForTier = (tier: string) => tier === 'Ouro' ? commissionPercent + 10 : tier === 'Prata' ? commissionPercent + 5 : commissionPercent;
 
   const simulatePayment = () => {
-    setResult(`SIMULAÇÃO OK — ${paymentMethod.toUpperCase()} — ${affiliateSource === 'link' ? 'LINK' : 'CÓDIGO'} ${affiliateCode || '—'} — nenhum pagamento real foi enviado. Comissão pendente: ¥${totals.commission.toLocaleString()}`);
+    const tierBefore = tierForRevenue(monthRevenue);
+    const saleCommissionPercent = percentForTier(tierBefore);
+    const commission = Math.round(totals.profit * saleCommissionPercent / 100);
+    const nextRevenue = monthRevenue + totals.profit;
+    const nextTier = tierForRevenue(nextRevenue);
+    setPurchaseCount((value) => value + 1);
+    setMonthRevenue(nextRevenue);
+    setSimulatedCommission((value) => value + commission);
+    setResult(`COMPRA ${purchaseCount + 1} SIMULADA — ${paymentMethod.toUpperCase()} — ${affiliateSource === 'link' ? 'LINK' : 'CÓDIGO'} ${affiliateCode || '—'} — nível da compra: ${tierBefore} (${saleCommissionPercent}%) — comissão: ¥${commission.toLocaleString()} — próximo nível: ${nextTier}`);
   };
 
   const reset = () => {
@@ -42,9 +55,21 @@ const CheckoutSandbox: React.FC = () => {
     setAffiliateCode('JUNIOR10');
     setDiscountPercent(10);
     setCommissionPercent(10);
+    setBronzeGoal(100000);
+    setSilverGoal(200000);
     setAffiliateSource('link');
     setPaymentMethod('card');
+    setPurchaseCount(0);
+    setMonthRevenue(0);
+    setSimulatedCommission(0);
     setResult('');
+  };
+
+  const resetMonth = () => {
+    setPurchaseCount(0);
+    setMonthRevenue(0);
+    setSimulatedCommission(0);
+    setResult('NOVO MÊS SIMULADO — vendas e comissão mensal zeradas; o nível inicial volta para Bronze.');
   };
 
   return (
@@ -80,6 +105,11 @@ const CheckoutSandbox: React.FC = () => {
           <p className="rounded-lg bg-muted p-3 text-xs">Link e código usam a mesma regra de comissão neste teste. A comissão é calculada sobre o lucro: produtos após desconto − custo dos produtos.</p>
         </div>
 
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1"><Label>Meta Bronze (¥)</Label><Input type="number" min="0" value={bronzeGoal} onChange={(e) => setBronzeGoal(Number(e.target.value))} /></div>
+            <div className="space-y-1"><Label>Meta Prata (¥)</Label><Input type="number" min="0" value={silverGoal} onChange={(e) => setSilverGoal(Number(e.target.value))} /></div>
+          </div>
+          <p className="rounded-lg bg-muted p-3 text-xs">A porcentagem da venda usa o nível atual. Se uma compra atingir a meta, a próxima compra usa a nova porcentagem.</p>
         <div className="rounded-xl border bg-card p-5 space-y-4">
           <h3 className="font-semibold">Itens simulados</h3>
           {items.map((item, index) => (
@@ -100,10 +130,10 @@ const CheckoutSandbox: React.FC = () => {
         <h3 className="font-semibold flex items-center gap-2"><CreditCard className="h-4 w-4" /> Resultado do pagamento simulado</h3>
         <div className="flex flex-wrap gap-2">{['card', 'pix', 'bank', 'wise'].map((method) => <Button key={method} type="button" variant={paymentMethod === method ? 'default' : 'outline'} onClick={() => setPaymentMethod(method)}>{method.toUpperCase()}</Button>)}</div>
         <div className="grid gap-2 text-sm md:grid-cols-4"><span>Subtotal: <strong>¥{totals.subtotal.toLocaleString()}</strong></span><span>Base cupom: <strong>¥{totals.eligibleForDiscount.toLocaleString()}</strong></span><span>Desconto: <strong className="text-green-600">−¥{totals.discount.toLocaleString()}</strong></span><span>Total: <strong>¥{totals.total.toLocaleString()}</strong></span></div>
-        <div className="grid gap-2 rounded-lg bg-secondary/40 p-3 text-sm md:grid-cols-3"><span>Custo: <strong>¥{totals.productCost.toLocaleString()}</strong></span><span>Lucro líquido: <strong>¥{totals.profit.toLocaleString()}</strong></span><span>Comissão: <strong className="text-primary">¥{totals.commission.toLocaleString()}</strong></span></div>
+        <div className="grid gap-2 rounded-lg bg-secondary/40 p-3 text-sm md:grid-cols-4"><span>Custo: <strong>¥{totals.productCost.toLocaleString()}</strong></span><span>Lucro líquido: <strong>¥{totals.profit.toLocaleString()}</strong></span><span>Vendas no mês: <strong>¥{monthRevenue.toLocaleString()}</strong></span><span>Comissão acumulada: <strong className="text-primary">¥{simulatedCommission.toLocaleString()}</strong></span></div>
+        <p className="text-xs text-muted-foreground">Compra {purchaseCount + 1}: nível {tierForRevenue(monthRevenue)} ({percentForTier(tierForRevenue(monthRevenue))}%). A próxima compra muda de porcentagem depois de atingir a meta.</p>
         <p className="text-xs text-muted-foreground">A comissão é liberada depois da confirmação da entrega. Nenhuma comissão real é criada neste Sandbox.</p>
-        <div className="flex flex-wrap gap-2"><Button onClick={simulatePayment} className="gap-2"><ShieldCheck className="h-4 w-4" /> Simular pagamento</Button><Button onClick={reset} variant="outline" className="gap-2"><RotateCcw className="h-4 w-4" /> Limpar teste</Button></div>
-        {result && <p className="rounded-lg bg-green-50 p-3 text-sm font-semibold text-green-800">{result}</p>}
+        <div className="flex flex-wrap gap-2"><Button onClick={simulatePayment} className="gap-2"><ShieldCheck className="h-4 w-4" /> Simular compra</Button><Button onClick={resetMonth} variant="outline">Fechar mês / zerar</Button><Button onClick={reset} variant="outline" className="gap-2"><RotateCcw className="h-4 w-4" /> Limpar teste</Button></div>
       </div>
     </div>
   );
