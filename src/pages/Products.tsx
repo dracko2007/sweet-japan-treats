@@ -1,11 +1,12 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useParams, Link, useSearchParams } from 'react-router-dom';
-import { Search, X, SlidersHorizontal, ChevronDown, Eye, EyeOff, Menu } from 'lucide-react';
+import { Search, X, SlidersHorizontal, ChevronDown, Eye, EyeOff, Menu, ShoppingCart, ArrowRight } from 'lucide-react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import Layout from '@/components/layout/Layout';
 import CompactProductCard from '@/components/products/CompactProductCard';
 import SidebarFilters from '@/components/products/SidebarFilters';
 import { useProducts } from '@/context/ProductsContext';
+import { useCart } from '@/context/CartContext';
 import { cn } from '@/lib/utils';
 import { useLanguage } from '@/context/LanguageContext';
 import { usePagination } from '@/hooks/usePagination';
@@ -13,7 +14,8 @@ import Pagination from '@/components/Pagination';
 import { minEffectiveYen } from '@/utils/pricing';
 import { categoryService, DEFAULT_CATEGORIES, type ProductCategory } from '@/services/categoryService';
 import ItemListJsonLd from '@/components/ItemListJsonLd';
-
+import { formatPrice, getCurrencyByCountry } from '@/utils/currency';
+import { convertYen as fxConvert } from '@/services/fxService';
 const normalize = (s: string) =>
   (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 
@@ -29,7 +31,7 @@ const CATEGORY_ICONS: Record<string, string> = {
 const Products: React.FC = () => {
   const { category } = useParams<{ category?: string }>();
   const [searchParams] = useSearchParams();
-  const { t, language } = useLanguage();
+  const { t, language, selectedCountry } = useLanguage();
   const [showFiltersPanel, setShowFiltersPanel] = useState(false);
   const prefersReducedMotion = useReducedMotion();
 
@@ -85,7 +87,9 @@ const Products: React.FC = () => {
     return descs[language]?.[id] || descs['pt'][id] || '';
   };
   const { products, loading } = useProducts();
-
+  const { items: cartItems, totalItems, totalPrice } = useCart();
+  const currency = getCurrencyByCountry(selectedCountry);
+  const convertYen = (yen: number) => fxConvert(yen, currency);
   const [query,      setQuery]      = useState(searchParams.get('q') || '');
   const [sort,       setSort]       = useState<SortKey | null>(null);
   const [catFilter,  setCatFilter]  = useState<string | null>(null); // só em /todos
@@ -246,8 +250,8 @@ const Products: React.FC = () => {
           )}
 
           {/* Layout: Filtro Lateral + Grid de Produtos */}
-          <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-            {/* Filtro Lateral — Desktop (20% width) */}
+          <div className="grid grid-cols-1 lg:grid-cols-6 gap-6">
+            {/* Filtro Lateral — Desktop */}
             <div className="hidden lg:block">
               <SidebarFilters
                 categories={availableCats.map(id => allCategories.find(c => c.id === id)!).filter(Boolean)}
@@ -413,6 +417,44 @@ const Products: React.FC = () => {
                 </>
               )}
             </div>
+
+            <aside className="hidden lg:block lg:col-span-1">
+              <div className="sticky top-36 overflow-hidden rounded-2xl border border-sky-200 bg-white shadow-lg">
+                <div className="bg-gradient-to-br from-sky-400 to-cyan-500 p-4 text-white">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 font-black">
+                      <ShoppingCart className="h-5 w-5" />
+                      Seu carrinho
+                    </div>
+                    <span className="rounded-full bg-white/20 px-2 py-0.5 text-xs font-black">{totalItems}</span>
+                  </div>
+                  <p className="mt-2 text-xs text-white/80">O que você adicionou</p>
+                </div>
+                <div className="max-h-[45vh] space-y-3 overflow-y-auto p-3">
+                  {cartItems.length === 0 ? (
+                    <p className="py-6 text-center text-xs text-muted-foreground">Seu carrinho está vazio.</p>
+                  ) : cartItems.map((item) => (
+                    <div key={`${item.product.id}-${item.size}`} className="flex items-center gap-2 border-b border-slate-100 pb-2">
+                      <img src={item.product.thumbnail || item.product.image} alt="" className="h-11 w-11 rounded-lg bg-slate-50 object-contain" />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-xs font-bold text-slate-700">{item.product.name}</p>
+                        <p className="text-[11px] text-slate-500">Qtd. {item.quantity}</p>
+                      </div>
+                      <span className="text-[11px] font-black text-sky-600">{formatPrice(convertYen(item.product.prices.small * item.quantity), currency)}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="border-t border-slate-100 bg-slate-50 p-3">
+                  <div className="mb-3 flex items-center justify-between text-sm font-black text-slate-800">
+                    <span>Subtotal</span>
+                    <span>{formatPrice(convertYen(totalPrice), currency)}</span>
+                  </div>
+                  <Link to="/carrinho" className="flex items-center justify-center gap-2 rounded-xl bg-orange-500 px-3 py-2.5 text-xs font-black text-white shadow-md transition hover:bg-orange-600">
+                    Ir para o carrinho <ArrowRight className="h-4 w-4" />
+                  </Link>
+                </div>
+              </div>
+            </aside>
           </div>
         </div>
       </section>

@@ -4,7 +4,6 @@ import { Heart, Plus, Star } from 'lucide-react';
 import { Product } from '@/types';
 import { useCart } from '@/context/CartContext';
 import { useUser } from '@/context/UserContext';
-import { wishlistService } from '@/services/wishlistService';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { useLanguage } from '@/context/LanguageContext';
@@ -27,7 +26,7 @@ const formatCount = (n: number): string => {
 /** Card denso estilo Temu: só imagem, nome, preço e ações mínimas — para grades com muitos itens por linha. */
 const CompactProductCard: React.FC<CompactProductCardProps> = ({ product }) => {
   const navigate = useNavigate();
-  const { addToCart } = useCart();
+  const { addToCart, items: cartItems } = useCart();
   const { user } = useUser();
   const { toast } = useToast();
   const { selectedCountry } = useLanguage();
@@ -48,6 +47,9 @@ const CompactProductCard: React.FC<CompactProductCardProps> = ({ product }) => {
   const originalPrice = convertYen(baseYen(product, firstVariant?.id || 'small'));
   const isSoldOut = product.stock && !product.stock.unlimited && product.stock.quantity === 0;
   const name = productEnglishName(product);
+  const cartQuantity = cartItems
+    .filter((item) => item.product.id === product.id && !item.freeGift)
+    .reduce((sum, item) => sum + item.quantity, 0);
 
   const handleToggleFavorite = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -222,17 +224,22 @@ const CompactProductCard: React.FC<CompactProductCardProps> = ({ product }) => {
                 {formatPrice(originalPrice, currency)}
               </p>
             )}
-          </div>
           {!isSoldOut && (
             <button
               onClick={handleAddToCart}
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-pink-500 via-pink-600 to-fuchsia-600 text-white shadow-lg shadow-pink-500/30 transition-all duration-300 hover:scale-125 hover:-rotate-6 hover:shadow-2xl active:scale-95 group-hover:translate-y-1 group-hover:animate-bounce"
-              aria-label="Adicionar ao carrinho"
+              className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-pink-500 via-pink-600 to-fuchsia-600 text-white shadow-lg shadow-pink-500/30 transition-all duration-300 hover:scale-125 hover:-rotate-6 hover:shadow-2xl active:scale-95 group-hover:translate-y-1"
+              aria-label={cartQuantity > 0 ? `Adicionar mais — ${cartQuantity} no carrinho` : 'Adicionar ao carrinho'}
             >
               <Plus className="w-5 h-5 transition-all" />
+              {cartQuantity > 0 && (
+                <span className="absolute -right-2 -top-2 flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-white bg-orange-500 px-1 text-[10px] font-black text-white shadow-md">
+                  {cartQuantity}
+                </span>
+              )}
             </button>
           )}
         </div>
+      </div>
       </div>
     </article>
   );
