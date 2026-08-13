@@ -16,6 +16,8 @@ dist-ssr/
 .next/
 build/
 *.local
+.local/
+*.deb
 
 # TypeScript incremental build cache
 *.tsbuildinfo
