@@ -442,10 +442,6 @@ async function handleCreate(req, res) {
       await registrarTentativaFraude(db, customer, { attemptType: 'product_limit', productId: produtoBloqueado });
       throw new HttpError(409, 'promotion_limit');
     }
-    if (coupon?.affiliateCode && !coupon.affiliateProductId && cpfData?.affiliateCodes?.length) {
-      await registrarTentativaFraude(db, customer, { attemptType: 'affiliate_reuse', affiliateCode: coupon.affiliateCode });
-      throw new HttpError(409, 'affiliate_coupon_already_used');
-    }
 
     const now = new Date().toISOString();
     const trackingPrefix = country === 'Japão' ? 'JP' : country === 'Brasil' ? 'NX' : 'EX';
