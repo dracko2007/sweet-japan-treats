@@ -33,13 +33,24 @@ export default defineConfig(({ mode }) => ({
         // index.html: sempre busca da rede, usa cache só se offline
         navigationPreload: true,
         runtimeCaching: [
-          // Imagens do Firebase Storage — cache 7 dias
+          // Imagens do catálogo no Cloudinary — depois da primeira visita,
+          // o navegador entrega do cache local sem repetir o download.
+          {
+            urlPattern: /^https:\/\/res\.cloudinary\.com\/.*\.(?:avif|webp|jpe?g|png|gif)(?:\?.*)?$/i,
+            handler: "CacheFirst",
+            options: {
+              cacheName: "cloudinary-product-images",
+              expiration: { maxEntries: 500, maxAgeSeconds: 60 * 60 * 24 * 30 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+          // Imagens do Firebase Storage — cache 30 dias
           {
             urlPattern: /^https:\/\/firebasestorage\.googleapis\.com\/.*/i,
             handler: "CacheFirst",
             options: {
               cacheName: "firebase-images",
-              expiration: { maxEntries: 200, maxAgeSeconds: 60 * 60 * 24 * 7 },
+              expiration: { maxEntries: 300, maxAgeSeconds: 60 * 60 * 24 * 30 },
               cacheableResponse: { statuses: [0, 200] },
             },
           },
