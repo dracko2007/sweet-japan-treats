@@ -86,14 +86,13 @@ async function claimSocialFollow(db, user, body) {
       : {};
     if (follows[network] === true) return result(0, points, true);
 
-    // A client assertion is not evidence of a provider follow. Keep the
-    // engagement marker for UX/administration, but never mint spendable
-    // currency without a verified provider callback.
+    const total = points + SOCIAL_POINTS;
     transaction.update(userRef, {
       socialFollows: { ...follows, [network]: true },
+      points: total,
       updatedAt: new Date().toISOString(),
     });
-    return result(0, points);
+    return result(SOCIAL_POINTS, total);
   });
 }
 
