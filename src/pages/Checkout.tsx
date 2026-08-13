@@ -117,6 +117,7 @@ const Checkout: React.FC = () => {
   const [pointsToUse, setPointsToUse] = useState(0);
   const productSubtotalYen = items.reduce((s, i) => i.freeGift ? s : s + effectiveYen(i.product, i.size) * i.quantity, 0);
   const convertYen = (yen: number) => fxConvert(yen, currency);
+  const convertYenExact = (yen: number) => fxConvert(yen, currency, true);
   const maxRedeemable = canRedeem ? Math.min(availablePoints, Math.floor(productSubtotalYen / POINTS.yenPerPoint)) : 0;
   const redeemPoints = Math.max(0, Math.min(pointsToUse, maxRedeemable));
   const pointsDiscount = convertYen(redeemPoints * POINTS.yenPerPoint);
