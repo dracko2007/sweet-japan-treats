@@ -1,11 +1,13 @@
 import geo from './_handlers/geo.js';
 import productEnrich from './_handlers/product-enrich.js';
+import products from './_handlers/products.js';
 import sitemap from './_handlers/sitemap.js';
 import wiseRate from './_handlers/wise-rate.js';
 
 const HANDLERS = {
   geo,
   'product-enrich': productEnrich,
+  products,
   sitemap,
   'wise-rate': wiseRate,
 };

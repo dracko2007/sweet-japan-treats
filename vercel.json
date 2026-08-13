@@ -26,6 +26,7 @@
     { "source": "/sitemap.xml", "destination": "/api/catalog?action=sitemap" },
     { "source": "/api/geo", "destination": "/api/catalog?action=geo" },
     { "source": "/api/wise-rate", "destination": "/api/catalog?action=wise-rate" },
+    { "source": "/api/products", "destination": "/api/catalog?action=products" },
     { "source": "/api/product-enrich", "destination": "/api/catalog?action=product-enrich" },
     { "source": "/feed.xml", "destination": "/api/feed?region=br&format=xml" },
     { "source": "/feed-br.xml", "destination": "/api/feed?region=br&format=xml" },
