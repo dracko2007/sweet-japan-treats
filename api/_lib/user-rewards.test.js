@@ -101,7 +101,7 @@ beforeEach(() => {
 });
 
 describe('server-defined user rewards', () => {
-  it('awards each social network once and ignores replay', async () => {
+  it('records social engagement without minting points without provider proof', async () => {
     const db = new FakeDb({ 'users/u1': { points: 100, socialFollows: {} } });
 
     await expect(claimSocialFollow(db, user, { action: 'social-follow', network: 'instagram', points: 999999 }))
@@ -110,9 +110,9 @@ describe('server-defined user rewards', () => {
     const first = await claimSocialFollow(db, user, { action: 'social-follow', network: 'instagram' });
     const replay = await claimSocialFollow(db, user, { action: 'social-follow', network: 'instagram' });
 
-    expect(first).toEqual({ ok: true, awarded: 500, total: 600, alreadyClaimed: false });
-    expect(replay).toEqual({ ok: true, awarded: 0, total: 600, alreadyClaimed: true });
-    expect(db.get('users/u1')).toMatchObject({ points: 600, socialFollows: { instagram: true } });
+    expect(first).toEqual({ ok: true, awarded: 0, total: 100, alreadyClaimed: false });
+    expect(replay).toEqual({ ok: true, awarded: 0, total: 100, alreadyClaimed: true });
+    expect(db.get('users/u1')).toMatchObject({ points: 100, socialFollows: { instagram: true } });
   });
 
   it('derives birthday eligibility in Tokyo and awards once per year', async () => {

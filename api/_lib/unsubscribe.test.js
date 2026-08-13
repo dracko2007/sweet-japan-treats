@@ -135,10 +135,11 @@ describe('endpoint de cancelamento', () => {
     expect(res.body).toContain('cancelada');
   });
 
-  it('POST com a=on volta a inscrever', async () => {
-    await chamar('POST', { a: 'on' });
+  it('token de cancelamento não pode reativar inscrição', async () => {
+    const res = await chamar('POST', { a: 'on' });
 
-    expect(mocks.set.mock.calls[0][2]).toMatchObject({ email: CLIENTE, optedOut: false });
+    expect(res.statusCode).toBe(403);
+    expect(mocks.set).not.toHaveBeenCalled();
   });
 
   it('token inválido não grava e responde 400 em HTML', async () => {

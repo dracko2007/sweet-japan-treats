@@ -3,8 +3,11 @@ import { adminDb } from './firebase-admin.js';
 import { getHeader, HttpError } from './http.js';
 
 function clientAddress(req) {
-  const forwarded = String(getHeader(req, 'x-forwarded-for') || '').split(',')[0].trim();
-  return forwarded || req.socket?.remoteAddress || 'unknown';
+  const trustedHeader = String(process.env.TRUSTED_PROXY_IP_HEADER || '').trim().toLowerCase();
+  const trustedProxy = process.env.TRUSTED_PROXY === 'true';
+  const headerValue = trustedHeader && trustedProxy ? getHeader(req, trustedHeader) : '';
+  if (headerValue) return String(headerValue).split(',')[0].trim();
+  return String(req.socket?.remoteAddress || req.connection?.remoteAddress || 'unknown');
 }
 
 function documentId(scope, identity) {

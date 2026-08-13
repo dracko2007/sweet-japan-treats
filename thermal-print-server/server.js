@@ -15,6 +15,10 @@ escpos.Network = require('escpos-network');
 
 const config = require('./config');
 
+if (!config.authToken) {
+  throw new Error('THERMAL_PRINT_AUTH_TOKEN must be configured before starting the print server');
+}
+
 const app = express();
 
 app.use(cors({ origin: config.allowedOrigins }));

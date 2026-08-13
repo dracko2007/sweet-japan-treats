@@ -107,7 +107,7 @@ export default function ThermalPrinterSettings() {
             type="text"
             value={cfg.authToken}
             onChange={e => setCfg(c => ({ ...c, authToken: e.target.value.trim() }))}
-            placeholder="japan-express-print-token-2024"
+            placeholder="Configure o token secreto do servidor"
             className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm font-mono"
           />
           <p className="text-xs text-muted-foreground mt-1">

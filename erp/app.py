@@ -7,6 +7,7 @@ despesas e clientes integrado ao Firebase.
 Executar: streamlit run app.py
 """
 
+import os
 import streamlit as st
 import streamlit.components.v1 as components
 import pandas as pd
@@ -20,8 +21,31 @@ import io
 import requests as http_requests
 from pathlib import Path
 
+def whatsapp_request(method, url, **kwargs):
+    """Call the private WhatsApp service with its server-side bearer token."""
+    token = os.environ.get('WHATSAPP_API_TOKEN', '').strip()
+    if not token:
+        raise RuntimeError('WHATSAPP_API_TOKEN is not configured')
+    headers = dict(kwargs.pop('headers', {}) or {})
+    headers['Authorization'] = f'Bearer {token}'
+    return http_requests.request(method, url, headers=headers, **kwargs)
+
+def safe_excel_value(value):
+    if not isinstance(value, str) or not value:
+        return value
+    if value[0] in ('=', '+', '-', '@', '\t', '\r'):
+        return f"'{value}"
+    return value
+
+def safe_to_excel(frame, writer, **kwargs):
+    safe_frame = frame.copy()
+    for column in safe_frame.columns:
+        if safe_frame[column].dtype == 'object':
+            safe_frame[column] = safe_frame[column].map(safe_excel_value)
+    safe_frame.to_excel(writer, **kwargs)
+
 from firebase_service import (
-    get_firebase_db,
+    require_erp_operator,
     get_all_orders, get_all_users,
     save_expense, get_all_expenses, delete_expense,
     save_supply, get_all_supplies, delete_supply,
@@ -45,6 +69,11 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
+# =====================================================
+# AUTENTICAÇÃO DO ERP (antes de qualquer UI ou Firebase Admin)
+# =====================================================
+db = require_erp_operator()
+
 
 # =====================================================
 # CSS CUSTOMIZADO - TEMA PROFISSIONAL
@@ -156,11 +185,6 @@ st.markdown("""
     }
 </style>
 """, unsafe_allow_html=True)
-
-# =====================================================
-# INICIALIZAÇÃO DO FIREBASE
-# =====================================================
-db = get_firebase_db()
 
 # =====================================================
 # SIDEBAR - NAVEGAÇÃO
@@ -552,7 +576,7 @@ elif menu == "💰 Vendas Detalhadas":
     st.subheader("📥 Exportar Dados")
     buffer = io.BytesIO()
     with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
-        df_filtered.to_excel(writer, sheet_name='Vendas', index=False)
+        safe_to_excel(df_filtered, writer, sheet_name='Vendas', index=False)
     
     st.download_button(
         label="⬇️ Baixar Excel",
@@ -1727,37 +1751,37 @@ elif menu == "📄 Relatórios":
                 'Métrica': ['Faturamento Bruto', 'Total de Pedidos', 'Unidades Vendidas', 'Total de Despesas', 'Lucro Estimado'],
                 'Valor': [revenue, n_orders, n_units, total_expenses, revenue - total_expenses],
             }
-            pd.DataFrame(summary_data).to_excel(writer, sheet_name='Resumo', index=False)
+            safe_to_excel(pd.DataFrame(summary_data), writer, sheet_name='Resumo', index=False)
             has_data = True
             if not df_filtered.empty:
-                df_filtered.to_excel(writer, sheet_name='Vendas Detalhadas', index=False)
+                safe_to_excel(df_filtered, writer, sheet_name='Vendas Detalhadas', index=False)
             if expenses_filtered:
-                pd.DataFrame(expenses_filtered).to_excel(writer, sheet_name='Despesas', index=False)
+                safe_to_excel(pd.DataFrame(expenses_filtered), writer, sheet_name='Despesas', index=False)
         
         elif report_type == "Relatório de Vendas por Produto":
             if not df_filtered.empty:
                 by_product = df_filtered.groupby(['product', 'category']).agg(
                     revenue=('itemTotal', 'sum'), qty=('quantity', 'sum'), orders=('orderNumber', 'nunique'),
                 ).reset_index()
-                by_product.to_excel(writer, sheet_name='Por Produto', index=False)
-                df_filtered.to_excel(writer, sheet_name='Detalhado', index=False)
+                safe_to_excel(by_product, writer, sheet_name='Por Produto', index=False)
+                safe_to_excel(df_filtered, writer, sheet_name='Detalhado', index=False)
                 has_data = True
         
         elif report_type == "Relatório de Despesas":
             if expenses_filtered:
-                pd.DataFrame(expenses_filtered).to_excel(writer, sheet_name='Despesas', index=False)
+                safe_to_excel(pd.DataFrame(expenses_filtered), writer, sheet_name='Despesas', index=False)
                 has_data = True
         
         elif report_type == "Relatório de Clientes":
             users = get_all_users(db)
             if users:
-                pd.DataFrame(users).to_excel(writer, sheet_name='Clientes', index=False)
+                safe_to_excel(pd.DataFrame(users), writer, sheet_name='Clientes', index=False)
                 has_data = True
         
         elif report_type == "Relatório de Estoque":
             stock = get_all_stock(db)
             if stock:
-                pd.DataFrame(stock).to_excel(writer, sheet_name='Estoque', index=False)
+                safe_to_excel(pd.DataFrame(stock), writer, sheet_name='Estoque', index=False)
                 has_data = True
     
     if has_data:
@@ -1931,7 +1955,7 @@ elif menu == "📦 Gestão de Pedidos":
                             wa_payload['carrier'] = selected_order.get('carrier', '')
                         
                         whatsapp_api_url = get_whatsapp_api_url(db)
-                        wa_response = http_requests.post(f'{whatsapp_api_url}/api/send-order-notification', json=wa_payload, timeout=10)
+                        wa_response = whatsapp_request('POST', f'{whatsapp_api_url}/api/send-order-notification', json=wa_payload, timeout=10)
                         if wa_response.status_code == 200:
                             status_labels = {
                                 'processing': '🔄 Processando',
@@ -1981,7 +2005,7 @@ elif menu == "📦 Gestão de Pedidos":
                     if customer_phone:
                         try:
                             whatsapp_api_url = get_whatsapp_api_url(db)
-                            wa_response = http_requests.post(f'{whatsapp_api_url}/api/send-order-notification', json={
+                            wa_response = whatsapp_request('POST', f'{whatsapp_api_url}/api/send-order-notification', json={
                                 'phone': customer_phone,
                                 'orderNumber': selected_order.get('orderNumber', ''),
                                 'customerName': selected_order.get('customerName', ''),
@@ -2550,7 +2574,7 @@ elif menu == "📱 WhatsApp":
     # Helper function to check WhatsApp service
     def get_wa_status():
         try:
-            r = http_requests.get(f"{WHATSAPP_API}/api/status", timeout=5)
+            r = whatsapp_request('GET', f"{WHATSAPP_API}/api/status", timeout=5)
             return r.json()
         except:
             return None
@@ -2601,7 +2625,7 @@ elif menu == "📱 WhatsApp":
             
             if st.button("🔌 Desconectar WhatsApp", type="secondary"):
                 try:
-                    http_requests.post(f"{WHATSAPP_API}/api/disconnect", timeout=10)
+                    whatsapp_request('POST', f"{WHATSAPP_API}/api/disconnect", timeout=10)
                     st.warning("WhatsApp desconectado. Será necessário escanear o QR Code novamente.")
                     st.rerun()
                 except:
@@ -2618,7 +2642,7 @@ elif menu == "📱 WhatsApp":
             """)
             
             try:
-                qr_data = http_requests.get(f"{WHATSAPP_API}/api/qrcode", timeout=5).json()
+                qr_data = whatsapp_request('GET', f"{WHATSAPP_API}/api/qrcode", timeout=5).json()
                 if qr_data.get('qrCode'):
                     # Display QR Code using st.image (more reliable than components.html)
                     import base64 as b64_module
@@ -2654,7 +2678,7 @@ elif menu == "📱 WhatsApp":
             st.warning("WhatsApp desconectado.")
             if st.button("🔄 Reconectar", use_container_width=True):
                 try:
-                    http_requests.post(f"{WHATSAPP_API}/api/restart", timeout=10)
+                    whatsapp_request('POST', f"{WHATSAPP_API}/api/restart", timeout=10)
                     st.info("Reconectando... Aguarde e recarregue a página.")
                 except:
                     st.error("Erro ao reconectar.")
@@ -2675,7 +2699,7 @@ elif menu == "📱 WhatsApp":
             if st.button("📤 Enviar", type="primary", use_container_width=True):
                 if phone_input and msg_input:
                     try:
-                        resp = http_requests.post(f"{WHATSAPP_API}/api/send", json={
+                        resp = whatsapp_request('POST', f"{WHATSAPP_API}/api/send", json={
                             'phone': phone_input,
                             'message': msg_input
                         }, timeout=30)
@@ -2718,7 +2742,7 @@ elif menu == "📱 WhatsApp":
                                         'quantity': item.get('quantity', 1),
                                     })
                                 
-                                resp = http_requests.post(f"{WHATSAPP_API}/api/send-order-notification", json={
+                                resp = whatsapp_request('POST', f"{WHATSAPP_API}/api/send-order-notification", json={
                                     'phone': sel_order.get('customerPhone', ''),
                                     'orderNumber': sel_order.get('orderNumber', ''),
                                     'customerName': sel_order.get('customerName', ''),
@@ -2755,7 +2779,7 @@ elif menu == "📱 WhatsApp":
                                 if tracking_input:
                                     payload['trackingNumber'] = tracking_input
                                 
-                                resp = http_requests.post(f"{WHATSAPP_API}/api/send-order-notification", json=payload, timeout=30)
+                                resp = whatsapp_request('POST', f"{WHATSAPP_API}/api/send-order-notification", json=payload, timeout=30)
                                 result = resp.json()
                                 if result.get('success'):
                                     st.success("✅ Atualização enviada via WhatsApp!")
@@ -2769,7 +2793,7 @@ elif menu == "📱 WhatsApp":
                             value=f"🏮 *Japan Express*\n\nOlá {sel_order.get('customerName', '')}!\n\n")
                         if st.button("📤 Enviar Mensagem", type="primary", use_container_width=True):
                             try:
-                                resp = http_requests.post(f"{WHATSAPP_API}/api/send", json={
+                                resp = whatsapp_request('POST', f"{WHATSAPP_API}/api/send", json={
                                     'phone': sel_order.get('customerPhone', ''),
                                     'message': custom_msg,
                                 }, timeout=30)
@@ -2875,7 +2899,7 @@ _Japan Express_"""
         st.subheader("📋 Histórico de Mensagens")
         
         try:
-            log_resp = http_requests.get(f"{WHATSAPP_API}/api/messages", timeout=5)
+            log_resp = whatsapp_request('GET', f"{WHATSAPP_API}/api/messages", timeout=5)
             log_data = log_resp.json()
             messages = log_data.get('messages', [])
             

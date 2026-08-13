@@ -14,12 +14,20 @@ if not exist "erp\whatsapp-service" (
     exit /b
 )
 
-:: 2. Iniciar Serviço de WhatsApp
-echo [1/3] Iniciando o Serviço do WhatsApp...
+:: 3. Exigir segredo fora do repositório antes de publicar o serviço
+if "%WHATSAPP_API_TOKEN%"=="" (
+    echo [ERRO] WHATSAPP_API_TOKEN não configurado.
+    echo Defina um token aleatório apenas no ambiente local antes de iniciar.
+    pause
+    exit /b
+)
+
+:: 4. Iniciar Serviço de WhatsApp
+echo [1/4] Iniciando o Serviço do WhatsApp...
 start "WhatsApp Service" cmd /k "cd erp\whatsapp-service && npm run start"
 
-:: 3. Iniciar Túnel ngrok
-echo [2/3] Iniciando o Túnel ngrok na porta 3001...
+:: 5. Iniciar Túnel ngrok
+echo [2/4] Iniciando o Túnel ngrok na porta 3001...
 start "ngrok Tunnel" cmd /k "C:\Users\VAIO\AppData\Local\ngrok\ngrok.exe http 3001"
 
 :: 4. Aguardar inicialização e buscar URL

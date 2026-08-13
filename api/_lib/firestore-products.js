@@ -1,8 +1,14 @@
-// Leitura pública do catálogo de produtos via REST do Firestore (mesmo caminho
-// que o site usa no client). Compartilhado entre sitemap.js e merchant-feed.js —
-// não duplicar este parser em cada endpoint.
+// Leitura server-side do catálogo. O Admin SDK reads private product
+// documents, then this module projects only public fields.
+import { adminDb } from './firebase-admin.js';
 
-const FIREBASE_PROJECT_ID = process.env.FIREBASE_PROJECT_ID || '';
+const PUBLIC_FIELDS = [
+  'sku', 'gtin', 'name', 'description', 'category', 'prices', 'variants',
+  'image', 'thumbnail', 'gallery', 'video', 'videoCover', 'flavor',
+  'deliveryRestrict', 'origin', 'discountPercent', 'i18n', 'weightGrams',
+  'tags', 'featured', 'featuredAt', 'heroCarousel', 'heroCarouselAt',
+  'isNew', 'salesCount', 'rating', 'stock', 'promoGift',
+];
 
 export function parseValue(v) {
   if ('stringValue' in v) return v.stringValue;
@@ -27,22 +33,16 @@ export function escapeXml(s) {
 }
 
 export async function fetchProducts() {
-  if (!FIREBASE_PROJECT_ID) throw new Error('FIREBASE_PROJECT_ID não configurado');
-  const base = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/products?pageSize=300`;
-  const all = [];
-  let pageToken = '';
-  do {
-    const url = pageToken ? `${base}&pageToken=${pageToken}` : base;
-    const res = await fetch(url);
-    if (!res.ok) throw new Error('Firestore read failed: ' + res.status);
-    const data = await res.json();
-    (data.documents || []).forEach(doc => {
-      const id = doc.name.split('/').pop();
-      all.push({ id, ...parseFields(doc.fields || {}) });
-    });
-    pageToken = data.nextPageToken || '';
-  } while (pageToken);
-  return all;
+  const snapshot = await adminDb().collection('products').get();
+  return snapshot.docs.flatMap((document) => {
+    const data = document.data() || {};
+    if (data.hidden === true || data.__deleted === true) return [];
+    const product = { id: document.id };
+    for (const field of PUBLIC_FIELDS) {
+      if (data[field] !== undefined) product[field] = data[field];
+    }
+    return [product];
+  });
 }
 
 // Catálogo internacional: some produtos só podem ser entregues dentro do Japão

@@ -31,6 +31,7 @@ export default function WhatsAppSettings() {
     if (cfg.enabled) check();
   }
 
+
   async function sendTest() {
     if (!testPhone.trim()) {
       toast({ title: 'Informe um número', description: 'Digite um telefone para o teste.', variant: 'destructive' });
@@ -87,19 +88,6 @@ export default function WhatsAppSettings() {
           </p>
         </div>
 
-        <div>
-          <label className="text-sm font-semibold block mb-1">Token de autenticação</label>
-          <input
-            type="text"
-            value={cfg.authToken}
-            onChange={e => setCfg(c => ({ ...c, authToken: e.target.value.trim() }))}
-            placeholder="japan-express-whatsapp-token-2024"
-            className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm font-mono"
-          />
-          <p className="text-xs text-muted-foreground mt-1">
-            Igual ao <code>authToken</code> do <code>config.js</code> do servidor.
-          </p>
-        </div>
       </div>
 
       {/* Status */}
@@ -121,25 +109,13 @@ export default function WhatsAppSettings() {
         ) : status?.online === false ? (
           <>
             <WifiOff className="w-4 h-4 text-red-500" />
-            <span className="text-sm text-red-600 dark:text-red-400 font-medium">Servidor não encontrado — verifique se está rodando</span>
+            <span className="text-sm text-red-600 dark:text-red-400 font-medium">Controle direto desativado — use o ERP autenticado para operar o WhatsApp.</span>
           </>
         ) : (
           <span className="text-sm text-muted-foreground">Status desconhecido</span>
         )}
       </div>
 
-      {/* Link do QR */}
-      {status?.online && !status?.ready && (
-        <a
-          href={`${cfg.serverUrl}/qr`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-green-600 text-white text-sm font-medium hover:bg-green-700"
-        >
-          <QrCode className="w-4 h-4" />
-          Abrir QR code para parear
-        </a>
-      )}
 
       {/* Ações */}
       <div className="flex flex-wrap gap-3">
@@ -175,7 +151,7 @@ export default function WhatsAppSettings() {
           <li>Copie a pasta <code>whatsapp-server</code> do projeto para o PC do operador</li>
           <li>Execute <code>npm install</code> e depois <code>npm start</code></li>
           <li>Escaneie o QR code <strong>uma vez</strong> com o WhatsApp da loja (a sessão fica salva)</li>
-          <li>Configure a URL e o token aqui acima e clique em Salvar</li>
+          <li>Configure a URL do serviço no ERP autenticado e opere o WhatsApp por lá</li>
         </ol>
         <p className="text-xs text-amber-700 dark:text-amber-400 mt-2">
           ⚠️ Use um número dedicado da loja. Envie só mensagens de status do pedido para evitar bloqueio.

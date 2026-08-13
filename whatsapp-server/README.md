@@ -20,15 +20,21 @@ npm install
 
 ## Iniciar
 
+Configure um segredo forte somente no ambiente do operador antes de iniciar
+(ele não deve ser salvo no repositório):
+
 ```bash
+export WHATSAPP_AUTH_TOKEN='<segredo-gerado-fora-do-repositório>'
 npm start
 ```
 
-Na **primeira vez**, um QR code aparece no terminal. Escaneie com o WhatsApp da loja:
+Sem `WHATSAPP_AUTH_TOKEN`, o servidor não inicia. Na **primeira vez**, um QR
+code aparece no terminal. Escaneie com o WhatsApp da loja:
 
 > WhatsApp → ⋮ (menu) → **Aparelhos conectados** → **Conectar um aparelho**
 
-Também pode abrir `http://localhost:3220/qr` no navegador para ver o QR.
+Também pode abrir `http://localhost:3220/qr` no navegador, informando o token
+no painel admin, para ver o QR.
 
 Depois de conectar, aparece `✅ Pronto!` e a sessão fica salva. Pode fechar o
 terminal e reabrir com `npm start` — não pede QR de novo.
@@ -55,11 +61,9 @@ pm2 stop japan-whatsapp     # parar
 
 ## Configurar no painel admin
 
-No site: **Admin → Configurações → WhatsApp**
-- Ativar: ✅
-- URL do servidor: `http://localhost:3220`
-- Token: o mesmo de `config.js` (`authToken`)
-
+O controle direto pelo navegador está desativado para não expor o segredo.
+Use o ERP autenticado para operar o serviço. Clientes de servidor devem enviar
+`Authorization: Bearer ...` com o valor configurado em `WHATSAPP_AUTH_TOKEN`.
 ## ⚠️ Aviso importante
 
 O `whatsapp-web.js` usa o WhatsApp Web de forma **não-oficial**. Use um número
@@ -71,5 +75,5 @@ Enviar spam pode levar ao bloqueio do número pelo WhatsApp.
 | Método | Rota             | Descrição                                  |
 |--------|------------------|--------------------------------------------|
 | GET    | `/health`        | Status (online + conectado). Requer token. |
-| GET    | `/qr`            | Página com o QR code para parear.          |
+| GET    | `/qr`            | Página com o QR code para parear. Requer token. |
 | POST   | `/send-message`  | `{ phone, message }`. Requer token.        |

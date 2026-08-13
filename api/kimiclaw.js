@@ -163,11 +163,12 @@ calculadora de frete do site — nunca tente calcular de cabeça, mesmo que pare
 Responda de forma direta, técnica e completa. Pode usar mais de 4 frases quando a pergunta for complexa.`;
 
 export default async function handler(req, res) {
-  // ---------- Verificação de origem ----------
-  const origin = req.headers['origin'] || '';
-  const isAllowedOrigin = VALID_ORIGINS.some((o) => origin.startsWith(o));
+  // Only exact configured origins are trusted; prefix matching lets
+  // attacker-controlled lookalike hosts pass the CORS gate.
+  const origin = String(req.headers['origin'] || '');
+  const isAllowedOrigin = !origin || VALID_ORIGINS.includes(origin);
 
-  if (origin && !isAllowedOrigin) {
+  if (!isAllowedOrigin) {
     res.status(403).json({ error: 'Origem não autorizada' });
     return;
   }
@@ -189,11 +190,8 @@ export default async function handler(req, res) {
     return;
   }
 
-  // ---------- Rate limiting por IP ----------
-  const ip =
-    req.headers['x-forwarded-for']?.split(',')[0]?.trim() ||
-    req.socket?.remoteAddress ||
-    'unknown';
+  // Never trust caller-controlled forwarding headers for quota identity.
+  const ip = req.socket?.remoteAddress || 'unknown';
 
   if (!checkRateLimit(ip)) {
     res.status(429).json({ error: 'Muitas requisições. Aguarde um momento.' });
@@ -213,6 +211,11 @@ export default async function handler(req, res) {
   if (groqKey) providers.push({ name: 'groq', url: GROQ_API_URL, key: groqKey, models: GROQ_MODELS });
 
   try {
+    const rawBody = typeof req.body === 'string' ? req.body : JSON.stringify(req.body || {});
+    if (Buffer.byteLength(rawBody, 'utf8') > 64 * 1024) {
+      res.status(413).json({ error: 'request_too_large' });
+      return;
+    }
     const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
 
     // Limita histórico e catálogo para controlar uso de tokens. 12 turnos (~2k
@@ -220,7 +223,12 @@ export default async function handler(req, res) {
     // dentro da janela por várias perguntas de acompanhamento.
     const history = Array.isArray(body.messages) ? body.messages.slice(-12) : [];
     const catalog = Array.isArray(body.catalog) ? body.catalog.slice(0, 60) : [];
-    const locale = body.locale || { country: 'Brasil', currencyCode: 'BRL', currencySymbol: 'R$' };
+    const rawLocale = body.locale && typeof body.locale === 'object' ? body.locale : {};
+    const locale = {
+      country: typeof rawLocale.country === 'string' ? rawLocale.country.slice(0, 64) : 'Brasil',
+      currencyCode: typeof rawLocale.currencyCode === 'string' ? rawLocale.currencyCode.slice(0, 12) : 'BRL',
+      currencySymbol: typeof rawLocale.currencySymbol === 'string' ? rawLocale.currencySymbol.slice(0, 8) : 'R$',
+    };
 
     // isAdmin é determinado pelo servidor via Firebase token — body.isAdmin é ignorado.
     // O cliente envia o token no header x-firebase-token; o servidor verifica e confere
@@ -242,8 +250,9 @@ export default async function handler(req, res) {
 
     const adminCatalog = isAdmin && Array.isArray(body.adminCatalog) ? body.adminCatalog.slice(0, 80) : [];
 
-    // Sanitiza textos de entrada (remove tags HTML para evitar prompt injection)
+    // Remove markup and bound every user-controlled prompt field.
     const sanitize = (s) => typeof s === 'string' ? s.replace(/<[^>]*>/g, '').slice(0, 500) : '';
+    const field = (s, max = 160) => sanitize(s).slice(0, max);
     const safeHistory = history.map((m) => ({
       role: m.role === 'assistant' ? 'assistant' : 'user',
       content: sanitize(m.content),
@@ -259,28 +268,32 @@ export default async function handler(req, res) {
     systemContent += `\n\nCONTEXTO: ${isAdmin ? 'o administrador está consultando para' : 'o cliente está comprando para'} **${locale.country}** (moeda ${locale.currencyCode}). O site já exibe todos os preços e fretes convertidos automaticamente pra essa moeda — você nunca precisa escrever, converter ou estimar nenhum valor, isso já está resolvido pelo sistema.`;
 
     if (isAdmin && adminCatalog.length) {
-      // Admin: catálogo completo com custo, peso e status oculto
       const lines = adminCatalog
         .map((p) => {
-          const promo = p.discount ? ` (-${p.discount}%)` : '';
-          const cost = p.costYen ? ` | Custo: ¥${p.costYen}` : '';
+          const promo = p.discount ? ` (-${field(p.discount, 24)}%)` : '';
+          const cost = p.costYen ? ` | Custo: ¥${field(p.costYen, 24)}` : '';
           const wt = p.weightGrams
-            ? ` | Peso: ${p.weightGrams.small}g (P) / ${p.weightGrams.large}g (G)`
+            ? ` | Peso: ${field(p.weightGrams.small, 16)}g (P) / ${field(p.weightGrams.large, 16)}g (G)`
             : '';
           const hidden = p.hidden ? ' [OCULTO]' : '';
-          return `- [${p.id}] ${p.name} [${p.category}] ¥${p.priceYen}${promo}${cost}${wt}${hidden}`;
+          return `- [${field(p.id, 120)}] ${field(p.name)} [${field(p.category, 80)}] ¥${field(p.priceYen, 24)}${promo}${cost}${wt}${hidden}`;
         })
         .join('\n');
       systemContent += `\n\nCATÁLOGO ADMIN COMPLETO (${adminCatalog.length} itens, inclui ocultos):\n${lines}\n\nOs preços/custos acima são só para sua análise interna. NUNCA escreva o ID de um produto (o código entre colchetes) na resposta visível — ele não é um link, o admin não entende esse formato; IDs só podem aparecer depois de ||| na tag abaixo. Toda vez que citar, recomendar ou responder um pedido de link/foto/preço de um produto — inclusive follow-ups tipo "manda o link desse" sobre algo já mencionado antes — cite o ID pela tag |||PRODUCT_IDS ao final da resposta (mesmo formato do catálogo de cliente) em vez de repetir preço/ID em texto; o card exibido já mostra o valor real, a foto e o botão de ação. Se o produto mencionado antes não estiver na lista de IDs acima, diga que precisa buscar de novo — nunca invente um ID.`;
     } else if (catalog.length) {
       const lines = catalog
         .map((p) => {
-          const promo = p.discount ? ` (-${p.discount}%)` : '';
-          const wt = p.approxWeightGrams ? ` | ~${p.approxWeightGrams}g` : '';
-          return `- [${p.id}] ${p.name} [${p.category}] ¥${p.priceYen}${promo}${wt}`;
+          const promo = p.discount ? ` (-${field(p.discount, 24)}%)` : '';
+          const wt = p.approxWeightGrams ? ` | ~${field(p.approxWeightGrams, 16)}g` : '';
+          return `- [${field(p.id, 120)}] ${field(p.name)} [${field(p.category, 80)}] ¥${field(p.priceYen, 24)}${promo}${wt}`;
         })
         .join('\n');
       systemContent += `\n\nCATÁLOGO ATUAL DA LOJA (${catalog.length} itens — use SOMENTE isto para dizer o que existe). O código entre colchetes no início de cada linha é o ID único do produto:\n${lines}\n\nOs preços em ¥ acima são só para sua referência interna (ex.: julgar se algo é "mais em conta") — NUNCA copie, escreva ou converta esse número na sua resposta. NUNCA escreva o ID de um produto (o código entre colchetes) na resposta visível — ele NÃO é um link e o cliente não entende esse formato; IDs só podem aparecer depois de ||| na tag abaixo. REGRA DE LINK/RECOMENDAÇÃO: toda vez que citar, recomendar, comparar, ou responder um pedido de link/foto/preço de um ou mais produtos do catálogo — inclusive quando o cliente pede de novo ("manda o link", "qual o link desse", "manda a foto", "e o preço?") de algo já mencionado antes na conversa — adicione AO FINAL da sua resposta (em uma única linha, nunca no meio do texto) a tag |||PRODUCT_IDS: seguida dos IDs exatos (os que estão entre colchetes acima) separados por vírgula, sem espaços, máximo 5. Ex.: "Encontrei o Shampoo X e o Condicionador Y! |||PRODUCT_IDS: shampoo-x,cond-y". A parte depois de ||| é ocultada do cliente e vira automaticamente, para CADA produto, um card clicável separado com foto, nome, preço real e botão de adicionar ao carrinho — por isso a resposta em texto deve ser SÓ uma frase curta de introdução, sem repetir nome, preço ou descrição de cada item (os cards já separam item por item, isso não precisa estar no texto). Se algum produto mencionado antes na conversa não aparecer na lista de IDs acima, diga que precisa buscar de novo pelo nome — NUNCA invente ou reaproveite um ID de memória. Se você não recomendar nenhum produto específico do catálogo, NÃO inclua a tag.`;
+    }
+
+    if (systemContent.length > 100_000) {
+      res.status(413).json({ error: 'prompt_too_large' });
+      return;
     }
 
     const baseMessages = [{ role: 'system', content: systemContent }, ...safeHistory];

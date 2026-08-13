@@ -19,6 +19,19 @@ export async function requireUser(req) {
   }
 }
 
+/**
+ * Require an identity with a verified, non-empty e-mail address. Firebase
+ * anonymous users and accounts that have not completed e-mail verification
+ * must not be used for e-mail-bound ownership or rewards.
+ */
+export async function requireVerifiedUser(req) {
+  const user = await requireUser(req);
+  if (user.email_verified !== true || typeof user.email !== 'string' || !user.email.trim()) {
+    throw new HttpError(403, 'verified_email_required');
+  }
+  return user;
+}
+
 
 function configuredSuperAdminEmail() {
   return String(process.env.ADMIN_EMAIL || process.env.VITE_ADMIN_EMAIL || '').trim().toLowerCase();
@@ -48,24 +61,9 @@ function sameSecret(left, right) {
 
 export async function requireAdmin(req) {
   const user = await requireUser(req);
-  const adminRole = Number(user.adminRole);
-  const hasAdminClaim =
-    user.admin === true ||
-    user.role === 'admin' ||
-    user.adminRole === 'admin' ||
-    [1, 2, 3].includes(adminRole);
-  if (hasAdminClaim) {
-    return user;
-  }
 
-  // Bootstrap: super-admin reconhecido pelo e-mail verificado no próprio token,
-  // sem depender de custom claims pré-configuradas (mesma regra do firestore.rules).
-  // Sem ADMIN_EMAIL a branch é só pulada em vez de derrubar a requisição: admin
-  // já gravado em `admins/{uid}` não depende dessa env var para entrar.
-  const superEmail = configuredSuperAdminEmail();
-  if (superEmail && user.email_verified === true && String(user.email || '').toLowerCase() === superEmail) {
-    return user;
-  }
+  // Claims and email are not sufficient: storage and Firestore rules use the
+  // same active admins/{uid} record, so revocation is immediate everywhere.
 
   try {
     const byUid = await adminDb().collection('admins').doc(user.uid).get();

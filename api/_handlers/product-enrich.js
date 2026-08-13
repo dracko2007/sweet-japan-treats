@@ -4,7 +4,7 @@
 // 3. Usa Groq para manter nome em inglês e traduzir somente a descrição.
 // 4. Sem marketplace: AI estima o preço com base no próprio conhecimento.
 // Preço de venda = custo de aquisição × 1.5 (50% de markup).
-
+import { requireAdmin } from '../_lib/auth.js';
 const RAKUTEN_APP_ID = process.env.RAKUTEN_APP_ID || '';
 const YAHOO_APP_ID   = process.env.YAHOO_APP_ID || ''; // Yahoo! Shopping Client ID
 const GROQ_API_KEY   = process.env.GROQ_API_KEY || '';
@@ -803,20 +803,22 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') { res.status(204).end(); return; }
   if (req.method !== 'POST')    { res.status(405).json({ error: 'Method not allowed' }); return; }
 
-  const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim()
-    || req.socket?.remoteAddress || 'unknown';
-  if (!checkRateLimit(ip)) {
+  let admin;
+  try {
+    admin = await requireAdmin(req);
+  } catch (error) {
+    const status = Number(error?.statusCode) || 401;
+    res.status(status).json({ error: status === 403 ? 'Acesso restrito a administradores.' : 'Não autenticado.' });
+    return;
+  }
+
+  const ip = req.socket?.remoteAddress || 'unknown';
+  if (!checkRateLimit(admin.uid || ip)) {
     res.status(429).json({ error: 'Muitas requisições. Aguarde um momento.' });
     return;
   }
 
   const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
-
-  // Barreira básica: apenas sessões admin chamam este endpoint
-  if (body.isAdmin !== true) {
-    res.status(403).json({ error: 'Acesso restrito a administradores.' });
-    return;
-  }
 
   const productName = typeof body.productName === 'string'
     ? body.productName.trim().slice(0, 200) : '';

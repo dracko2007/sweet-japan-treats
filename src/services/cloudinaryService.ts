@@ -3,10 +3,6 @@
 import { storage } from '@/config/firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
-const CLOUD_NAME = 'dw4j4tpub';
-const UPLOAD_PRESET = 'japanexpress';
-const UPLOAD_URL = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`;
-const UPLOAD_URL_VIDEO = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/video/upload`;
 
 // Data URL → Blob sem passar pelo `fetch`.
 //
@@ -187,38 +183,10 @@ export const cloudinaryService = {
       try {
         return await uploadToFirebase(blob, folder);
       } catch (e) {
-        console.warn('Firebase Storage indisponível, tentando Cloudinary:', e);
+        console.warn('Firebase Storage indisponível; upload cancelado porque o fallback Cloudinary sem assinatura está desativado.', e);
       }
     }
 
-    // 2) Cloudinary (fallback)
-    if (blob) {
-      // 1) Cloudinary
-      try {
-        const form = new FormData();
-        form.append('file', blob);
-        form.append('upload_preset', UPLOAD_PRESET);
-        form.append('folder', folder);
-        const response = await fetch(UPLOAD_URL, { method: 'POST', body: form });
-        if (response.ok) {
-          const data = await response.json();
-          // Guarda a master limpa. A qualidade de entrega é decidida por
-          // `cdnImage` no momento do render, não congelada na URL.
-          return data.secure_url as string;
-        }
-        const err = await response.json().catch(() => ({}));
-        motivos.push(`Cloudinary ${response.status}: ${err?.error?.message || 'sem detalhe'}`);
-      } catch (e) {
-        motivos.push(`Cloudinary inacessível (${e instanceof Error ? e.message : String(e)})`);
-      }
-
-      // 2) Fallback: Firebase Storage
-      try {
-        return await uploadToFirebase(blob, folder);
-      } catch (e) {
-        motivos.push(`Firebase Storage: ${e instanceof Error ? e.message : String(e)}`);
-      }
-    }
 
     // Aqui existia um terceiro nível que salvava a imagem em base64 dentro do
     // próprio documento do Firestore, "para o produto nunca deixar de salvar".
@@ -233,23 +201,9 @@ export const cloudinaryService = {
   },
 
   async uploadVideoFile(file: File, folder: string): Promise<string> {
-    try {
-      const form = new FormData();
-      form.append('file', file);
-      form.append('upload_preset', UPLOAD_PRESET);
-      form.append('folder', folder);
-      const response = await fetch(UPLOAD_URL_VIDEO, { method: 'POST', body: form });
-      if (response.ok) {
-        const data = await response.json();
-        return data.secure_url as string;
-      }
-      const err = await response.json().catch(() => ({}));
-      console.warn(`Cloudinary vídeo indisponível (${response.status}): ${err?.error?.message}. Tentando Firebase Storage.`);
-    } catch (e) {
-      console.warn('Cloudinary vídeo offline, tentando Firebase Storage:', e);
-    }
-
-    // Fallback: Firebase Storage (sem último recurso base64 — vídeo é grande demais para o Firestore)
+    // Unsigned browser uploads are disabled. Firebase Storage is protected by
+    // Firebase Auth/rules; provider credentials and signed Cloudinary
+    // parameters must be issued by a server endpoint when re-enabled.
     return uploadVideoToFirebase(file, folder);
   },
 };

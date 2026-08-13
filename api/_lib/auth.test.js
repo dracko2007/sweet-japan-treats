@@ -109,32 +109,39 @@ describe('requireAdmin', () => {
     }
   });
 
-  it('retorna user se tem claims admin mesmo sem ADMIN_EMAIL configurado', async () => {
+  it('rejeita claims admin sem registro ativo, pois o token pode ter sido revogado', async () => {
     const req = {
       headers: { authorization: 'Bearer fake-token' },
     };
     const user = {
       uid: 'admin456',
       email: 'admin@internal.com',
-      admin: true, // Já tem claim admin
+      admin: true,
       role: 'admin',
       adminRole: 0,
     };
     mocks.verifyIdToken.mockResolvedValue(user);
     const auth = { verifyIdToken: mocks.verifyIdToken };
     mocks.getAuthMock.mockReturnValue(auth);
+    const db = {
+      collection: vi.fn().mockReturnValue({
+        doc: vi.fn().mockReturnValue({
+          get: vi.fn().mockResolvedValue({ exists: false }),
+        }),
+      }),
+    };
+    mocks.getDbMock.mockReturnValue(db);
 
-    const result = await requireAdmin(req);
-    expect(result).toEqual(user);
-    // Nunca consulta Firebase quando tem claim admin
-    expect(mocks.getDbMock).not.toHaveBeenCalled();
+    await expect(requireAdmin(req)).rejects.toMatchObject({
+      statusCode: 403,
+      code: 'forbidden',
+    });
+    expect(mocks.getDbMock).toHaveBeenCalled();
   });
 
-  it('reconhece super-admin via e-mail verificado quando ADMIN_EMAIL está configurado', async () => {
+  it('rejeita super-admin por e-mail sem registro ativo', async () => {
     process.env.ADMIN_EMAIL = 'paula@store.com';
-    const req = {
-      headers: { authorization: 'Bearer fake-token' },
-    };
+    const req = { headers: { authorization: 'Bearer fake-token' } };
     const user = {
       uid: 'paula-uid',
       email: 'paula@store.com',
@@ -144,13 +151,13 @@ describe('requireAdmin', () => {
       adminRole: 0,
     };
     mocks.verifyIdToken.mockResolvedValue(user);
-    const auth = { verifyIdToken: mocks.verifyIdToken };
-    mocks.getAuthMock.mockReturnValue(auth);
-
-    const result = await requireAdmin(req);
-    expect(result).toEqual(user);
-    // Bootstrap via e-mail, não consulta banco
-    expect(mocks.getDbMock).not.toHaveBeenCalled();
+    mocks.getAuthMock.mockReturnValue({ verifyIdToken: mocks.verifyIdToken });
+    mocks.getDbMock.mockReturnValue({
+      collection: vi.fn().mockReturnValue({
+        doc: vi.fn().mockReturnValue({ get: vi.fn().mockResolvedValue({ exists: false }) }),
+      }),
+    });
+    await expect(requireAdmin(req)).rejects.toMatchObject({ statusCode: 403, code: 'forbidden' });
   });
 
   it('consulta admins/{uid} se nenhuma das branches anteriores concedeu', async () => {

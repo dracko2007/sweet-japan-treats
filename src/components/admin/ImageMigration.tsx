@@ -5,6 +5,7 @@ import { useProducts } from '@/context/ProductsContext';
 import { productService } from '@/services/productService';
 import { cloudinaryService, cdnOriginal } from '@/services/cloudinaryService';
 import { Product } from '@/types';
+import { authenticatedFetch } from '@/services/authenticatedFetch';
 
 const CONCURRENCY = 3;
 
@@ -217,11 +218,11 @@ const ImageMigration: React.FC = () => {
         const timer = window.setTimeout(() => controller.abort(), 30000);
         let response: Response;
         try {
-          response = await fetch('/api/product-enrich', {
+          response = await authenticatedFetch('/api/product-enrich', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             signal: controller.signal,
-            body: JSON.stringify({ productName: p.name, isAdmin: true, fields: { images: true, description: false, price: false, weight: false } }),
+            body: JSON.stringify({ productName: p.name, fields: { images: true, description: false, price: false, weight: false } }),
           });
         } finally {
           window.clearTimeout(timer);

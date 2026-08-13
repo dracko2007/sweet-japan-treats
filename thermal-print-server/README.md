@@ -55,10 +55,14 @@ sudo systemctl restart japan-express-print
 
 ## Testar impressão via curl
 
+Defina primeiro um token secreto fora do repositório e exporte-o no ambiente
+do servidor (`THERMAL_PRINT_AUTH_TOKEN`). Use o mesmo valor apenas no cliente
+administrativo configurado localmente; nunca o commite nem o publique.
+
 ```bash
 curl -X POST http://localhost:3210/print \
   -H "Content-Type: application/json" \
-  -H "x-print-token: japan-express-print-token-2024" \
+  -H "x-print-token: $THERMAL_PRINT_AUTH_TOKEN" \
   -d '{
     "orderNumber": "SE-BR-999",
     "status": "pending",

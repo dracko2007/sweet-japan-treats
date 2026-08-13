@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button';
 import { useUser } from '@/context/UserContext';
 import { emailService } from '@/services/emailService';
 import { emailServiceSimple } from '@/services/emailServiceSimple';
-import { whatsappService } from '@/services/whatsappService';
 import { whatsappServiceSimple } from '@/services/whatsappServiceSimple';
 import { waServer } from '@/services/waServerService';
 import { useToast } from '@/hooks/use-toast';
@@ -56,6 +55,15 @@ const isDev = import.meta.env.DEV;
 const devLog = isDev ? console.log.bind(console) : () => {};
 const devWarn = isDev ? console.warn.bind(console) : () => {};
 const devError = isDev ? console.error.bind(console) : () => {};
+
+function escapeHtml(value: unknown): string {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 
 
 type AdminTab =
@@ -454,27 +462,15 @@ Time: ${new Date().toLocaleString('pt-BR')}
 _This is an automated test message_
       `.trim();
       
-      let whatsappResult = false;
-      
-      // Try Twilio first
-      if (import.meta.env.VITE_TWILIO_ACCOUNT_SID && import.meta.env.VITE_TWILIO_AUTH_TOKEN) {
-        devLog('📱 Testing Twilio...');
-        whatsappResult = await whatsappService.sendMessage({
-          // `whatsapp.digits` = 81 + 7013671679. O literal antigo era
-          // `+8107013671679`: carregava o zero do DDD japonês, que o formato
-          // internacional não tem. Número com dígito a mais não entrega.
-          to: `+${COMPANY_PROFILE.whatsapp.digits}`,
-          message: testMessage
-        });
-      } else {
-        // Use simple WhatsApp (always works)
-        devLog('📱 Testing Simple WhatsApp (opens directly)...');
-        whatsappServiceSimple.sendMessage({
-          to: COMPANY_PROFILE.whatsapp.digits,
-          message: testMessage
-        });
-        whatsappResult = true; // It opened, so consider it a success
-      }
+      // Provider credentials are server-only. The browser test only opens the
+      // safe manual client; automatic delivery is exercised through the
+      // authenticated server service in the WhatsApp settings panel.
+      devLog('📱 Testing Simple WhatsApp (opens directly)...');
+      whatsappServiceSimple.sendMessage({
+        to: COMPANY_PROFILE.whatsapp.digits,
+        message: testMessage
+      });
+      whatsappResult = true; // It opened, so consider it a success
       
       devLog('📱 WhatsApp test result:', whatsappResult);
       
@@ -496,7 +492,7 @@ _This is an automated test message_
   };
 
   const printOrder = (order: any) => {
-    const printWindow = window.open('', '_blank');
+    const printWindow = window.open('', '_blank', 'noopener,noreferrer');
     if (!printWindow) return;
 
     const statusLabel: Record<string, string> = {
@@ -521,23 +517,21 @@ _This is an automated test message_
     const discount = order.couponDiscount || (itemsSubtotal > order.totalPrice ? itemsSubtotal - order.totalPrice : 0);
     const shippingCost = order.shipping?.cost ?? null;
     const grandTotal = order.totalPrice ?? order.total ?? 0;
-    const grandTotalYen = (order as any).grandTotalYen;
+    const grandTotalYen = order.grandTotalYen;
 
     const itemsHtml = order.items.map((item: any) => `
       <tr>
-        <td style="padding:6px 8px;border-bottom:1px solid #eee;">${item.productName || item.name}${item.size ? ` <span style="color:#888;font-size:12px;">(${item.size})</span>` : ''}</td>
-        <td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:center;">${item.quantity}</td>
-        <td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:right;">R$ ${(item.price * item.quantity).toFixed(2)}</td>
+        <td style="padding:6px 8px;border-bottom:1px solid #eee;">${escapeHtml(item.productName || item.name)}${item.size ? ` <span style="color:#888;font-size:12px;">(${escapeHtml(item.size)})</span>` : ''}</td>
+        <td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:center;">${Number(item.quantity) || 0}</td>
+        <td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:right;">R$ ${(Number(item.price) * Number(item.quantity)).toFixed(2)}</td>
       </tr>
     `).join('');
-
     const html = `<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8"/>
-  <title>Pedido ${order.orderNumber}</title>
+  <title>Pedido ${escapeHtml(order.orderNumber || 'N/A')}</title>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: Arial, sans-serif; font-size: 14px; color: #111; background: #fff; padding: 24px; }
     .no-print { margin-bottom: 16px; }
     @media print { .no-print { display: none; } body { padding: 0; } }
@@ -575,28 +569,27 @@ _This is an automated test message_
       <div style="font-size:11px;color:#888;margin-top:2px;">Importação Direta Japão-Brasil</div>
     </div>
     <div style="text-align:right;">
-      <div class="order-id">Pedido: ${order.orderNumber || 'N/A'}</div>
-      <div class="order-date">${new Date(order.orderDate || order.date || Date.now()).toLocaleString('pt-BR')}</div>
-      <div class="status-badge">${statusLabel[order.status] || order.status}</div>
+      <div class="order-id">Pedido: ${escapeHtml(order.orderNumber || 'N/A')}</div>
+      <div class="order-date">${escapeHtml(new Date(order.orderDate || order.date || Date.now()).toLocaleString('pt-BR'))}</div>
+      <div class="status-badge">${escapeHtml(statusLabel[order.status] || order.status || 'N/A')}</div>
     </div>
   </div>
-
   <div class="grid">
     <div class="section">
       <h3>👤 Cliente</h3>
-      <p><strong>${order.shippingAddress?.name || order.customerName || 'N/A'}</strong></p>
+      <p><strong>${escapeHtml(order.shippingAddress?.name || order.customerName || 'N/A')}</strong></p>
       <p class="label">E-mail</p>
-      <p>${order.customerEmail || 'N/A'}</p>
+      <p>${escapeHtml(order.customerEmail || 'N/A')}</p>
       <p class="label">Telefone</p>
-      <p>${order.shippingAddress?.phone || order.phone || 'N/A'}</p>
-      ${order.cpf ? `<p class="label">CPF</p><p>${order.cpf}</p>` : ''}
+      <p>${escapeHtml(order.shippingAddress?.phone || order.phone || 'N/A')}</p>
+      ${order.cpf ? `<p class="label">CPF</p><p>${escapeHtml(order.cpf)}</p>` : ''}
     </div>
     <div class="section">
       <h3>📍 Endereço de Entrega</h3>
-      <p>〒 ${order.shippingAddress?.postalCode || 'N/A'}</p>
-      <p>${order.shippingAddress?.prefecture || ''} ${order.shippingAddress?.city || ''}</p>
-      <p>${order.shippingAddress?.address || ''}</p>
-      ${order.shippingAddress?.building ? `<p>${order.shippingAddress.building}</p>` : ''}
+      <p>〒 ${escapeHtml(order.shippingAddress?.postalCode || 'N/A')}</p>
+      <p>${escapeHtml(`${order.shippingAddress?.prefecture || ''} ${order.shippingAddress?.city || ''}`)}</p>
+      <p>${escapeHtml(order.shippingAddress?.address || '')}</p>
+      ${order.shippingAddress?.building ? `<p>${escapeHtml(order.shippingAddress.building)}</p>` : ''}
     </div>
   </div>
 
@@ -620,9 +613,9 @@ _This is an automated test message_
         <td></td>
         <td>R$ ${itemsSubtotal.toFixed(2)}</td>
       </tr>
-      ${discount > 0 ? `<tr class="discount"><td>Cupom ${order.couponCode ? `(${order.couponCode})` : ''}</td><td></td><td>-R$ ${discount.toFixed(2)}</td></tr>` : ''}
+      ${discount > 0 ? `<tr class="discount"><td>Cupom ${order.couponCode ? `(${escapeHtml(order.couponCode)})` : ''}</td><td></td><td>-R$ ${discount.toFixed(2)}</td></tr>` : ''}
       <tr>
-        <td>Frete ${order.shippingCarrier ? `(${order.shippingCarrier})` : ''}</td>
+        <td>Frete ${order.shippingCarrier ? `(${escapeHtml(order.shippingCarrier)})` : ''}</td>
         <td></td>
         <td>${shippingCost != null ? (shippingCost === 0 ? 'Grátis' : `R$ ${shippingCost.toFixed(2)}`) : 'N/A'}</td>
       </tr>
@@ -637,8 +630,8 @@ _This is an automated test message_
 
   <div class="section">
     <h3>💳 Pagamento</h3>
-    <p>${paymentLabel[order.paymentMethod] || order.paymentMethod || 'N/A'}</p>
-    <p style="margin-top:6px;">Status: <strong>${statusLabel[order.status] || order.status}</strong></p>
+    <p>${escapeHtml(paymentLabel[order.paymentMethod] || order.paymentMethod || 'N/A')}</p>
+    <p style="margin-top:6px;">Status: <strong>${escapeHtml(statusLabel[order.status] || order.status || 'N/A')}</strong></p>
   </div>
 
   <div class="footer">
@@ -652,14 +645,14 @@ _This is an automated test message_
   };
 
   const printShippingLabel = (order: any) => {
-    const printWindow = window.open('', '_blank');
+    const printWindow = window.open('', '_blank', 'noopener,noreferrer');
     if (!printWindow) return;
 
     const html = `
       <!DOCTYPE html>
       <html>
       <head>
-        <title>Etiqueta de Envio - ${order.orderNumber}</title>
+        <title>Etiqueta de Envio - ${escapeHtml(order.orderNumber || 'N/A')}</title>
         <style>
           body { font-family: Arial, sans-serif; padding: 20px; }
           .label { border: 3px solid #000; padding: 20px; max-width: 800px; margin: 0 auto; }
@@ -687,36 +680,36 @@ _This is an automated test message_
           <div class="header">
             <h1>🌸 JAPAN EXPRESS</h1>
             <h2>Importação Direta Japão-Brasil</h2>
-            <p class="strong">Pedido: ${order.orderNumber || 'N/A'}</p>
-            <p>Data: ${new Date(order.orderDate || order.date).toLocaleDateString('pt-BR')}</p>
+            <p class="strong">Pedido: ${escapeHtml(order.orderNumber || 'N/A')}</p>
+            <p>Data: ${escapeHtml(new Date(order.orderDate || order.date || Date.now()).toLocaleDateString('pt-BR'))}</p>
           </div>
 
           <div class="section">
             <h3>📦 PRODUTOS</h3>
             ${order.items.map((item: any) => `
-              <p>• ${item.productName} (${item.size}) x${item.quantity} - R$${(item.price * item.quantity).toLocaleString()}</p>
+              <p>• ${escapeHtml(item.productName || item.name)} (${escapeHtml(item.size || '')}) x${Number(item.quantity) || 0} - R$${(Number(item.price) * Number(item.quantity)).toLocaleString()}</p>
             `).join('')}
-            <p class="strong" style="margin-top: 10px;">Total: R$${(order.totalPrice ?? order.totalAmount ?? 0).toLocaleString()}</p>
+            <p class="strong" style="margin-top: 10px;">Total: R$${Number(order.totalPrice ?? order.totalAmount ?? 0).toLocaleString()}</p>
           </div>
 
           <div class="row">
             <div class="box">
               <h3>📤 REMETENTE (ご依頼主)</h3>
-              <p class="strong">${COMPANY_PROFILE.contactName}</p>
-              <p>〒${COMPANY_PROFILE.fulfillmentOrigin.postalCode}</p>
-              <p>${COMPANY_PROFILE.fulfillmentOrigin.formattedJa.replace(`〒${COMPANY_PROFILE.fulfillmentOrigin.postalCode} `, '')}</p>
-              <p>📞 ${COMPANY_PROFILE.whatsapp.domestic}</p>
+              <p class="strong">${escapeHtml(COMPANY_PROFILE.contactName)}</p>
+              <p>〒${escapeHtml(COMPANY_PROFILE.fulfillmentOrigin.postalCode)}</p>
+              <p>${escapeHtml(COMPANY_PROFILE.fulfillmentOrigin.formattedJa.replace(`〒${COMPANY_PROFILE.fulfillmentOrigin.postalCode} `, ''))}</p>
+              <p>📞 ${escapeHtml(COMPANY_PROFILE.whatsapp.domestic)}</p>
             </div>
             
             <div class="box">
               <h3>📥 DESTINATÁRIO (Aduana Brasil)</h3>
-              <p class="strong">${order.shippingAddress?.name || order.name || order.customerName || 'N/A'}</p>
-              <p>CPF: ${order.cpf || 'N/A'}</p>
-              <p>CEP: ${order.shippingAddress?.postalCode || order.postalCode || 'N/A'}</p>
-              <p>${order.shippingAddress?.prefecture || order.prefecture || ''} - ${order.shippingAddress?.city || order.city || ''}</p>
-              <p>${order.shippingAddress?.address || order.address || ''}</p>
-              ${(order.shippingAddress?.building || order.building) ? `<p>Complemento: ${order.shippingAddress?.building || order.building}</p>` : ''}
-              <p>📞 ${order.phone || 'N/A'}</p>
+              <p class="strong">${escapeHtml(order.shippingAddress?.name || order.name || order.customerName || 'N/A')}</p>
+              <p>CPF: ${escapeHtml(order.cpf || 'N/A')}</p>
+              <p>CEP: ${escapeHtml(order.shippingAddress?.postalCode || order.postalCode || 'N/A')}</p>
+              <p>${escapeHtml(`${order.shippingAddress?.prefecture || order.prefecture || ''} - ${order.shippingAddress?.city || order.city || ''}`)}</p>
+              <p>${escapeHtml(order.shippingAddress?.address || order.address || '')}</p>
+              ${(order.shippingAddress?.building || order.building) ? `<p>Complemento: ${escapeHtml(order.shippingAddress?.building || order.building)}</p>` : ''}
+              <p>📞 ${escapeHtml(order.phone || 'N/A')}</p>
             </div>
           </div>
 

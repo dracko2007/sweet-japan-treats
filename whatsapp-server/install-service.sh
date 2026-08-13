@@ -6,6 +6,11 @@
 set -e
 cd "$(dirname "$0")"
 
+if [[ -z "${WHATSAPP_AUTH_TOKEN:-}" ]]; then
+  echo "[ERRO] WHATSAPP_AUTH_TOKEN deve ser definido no ambiente antes de instalar o serviço."
+  exit 1
+fi
+
 echo ""
 echo "=== Japan Express WhatsApp Server — Instalação com pm2 ==="
 echo ""

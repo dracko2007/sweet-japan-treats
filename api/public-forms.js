@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { decodeEmail, setOptOut, verifyUnsubscribeToken } from './_lib/email-optout.js';
 import { adminDb } from './_lib/firebase-admin.js';
 import {
@@ -18,6 +18,25 @@ import { sendPush } from './_lib/push.js';
 
 const SOURCES = new Set(['exit_intent', 'newsletter_footer', 'guide', 'cart_reminder']);
 const SHIPPING = new Set(['aereo', 'maritimo', 'container', 'combinar']);
+
+const CANONICAL_PAGE_PATTERNS = [
+  /^\/$/,
+  /^\/produtos(?:\/[^/]+)?$/,
+  /^\/produto\/[^/]+$/,
+  /^\/carrinho$/,
+  /^\/checkout$/,
+  /^\/order-review$/,
+  /^\/order-confirmation$/,
+  /^\/cadastro$/,
+  /^\/login$/,
+  /^\/perfil$/,
+  /^\/frete$/,
+  /^\/ofertas$/,
+  /^\/como-funciona$/,
+  /^\/sobre$/,
+  /^\/vlog$/,
+  /^\/admin$/,
+];
 
 function optionalEmail(value) {
   return value ? normalizeEmail(value) : '';
@@ -96,7 +115,7 @@ async function persistSubmission(type, data) {
   const db = adminDb();
   const now = new Date().toISOString();
   if (type === 'newsletter') {
-    const id = data.email.replace(/[.#$/[\]]/g, '_');
+    const id = createHash('sha256').update(data.email, 'utf8').digest('hex');
     const ref = db.collection('newsletter').doc(id);
     const existing = await ref.get();
     await ref.set({
@@ -213,7 +232,9 @@ function parseEvent(body) {
 
   if (type === 'page') {
     const slug = requiredText(body.slug, { max: 160 });
-    if (!slug.startsWith('/') || slug.includes('\\')) throw new HttpError(400, 'invalid_request');
+    if (!slug.startsWith('/') || slug.includes('\\') || !CANONICAL_PAGE_PATTERNS.some((pattern) => pattern.test(slug))) {
+      throw new HttpError(400, 'invalid_request');
+    }
     return { type, slug, label: requiredText(body.label, { max: 160 }) };
   }
   if (type === 'product') {
@@ -250,6 +271,8 @@ async function incrementEvent(event) {
   }
 
   if (event.type === 'product') {
+    const product = await db.collection('products').doc(event.productId).get();
+    if (!product.exists) throw new HttpError(404, 'unknown_product');
     const ref = db.collection('analytics_products').doc(event.productId);
     await db.runTransaction(async (transaction) => {
       const snap = await transaction.get(ref);
@@ -353,26 +376,24 @@ async function handleUnsubscribe(req, res) {
     return;
   }
 
-  const reativar = String(req.query?.a || '') === 'on';
+  // The signed email capability is cancellation-only. Re-enabling marketing
+  // requires an authenticated profile action, so a leaked old URL cannot
+  // reverse a later opt-out.
+  if (String(req.query?.a || '') === 'on') {
+    renderPage(res, 403, 'Acao indisponivel', `<h2 style="margin:0 0 12px;font-size:19px">Ação indisponível</h2><p>Para reativar comunicações, entre na sua conta e altere a preferência de e-mail.</p>`);
+    return;
+  }
+
   try {
-    // Limite largo e por IP: o token já impede descadastrar terceiros, então o
-    // que resta a conter é enxurrada de escrita. Apertar mais seria pior do que
-    // o abuso — recusar um cancelamento legítimo é o que faz o cliente marcar
-    // a loja como spam.
     await enforceRateLimit(req, { scope: 'unsubscribe', limit: 60, windowMs: 60 * 60 * 1000 });
-    await setOptOut(email, { optedOut: !reativar, source: 'email_link' });
+    await setOptOut(email, { optedOut: true, source: 'email_link' });
   } catch (error) {
     console.error('[unsubscribe]', error instanceof Error ? error.message : error);
     renderPage(res, error instanceof HttpError ? error.statusCode : 500, 'Nao deu certo', `<h2 style="margin:0 0 12px;font-size:19px">Não foi possível concluir agora</h2><p>Tente de novo em alguns minutos. Se continuar, escreva para <a href="mailto:${MAIL_REPLY_TO}" style="color:#ec4899">${MAIL_REPLY_TO}</a> que resolvemos manualmente.</p>`);
     return;
   }
 
-  if (reativar) {
-    renderPage(res, 200, 'Inscricao reativada', `<h2 style="margin:0 0 12px;font-size:19px">Inscrição reativada</h2><p><strong>${alvo}</strong> volta a receber novidades e promoções.</p><p style="${NOTA}"><a href="${loja}" style="color:#ec4899">Voltar para a loja</a></p>`);
-    return;
-  }
-
-  renderPage(res, 200, 'Inscricao cancelada', `<h2 style="margin:0 0 12px;font-size:19px">Pronto, inscrição cancelada</h2><p><strong>${alvo}</strong> não vai mais receber novidades, promoções nem lembretes de carrinho.</p><p style="${NOTA}">Confirmação de pedido e rastreio continuam chegando: são avisos do que você comprou, não divulgação.</p><form method="post" action="${base}&amp;a=on" style="margin:22px 0 0"><button type="submit" style="${BOTAO_SECUNDARIO}">Foi sem querer, voltar a receber</button></form><p style="${NOTA}"><a href="${loja}" style="color:#ec4899">Voltar para a loja</a></p>`);
+  renderPage(res, 200, 'Inscricao cancelada', `<h2 style="margin:0 0 12px;font-size:19px">Pronto, inscrição cancelada</h2><p><strong>${alvo}</strong> não vai mais receber novidades, promoções nem lembretes de carrinho.</p><p style="${NOTA}">Confirmação de pedido e rastreio continuam chegando: são avisos do que você comprou, não divulgação.</p><p style="${NOTA}">Para reativar comunicações, entre na sua conta e altere a preferência de e-mail.</p><p style="${NOTA}"><a href="${loja}" style="color:#ec4899">Voltar para a loja</a></p>`);
 }
 
 export default async function handler(req, res) {

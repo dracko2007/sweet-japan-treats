@@ -7,17 +7,12 @@
 
 import { db } from '@/config/firebase';
 import {
-  collection,
-  getDocs,
   doc,
   setDoc,
   updateDoc,
   increment,
   serverTimestamp,
   deleteField,
-  query,
-  where,
-  Timestamp,
 } from 'firebase/firestore';
 import type { CatalogSnapshot } from '@/services/catalogCache';
 import { gravarCatalogo, lerCatalogo, limparCatalogo } from '@/services/catalogCache';
@@ -119,25 +114,21 @@ export const productService = {
    *  reler 1 documento por sincronização; perder uma atualização custaria
    *  estoque errado na vitrine. */
   async getOverrides(desdeMs: number | null = null): Promise<Overrides & { maxMs: number }> {
-    if (!db) throw new Error('Firebase indisponível');
     try {
-      const alvo = collection(db, COL);
-      const snap = await getDocs(
-        desdeMs === null ? alvo : query(alvo, where('updatedAt', '>=', Timestamp.fromMillis(desdeMs))),
-      );
-      const items: Product[] = [];
-      const deleted: string[] = [];
-      let maxMs = desdeMs ?? 0;
-      snap.forEach((d) => {
-        const data = d.data() as Record<string, unknown>;
-        maxMs = Math.max(maxMs, instanteMs(data.updatedAt));
-        if (data.__deleted) {
-          deleted.push(d.id);
-          return;
-        }
-        items.push(withCdnImages({ id: d.id, ...(data as object) } as Product));
-      });
-      return { items, deleted, maxMs };
+      const suffix = desdeMs === null ? '' : `?since=${encodeURIComponent(String(desdeMs))}`;
+      const response = await fetch(`/api/products${suffix}`, { headers: { Accept: 'application/json' } });
+      if (!response.ok) throw new Error(`Catálogo indisponível (${response.status})`);
+      const payload = await response.json() as {
+        items?: unknown;
+        deleted?: unknown;
+        maxMs?: unknown;
+      };
+      if (!Array.isArray(payload.items) || !Array.isArray(payload.deleted) || !Number.isFinite(Number(payload.maxMs))) {
+        throw new Error('Resposta de catálogo inválida');
+      }
+      const items = payload.items.map((item) => withCdnImages(item as Product));
+      const deleted = payload.deleted.filter((id): id is string => typeof id === 'string');
+      return { items, deleted, maxMs: Number(payload.maxMs) };
     } catch (e) {
       devWarn('productService.getOverrides falhou:', e);
       throw e;

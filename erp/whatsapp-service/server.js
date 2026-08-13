@@ -13,10 +13,34 @@ const QRCode = require('qrcode');
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const crypto = require('crypto');
+
+const API_TOKEN = (process.env.WHATSAPP_API_TOKEN || '').trim();
+if (!API_TOKEN) {
+    throw new Error('WHATSAPP_API_TOKEN must be configured before starting the WhatsApp service');
+}
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+function requireAuth(req, res, next) {
+    const authorization = req.get('authorization') || '';
+    const match = authorization.match(/^Bearer\s+(.+)$/i);
+    const provided = match ? match[1].trim() : '';
+    const expected = Buffer.from(API_TOKEN, 'utf8');
+    const actual = Buffer.from(provided, 'utf8');
+    const valid = actual.length === expected.length &&
+        crypto.timingSafeEqual(actual, expected);
+    if (!valid) {
+        return res.status(401).json({ error: 'Authentication required' });
+    }
+    next();
+}
+
+// Every API route, including status and lifecycle controls, requires the
+// server-only bearer token. CORS remains enabled for legitimate callers.
+app.use(requireAuth);
 
 // =====================================================
 // STATE

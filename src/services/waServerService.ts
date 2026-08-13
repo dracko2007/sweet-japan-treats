@@ -13,13 +13,11 @@ const STORAGE_KEY = 'whatsappServer';
 export interface WaServerConfig {
   enabled: boolean;
   serverUrl: string; // ex: "http://localhost:3220"
-  authToken: string;
 }
 
 const DEFAULT_CONFIG: WaServerConfig = {
   enabled: false,
   serverUrl: 'http://localhost:3220',
-  authToken: 'japan-express-whatsapp-token-2024',
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -74,53 +72,32 @@ export const waServer = {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (!raw) return DEFAULT_CONFIG;
-      return { ...DEFAULT_CONFIG, ...JSON.parse(raw) };
+      const parsed = JSON.parse(raw) as Partial<WaServerConfig>;
+      return {
+        enabled: !!parsed.enabled,
+        serverUrl: typeof parsed.serverUrl === 'string' ? parsed.serverUrl : DEFAULT_CONFIG.serverUrl,
+      };
     } catch {
       return DEFAULT_CONFIG;
     }
   },
 
   saveConfig(config: WaServerConfig): void {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      enabled: config.enabled,
+      serverUrl: config.serverUrl,
+    }));
   },
 
-  /** online = servidor responde; ready = WhatsApp conectado (QR já escaneado). */
+  /** Direct browser control is disabled; use the server-side ERP integration. */
   async checkStatus(): Promise<{ online: boolean; ready: boolean }> {
-    const cfg = this.getConfig();
-    if (!cfg.enabled) return { online: false, ready: false };
-    try {
-      const res = await fetch(`${cfg.serverUrl}/health`, {
-        headers: { 'x-wa-token': cfg.authToken },
-        signal: AbortSignal.timeout(3000),
-      });
-      if (!res.ok) return { online: false, ready: false };
-      const body = await res.json().catch(() => ({}));
-      return { online: true, ready: !!(body as { ready?: boolean }).ready };
-    } catch {
-      return { online: false, ready: false };
-    }
+    return { online: false, ready: false };
   },
+
 
   /** Envio bruto. Nunca lança — retorna { ok, error }. */
-  async sendMessage(phone: string, message: string): Promise<{ ok: boolean; error?: string }> {
-    const cfg = this.getConfig();
-    if (!cfg.enabled) return { ok: false, error: 'WhatsApp não ativado' };
-    if (!phone) return { ok: false, error: 'Cliente sem telefone' };
-    try {
-      const res = await fetch(`${cfg.serverUrl}/send-message`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-wa-token': cfg.authToken },
-        body: JSON.stringify({ phone, message }),
-        signal: AbortSignal.timeout(15000),
-      });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        return { ok: false, error: (body as { error?: string }).error || `HTTP ${res.status}` };
-      }
-      return { ok: true };
-    } catch (e: unknown) {
-      return { ok: false, error: e instanceof Error ? e.message : String(e) };
-    }
+  async sendMessage(_phone: string, _message: string): Promise<{ ok: boolean; error?: string }> {
+    return { ok: false, error: 'O controle WhatsApp deve ser executado pelo ERP autenticado' };
   },
 
   notifyPaymentConfirmed(order: OrderLike) {

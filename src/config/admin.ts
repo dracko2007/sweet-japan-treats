@@ -1,16 +1,10 @@
 // Configuração centralizada do administrador.
 // A autenticação usa Firebase Auth puro — a senha nunca é armazenada no bundle.
 //
-// O e-mail do admin PRECISA estar no bundle do cliente: sem ele o atalho de
-// super-admin em adminService.authenticate() não casa, o login cai no fluxo de
-// cliente comum e o admin "entra como usuário normal". O fallback garante isso
-// mesmo em builds onde VITE_ADMIN_EMAIL não foi injetada (Vite só inlineia
-// VITE_* em build time, e .env é gitignored — logo ausente na build da Vercel).
-// Saber este e-mail não abre o painel: a barreira real é a senha do Firebase
-// Auth + email_verified + requireAdmin() no servidor (que ainda exige ADMIN_EMAIL
-// no ambiente). Mantenha este valor sincronizado com ADMIN_EMAIL da Vercel.
+// The administrator e-mail is deployment configuration, not a source fallback.
+// Without VITE_ADMIN_EMAIL the client cannot identify a bootstrap administrator.
 export const ADMIN_EMAIL =
-  (String(import.meta.env.VITE_ADMIN_EMAIL || '').trim() || 'dracko2007@gmail.com').toLowerCase();
+  String(import.meta.env.VITE_ADMIN_EMAIL || '').trim().toLowerCase();
 
 export const ADMIN_USER_ID = 'admin-001';
 

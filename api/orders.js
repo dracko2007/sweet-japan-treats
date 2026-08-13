@@ -25,7 +25,9 @@ import { buildOrderEmail, sendMail } from './_lib/mailer.js';
 import { enforceRateLimit } from './_lib/rate-limit.js';
 
 const PAYMENT_METHODS = new Set(['card', 'pix', 'bank', 'paypay', 'yucho', 'wise']);
+const TOGGLEABLE_PAYMENT_METHODS = new Set(['card', 'pix', 'wise']);
 const ORDER_PATTERN = /^(?:SC-JP|SE-[A-Z]{2})-\d{6}$/;
+const PERSONAL_COUPON_RESERVATION_MS = 30 * 60 * 1000;
 
 function parseItems(raw) {
   if (!Array.isArray(raw) || raw.length < 1 || raw.length > 100) throw new HttpError(400, 'invalid_items');
@@ -40,22 +42,31 @@ function parseItems(raw) {
   });
 }
 
+function isValidCpf(value) {
+  const cpf = String(value || '').replace(/\D/g, '');
+  if (cpf.length !== 11 || /^(\d)\1{10}$/.test(cpf)) return false;
+  let sum = 0;
+  for (let i = 0; i < 9; i++) sum += Number(cpf[i]) * (10 - i);
+  let digit = (sum * 10) % 11;
+  if (digit === 10) digit = 0;
+  if (digit !== Number(cpf[9])) return false;
+  sum = 0;
+  for (let i = 0; i < 10; i++) sum += Number(cpf[i]) * (11 - i);
+  digit = (sum * 10) % 11;
+  if (digit === 10) digit = 0;
+  return digit === Number(cpf[10]);
+}
+
 function parseCustomer(raw, user, country) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new HttpError(400, 'invalid_customer');
   assertExactKeys(raw, ['name', 'email', 'phone', 'cpf', 'postalCode', 'city', 'address', 'building']);
   const tokenEmail = user.email ? normalizeEmail(user.email) : '';
+  if (tokenEmail && user.email_verified !== true) throw new HttpError(403, 'verified_email_required');
   const submittedEmail = normalizeEmail(raw.email);
   if (tokenEmail && tokenEmail !== submittedEmail) throw new HttpError(403, 'email_mismatch');
   const cpf = String(raw.cpf || '').replace(/\D/g, '');
-  if (cpf && cpf.length !== 11) throw new HttpError(400, 'invalid_cpf');
-  // A aduana brasileira exige o CPF do destinatário, então para o Brasil ele
-  // não é opcional na prática — o pedido sem CPF trava na importação. Exigir
-  // aqui, além de evitar esse travamento, é o que dá ao guarda de cupom uma
-  // âncora que o cliente não troca à vontade (ver ALTO 3 do AUDITORIA.md).
-  // Fora do Brasil não há documento equivalente e o campo segue opcional.
-  if (country === 'Brasil' && cpf.length !== 11) throw new HttpError(400, 'cpf_required');
+  if (cpf && !isValidCpf(cpf)) throw new HttpError(400, 'invalid_cpf');
   return {
-    name: requiredText(raw.name, { max: 120 }),
     email: tokenEmail || submittedEmail,
     phone: optionalText(raw.phone, { max: 40 }),
     cpf,
@@ -82,6 +93,29 @@ function activeByDate(value) {
   if (!value) return true;
   const timestamp = typeof value === 'number' ? value : new Date(value).getTime();
   return Number.isFinite(timestamp) && timestamp > Date.now();
+}
+
+async function assertPaymentMethodEnabled(db, paymentMethod) {
+  if (!TOGGLEABLE_PAYMENT_METHODS.has(paymentMethod)) return;
+  const settings = await db.collection('settings').doc('payments').get();
+  if (!settings.exists) throw new HttpError(503, 'payment_settings_not_configured');
+  const key = `${paymentMethod}Enabled`;
+  if (settings.data()?.[key] !== true) throw new HttpError(409, 'payment_method_disabled');
+}
+
+function negotiationMatchesOrder(negotiation, requestedItems, customer, country, prefecture, carrier) {
+  const requested = requestedItems
+    .map(({ productId, variantId, quantity }) => ({ productId, size: variantId, quantity }))
+    .sort((a, b) => `${a.productId}:${a.size}`.localeCompare(`${b.productId}:${b.size}`));
+  const approvedCart = (Array.isArray(negotiation.cartItems) ? negotiation.cartItems : [])
+    .map((item) => ({ productId: String(item.productId), size: String(item.size), quantity: Number(item.quantity) }))
+    .sort((a, b) => `${a.productId}:${a.size}`.localeCompare(`${b.productId}:${b.size}`));
+  const form = negotiation.checkoutForm || {};
+  return JSON.stringify(requested) === JSON.stringify(approvedCart)
+    && String(form.country || '') === country
+    && String(form.prefecture || '') === prefecture
+    && String(form.email || '').trim().toLowerCase() === customer.email
+    && String(negotiation.shipping?.carrier || '') === carrier;
 }
 
 async function resolveCoupon(db, code, userDoc, customer, productSubtotalHint = 0, userId = '', emailVerified = false) {
@@ -235,7 +269,7 @@ async function handleMarkReceived(req, res) {
     const tokenEmail = typeof user.email === 'string' ? user.email.trim().toLowerCase() : '';
     const customerEmail = typeof order.customerEmail === 'string' ? order.customerEmail.trim().toLowerCase() : '';
     const isOwner = order.userId === user.uid
-      || (tokenEmail !== '' && customerEmail !== '' && tokenEmail === customerEmail);
+      || (user.email_verified === true && tokenEmail !== '' && customerEmail !== '' && tokenEmail === customerEmail);
     if (!isOwner) throw new HttpError(403, 'forbidden');
 
     if (order.status === 'delivered' && order.customerConfirmedAt) {
@@ -266,15 +300,11 @@ async function handleMarkReceived(req, res) {
 async function handleIssuePsFeeWaiver(req, res) {
   if (!handleCors(req, res, { methods: ['POST'] })) return;
   try {
-    const user = await requireUser(req);
-    await enforceRateLimit(req, {
-      scope: 'ps-fee-waiver',
-      limit: 5,
-      windowMs: 60 * 60 * 1000,
-      identity: user.uid,
-    });
-    const issued = issuePsFeeWaiver(user.uid);
-    res.status(200).json({ ok: true, token: issued.token, expiresAt: issued.expiresAt });
+    await requireUser(req);
+    // No server-verifiable cart/campaign proof is currently available at this
+    // endpoint. Fail closed instead of issuing a reusable fee waiver to every
+    // authenticated caller.
+    throw new HttpError(403, 'ps_fee_waiver_unavailable');
   } catch (error) {
     console.error('[ps-fee-waiver]', error instanceof Error ? error.message : error);
     sendError(res, error);
@@ -313,11 +343,11 @@ async function handleCreate(req, res) {
     const psFeeWaiverToken = optionalText(body.psFeeWaiverToken, { max: 1200 });
 
     const db = adminDb();
+    await assertPaymentMethodEnabled(db, paymentMethod);
     const orderRef = db.collection('orders').doc(orderId);
     const existing = await orderRef.get();
     if (existing.exists) {
       const order = { id: existing.id, ...existing.data() };
-      if (order.userId !== user.uid) throw new HttpError(409, 'order_id_conflict');
       const intent = order.paymentMethod === 'card' ? await stripeIntent(order) : null;
       res.status(200).json({ ok: true, order: publicOrder(order), clientSecret: intent?.client_secret || null });
       return;
@@ -360,6 +390,12 @@ async function handleCreate(req, res) {
     const negotiation = negotiationSnap?.exists ? negotiationSnap.data() : null;
     if (negotiation && negotiation.userId && negotiation.userId !== user.uid) throw new HttpError(403, 'invalid_negotiation');
     if (negotiation && negotiation.customerEmail && String(negotiation.customerEmail).toLowerCase() !== customer.email) throw new HttpError(403, 'invalid_negotiation');
+    if (negotiationId && (!negotiation || !['approved', 'auto_approved'].includes(negotiation.status))) {
+      throw new HttpError(409, 'negotiation_unavailable');
+    }
+    if (negotiation && !negotiationMatchesOrder(negotiation, requestedItems, customer, country, prefecture, carrier)) {
+      throw new HttpError(409, 'invalid_negotiation');
+    }
     const requestedPoints = Math.max(0, Math.floor(Number(body.redeemPoints || 0)));
     // Recusa cedo, com a mesma conta da transação, para o cliente ver o erro
     // antes de qualquer cobrança. A palavra final continua sendo a da transação.
@@ -435,7 +471,10 @@ async function handleCreate(req, res) {
       trackingCode: `${trackingPrefix}${randomInt(100000000, 1000000000)}JP`,
       couponCode: couponCode || '',
       couponSource: coupon?.source || '',
-      couponDiscountYen: quote.couponDiscountYen,
+      affiliateCode: coupon?.affiliateCode || '',
+      affiliateProductId: coupon?.affiliateProductId || '',
+      commissionPercent: coupon?.commissionPercent || 0,
+      affiliateOwnerEmail: coupon?.ownerEmail || '',
       productCostYen: quote.productCostYen,
       netProductsYen: quote.netProductsYen,
       promoCode: promoCode || '',
@@ -481,29 +520,56 @@ async function handleCreate(req, res) {
 
     // A reserva só entra quando há resgate: pedido sem pontos não paga o custo
     // de ler e reescrever o documento do usuário.
-    const userRefParaReserva = quote.redeemPoints > 0 ? db.collection('users').doc(user.uid) : null;
+    const personalCouponReservation = coupon?.source === 'personal';
+    const userRefParaReserva = (quote.redeemPoints > 0 || personalCouponReservation)
+      ? db.collection('users').doc(user.uid) : null;
     // Reserva da unidade da promoção da home: só quando há quantidade promocional
     // e a promoção está ativa.
     const promoStateRef = quote.homePromoQuantity > 0 ? refEstadoPromo(db) : null;
+    const negotiationRef = negotiationId ? db.collection('negotiations').doc(negotiationId) : null;
     await db.runTransaction(async (transaction) => {
-      const [current, waiverClaim, userAtual, promoStateAtual] = await Promise.all([
+      const [current, waiverClaim, userAtual, promoStateAtual, negotiationAtual] = await Promise.all([
         transaction.get(orderRef),
         waiverClaimRef ? transaction.get(waiverClaimRef) : Promise.resolve(null),
         userRefParaReserva ? transaction.get(userRefParaReserva) : Promise.resolve(null),
         promoStateRef ? transaction.get(promoStateRef) : Promise.resolve(null),
+        negotiationRef ? transaction.get(negotiationRef) : Promise.resolve(null),
       ]);
-      if (current.exists) throw new HttpError(409, 'order_id_conflict');
-      if (waiverClaim?.exists) throw new HttpError(409, 'ps_fee_waiver_already_used');
+      if (negotiationRef) {
+        const currentNegotiation = negotiationAtual?.exists ? negotiationAtual.data() : null;
+        if (!currentNegotiation || !['approved', 'auto_approved'].includes(currentNegotiation.status)) {
+          throw new HttpError(409, 'negotiation_unavailable');
+        }
+        if (currentNegotiation.claimedOrderId && currentNegotiation.claimedOrderId !== orderId) {
+          throw new HttpError(409, 'negotiation_already_used');
+        }
+        transaction.update(negotiationRef, { claimedOrderId: orderId, claimedAt: now });
+      }
       if (userRefParaReserva) {
-        // Aqui dentro o saldo é o de verdade: a checagem lá em cima roda fora
-        // de transação e não enxerga um checkout simultâneo do mesmo cliente.
+        // Revalidate all user-owned benefits inside the order transaction so
+        // concurrent checkouts cannot reserve one personal coupon twice.
         const userAgora = userAtual?.exists ? userAtual.data() : null;
         if (!userAgora) throw new HttpError(409, 'insufficient_points');
+        const updateUser = { updatedAt: now };
         if (quote.redeemPoints > pontosDisponiveis(userAgora)) throw new HttpError(409, 'insufficient_points');
-        transaction.update(userRefParaReserva, {
-          pointsHolds: comReserva(userAgora, orderId, quote.redeemPoints),
-          updatedAt: now,
-        });
+        if (quote.redeemPoints > 0) updateUser.pointsHolds = comReserva(userAgora, orderId, quote.redeemPoints);
+        if (personalCouponReservation) {
+          const coupons = Array.isArray(userAgora.coupons) ? userAgora.coupons : [];
+          const code = String(coupon.code || '').toUpperCase();
+          const found = coupons.find((entry) => String(entry.code || '').toUpperCase() === code);
+          const reservationActive = Number.isFinite(Date.parse(found?.reservedUntil || ''))
+            && Date.parse(found.reservedUntil) > Date.now();
+          if (!found || found.isUsed || (reservationActive && found.reservedOrderId !== orderId)) {
+            throw new HttpError(409, 'coupon_unavailable');
+          }
+          updateUser.coupons = coupons.map((entry) => String(entry.code || '').toUpperCase() === code
+            ? {
+              ...entry,
+              reservedOrderId: orderId,
+              reservedUntil: new Date(Date.now() + PERSONAL_COUPON_RESERVATION_MS).toISOString(),
+            } : entry);
+        }
+        transaction.update(userRefParaReserva, updateUser);
       }
       // Revalidação atômica do saldo da promoção: a checagem lá em cima roda
       // fora de transação. Se dois checkouts saem da checagem e chegam aqui, um

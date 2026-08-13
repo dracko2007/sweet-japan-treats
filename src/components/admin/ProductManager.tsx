@@ -23,6 +23,7 @@ import { convertYen as fxConvertYen } from '@/services/fxService';
 import { formatPrice } from '@/utils/currency';
 
 import { categoryService, DEFAULT_CATEGORIES, type ProductCategory } from '@/services/categoryService';
+import { authenticatedFetch } from '@/services/authenticatedFetch';
 
 const slugify = (s: string) =>
   s
@@ -303,11 +304,10 @@ const ProductManager: React.FC = () => {
     }
     setEnriching(true);
     try {
-      const res = await fetch('/api/product-enrich', {
+      const res = await authenticatedFetch('/api/product-enrich', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          isAdmin: true,
           productName: editing.name.trim(),
           targetLang: language || 'pt',
           markup: 1.5,
@@ -458,7 +458,7 @@ const ProductManager: React.FC = () => {
     }
     setUploadingVideo(true);
     try {
-      const folder = `japanexpress/products/${editing.id || 'temp-' + Date.now()}`;
+      const folder = `japanexpress/product-videos/${editing.id || 'temp-' + Date.now()}`;
       const url = await cloudinaryService.uploadVideoFile(file, folder);
       setEditing((prev) => (prev ? { ...prev, video: url } : prev));
       toast({ title: '✅ Vídeo enviado' });

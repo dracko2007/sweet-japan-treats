@@ -26,6 +26,15 @@ const DEFAULT_SENDER = {
   email: COMPANY_PROFILE.email,
 };
 
+function escapeHtml(value: unknown): string {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 // Basic JP→EN product category hints
 const guessCategory = (name: string): string => {
   const n = name.toLowerCase();
@@ -100,7 +109,7 @@ const CN23Modal: React.FC<CN23ModalProps> = ({ order, onClose }) => {
   const removeItem = (idx: number) => setItems(prev => prev.filter((_, i) => i !== idx));
 
   const printForm = () => {
-    const win = window.open('', '_blank');
+    const win = window.open('', '_blank', 'noopener,noreferrer');
     if (!win) return;
     const dateStr = new Date().toLocaleDateString('pt-BR');
     const totalWeightKg = (totalWeightG / 1000).toFixed(3);
@@ -126,8 +135,8 @@ const CN23Modal: React.FC<CN23ModalProps> = ({ order, onClose }) => {
           <tbody>
             ${items.map(it => `
               <tr>
-                <td style="border:1px solid #ccc;padding:3px;">${it.descriptionEn || it.description}</td>
-                <td style="border:1px solid #ccc;padding:3px;text-align:center;">${it.quantity}</td>
+                <td style="border:1px solid #ccc;padding:3px;">${escapeHtml(it.descriptionEn || it.description)}</td>
+                <td style="border:1px solid #ccc;padding:3px;text-align:center;">${Number(it.quantity) || 0}</td>
                 <td style="border:1px solid #ccc;padding:3px;text-align:right;">¥${(it.unitValueJpy * it.quantity).toLocaleString()}</td>
               </tr>
             `).join('')}
@@ -143,34 +152,33 @@ const CN23Modal: React.FC<CN23ModalProps> = ({ order, onClose }) => {
             <p style="margin:4px 0 0 0;border-bottom:1px solid #000;width:180px;padding-bottom:8px;">${dateStr}</p>
           </div>
         </div>
-        ${comments ? `<p style="font-size:9px;margin-top:6px;font-style:italic;">Comments: ${comments}</p>` : ''}
+        ${comments ? `<p style="font-size:9px;margin-top:6px;font-style:italic;">Comments: ${escapeHtml(comments)}</p>` : ''}
       </div>`;
 
     const cn23Html = `
       <div style="font-family:Arial,sans-serif;font-size:10px;max-width:800px;margin:0 auto;border:2px solid #000;padding:0;">
         <div style="background:#d32f2f;color:#fff;padding:6px 12px;font-weight:bold;font-size:13px;display:flex;justify-content:space-between;align-items:center;">
           <span>CN23 — CUSTOMS DECLARATION / DÉCLARATION EN DOUANE</span>
-          <span style="font-size:10px;font-weight:normal;">Pedido: ${order.orderNumber || 'N/A'}</span>
+          <span style="font-size:10px;font-weight:normal;">Pedido: ${escapeHtml(order.orderNumber || 'N/A')}</span>
         </div>
 
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:0;">
           <div style="border-right:1px solid #ccc;border-bottom:1px solid #ccc;padding:10px;">
             <div style="font-weight:bold;font-size:9px;color:#666;text-transform:uppercase;margin-bottom:6px;">FROM / EXPÉDITEUR</div>
-            <p style="margin:2px 0;font-weight:bold;">${sender.name}</p>
-            <p style="margin:2px 0;">${sender.address}</p>
-            <p style="margin:2px 0;">${sender.country}</p>
-            <p style="margin:2px 0;">Tel: ${sender.phone}</p>
+            <p style="margin:2px 0;font-weight:bold;">${escapeHtml(sender.name)}</p>
+            <p style="margin:2px 0;">${escapeHtml(sender.address)}</p>
+            <p style="margin:2px 0;">${escapeHtml(sender.country)}</p>
+            <p style="margin:2px 0;">Tel: ${escapeHtml(sender.phone)}</p>
           </div>
           <div style="border-bottom:1px solid #ccc;padding:10px;">
             <div style="font-weight:bold;font-size:9px;color:#666;text-transform:uppercase;margin-bottom:6px;">TO / DESTINATAIRE</div>
-            <p style="margin:2px 0;font-weight:bold;">${recipient.name}</p>
-            <p style="margin:2px 0;">${recipient.address}</p>
-            <p style="margin:2px 0;">${recipient.country}</p>
-            ${recipient.phone ? `<p style="margin:2px 0;">Tel: ${recipient.phone}</p>` : ''}
-            ${recipient.cpf ? `<p style="margin:2px 0;">CPF: ${recipient.cpf}</p>` : ''}
+            <p style="margin:2px 0;font-weight:bold;">${escapeHtml(recipient.name)}</p>
+            <p style="margin:2px 0;">${escapeHtml(recipient.address)}</p>
+            <p style="margin:2px 0;">${escapeHtml(recipient.country)}</p>
+            ${recipient.phone ? `<p style="margin:2px 0;">Tel: ${escapeHtml(recipient.phone)}</p>` : ''}
+            ${recipient.cpf ? `<p style="margin:2px 0;">CPF: ${escapeHtml(recipient.cpf)}</p>` : ''}
           </div>
         </div>
-
         <div style="padding:10px;border-bottom:1px solid #ccc;">
           <div style="font-weight:bold;font-size:9px;color:#666;text-transform:uppercase;margin-bottom:6px;">CATEGORY / CATÉGORIE</div>
           <span>☐ Gift &nbsp;&nbsp; ${category === 'commercial' ? '☑' : '☐'} Commercial &nbsp;&nbsp; ☐ Sample &nbsp;&nbsp; ☐ Documents &nbsp;&nbsp; ☐ Returned goods &nbsp;&nbsp; ${category === 'other' ? '☑' : '☐'} Other</span>
@@ -190,9 +198,9 @@ const CN23Modal: React.FC<CN23ModalProps> = ({ order, onClose }) => {
           <tbody>
             ${items.map(it => `
               <tr>
-                <td style="border:1px solid #ccc;padding:5px;">${it.descriptionEn || it.description}</td>
-                <td style="border:1px solid #ccc;padding:5px;text-align:center;">${it.hsCode || '—'}</td>
-                <td style="border:1px solid #ccc;padding:5px;text-align:center;">${it.quantity}</td>
+                <td style="border:1px solid #ccc;padding:5px;">${escapeHtml(it.descriptionEn || it.description)}</td>
+                <td style="border:1px solid #ccc;padding:5px;text-align:center;">${escapeHtml(it.hsCode || '—')}</td>
+                <td style="border:1px solid #ccc;padding:5px;text-align:center;">${Number(it.quantity) || 0}</td>
                 <td style="border:1px solid #ccc;padding:5px;text-align:center;">${((it.weightG * it.quantity) / 1000).toFixed(3)}</td>
                 <td style="border:1px solid #ccc;padding:5px;text-align:right;">¥${it.unitValueJpy.toLocaleString()}</td>
                 <td style="border:1px solid #ccc;padding:5px;text-align:right;">¥${(it.unitValueJpy * it.quantity).toLocaleString()}</td>
@@ -211,7 +219,7 @@ const CN23Modal: React.FC<CN23ModalProps> = ({ order, onClose }) => {
 
         ${comments ? `
         <div style="padding:8px 10px;border-top:1px solid #ccc;font-size:9px;">
-          <b>Comments / Observations:</b> ${comments}
+          <b>Comments / Observations:</b> ${escapeHtml(comments)}
         </div>` : ''}
 
         <div style="padding:10px;border-top:1px solid #ccc;display:grid;grid-template-columns:1fr 1fr;gap:20px;">
@@ -223,13 +231,13 @@ const CN23Modal: React.FC<CN23ModalProps> = ({ order, onClose }) => {
           <div style="text-align:right;font-size:9px;">
             <p style="margin:2px 0;">Postage: ¥ ___________</p>
             <p style="margin:2px 0;">Insurance: ¥ ___________</p>
-            <p style="margin:6px 0 0;font-weight:bold;">Order: ${order.orderNumber || 'N/A'}</p>
+            <p style="margin:6px 0 0;font-weight:bold;">Order: ${escapeHtml(order.orderNumber || 'N/A')}</p>
           </div>
         </div>
       </div>`;
 
     win.document.write(`<!DOCTYPE html><html><head>
-      <title>${formType} - ${order.orderNumber}</title>
+      <title>${escapeHtml(formType)} - ${escapeHtml(order.orderNumber || 'N/A')}</title>
       <style>
         body { margin: 20px; font-family: Arial, sans-serif; }
         @media print { body { margin: 0; } .no-print { display: none !important; } }
@@ -240,7 +248,7 @@ const CN23Modal: React.FC<CN23ModalProps> = ({ order, onClose }) => {
           🖨️ Imprimir ${formType}
         </button>
         <button onclick="window.close()" style="padding:8px 16px;font-size:14px;border:1px solid #ccc;border-radius:6px;cursor:pointer;">✕ Fechar</button>
-        <span style="font-size:12px;color:#666;">Formulário ${formType} • Pedido ${order.orderNumber || 'N/A'} • ${dateStr}</span>
+        <span style="font-size:12px;color:#666;">Formulário ${escapeHtml(formType)} • Pedido ${escapeHtml(order.orderNumber || 'N/A')} • ${escapeHtml(dateStr)}</span>
       </div>
       ${formType === 'CN22' ? cn22Html : cn23Html}
     </body></html>`);

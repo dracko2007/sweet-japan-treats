@@ -33,10 +33,13 @@ print("""
 
 SFTP_HOST = "partnerupload.google.com"
 SFTP_PORT = 19321
-SFTP_USER = "mc-sftp-5814734944"
-SFTP_PASSWORD = "_::y1!ZO,j"
+SFTP_USER = os.environ.get("SFTP_USER", "").strip()
+SFTP_PASSWORD = os.environ.get("SFTP_PASSWORD", "")
 SFTP_PATH = "/"
 FEED_LABEL = "JAPAN-EXPRESS-FRETES"
+
+if not SFTP_USER or not SFTP_PASSWORD:
+    raise RuntimeError("SFTP_USER and SFTP_PASSWORD must be configured outside the repository")
 
 # Fretes Japan Post (Tabela oficial)
 FRETES = {
@@ -205,10 +208,23 @@ try:
     print("=" * 80)
     
     print(f"\n🔐 Conectando a {SFTP_HOST}:{SFTP_PORT}...")
-    
-    transport = paramiko.Transport((SFTP_HOST, SFTP_PORT))
-    transport.connect(username=SFTP_USER, password=SFTP_PASSWORD)
-    sftp = paramiko.SFTPClient.from_transport(transport)
+
+    known_hosts = os.environ.get("SFTP_KNOWN_HOSTS", "").strip()
+    if not known_hosts:
+        raise RuntimeError("SFTP_KNOWN_HOSTS must point to a managed known_hosts file")
+    ssh = paramiko.SSHClient()
+    ssh.load_host_keys(known_hosts)
+    ssh.set_missing_host_key_policy(paramiko.RejectPolicy())
+    # SSHClient verifies the server key before password authentication.
+    ssh.connect(
+        hostname=SFTP_HOST,
+        port=SFTP_PORT,
+        username=SFTP_USER,
+        password=SFTP_PASSWORD,
+        look_for_keys=False,
+        allow_agent=False,
+    )
+    sftp = ssh.open_sftp()
     
     print("✅ Conectado ao servidor SFTP!")
     
@@ -218,7 +234,7 @@ try:
     print(f"✅ Upload bem-sucedido!")
     
     sftp.close()
-    transport.close()
+    ssh.close()
     
     # ========== RELATÓRIO FINAL ==========
     print("\n" + "=" * 80)

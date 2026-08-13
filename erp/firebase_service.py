@@ -11,6 +11,78 @@ import json
 from datetime import datetime
 
 
+def _configured_value(name):
+    """Read operator configuration without inventing a fallback credential."""
+    value = os.environ.get(name)
+    if value:
+        return str(value).strip()
+    try:
+        value = st.secrets.get(name)
+    except Exception:
+        value = None
+    return str(value).strip() if value else ''
+
+
+def _operator_emails():
+    configured = _configured_value('ERP_OPERATOR_EMAILS')
+    if not configured:
+        configured = _configured_value('ADMIN_EMAIL') or _configured_value('VITE_ADMIN_EMAIL')
+    return {
+        email.strip().lower()
+        for email in configured.split(',')
+        if email.strip()
+    }
+
+
+def _deny_operator_access(message):
+    st.error(message)
+    st.stop()
+
+
+def _authenticated_identity():
+    """Return the Streamlit OIDC identity, or stop before rendering the ERP."""
+    try:
+        user = st.user
+        logged_in = bool(user.is_logged_in)
+    except Exception:
+        _deny_operator_access(
+            'Autenticação do ERP não está configurada. Configure o provedor OIDC '
+            'do Streamlit antes de iniciar o sistema.'
+        )
+        return None
+
+    if not logged_in:
+        try:
+            st.login()
+        except Exception:
+            _deny_operator_access(
+                'Não foi possível iniciar a autenticação do ERP. '
+                'Verifique a configuração OIDC do Streamlit.'
+            )
+        st.stop()
+
+    email = str(getattr(user, 'email', '') or '').strip().lower()
+    if not email or getattr(user, 'email_verified', False) is not True:
+        _deny_operator_access('A conta do operador precisa ter um e-mail verificado.')
+    return email
+
+
+def require_erp_operator():
+    """Authenticate an explicitly allow-listed operator before opening Admin SDK."""
+    # This check intentionally completes before get_firebase_db(): an
+    # unauthorized OIDC identity must not trigger Admin credentials or reads.
+    email = _authenticated_identity()
+    allowed = _operator_emails()
+    if not allowed:
+        _deny_operator_access(
+            'Autorização do ERP não está configurada. Defina ERP_OPERATOR_EMAILS '
+            '(ou ADMIN_EMAIL) antes de iniciar o sistema.'
+        )
+    if email not in allowed:
+        _deny_operator_access('Sua conta não está autorizada a acessar o ERP.')
+    return get_firebase_db()
+
+
 def get_firebase_db():
     """Inicializa e retorna a conexão com o Firestore."""
     if not firebase_admin._apps:

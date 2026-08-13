@@ -24,8 +24,6 @@ module.exports = {
     'http://localhost:4173',
   ],
 
-  // Token secreto para autenticar as requisições do site
-  // Troque por uma string longa e aleatória — configure o mesmo valor
-  // em Configurações > Impressora no painel admin do site.
-  authToken: 'japan-express-print-token-2024',
+  // Token secreto obligatorio, provisionado fuera del repositorio.
+  authToken: (process.env.THERMAL_PRINT_AUTH_TOKEN || '').trim(),
 };

@@ -20,6 +20,7 @@ const cors = require('cors');
 const qrcode = require('qrcode');
 const qrcodeTerminal = require('qrcode-terminal');
 const { Client, LocalAuth } = require('whatsapp-web.js');
+const crypto = require('crypto');
 
 const config = require('./config');
 
@@ -89,24 +90,31 @@ function normalizePhone(raw) {
   }
   return `${digits}@c.us`;
 }
-
 function auth(req, res, next) {
-  const token = req.headers['x-wa-token'];
-  if (token !== config.authToken) {
-    return res.status(401).json({ error: 'Token inválido' });
+  const authorization = req.get('authorization') || '';
+  const match = authorization.match(/^Bearer\s+(.+)$/i);
+  const provided = match ? match[1].trim() : '';
+  const expected = Buffer.from(config.authToken, 'utf8');
+  const actual = Buffer.from(provided, 'utf8');
+  const valid = actual.length === expected.length &&
+    crypto.timingSafeEqual(actual, expected);
+  if (!valid) {
+    return res.status(401).json({ error: 'Authentication required' });
   }
   next();
 }
 
-// ─── Endpoints ──────────────────────────────────────────────────────────────────
+// Root health hint is protected like every other control-plane route.
+app.get('/', auth, (req, res) => {
+  res.json({ ok: true, service: 'whatsapp-server' });
+});
 
-// Health/status — o site usa para saber se está online e conectado
 app.get('/health', auth, (req, res) => {
   res.json({ ok: true, ready: isReady, hasQr: !!lastQr, version: '1.0.0' });
 });
 
 // QR code em PNG (para parear pelo navegador, sem olhar o terminal)
-app.get('/qr', async (req, res) => {
+app.get('/qr', auth, async (req, res) => {
   if (isReady) {
     return res.send('<h2>✅ WhatsApp já conectado!</h2><p>Pode fechar esta aba.</p>');
   }

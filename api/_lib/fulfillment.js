@@ -98,6 +98,17 @@ export async function fulfillOrder(orderId, { provider, reference, confirmedBy }
     ];
     const snapshots = await Promise.all(refs.map((ref) => transaction.get(ref)));
     const byPath = new Map(snapshots.map((snapshot) => [snapshot.ref.path, snapshot]));
+    const negotiationSnap = negotiationRef ? byPath.get(negotiationRef.path) : null;
+    if (negotiationRef && negotiationSnap?.exists) {
+      const negotiation = negotiationSnap.data() || {};
+      if (negotiation.claimedOrderId && negotiation.claimedOrderId !== orderId) {
+        throw new HttpError(409, 'negotiation_already_used');
+      }
+      if (negotiation.status === 'used' && negotiation.orderId && negotiation.orderId !== orderId) {
+        throw new HttpError(409, 'negotiation_already_used');
+      }
+    }
+
     const eventSnap = byPath.get(eventRef.path);
     if (eventSnap.exists) {
       if (eventSnap.data()?.orderId === orderId) return { replay: true, order };
@@ -148,6 +159,15 @@ export async function fulfillOrder(orderId, { provider, reference, confirmedBy }
     const userData = userSnap.exists ? userSnap.data() : null;
     const currentPoints = Number(userData?.points || 0);
     if (Number(order.redeemPoints || 0) > currentPoints) throw new HttpError(409, 'insufficient_points');
+    if (registeredUser && order.couponSource === 'personal' && order.couponCode) {
+      const personal = (Array.isArray(userData.coupons) ? userData.coupons : [])
+        .find((coupon) => String(coupon.code || '').toUpperCase() === String(order.couponCode).toUpperCase());
+      if (!personal || personal.isUsed || personal.reservedOrderId !== orderId
+        || !Number.isFinite(Date.parse(personal.reservedUntil || ''))
+        || Date.parse(personal.reservedUntil) <= Date.now()) {
+        throw new HttpError(409, 'coupon_unavailable');
+      }
+    }
 
     const couponSnap = couponRef ? byPath.get(couponRef.path) : null;
     const couponUsageSnap = couponUsageRef ? byPath.get(couponUsageRef.path) : null;
@@ -223,14 +243,15 @@ export async function fulfillOrder(orderId, { provider, reference, confirmedBy }
         // documento e trancaria o cupom para o mundo inteiro fora do Brasil.
         usedByCpf: cpfDoPedido.length === 11 ? unique([...usedByCpf, cpfDoPedido]) : usedByCpf,
         updatedAt: new Date().toISOString(),
-      }, { merge: true });
+      });
     }
 
     if (registeredUser) {
       const coupons = Array.isArray(userData.coupons) ? userData.coupons : [];
       let nextCoupons = coupons;
       if (order.couponSource === 'personal' && order.couponCode) {
-        nextCoupons = coupons.map((coupon) => String(coupon.code || '').toUpperCase() === order.couponCode ? { ...coupon, isUsed: true } : coupon);
+        nextCoupons = coupons.map((coupon) => String(coupon.code || '').toUpperCase() === order.couponCode
+          ? { ...coupon, isUsed: true, reservedOrderId: '' } : coupon);
       }
       if (order.promoCouponCode && !nextCoupons.some((coupon) => String(coupon.code || '').toUpperCase() === String(order.promoCouponCode).toUpperCase())) {
         nextCoupons = [...nextCoupons, {

@@ -13,6 +13,7 @@ const firestoreMocks = vi.hoisted(() => ({
 }));
 
 const cacheMocks = vi.hoisted(() => ({ snapshot: null as unknown }));
+const fetchMocks = vi.hoisted(() => ({ fetch: vi.fn() }));
 
 vi.mock('@/config/firebase', () => ({ auth: {}, db: {}, firebaseConfigReady: true }));
 
@@ -40,6 +41,7 @@ vi.mock('@/data/products', () => ({ products: [] }));
 vi.mock('@/utils/adminAuth', () => ({ ensureAdminAuth: vi.fn() }));
 vi.mock('@/services/cloudinaryService', () => ({ cdnImage: (url: string) => url }));
 
+globalThis.fetch = fetchMocks.fetch as typeof fetch;
 import { invalidateProductCache, productService, resetProductCache } from '@/services/productService';
 
 interface FakeDoc {
@@ -60,16 +62,26 @@ function produto(id: string, updatedAtMs: number, extra: Record<string, unknown>
 }
 
 function responder(docs: FakeDoc[]): void {
-  firestoreMocks.getDocs.mockResolvedValueOnce({
-    forEach: (fn: (d: FakeDoc) => void) => docs.forEach(fn),
+  const items: Record<string, unknown>[] = [];
+  const deleted: string[] = [];
+  let maxMs = 0;
+  for (const document of docs) {
+    const data = document.data();
+    const updatedAt = data.updatedAt as { toMillis?: () => number };
+    maxMs = Math.max(maxMs, updatedAt.toMillis?.() || 0);
+    if (data.__deleted) deleted.push(document.id);
+    else items.push({ id: document.id, ...data });
+  }
+  fetchMocks.fetch.mockResolvedValueOnce({
+    ok: true,
+    json: async () => ({ items, deleted, maxMs }),
   });
 }
 
 describe('sincronização do catálogo', () => {
   beforeEach(async () => {
     cacheMocks.snapshot = null;
-    firestoreMocks.getDocs.mockReset();
-    firestoreMocks.where.mockClear();
+    fetchMocks.fetch.mockReset();
     await resetProductCache();
   });
 
@@ -78,14 +90,12 @@ describe('sincronização do catálogo', () => {
 
     const primeira = await productService.getMerged();
     expect(primeira).toHaveLength(2);
-    expect(firestoreMocks.getDocs).toHaveBeenCalledTimes(1);
+    expect(fetchMocks.fetch).toHaveBeenCalledTimes(1);
     // Sem filtro: primeira visita precisa do catálogo inteiro.
-    expect(firestoreMocks.where).not.toHaveBeenCalled();
-
+    expect(String(fetchMocks.fetch.mock.calls[0][0])).toBe('/api/products');
     const segunda = await productService.getMerged();
 
     expect(segunda).toHaveLength(2);
-    expect(firestoreMocks.getDocs).toHaveBeenCalledTimes(1); // zero leituras novas
   });
 
   it('pergunta só o que mudou depois do maior updatedAt visto', async () => {
@@ -97,7 +107,7 @@ describe('sincronização do catálogo', () => {
     await productService.getMerged();
 
     // Parte do maior updatedAt (5000), não do relógio do cliente.
-    expect(firestoreMocks.where).toHaveBeenCalledWith('updatedAt', '>=', { ms: 5000 });
+    expect(String(fetchMocks.fetch.mock.calls[1][0])).toBe('/api/products?since=5000');
   });
 
   it('aplica o delta sobre o cache sem reler o catálogo inteiro', async () => {
@@ -129,7 +139,7 @@ describe('sincronização do catálogo', () => {
     await productService.getMerged();
 
     invalidateProductCache();
-    firestoreMocks.getDocs.mockRejectedValueOnce(new Error('RESOURCE_EXHAUSTED'));
+    fetchMocks.fetch.mockRejectedValueOnce(new Error('RESOURCE_EXHAUSTED'));
     const durantePane = await productService.getMerged();
 
     expect(durantePane.map((p) => p.id)).toEqual(['a']);

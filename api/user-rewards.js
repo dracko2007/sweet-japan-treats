@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { requireUser } from './_lib/auth.js';
+import { requireVerifiedUser } from './_lib/auth.js';
 import { adminAuth, adminDb } from './_lib/firebase-admin.js';
 import {
   assertExactKeys,
@@ -86,13 +86,14 @@ async function claimSocialFollow(db, user, body) {
       : {};
     if (follows[network] === true) return result(0, points, true);
 
-    const total = points + SOCIAL_POINTS;
+    // A client assertion is not evidence of a provider follow. Keep the
+    // engagement marker for UX/administration, but never mint spendable
+    // currency without a verified provider callback.
     transaction.update(userRef, {
       socialFollows: { ...follows, [network]: true },
-      points: total,
       updatedAt: new Date().toISOString(),
     });
-    return result(SOCIAL_POINTS, total);
+    return result(0, points);
   });
 }
 
@@ -233,7 +234,7 @@ export default async function handler(req, res) {
   if (!handleCors(req, res, { methods: ['POST'] })) return;
 
   try {
-    const user = await requireUser(req);
+    const user = await requireVerifiedUser(req);
     const body = parseJsonObject(req.body);
     const action = requiredText(body.action, { max: 30 });
     const db = adminDb();
