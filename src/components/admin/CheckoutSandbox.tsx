@@ -7,8 +7,8 @@ import { Label } from '@/components/ui/label';
 type SandboxItem = { name: string; price: number; cost: number; quantity: number; discounted: boolean };
 
 const initialItems: SandboxItem[] = [
-  { name: 'Produto em promoção', price: 2000, cost: 1200, quantity: 1, discounted: true },
-  { name: 'Produto sem promoção', price: 3000, cost: 1800, quantity: 1, discounted: false },
+  { name: 'Produto em promoção', price: 2000, cost: 1000, quantity: 1, discounted: true },
+  { name: 'Produto sem promoção', price: 3000, cost: 1500, quantity: 1, discounted: false },
 ];
 
 const CheckoutSandbox: React.FC = () => {
@@ -106,8 +106,8 @@ const CheckoutSandbox: React.FC = () => {
           {items.map((item, index) => (
             <div key={item.name} className="rounded-xl border p-3 space-y-2">
               <div className="flex items-center gap-3"><div className="min-w-0 flex-1"><p className="text-sm font-semibold">{item.name}</p><p className="text-xs text-muted-foreground">Quantidade: {item.quantity}</p></div><label className="flex items-center gap-1 text-xs"><input type="checkbox" checked={item.discounted} onChange={(e) => setItems((current) => current.map((value, i) => i === index ? { ...value, discounted: e.target.checked } : value))} /> Promoção</label></div>
-              <div className="grid grid-cols-2 gap-2"><Input type="number" min="0" aria-label="Preço do item" value={item.price} onChange={(e) => setItems((current) => current.map((value, i) => i === index ? { ...value, price: Number(e.target.value) } : value))} /><Input type="number" min="0" aria-label="Custo do item" value={item.cost} onChange={(e) => setItems((current) => current.map((value, i) => i === index ? { ...value, cost: Number(e.target.value) } : value))} /></div>
-              <p className="text-[11px] text-muted-foreground">Preço de venda · custo usado na comissão</p>
+              <div className="grid grid-cols-2 gap-2"><Input type="number" min="0" aria-label="Preço do item" value={item.price} onChange={(e) => { const price = Math.max(0, Number(e.target.value)); setItems((current) => current.map((value, i) => i === index ? { ...value, price, cost: Math.round(price / 2) } : value)); }} /><div className="rounded-md border bg-muted px-3 py-2 text-sm"><span className="block text-[10px] text-muted-foreground">Custo (50%)</span><strong>¥{item.cost.toLocaleString()}</strong></div></div>
+              <p className="text-[11px] text-muted-foreground">Preço de venda · custo automático equivalente à metade do preço</p>
             </div>
           ))}
           <div className="rounded-xl border border-blue-200 bg-blue-50 p-3 text-xs text-blue-800">O cupom não acumula no produto promocional. O lucro e a comissão consideram todos os produtos pagos.</div>
