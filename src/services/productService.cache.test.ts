@@ -92,7 +92,7 @@ describe('sincronização do catálogo', () => {
     expect(primeira).toHaveLength(2);
     expect(fetchMocks.fetch).toHaveBeenCalledTimes(1);
     // Sem filtro: primeira visita precisa do catálogo inteiro.
-    expect(String(fetchMocks.fetch.mock.calls[0][0])).toBe('/api/products');
+    expect(String(fetchMocks.fetch.mock.calls[0][0])).toMatch(/^\/api\/products\?_catalog=\d+$/);
     const segunda = await productService.getMerged();
 
     expect(segunda).toHaveLength(2);
@@ -107,7 +107,7 @@ describe('sincronização do catálogo', () => {
     await productService.getMerged();
 
     // Parte do maior updatedAt (5000), não do relógio do cliente.
-    expect(String(fetchMocks.fetch.mock.calls[1][0])).toBe('/api/products?since=5000');
+    expect(String(fetchMocks.fetch.mock.calls[1][0])).toMatch(/^\/api\/products\?_catalog=\d+&since=5000$/);
   });
 
   it('aplica o delta sobre o cache sem reler o catálogo inteiro', async () => {

@@ -115,8 +115,13 @@ export const productService = {
    *  estoque errado na vitrine. */
   async getOverrides(desdeMs: number | null = null): Promise<Overrides & { maxMs: number }> {
     try {
-      const suffix = desdeMs === null ? '' : `?since=${encodeURIComponent(String(desdeMs))}`;
-      const response = await fetch(`/api/products${suffix}`, { headers: { Accept: 'application/json' } });
+      const suffix = desdeMs === null ? '' : `&since=${encodeURIComponent(String(desdeMs))}`;
+      const separator = desdeMs === null ? '?' : suffix[0] === '&' ? '?' : '?';
+      const cacheBust = `_catalog=${Date.now()}`;
+      const response = await fetch(`/api/products${separator}${cacheBust}${desdeMs === null ? '' : suffix}`, {
+        headers: { Accept: 'application/json', 'Cache-Control': 'no-cache' },
+        cache: 'no-store',
+      });
       if (!response.ok) throw new Error(`Catálogo indisponível (${response.status})`);
       const payload = await response.json() as {
         items?: unknown;
