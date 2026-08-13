@@ -51,7 +51,7 @@ export default async function handler(req, res) {
       if (product.__deleted) deleted.push(document.id);
       else items.push(product);
     }
-    res.setHeader('Cache-Control', 'public, max-age=300, stale-while-revalidate=600');
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
     return res.status(200).json({ items, deleted, maxMs });
   } catch (error) {
     console.error('[products]', error instanceof Error ? error.message : error);
