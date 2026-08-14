@@ -18,7 +18,7 @@ const COUNTRY_NAME: Record<string, string> = {
   EC: 'Equador', AO: 'Angola', MZ: 'Moçambique', CV: 'Cabo Verde',
 };
 
-const GA4_URL = 'https://analytics.google.com/analytics/web/#/p/15438581912/';
+const GA4_URL = 'https://analytics.google.com/analytics/web/?authuser=1#/p/15438581912/reports/intelligenthome';
 
 type TabId = 'overview' | 'pages' | 'products';
 
