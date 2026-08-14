@@ -221,8 +221,7 @@ const Shipping: React.FC = () => {
     const brlELight2kg = fxConvert(getELightRate(2000, 5) ?? 5860, 'BRL');
     const brlEms1kg  = fxConvert(getEmsRate(billableWeightG, 5) ?? 4700, 'BRL');
     const brlEms3kg  = fxConvert(getEmsRate(3000, 5) ?? 7800, 'BRL');
-    const brlAir3kg  = fxConvert(getAirParcelRate(3000, 5) ?? 9950, 'BRL');
-    const brlAir5kg  = fxConvert(getAirParcelRate(5000, 5) ?? 15350, 'BRL');
+    const brlAir3kg  = fxConvert(getAirParcelRate(billableWeightG, 5) ?? 9950, 'BRL');
     const du = language === 'ja' ? '営業日' : language === 'en' ? 'business days' : 'dias úteis';
     const seaTime = language === 'ja' ? '60-90日' : language === 'en' ? '60-90 days' : '60-90 dias';
     const tbdTime = language === 'ja' ? '要相談' : language === 'en' ? 'TBD' : 'A definir';
@@ -662,7 +661,7 @@ const Shipping: React.FC = () => {
                   {t('shippingPage.sampleNote')}
                 </p>
                 <div className="space-y-3">
-                  {sampleRates.map((carrier) => (
+                  {sampleRates.filter((carrier) => billableWeightG <= 2000 || carrier.name !== 'Japan Post E-Light ✉️').map((carrier) => (
                     <div key={carrier.name} className="p-4 rounded-xl bg-card border border-border space-y-3 hover:border-primary/50 transition-all">
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex items-center gap-3">
