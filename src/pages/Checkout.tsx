@@ -82,8 +82,10 @@ const Checkout: React.FC = () => {
   const isUsa = formData.country === 'Estados Unidos';
   const currency = getCurrencyByCountry(formData.country);
 
-  // Coupon state must be available to determine affiliate-eligible lines.
-  const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
+  // Mantém o cupom validado no carrinho ao avançar para o checkout.
+  const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(
+    () => (location.state as { coupon?: Coupon } | null)?.coupon || null
+  );
   const [couponDiscount, setCouponDiscount] = useState(0);
   const baseTotalPrice = items.reduce(
     (sum, item) => item.freeGift ? sum : sum + fxConvert(effectiveYen(item.product, item.size), currency) * item.quantity, 0
@@ -99,6 +101,11 @@ const Checkout: React.FC = () => {
         : sum;
     }, 0
   );
+  useEffect(() => {
+    setCouponDiscount(
+      appliedCoupon ? computeCouponDiscount(appliedCoupon, regularSubtotalForCoupon) : 0
+    );
+  }, [appliedCoupon, regularSubtotalForCoupon]);
   const discountedItemCount = items.filter((item) =>
     !item.freeGift && (item.product.id.endsWith('_promo') || (item.product.discountPercent || 0) > 0)
   ).length;
