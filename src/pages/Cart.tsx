@@ -89,14 +89,13 @@ const Cart: React.FC = () => {
 
     // 2) Código de afiliado/influencer: público, reutilizável e disponível
     // para visitantes. Não depende de login nem de cupom pessoal.
-    const aff = await affiliateService.validate(code);
-    if (aff.valid && aff.affiliate) {
-      applyCouponObject(affiliateToCoupon(aff.affiliate, null));
-      safeStorage.setItem('affiliate_ref', aff.affiliate.code);
+    const affiliateResult = await affiliateService.validate(code);
+    if (affiliateResult.valid && affiliateResult.affiliate) {
+      applyCouponObject(affiliateToCoupon(affiliateResult.affiliate, null));
+      safeStorage.setItem('affiliate_ref', affiliateResult.affiliate.code);
       safeStorage.removeItem('affiliate_ref_product');
       return;
     }
-
     // 3) Cupom global criado no painel admin (público conforme as regras
     // configuradas; cupons comuns continuam sujeitos a autenticação).
     const globalResult = await globalCouponService.validateCouponAsync(code, user?.email || undefined, productSubtotalYen);
@@ -115,7 +114,15 @@ const Cart: React.FC = () => {
       return;
     }
 
-    // 4) Falhou
+    // Mostra o motivo real do código afiliado, especialmente quando expirou.
+    if (affiliateResult.error === 'Código expirado.') {
+      setCouponError('Código de afiliado expirado. Não pode mais ser usado.');
+      return;
+    }
+    if (affiliateResult.error === 'Código inativo.') {
+      setCouponError('Código de afiliado inativo. Não pode ser usado.');
+      return;
+    }
     setActiveCoupon(null);
     setCouponError(
       isAuthenticated
