@@ -215,11 +215,10 @@ const Shipping: React.FC = () => {
       ];
     }
 
-    // Brasil — preços calculados com tabelas reais Japan Post (zona 5)
-    // Referência: E-Light 1kg / 2kg, EMS 1kg / 3kg, Kozutsumi Air 3kg / 5kg
-    const brlELight1kg = fxConvert(getELightRate(1000, 5) ?? 3260, 'BRL');
+    // Brasil — valores calculados pela mesma tabela e peso faturável do simulador.
+    const brlELight1kg = fxConvert(getELightRate(billableWeightG, 5) ?? 3260, 'BRL');
     const brlELight2kg = fxConvert(getELightRate(2000, 5) ?? 5860, 'BRL');
-    const brlEms1kg  = fxConvert(getEmsRate(1000, 5) ?? 4700, 'BRL');
+    const brlEms1kg  = fxConvert(getEmsRate(billableWeightG, 5) ?? 4700, 'BRL');
     const brlEms3kg  = fxConvert(getEmsRate(3000, 5) ?? 7800, 'BRL');
     const brlAir3kg  = fxConvert(getAirParcelRate(3000, 5) ?? 9950, 'BRL');
     const brlAir5kg  = fxConvert(getAirParcelRate(5000, 5) ?? 15350, 'BRL');
