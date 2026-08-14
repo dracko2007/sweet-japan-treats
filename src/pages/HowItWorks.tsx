@@ -19,7 +19,7 @@ import { useLanguage } from '@/context/LanguageContext';
 const getJourney = (lang: string) => {
   if (lang === 'en') return [
     { icon: Package, color: '#ec4899', title: 'You place the order', desc: 'Choose products in the catalog and complete your cart. Can be a ready product or a custom "Place Your Order".' },
-    { icon: CreditCard, color: '#f59e0b', title: 'Payment', desc: 'Pay via PIX or Wise (Brazil), PayPay (Japan) or Wise (international). We start preparing only after payment confirmation.' },
+    { icon: CreditCard, color: '#f59e0b', title: 'Payment', desc: 'Pay by credit card (Brazil and Japan) or Wise (international). We start preparing only after payment confirmation.' },
     { icon: Package, color: '#8b5cf6', title: 'Preparation in Hiroshima', desc: 'We carefully pick and pack everything in our Japan store, with extra protection for the journey.' },
     { icon: Plane, color: '#3b82f6', title: 'Air / sea shipping', desc: 'The package travels from Japan to your country via the chosen carrier (EMS, Correios, Yamato, sea...).' },
     { icon: Landmark, color: '#ef4444', title: 'Customs & taxes', desc: 'On arrival, customs inspects the package. If there is tax, you receive a notification and pay online BEFORE release — never in cash to the postal worker.' },
@@ -28,7 +28,7 @@ const getJourney = (lang: string) => {
   ];
   if (lang === 'ja') return [
     { icon: Package, color: '#ec4899', title: 'ご注文', desc: 'カタログから商品を選んでカートに入れます。既製品のほか、カスタム注文も承っています。' },
-    { icon: CreditCard, color: '#f59e0b', title: 'お支払い', desc: 'PIXまたはWise（ブラジル）、PayPay（日本）、Wise（海外）でお支払いいただけます。入金確認後に準備を開始します。' },
+    { icon: CreditCard, color: '#f59e0b', title: 'お支払い', desc: 'ブラジル・日本ではクレジットカード、海外ではWiseでお支払いいただけます。入金確認後に準備を開始します。' },
     { icon: Package, color: '#8b5cf6', title: '広島での準備', desc: '日本の店舗で丁寧に商品をピッキングし、長距離輸送に備えた特別な梱包を施します。' },
     { icon: Plane, color: '#3b82f6', title: '航空便・船便での発送', desc: '選択した配送業者（EMS、Correios、ヤマト、船便など）で日本からお届け先の国へ発送します。' },
     { icon: Landmark, color: '#ef4444', title: '税関・関税', desc: '到着後、税関が荷物を検査します。関税がある場合は通知が届き、オンラインで支払い後に通関されます。配達員への現金払いは不要です。' },
@@ -37,7 +37,7 @@ const getJourney = (lang: string) => {
   ];
   return [
     { icon: Package, color: '#ec4899', title: 'Você faz o pedido', desc: 'Escolhe os produtos no catálogo e fecha o carrinho. Pode ser produto pronto ou um "Faça seu Pedido" personalizado.' },
-    { icon: CreditCard, color: '#f59e0b', title: 'Pagamento', desc: 'Você paga por PIX ou Wise (Brasil), PayPay (Japão) ou Wise (internacional). Só preparamos o pacote depois do pagamento confirmado.' },
+    { icon: CreditCard, color: '#f59e0b', title: 'Pagamento', desc: 'Você paga com cartão de crédito no Brasil e no Japão, ou Wise no exterior. Só preparamos o pacote depois do pagamento confirmado.' },
     { icon: Package, color: '#8b5cf6', title: 'Preparo em Hiroshima', desc: 'Separamos e embalamos tudo com carinho na nossa loja no Japão, com proteção extra para a viagem.' },
     { icon: Plane, color: '#3b82f6', title: 'Envio aéreo / marítimo', desc: 'O pacote viaja do Japão até o seu país pela transportadora escolhida (EMS, Correios, Yamato, navio...).' },
     { icon: Landmark, color: '#ef4444', title: 'Alfândega & impostos', desc: 'Na chegada, a Receita Federal fiscaliza o pacote. Se houver imposto, você recebe a notificação e paga online ANTES da liberação — nunca em dinheiro ao carteiro.' },
@@ -59,13 +59,13 @@ const getPayments = (lang: string) => {
       ],
     },
     {
-      id: 'paypay', icon: Wallet, color: '#ef4444', label: 'PayPay', tag: 'Japan 🇯🇵',
-      short: 'Most used digital wallet in Japan, via QR Code.',
+      id: 'card', icon: CreditCard, color: '#ef4444', label: 'Cartão de crédito', tag: 'Brasil e Japão 🌍',
+      short: 'Pagamento seguro com cartão de crédito.',
       steps: [
-        'At checkout, choose PayPay.',
-        'Open the PayPay app and tap "Scan".',
-        'Scan the Japan Express QR Code.',
-        'Enter the exact amount and confirm payment.',
+        'No checkout, escolha Cartão de crédito.',
+        'Informe os dados do cartão na página segura de pagamento.',
+        'Confirme o valor exato da compra.',
+        'Após a aprovação, seu pedido entra em preparo.',
       ],
     },
     {
@@ -91,13 +91,13 @@ const getPayments = (lang: string) => {
       ],
     },
     {
-      id: 'paypay', icon: Wallet, color: '#ef4444', label: 'PayPay', tag: '日本 🇯🇵',
-      short: 'QRコードで使える、日本で最も利用されている電子財布。',
+      id: 'card', icon: CreditCard, color: '#ef4444', label: 'クレジットカード', tag: 'ブラジル・日本 🌍',
+      short: 'クレジットカードによる安全な支払い。',
       steps: [
-        'チェックアウトでPayPayを選択。',
-        'PayPayアプリを開いて「スキャン」をタップ。',
-        'Japan ExpressのQRコードをスキャン。',
-        '正確な金額を入力して支払いを確認。',
+        'チェックアウトでクレジットカードを選択。',
+        '安全な決済ページでカード情報を入力。',
+        '購入金額を確認して支払いを確定。',
+        '承認後、注文の準備を開始します。',
       ],
     },
     {
@@ -123,13 +123,13 @@ const getPayments = (lang: string) => {
       ],
     },
     {
-      id: 'paypay', icon: Wallet, color: '#ef4444', label: 'PayPay', tag: 'Japão 🇯🇵',
-      short: 'Carteira digital mais usada no Japão, via QR Code.',
+      id: 'card', icon: CreditCard, color: '#ef4444', label: 'Cartão de crédito', tag: 'Brasil e Japão 🌍',
+      short: 'Pagamento seguro com cartão de crédito.',
       steps: [
-        'No checkout, escolha PayPay.',
-        'Abra o app PayPay e toque em "Scan".',
-        'Escaneie o QR Code da Japan Express.',
-        'Digite o valor exato e confirme o pagamento.',
+        'No checkout, escolha Cartão de crédito.',
+        'Informe os dados do cartão na página segura de pagamento.',
+        'Confirme o valor exato da compra.',
+        'Após a aprovação, seu pedido entra em preparo.',
       ],
     },
     {

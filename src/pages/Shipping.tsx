@@ -98,7 +98,7 @@ const Shipping: React.FC = () => {
     }
 
     const emsYen = getEmsRate(billableWeightG, zone);
-    rates.push({ name: 'Japan Post EMS / DHL ✈️', cost: emsYen ? fxConvert(emsYen, cur) : null, time: `${zd.ems} ${du}` });
+    rates.push({ name: 'Japan Post EMS ✈️', cost: emsYen ? fxConvert(emsYen, cur) : null, time: `${zd.ems} ${du}` });
     const seaTime = language === 'ja' ? '60-90日' : language === 'en' ? '60-90 days' : '60-90 dias';
     const tbdTime = language === 'ja' ? '要相談' : language === 'en' ? 'TBD' : 'A definir';
     rates.push({ name: 'Sea Freight 🚢', cost: null, time: seaTime, consultar: true });
@@ -237,7 +237,7 @@ const Shipping: React.FC = () => {
         features: ['Até 2 kg', 'Rastreio básico', 'Mais acessível']
       },
       {
-        name: 'Japan Post EMS / DHL ✈️',
+        name: 'Japan Post EMS ✈️',
         logo: '✈️',
         desc: t('shippingPage.carrier.ems.desc'),
         rate60: brlEms1kg,
