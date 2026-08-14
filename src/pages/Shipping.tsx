@@ -50,6 +50,7 @@ const Shipping: React.FC = () => {
   const simVolume = (simHeight * simWidth * simDepth) / 1000000; // Volume in m³
   const volumetricWeight = simVolume * 200; // Volumetric constant: 1m3 = 200kg (standards)
   const billableWeight = Math.max(simWeight, volumetricWeight);
+  const billableWeightG = Math.max(1, Math.round(billableWeight * 1000));
   const dimensionSum = simHeight + simWidth + simDepth;
 
   const isOversize = dimensionSum > MAX_DIM_SUM_CM;
