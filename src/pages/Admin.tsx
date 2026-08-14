@@ -869,7 +869,7 @@ _This is an automated test message_
             </aside>
 
             {/* COLUNA DE CONTEÚDO */}
-            <div className="flex-1 min-w-0 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto">
+            <div className="flex-1 min-w-0">
               {/* Navegação mobile (scroll horizontal) */}
               <div className="lg:hidden mb-6">
                 <nav className="flex overflow-x-auto scrollbar-hide gap-2 pb-1">
