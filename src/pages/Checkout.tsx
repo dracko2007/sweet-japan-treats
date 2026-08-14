@@ -1120,6 +1120,12 @@ const Checkout: React.FC = () => {
                     const originalItemPrice = originalUnitPrice * item.quantity;
                     const productName = productEnglishName(item.product);
                     const hasProductDiscount = hasDiscount(item.product);
+                    const affiliateEligible = Boolean(appliedCoupon?.affiliateCode)
+                      && !item.freeGift && !itemIsPromo && !hasProductDiscount;
+                    const itemCouponDiscount = affiliateEligible && regularSubtotalForCoupon > 0
+                      ? couponDiscount * (displayItemPrice / regularSubtotalForCoupon)
+                      : 0;
+                    const finalItemPrice = Math.max(0, displayItemPrice - itemCouponDiscount);
                     return (
                       <div
                         key={`${item.product.id}-${item.size}`}
@@ -1135,9 +1141,17 @@ const Checkout: React.FC = () => {
                           {hasProductDiscount && (
                             <p className="text-[10px] text-muted-foreground line-through">{formatPrice(originalItemPrice, currency)}</p>
                           )}
+                          {affiliateEligible && itemCouponDiscount > 0 && (
+                            <p className="text-[10px] text-muted-foreground line-through">{formatPrice(displayItemPrice, currency)}</p>
+                          )}
                           {(itemIsPromo || hasProductDiscount) && (
                             <p className="text-[10px] text-red-600 font-bold">
                               {hasProductDiscount ? `−${item.product.discountPercent}% desconto da loja` : 'Preço promocional da loja'}
+                            </p>
+                          )}
+                          {affiliateEligible && itemCouponDiscount > 0 && (
+                            <p className="text-[10px] text-green-600 font-bold">
+                              −{appliedCoupon?.discount}% cupom de afiliado
                             </p>
                           )}
                           <p className="text-[10px] text-gray-400 font-semibold mt-0.5">
@@ -1145,7 +1159,7 @@ const Checkout: React.FC = () => {
                           </p>
                         </div>
                         <p className={`font-bold text-xs ${item.freeGift ? 'text-green-600' : 'text-gray-800'}`}>
-                          {item.freeGift ? 'GRÁTIS' : formatPrice(displayItemPrice, currency)}
+                          {item.freeGift ? 'GRÁTIS' : formatPrice(finalItemPrice, currency)}
                         </p>
                       </div>
                     );
