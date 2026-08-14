@@ -1,10 +1,11 @@
 // Configuração centralizada do administrador.
 // A autenticação usa Firebase Auth puro — a senha nunca é armazenada no bundle.
 //
-// The administrator e-mail is deployment configuration, not a source fallback.
-// Without VITE_ADMIN_EMAIL the client cannot identify a bootstrap administrator.
+// A conta administrativa é uma identidade fixa do Firebase Auth. A variável
+// de ambiente pode sobrescrever o e-mail em instalações diferentes, mas a
+// aplicação principal continua funcionando sem depender da Vercel.
 export const ADMIN_EMAIL =
-  String(import.meta.env.VITE_ADMIN_EMAIL || '').trim().toLowerCase();
+  String(import.meta.env.VITE_ADMIN_EMAIL || 'dracko2007@gmail.com').trim().toLowerCase();
 
 export const ADMIN_USER_ID = 'admin-001';
 
