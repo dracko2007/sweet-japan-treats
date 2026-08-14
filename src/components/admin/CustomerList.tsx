@@ -362,12 +362,13 @@ const CustomerList: React.FC = () => {
         promoCampaignService.deleteAllCampaignData(),
       ]);
 
-      // Limpa localStorage: sakura_orders, carrinho, negociação ativa
+      // Limpa também o consentimento local para o banner de cookies reaparecer
+      // depois de um reset completo (Ctrl+Shift+R não remove localStorage).
+      safeStorage.removeItem('cookie_consent');
       safeStorage.removeItem('sakura_orders');
       safeStorage.removeItem('redeem_points');
       safeStorage.removeItem('sakura_cart');
       safeStorage.removeItem('activeNegId');
-
       // Limpa orders de todos os usuários em japan-express-users (localStorage legado)
       try {
         const raw = safeStorage.getItem('japan-express-users');
