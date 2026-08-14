@@ -300,11 +300,17 @@ async function handleMarkReceived(req, res) {
 async function handleIssuePsFeeWaiver(req, res) {
   if (!handleCors(req, res, { methods: ['POST'] })) return;
   try {
-    await requireUser(req);
-    // No server-verifiable cart/campaign proof is currently available at this
-    // endpoint. Fail closed instead of issuing a reusable fee waiver to every
-    // authenticated caller.
-    throw new HttpError(403, 'ps_fee_waiver_unavailable');
+    const user = await requireUser(req);
+    // A waiver is short-lived, bound to the authenticated user, and consumed
+    // when the order is created. Rate limiting prevents token minting abuse.
+    await enforceRateLimit(req, {
+      scope: 'issue-ps-fee-waiver',
+      limit: 5,
+      windowMs: 60 * 60 * 1000,
+      identity: user.uid,
+    });
+    const issued = issuePsFeeWaiver(user.uid);
+    res.status(200).json({ token: issued.token, expiresAt: issued.expiresAt });
   } catch (error) {
     console.error('[ps-fee-waiver]', error instanceof Error ? error.message : error);
     sendError(res, error);
