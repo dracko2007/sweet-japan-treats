@@ -87,7 +87,18 @@ const Cart: React.FC = () => {
       }
     }
 
-    // 2) Cupom global criado no painel admin (público, carrega do Firestore)
+    // 2) Código de afiliado/influencer: público, reutilizável e disponível
+    // para visitantes. Não depende de login nem de cupom pessoal.
+    const aff = await affiliateService.validate(code);
+    if (aff.valid && aff.affiliate) {
+      applyCouponObject(affiliateToCoupon(aff.affiliate, null));
+      safeStorage.setItem('affiliate_ref', aff.affiliate.code);
+      safeStorage.removeItem('affiliate_ref_product');
+      return;
+    }
+
+    // 3) Cupom global criado no painel admin (público conforme as regras
+    // configuradas; cupons comuns continuam sujeitos a autenticação).
     const globalResult = await globalCouponService.validateCouponAsync(code, user?.email || undefined, productSubtotalYen);
     if (globalResult.valid && globalResult.coupon) {
       const gc = globalResult.coupon;
@@ -101,16 +112,6 @@ const Cart: React.FC = () => {
         isUsed: false,
         freeShipping: gc.freeShipping,
       });
-      return;
-    }
-
-    // 3) Código de afiliado/influencer (público)
-    const aff = await affiliateService.validate(code);
-    if (aff.valid && aff.affiliate) {
-      // Quando digitado manualmente (não via link de produto), não há productId
-      applyCouponObject(affiliateToCoupon(aff.affiliate, null));
-      safeStorage.setItem('affiliate_ref', aff.affiliate.code);
-      safeStorage.removeItem('affiliate_ref_product');
       return;
     }
 
