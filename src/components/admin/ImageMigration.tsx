@@ -8,6 +8,26 @@ import { Product } from '@/types';
 import { authenticatedFetch } from '@/services/authenticatedFetch';
 
 const CONCURRENCY = 3;
+async function runWithConcurrency<T>(
+  items: T[],
+  concurrency: number,
+  worker: (item: T) => Promise<void>,
+): Promise<void> {
+  if (items.length === 0) return;
+
+  let nextIndex = 0;
+  const workerCount = Math.min(Math.max(1, concurrency), items.length);
+  await Promise.all(
+    Array.from({ length: workerCount }, async () => {
+      while (nextIndex < items.length) {
+        const item = items[nextIndex];
+        nextIndex += 1;
+        if (item !== undefined) await worker(item);
+      }
+    }),
+  );
+}
+
 
 /** Reduz e converte para WebP. Devolve `''` quando não há nada a ganhar — os
  *  chamadores tratam `''` como "mantém o original", evitando o re-encode que
@@ -174,7 +194,7 @@ const ImageMigration: React.FC = () => {
   const runHDRemigration = useCallback(async () => {
     if (productsWithImages.length === 0) return;
     const errors: string[] = [];
-    setHdState({ status: 'running', total: productsWithImages.length, done: 0, errors: [] });
+    setHdState({ status: 'running', total: productsWithImages.length, done: 0, success: 0, errors: [] });
     await runWithConcurrency(productsWithImages, 2, async (p) => {
       try {
         const migrated = await remigrateProductHD(p);

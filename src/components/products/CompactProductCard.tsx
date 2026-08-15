@@ -81,13 +81,10 @@ const CompactProductCard: React.FC<CompactProductCardProps> = ({ product }) => {
 
   return (
     <article
-      onClick={() => {
-        // Animação de clique
-        const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+      onClick={(event: React.MouseEvent<HTMLElement>) => {
+        const rect = event.currentTarget.getBoundingClientRect();
         const x = event.clientX - rect.left;
         const y = event.clientY - rect.top;
-
-        // Criar ripple effect
         const ripple = document.createElement('div');
         ripple.style.position = 'absolute';
         ripple.style.left = x + 'px';
@@ -99,9 +96,7 @@ const CompactProductCard: React.FC<CompactProductCardProps> = ({ product }) => {
         ripple.style.pointerEvents = 'none';
         ripple.style.animation = 'ripple-expand 0.6s ease-out forwards';
         ripple.className = 'ripple-effect';
-
-        (event.currentTarget as HTMLElement).appendChild(ripple);
-
+        event.currentTarget.appendChild(ripple);
         setTimeout(() => ripple.remove(), 600);
         navigate(`/produto/${product.id}`);
       }}

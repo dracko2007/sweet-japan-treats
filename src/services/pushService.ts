@@ -18,14 +18,15 @@ export const isPushSupported = (): boolean =>
   'Notification' in window &&
   !!VAPID_PUBLIC_KEY;
 
-// Converte a chave pública VAPID (base64url) para Uint8Array — formato exigido por applicationServerKey.
-function urlBase64ToUint8Array(base64String: string): Uint8Array {
+// Converte a chave pública VAPID (base64url) para um ArrayBuffer — tipo aceito por applicationServerKey.
+function urlBase64ToArrayBuffer(base64String: string): ArrayBuffer {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
   const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
   const rawData = atob(base64);
-  const output = new Uint8Array(rawData.length);
+  const buffer = new ArrayBuffer(rawData.length);
+  const output = new Uint8Array(buffer);
   for (let i = 0; i < rawData.length; i++) output[i] = rawData.charCodeAt(i);
-  return output;
+  return buffer;
 }
 
 async function getRegistration(): Promise<ServiceWorkerRegistration> {
@@ -107,7 +108,7 @@ export const pushService = {
       if (!sub) {
         sub = await reg.pushManager.subscribe({
           userVisibleOnly: true,
-          applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY as string),
+          applicationServerKey: urlBase64ToArrayBuffer(VAPID_PUBLIC_KEY as string),
         });
       }
 

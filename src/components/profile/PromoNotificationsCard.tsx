@@ -38,6 +38,7 @@ const PromoNotificationsCard: React.FC = () => {
         const arr = raw && typeof raw === 'object' && 'items' in raw && Array.isArray(raw.items) ? raw.items : [];
         const list = arr as PromoFeedItem[];
         const legacyNotificationCutoff = new Date('2026-08-12T00:00:00').getTime();
+        const now = Date.now();
         setItems(list.filter((i) => i && i.code && Number.isFinite(i.expiresAt)
           && i.expiresAt > now && i.createdAt >= legacyNotificationCutoff));
       })

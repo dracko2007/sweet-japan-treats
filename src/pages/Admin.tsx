@@ -20,7 +20,7 @@ import VlogManager from '@/components/admin/VlogManager';
 import CustomRequestManager from '@/components/admin/CustomRequestManager';
 import B2BRequestManager from '@/components/admin/B2BRequestManager';
 import AdminAccessManager from '@/components/admin/AdminAccessManager';
-import VideoReviewManager from '@/components/admin/VideoReviewManager';
+import CN23Modal from '@/components/admin/CN23Modal';
 import ImageMigration from '@/components/admin/ImageMigration';
 import PromotionManager from '@/components/admin/PromotionManager';
 import NegotiationManager from '@/components/admin/NegotiationManager';
@@ -38,6 +38,7 @@ import MarginAudit from '@/components/admin/MarginAudit';
 import FinanceDetailManager from '@/components/admin/FinanceDetailManager';
 import CheckoutSandbox from '@/components/admin/CheckoutSandbox';
 import PromoNotificationModal from '@/components/admin/PromoNotificationModal';
+import VideoReviewManager from '@/components/admin/VideoReviewManager';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { orderService } from '@/services/orderService';
 import type { OrderPageCursor } from '@/services/firebaseSyncService';
@@ -69,7 +70,8 @@ function escapeHtml(value: unknown): string {
 type AdminTab =
   | 'orders' | 'coupons' | 'dashboard' | 'customers' | 'products'
   | 'calculator' | 'migration' | 'promotion' | 'negotiations' | 'marketing' | 'employees' | 'coupon-usage' | 'fraud'
-  | 'thermal-printer' | 'whatsapp' | 'review-moderation' | 'margin-audit' | 'visitors' | 'finance-detail' | 'sandbox';
+  | 'thermal-printer' | 'whatsapp' | 'review-moderation' | 'margin-audit' | 'visitors' | 'finance-detail' | 'sandbox'
+  | 'affiliates' | 'requests' | 'b2b' | 'videos' | 'home' | 'vlog' | 'sorteio' | 'admins';
 
 interface AdminTabItem {
   id: AdminTab;
@@ -396,6 +398,7 @@ const Admin: React.FC = () => {
       devLog('📧 Testing email service...');
       
       let emailResult = false;
+      let whatsappResult = false;
       
       // Try Resend first
       if (import.meta.env.VITE_RESEND_API_KEY) {

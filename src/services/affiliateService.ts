@@ -66,6 +66,11 @@ export const TIER_CONFIG: Record<AffiliateTier, {
   gold:   { label: 'Ouro',   emoji: '🥇', commissionPercent: 20, goalYen: 201_000, nextTier: null,     prevTier: 'silver' },
 };
 
+const computeNextTier = (tier: AffiliateTier, revenue: number): AffiliateTier => {
+  const next = TIER_CONFIG[tier].nextTier;
+  return next && revenue >= TIER_CONFIG[next].goalYen ? next : tier;
+};
+
 export interface Affiliate {
   code: string;
   ownerName: string;

@@ -8,6 +8,7 @@ import { ActivePromo, PROMO_TYPES } from '@/types/promotion';
 import { collection, getDocs, doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '@/config/firebase';
 import { promoOffer } from '../../../shared/promo-offer.js';
+import { authenticatedFetch } from '@/services/authenticatedFetch';
 
 const STORE_URL = 'https://japanexpress-store.com';
 
