@@ -18,7 +18,7 @@ const firebaseConfig = {
   storageBucket: "localstorage-98492.firebasestorage.app",
   messagingSenderId: "1087648598267",
   appId: "1:1087648598267:web:fbfbc19ad31aa05839885e",
-  measurementId: "G-BH2VFVJC2J"
+  measurementId: "G-F7VQTG41VF"
 };
 
 const firebaseConfigReady = true;
