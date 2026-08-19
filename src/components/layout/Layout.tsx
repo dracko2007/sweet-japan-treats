@@ -11,13 +11,14 @@ import { affiliateService } from '@/services/affiliateService';
 // chunk compartilhado (Layout) leve. Ausência momentânea do botão não afeta
 // o conteúdo principal da página — fallback null é apropriado aqui.
 const KimiClawAssistant = lazy(() => import('../KimiClawAssistant'));
+const FloatingWhatsAppButton = lazy(() => import('../FloatingWhatsAppButton'));
 
 interface LayoutProps {
   children: React.ReactNode;
 }
 
 const Layout: React.FC<LayoutProps> = ({ children }) => {
-  // KimiClaw é assistente do cliente — não aparece no painel admin
+  // KimiClaw e WhatsApp são assistentes do cliente — não aparecem no painel admin
   const isAdminPage = useLocation().pathname.startsWith('/admin');
   const { user } = useUser();
   const [affiliateNotice, setAffiliateNotice] = useState(0);
@@ -48,9 +49,14 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       </main>
       <Footer />
       {!isAdminPage && (
-        <Suspense fallback={null}>
-          <KimiClawAssistant />
-        </Suspense>
+        <>
+          <Suspense fallback={null}>
+            <KimiClawAssistant />
+          </Suspense>
+          <Suspense fallback={null}>
+            <FloatingWhatsAppButton />
+          </Suspense>
+        </>
       )}
       <AdminPreviewBar />
     </div>

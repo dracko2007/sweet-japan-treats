@@ -24,6 +24,7 @@ import ProductJsonLd from '@/components/ProductJsonLd';
 import { useSeo } from '@/hooks/useSeo';
 import DeliveryEstimateBadge from '@/components/products/DeliveryEstimate';
 import StockUrgency from '@/components/products/StockUrgency';
+import ProductTrustBadges from '@/components/products/ProductTrustBadges';
 import { recentlyViewed } from '@/utils/recentlyViewed';
 import { promoCampaignService } from '@/services/promoCampaignService';
 import { safeStorage } from '@/utils/storage';
@@ -413,6 +414,8 @@ const ProductDetail: React.FC = () => {
                     <Share2 className="w-5 h-5" />
                   </Button>
                 </div>
+
+                <ProductTrustBadges productName={translatedName} className="mt-6" />
 
               </div>
             </div>
