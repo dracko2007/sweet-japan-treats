@@ -491,7 +491,7 @@ const ProductManager: React.FC = () => {
 
       const toCdnUrl = async (imgStr: string): Promise<string> => {
         if (!imgStr) return '';
-        if (cloudinaryService.isCloudinaryUrl(imgStr)) return imgStr;
+        if (cloudinaryService.isCloudinaryUrl(imgStr) || cloudinaryService.isFirebaseUrl(imgStr)) return imgStr;
         let dataUrl = imgStr;
         if (cloudinaryService.isExternalUrl(imgStr)) {
           dataUrl = await urlToCompressedDataURL(imgStr);
@@ -505,7 +505,7 @@ const ProductManager: React.FC = () => {
 
       // Thumbnail HD 1200px a partir do data URL original
       let thumbnailUrl = editing.thumbnail || '';
-      const needNewThumb = rawCover && !cloudinaryService.isCloudinaryUrl(rawCover);
+      const needNewThumb = rawCover && !cloudinaryService.isCloudinaryUrl(rawCover) && !cloudinaryService.isFirebaseUrl(rawCover);
       if (needNewThumb) {
         const thumbData = await urlToCompressedDataURL(
           cloudinaryService.isDataUrl(rawCover) ? rawCover : coverUrl,

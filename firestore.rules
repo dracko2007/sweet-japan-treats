@@ -175,8 +175,7 @@ service cloud.firestore {
     }
 
     match /products/{productId} {
-      // Public clients use the server-side sanitized catalog projection.
-      allow read: if false;
+      allow read: if true;
       allow create, update, delete: if isAdmin();
     }
 

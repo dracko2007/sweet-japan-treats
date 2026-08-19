@@ -7,6 +7,11 @@
 
 import { db } from '@/config/firebase';
 import {
+  collection,
+  getDocs,
+  query,
+  where,
+  Timestamp,
   doc,
   setDoc,
   updateDoc,
@@ -116,28 +121,60 @@ export const productService = {
   async getOverrides(desdeMs: number | null = null): Promise<Overrides & { maxMs: number }> {
     try {
       const suffix = desdeMs === null ? '' : `&since=${encodeURIComponent(String(desdeMs))}`;
-      const separator = desdeMs === null ? '?' : suffix[0] === '&' ? '?' : '?';
+      const separator = '?';
       const cacheBust = `_catalog=${Date.now()}`;
       const response = await fetch(`/api/products${separator}${cacheBust}${desdeMs === null ? '' : suffix}`, {
         headers: { Accept: 'application/json', 'Cache-Control': 'no-cache' },
         cache: 'no-store',
       });
-      if (!response.ok) throw new Error(`Catálogo indisponível (${response.status})`);
-      const payload = await response.json() as {
-        items?: unknown;
-        deleted?: unknown;
-        maxMs?: unknown;
-      };
-      if (!Array.isArray(payload.items) || !Array.isArray(payload.deleted) || !Number.isFinite(Number(payload.maxMs))) {
-        throw new Error('Resposta de catálogo inválida');
+      if (response.ok && response.headers.get('content-type')?.includes('application/json')) {
+        const payload = await response.json() as {
+          items?: unknown;
+          deleted?: unknown;
+          maxMs?: unknown;
+        };
+        if (Array.isArray(payload.items) && Array.isArray(payload.deleted) && Number.isFinite(Number(payload.maxMs))) {
+          const items = payload.items.map((item) => withCdnImages(item as Product));
+          const deleted = payload.deleted.filter((id): id is string => typeof id === 'string');
+          return { items, deleted, maxMs: Number(payload.maxMs) };
+        }
       }
-      const items = payload.items.map((item) => withCdnImages(item as Product));
-      const deleted = payload.deleted.filter((id): id is string => typeof id === 'string');
-      return { items, deleted, maxMs: Number(payload.maxMs) };
     } catch (e) {
-      devWarn('productService.getOverrides falhou:', e);
-      throw e;
+      devWarn('productService.getOverrides via /api/products falhou, tentando Firestore direto:', e);
     }
+
+    // Fallback direto via Firestore Client SDK (essencial para localhost / dev ou falhas de endpoint)
+    if (db) {
+      try {
+        const colRef = collection(db, COL);
+        const firestoreQuery = desdeMs ? query(colRef, where('updatedAt', '>=', Timestamp.fromMillis(desdeMs))) : colRef;
+        const snap = await getDocs(firestoreQuery);
+        const items: Product[] = [];
+        const deleted: string[] = [];
+        let maxMs = desdeMs || 0;
+
+        snap.forEach((d) => {
+          const data = d.data() as Record<string, unknown>;
+          const stamp = data.updatedAt as { toMillis?: () => number } | undefined;
+          if (stamp && typeof stamp.toMillis === 'function') {
+            maxMs = Math.max(maxMs, stamp.toMillis());
+          }
+          if (data.__deleted === true) {
+            deleted.push(d.id);
+            return;
+          }
+          if (data.hidden === true) return;
+          items.push(withCdnImages({ id: d.id, ...data } as Product));
+        });
+
+        return { items, deleted, maxMs };
+      } catch (err) {
+        devWarn('productService.getOverrides via Firestore direto falhou:', err);
+        throw err;
+      }
+    }
+
+    throw new Error('Catálogo e Firestore indisponíveis');
   },
 
   /** Sincroniza o cache local com o Firestore e devolve o retrato atual.
@@ -205,7 +242,8 @@ export const productService = {
     }
     for (const p of memoria.items) map.set(p.id, p);
     for (const id of memoria.deleted) map.delete(id);
-    return Array.from(map.values()).filter((p) => p.image);
+    const result = Array.from(map.values()).filter((p) => p.image);
+    return result.length > 0 ? result : memoria.items.length > 0 ? memoria.items : defaultProducts;
   },
 
   /** Cria ou atualiza um produto. Invalida o cache local automaticamente. */

@@ -153,7 +153,8 @@ export const cloudinaryService = {
     typeof s === 'string' && s.includes('res.cloudinary.com'),
 
   isFirebaseUrl: (s: string) =>
-    typeof s === 'string' && s.includes('firebasestorage.app'),
+    typeof s === 'string' &&
+    (s.includes('firebasestorage.app') || s.includes('firebasestorage.googleapis.com')),
 
   isDataUrl: (s: string) =>
     typeof s === 'string' && s.startsWith('data:'),
@@ -162,7 +163,8 @@ export const cloudinaryService = {
     typeof s === 'string' &&
     s.startsWith('http') &&
     !s.includes('res.cloudinary.com') &&
-    !s.includes('firebasestorage.app'),
+    !s.includes('firebasestorage.app') &&
+    !s.includes('firebasestorage.googleapis.com'),
 
   needsMigration: (s?: string) =>
     typeof s === 'string' && s.startsWith('data:'),
