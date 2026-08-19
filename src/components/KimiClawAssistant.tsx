@@ -1287,11 +1287,24 @@ const KimiClawAssistant: React.FC = () => {
     <div className="fixed bottom-6 right-6 z-[9999] font-sans">
       {/* ATTENTION BADGE */}
       {showAttentionBadge && !isOpen && (
-        <div className="absolute bottom-16 right-2 bg-gradient-to-r from-primary to-accent text-white text-xs px-3 py-1.5 rounded-full shadow-elevated whitespace-nowrap animate-float border border-white/20 select-none">
-          <span className="flex items-center gap-1.5 font-medium">
+        <div className="absolute bottom-16 right-2 bg-gradient-to-r from-primary to-accent text-white text-xs pl-3 pr-2 py-1.5 rounded-full shadow-elevated whitespace-nowrap animate-float border border-white/20 select-none flex items-center gap-2">
+          <button
+            onClick={() => setIsOpen(true)}
+            className="flex items-center gap-1.5 font-medium cursor-pointer"
+          >
             <Sparkles className="w-3.5 h-3.5 text-yellow-300 animate-pulse" />
             {t('kimiclaw.tryMe')}
-          </span>
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowAttentionBadge(false);
+            }}
+            className="p-0.5 hover:bg-white/20 rounded-full transition-colors text-white/80 hover:text-white cursor-pointer"
+            aria-label="Fechar balão"
+          >
+            <X className="w-3 h-3" />
+          </button>
           <div className="absolute -bottom-1 right-5 w-2 h-2 bg-accent rotate-45 border-r border-b border-white/10" />
         </div>
       )}
