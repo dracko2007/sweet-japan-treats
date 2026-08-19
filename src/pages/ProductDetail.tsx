@@ -341,30 +341,6 @@ const ProductDetail: React.FC = () => {
                   )}
                 </div>
 
-                <div className="mb-6">
-                  <label className="block text-sm font-medium mb-3">{t('productDetail.quantity')}</label>
-                  <div className="flex items-center gap-4">
-                    <div className="flex items-center border-2 border-border rounded-xl">
-                      <button
-                        onClick={() => setQuantity(q => Math.max(1, q - 1))}
-                        className="px-4 py-3 hover:bg-secondary transition-colors"
-                      >
-                        -
-                      </button>
-                      <span className="px-6 font-semibold">{quantity}</span>
-                      <button
-                        onClick={() => setQuantity(q => q + 1)}
-                        className="px-4 py-3 hover:bg-secondary transition-colors"
-                      >
-                        +
-                      </button>
-                    </div>
-                    <div className="text-2xl font-bold text-primary">
-                      {formatPrice(currentPrice * quantity, currency)}
-                    </div>
-                  </div>
-                </div>
-
                 {/* Aviso de restrição de destino */}
                 {deliveryBlocked && (
                   <div className="flex items-center gap-2 bg-red-50 dark:bg-red-950/30 border border-red-300 dark:border-red-800 rounded-xl px-4 py-3 mb-4">
@@ -388,28 +364,52 @@ const ProductDetail: React.FC = () => {
                 )}
                 <StockUrgency stock={product.stock} className="mb-4" />
 
-                <div className="flex gap-3 mb-6">
+                {/* Bloco de Quantidade + Botão Adicionar ao Carrinho */}
+                <div className="flex flex-wrap sm:flex-nowrap items-center gap-3 mb-6">
+                  <div className="flex items-center border-2 border-border rounded-xl h-11 shrink-0 bg-background">
+                    <button
+                      onClick={() => setQuantity(q => Math.max(1, q - 1))}
+                      className="px-3.5 h-full hover:bg-secondary rounded-l-lg transition-colors font-bold text-base"
+                      aria-label="Diminuir quantidade"
+                    >
+                      -
+                    </button>
+                    <span className="px-4 font-bold text-sm min-w-[2.5rem] text-center">{quantity}</span>
+                    <button
+                      onClick={() => setQuantity(q => q + 1)}
+                      className="px-3.5 h-full hover:bg-secondary rounded-r-lg transition-colors font-bold text-base"
+                      aria-label="Aumentar quantidade"
+                    >
+                      +
+                    </button>
+                  </div>
+
                   <Button
                     onClick={handleAddToCart}
                     size="lg"
                     disabled={deliveryBlocked}
-                    className={`flex-1 gap-2 ${deliveryBlocked ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    className={`flex-1 h-11 gap-2 text-base font-bold shadow-md hover:shadow-lg transition-all ${deliveryBlocked ? 'opacity-50 cursor-not-allowed' : ''}`}
                   >
                     <ShoppingCart className="w-5 h-5" />
                     {deliveryBlocked ? deliveryBlockBtn : t('productDetail.addToCart')}
                   </Button>
+
                   <Button
                     variant="outline"
                     size="lg"
                     onClick={handleToggleFavorite}
-                    className={cn(isFavorite && "bg-red-50 dark:bg-red-950 border-red-500")}
+                    aria-label="Favoritar produto"
+                    className={cn("h-11 px-3.5", isFavorite && "bg-red-50 dark:bg-red-950 border-red-500")}
                   >
                     <Heart className={cn("w-5 h-5", isFavorite && "fill-red-500 text-red-500")} />
                   </Button>
+
                   <Button
                     variant="outline"
                     size="lg"
                     onClick={handleShare}
+                    aria-label="Compartilhar produto"
+                    className="h-11 px-3.5"
                   >
                     <Share2 className="w-5 h-5" />
                   </Button>
