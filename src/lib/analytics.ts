@@ -67,17 +67,18 @@ function ensureMetaPixel(): void {
     return;
   }
 
-  // Bootstrap padrão do Meta Pixel (equivalente ao snippet oficial). O corpo
-  // usa `fbq`, já tipado, em vez do nome da própria função: dentro dela o TS
-  // infere `(...args) => void`, que não conhece `callMethod` nem `queue` —
-  // os dois só passam a existir quando o fbevents.js carrega e troca o stub.
+  // Bootstrap padrão do Meta Pixel
   const fbq = function fbqStub(...args: unknown[]) {
-    const alvo = fbq as NonNullable<Window['fbq']>;
-    (alvo.callMethod ? alvo.callMethod : (alvo.queue = alvo.queue || []).push).apply(alvo, args as never);
+    if (fbq.callMethod) {
+      fbq.callMethod(...args);
+    } else {
+      fbq.queue.push(args);
+    }
   } as NonNullable<Window['fbq']>;
+  fbq.queue = [];
+  fbq.loaded = true;
   window.fbq = fbq;
   if (!window._fbq) window._fbq = fbq;
-  fbq!.queue = [];
 
   const script = document.createElement('script');
   script.async = true;
