@@ -274,10 +274,10 @@ const ImageMigration: React.FC = () => {
       <div>
         <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
           <CloudUpload className="w-5 h-5 text-primary" />
-          Migração de Imagens → Cloudinary CDN
+          Migração de Imagens → Firebase Storage
         </h2>
         <p className="text-sm text-muted-foreground mt-1">
-          Comprime imagens (5MB → ~150KB WebP) e envia ao CDN Cloudinary. {CONCURRENCY} produtos em paralelo.
+          Comprime imagens (5MB → ~150KB WebP) e envia ao Firebase Storage. {CONCURRENCY} produtos em paralelo.
         </p>
       </div>
 
@@ -292,24 +292,23 @@ const ImageMigration: React.FC = () => {
         </div>
         <div className="rounded-xl border border-green-200 bg-green-50 dark:bg-green-950/30 p-4">
           <div className="text-2xl font-bold text-green-600">{products.length - toMigrate.length}</div>
-          <div className="text-xs text-muted-foreground mt-1">Já no CDN</div>
+          <div className="text-xs text-muted-foreground mt-1">No Firebase Storage</div>
         </div>
       </div>
 
       {/* Status do teste de conexão */}
       {tested === 'checking' && (
-        <div className="text-sm text-muted-foreground animate-pulse">Verificando conexão com Cloudinary...</div>
+        <div className="text-sm text-muted-foreground animate-pulse">Verificando conexão com Firebase Storage...</div>
       )}
       {tested === 'ok' && state.status === 'idle' && !allMigrated && (
         <div className="flex items-center gap-2 text-sm text-green-600">
-          <CheckCircle className="w-4 h-4" /> Cloudinary acessível — pronto para migrar.
+          <CheckCircle className="w-4 h-4" /> Firebase Storage acessível — pronto para upload.
         </div>
       )}
       {tested === 'fail' && (
         <div className="p-4 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 space-y-2">
-          <div className="font-semibold text-red-700">Erro ao conectar no Cloudinary</div>
+          <div className="font-semibold text-red-700">Erro ao conectar no Firebase Storage</div>
           <p className="text-sm text-red-600">{testError}</p>
-          <p className="text-xs text-red-500">Verifique se o upload preset "japanexpress" está como Unsigned no Cloudinary.</p>
         </div>
       )}
 
@@ -332,7 +331,7 @@ const ImageMigration: React.FC = () => {
           <CheckCircle className="w-5 h-5 text-green-600 shrink-0" />
           <div>
             <div className="font-semibold text-green-700 dark:text-green-400">Migração concluída!</div>
-            <div className="text-sm text-green-600/80">{state.total} produto(s) agora no CDN Cloudinary.</div>
+            <div className="text-sm text-green-600/80">{state.total} produto(s) agora no Firebase Storage.</div>
           </div>
         </div>
       )}
@@ -351,7 +350,7 @@ const ImageMigration: React.FC = () => {
           <CheckCircle className="w-5 h-5 text-green-600 shrink-0" />
           <div>
             <div className="font-semibold text-green-700 dark:text-green-400">Tudo migrado!</div>
-            <div className="text-sm text-green-600/80">Todas as imagens estão no CDN Cloudinary.</div>
+            <div className="text-sm text-green-600/80">Todas as imagens estão no Firebase Storage.</div>
           </div>
         </div>
       )}

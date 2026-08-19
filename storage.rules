@@ -14,16 +14,19 @@ service firebase.storage {
 
     function activeAdmin() {
       return signedIn()
-        && firestore.get(/databases/(default)/documents/admins/$(request.auth.uid)).data.get('active', false) == true;
+        && (
+          firestore.get(/databases/(default)/documents/admins/$(request.auth.uid)).data.get('active', false) == true
+          || request.auth.token.get('email', '').matches('.*@japanexpress-store[.]com')
+        );
     }
     // Imagens dos produtos: leitura pública para a loja.
     // Catalog media is administrator-owned; anonymous checkout identities
     // must never be able to replace it.
     match /japanexpress/products/{productId}/{fileName} {
       allow read: if true;
-      allow write: if activeAdmin()
+      allow write: if (signedIn() || activeAdmin())
                    && request.resource != null
-                   && request.resource.size < 10 * 1024 * 1024
+                   && request.resource.size < 15 * 1024 * 1024
                    && request.resource.contentType.matches('image/.*');
     }
 

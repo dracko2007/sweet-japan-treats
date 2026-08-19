@@ -167,7 +167,7 @@ export const cloudinaryService = {
     !s.includes('firebasestorage.googleapis.com'),
 
   needsMigration: (s?: string) =>
-    typeof s === 'string' && s.startsWith('data:'),
+    typeof s === 'string' && (s.startsWith('data:') || s.includes('res.cloudinary.com')),
 
   async uploadDataUrl(dataUrl: string, folder: string): Promise<string> {
     const motivos: string[] = [];
@@ -180,32 +180,19 @@ export const cloudinaryService = {
       motivos.push(`leitura da imagem falhou (${e instanceof Error ? e.message : String(e)})`);
     }
 
-    // 1) Firebase Storage (destino principal)
-    if (blob) {
-      try {
-        return await uploadToFirebase(blob, folder);
-      } catch (e) {
-        console.warn('Firebase Storage indisponível; upload cancelado porque o fallback Cloudinary sem assinatura está desativado.', e);
-      }
+    if (!blob) {
+      throw new Error(`Não foi possível converter a imagem em arquivo. ${motivos.join(' | ')}`);
     }
 
-
-    // Aqui existia um terceiro nível que salvava a imagem em base64 dentro do
-    // próprio documento do Firestore, "para o produto nunca deixar de salvar".
-    // A conta chegou em 26/07/2026: 88 produtos haviam acumulado 20,4 MB de
-    // base64 — 98% do catálogo — estourando a banda do Firestore e derrubando
-    // a loja inteira. E como a degradação era silenciosa, ninguém viu crescer.
-    //
-    // Falhar é mais barato: o admin vê o motivo, corrige e reenvia. O banco
-    // não é contaminado, e o botão "testar conexão" volta a dizer a verdade
-    // (antes ele acusava sucesso mesmo com o Cloudinary fora do ar).
-    throw new Error(`Não foi possível enviar a imagem. ${motivos.join(' | ')}`);
+    try {
+      return await uploadToFirebase(blob, folder);
+    } catch (e) {
+      console.error('Falha no upload para o Firebase Storage:', e);
+      throw new Error(`Erro ao enviar foto para o Firebase Storage: ${e instanceof Error ? e.message : String(e)}`);
+    }
   },
 
   async uploadVideoFile(file: File, folder: string): Promise<string> {
-    // Unsigned browser uploads are disabled. Firebase Storage is protected by
-    // Firebase Auth/rules; provider credentials and signed Cloudinary
-    // parameters must be issued by a server endpoint when re-enabled.
     return uploadVideoToFirebase(file, folder);
   },
 };
