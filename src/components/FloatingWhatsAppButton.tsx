@@ -22,10 +22,9 @@ interface FloatingWhatsAppButtonProps {
 const FloatingWhatsAppButton: React.FC<FloatingWhatsAppButtonProps> = () => {
   const location = useLocation();
   const [isOpen, setIsOpen] = useState(false);
-  const [isDismissed, setIsDismissed] = useState(false);
 
-  // Não renderiza dentro do painel administrativo ou se o usuário fechou
-  if (location.pathname.startsWith('/admin') || isDismissed) {
+  // Não renderiza dentro do painel administrativo
+  if (location.pathname.startsWith('/admin')) {
     return null;
   }
 
@@ -161,32 +160,19 @@ const FloatingWhatsAppButton: React.FC<FloatingWhatsAppButtonProps> = () => {
         </div>
       )}
 
-      {/* Botão de Gatilho (Pill) com botão de minimizar/fechar */}
-      <div className="group flex items-center bg-emerald-500 hover:bg-emerald-600 text-white rounded-full shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 hover:scale-105 transition-all duration-300 border border-emerald-400/30">
-        <button
-          onClick={() => setIsOpen(!isOpen)}
-          aria-label="Abrir atendimento no WhatsApp"
-          className="flex items-center gap-2.5 pl-3.5 pr-2 py-2.5 cursor-pointer select-none"
-        >
-          <div className="relative flex items-center justify-center w-6 h-6 rounded-full bg-white/20">
-            <MessageCircle className="w-4 h-4 fill-white" />
-          </div>
-          <span className="text-sm font-bold tracking-tight pr-1">
-            WhatsApp Japão
-          </span>
-        </button>
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            setIsDismissed(true);
-          }}
-          className="p-1.5 mr-1.5 hover:bg-emerald-700/60 rounded-full text-emerald-100 hover:text-white transition-colors cursor-pointer"
-          title="Fechar botão de WhatsApp"
-          aria-label="Fechar botão de WhatsApp"
-        >
-          <X className="w-3.5 h-3.5" />
-        </button>
-      </div>
+      {/* Botão de Gatilho (Pill) */}
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        aria-label="Abrir atendimento no WhatsApp"
+        className="group flex items-center gap-2.5 bg-emerald-500 hover:bg-emerald-600 text-white pl-3.5 pr-4 py-2.5 rounded-full shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 hover:scale-105 transition-all duration-300 active:scale-95 border border-emerald-400/30 cursor-pointer"
+      >
+        <div className="relative flex items-center justify-center w-6 h-6 rounded-full bg-white/20">
+          <MessageCircle className="w-4 h-4 fill-white" />
+        </div>
+        <span className="text-sm font-bold tracking-tight pr-0.5">
+          WhatsApp Japão
+        </span>
+      </button>
     </div>
   );
 };
