@@ -66,7 +66,22 @@ function parseCustomer(raw, user, country) {
   if (tokenEmail && tokenEmail !== submittedEmail) throw new HttpError(403, 'email_mismatch');
   const cpf = String(raw.cpf || '').replace(/\D/g, '');
   if (cpf && !isValidCpf(cpf)) throw new HttpError(400, 'invalid_cpf');
+  // A aduana brasileira exige o CPF do destinatário, então para o Brasil ele
+  // não é opcional na prática — o pedido sem CPF trava na importação. Exigir
+  // aqui, além de evitar esse travamento, é o que dá ao guarda de cupom uma
+  // âncora que o cliente não troca à vontade (ver ALTO 3 do AUDITORIA.md).
+  // Fora do Brasil não há documento equivalente e o campo segue opcional.
+  //
+  // Regressão: um commit de "remediação de segurança" (f69dbd2) trocou o
+  // guarda de comprimento por validação de dígito verificador (boa
+  // melhoria) mas apagou esta linha no processo, reabrindo o buraco que o
+  // ALTO 3 fechava — pedido do Brasil sem CPF voltou a passar. Restaurada.
+  if (country === 'Brasil' && cpf.length !== 11) throw new HttpError(400, 'cpf_required');
   return {
+    // Regressão: f69dbd2 também apagou este campo no mesmo refactor. Sem ele
+    // todo pedido gravava customerName/shippingAddress.name como undefined
+    // (ambos leem `customer.name` — ver mais abaixo neste arquivo).
+    name: requiredText(raw.name, { max: 120 }),
     email: tokenEmail || submittedEmail,
     phone: optionalText(raw.phone, { max: 40 }),
     cpf,
