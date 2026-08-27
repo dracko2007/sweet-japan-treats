@@ -47,7 +47,13 @@ async function products(req, res) {
       if (stamp && typeof stamp.toMillis === 'function') maxMs = Math.max(maxMs, stamp.toMillis());
       const product = publicProduct(document.id, data);
       if (!product) {
-        if (data.__deleted === true) deleted.push(document.id);
+        // Hidden (and actually-deleted) docs must be reported as tombstones too.
+        // Without this, a product hidden after a client already cached it as
+        // visible never gets purged: the delta query returns it (updatedAt
+        // changed), publicProduct() correctly excludes it from `items`, but
+        // the client's local cache keeps serving the stale visible copy
+        // forever because it never saw a matching id in `deleted`.
+        if (data.__deleted === true || data.hidden === true) deleted.push(document.id);
         continue;
       }
       if (product.__deleted) deleted.push(document.id);
