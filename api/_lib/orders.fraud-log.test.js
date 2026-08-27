@@ -5,13 +5,14 @@
 //
 // Agora quem registra é o servidor, no ponto em que ele de fato recusa.
 //
-// O gatilho original aqui era reuso de cupom de afiliado por CPF
+// O primeiro gatilho abaixo é reuso de cupom de afiliado GENÉRICO por CPF
 // (`affiliate_reuse`/`affiliate_coupon_already_used`). O commit 70b6c7b
-// ("fix: allow affiliate codes for every customer") removeu essa trava de
-// propósito — decisão de produto, não regressão. O gatilho que sobrou para
-// exercitar `registrarTentativaFraude` é o limite por produto da promoção da
-// home (`product_limit`/`promotion_limit`), então o cenário abaixo usa esse
-// caminho para continuar defendendo "log falhar não pode virar 500".
+// ("fix: allow affiliate codes for every customer") tinha removido essa
+// trava, mas a decisão foi restaurá-la: código de afiliado amarrado a um
+// produto específico (`affiliateProductId`) continua isento de propósito —
+// é o caso de promoção pontual onde reuso pelo mesmo CPF é esperado. O
+// segundo gatilho é o limite por produto da promoção da home
+// (`product_limit`/`promotion_limit`), que nunca saiu do código.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
@@ -90,6 +91,31 @@ function pedido() {
   };
 }
 
+/** Pedido com cupom de afiliado, vindo de um CPF que já usou outro afiliado. */
+function pedidoAfiliado() {
+  return {
+    method: 'POST',
+    headers: { authorization: 'Bearer t' },
+    body: {
+      orderId: 'SC-JP-654321',
+      items: [{ productId: 'p1', variantId: 'small', quantity: 1 }],
+      country: 'Brasil',
+      prefecture: '',
+      state: 'SP',
+      shippingCarrier: 'ems',
+      paymentMethod: 'wise',
+      couponCode: 'ANA10',
+      redeemPoints: 0,
+      negotiationId: '',
+      promoCode: '',
+      customer: {
+        name: 'Cliente Teste', email: 'cliente@exemplo.com', phone: '', cpf: CPF,
+        postalCode: '01310-100', city: 'Sao Paulo', address: 'Av Paulista 1000', building: '',
+      },
+    },
+  };
+}
+
 const HORA = 60 * 60 * 1000;
 
 beforeEach(() => {
@@ -118,7 +144,7 @@ beforeEach(() => {
   mocks.banco.set(`cpf_index/${CPF}`, { productIds: ['p1'], affiliateCodes: [] });
 });
 
-describe('registro de tentativa de fraude', () => {
+describe('registro de tentativa de fraude — limite de produto', () => {
   it('grava a tentativa quando recusa por limite de produto da promoção', async () => {
     const res = resposta();
 
@@ -160,6 +186,70 @@ describe('registro de tentativa de fraude', () => {
     await handleCreate(pedido(), res);
 
     expect(res.statusCode).not.toBe(409);
+    expect(mocks.add).not.toHaveBeenCalled();
+  });
+});
+
+describe('registro de tentativa de fraude — reuso de cupom de afiliado', () => {
+  beforeEach(() => {
+    mocks.banco.set('affiliates/ANA10', { active: true, discountPercent: 10, commissionPercent: 10, ownerEmail: 'ana@exemplo.com' });
+    // Este CPF já usou desconto de afiliado numa compra anterior.
+    mocks.banco.set(`cpf_index/${CPF}`, { productIds: [], affiliateCodes: ['OUTRO'] });
+  });
+
+  it('grava a tentativa quando recusa a reutilização de cupom de afiliado', async () => {
+    const res = resposta();
+
+    await handleCreate(pedidoAfiliado(), res);
+
+    expect(res.statusCode).toBe(409);
+    expect(res.body).toEqual({ error: 'affiliate_coupon_already_used' });
+
+    const [colecaoRef] = mocks.add.mock.calls;
+    expect(mocks.add).toHaveBeenCalledTimes(1);
+    expect(colecaoRef[0]).toMatchObject({
+      attemptType: 'affiliate_reuse',
+      affiliateCode: 'ANA10',
+      cpfFull: CPF,
+      customerEmail: 'cliente@exemplo.com',
+      customerName: 'Cliente Teste',
+    });
+    // O painel mostra o mascarado e busca pelo completo.
+    expect(colecaoRef[0].cpf).toBe('390***44705');
+    expect(colecaoRef[0].blockedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+  });
+
+  // Perder uma linha de log é muito menos grave do que transformar um bloqueio
+  // legítimo em erro 500 — o cliente veria "algo deu errado" e tentaria de novo.
+  it('falha ao gravar o log não vira erro 500', async () => {
+    mocks.add.mockRejectedValue(new Error('firestore fora'));
+    const res = resposta();
+
+    await handleCreate(pedidoAfiliado(), res);
+
+    expect(res.statusCode).toBe(409);
+    expect(res.body).toEqual({ error: 'affiliate_coupon_already_used' });
+  });
+
+  it('código de afiliado amarrado a produto fica isento do bloqueio', async () => {
+    mocks.banco.set('affiliates/ANA10', {
+      active: true, discountPercent: 10, commissionPercent: 10, ownerEmail: 'ana@exemplo.com', productId: 'p1',
+    });
+    const res = resposta();
+
+    await handleCreate(pedidoAfiliado(), res);
+
+    expect(res.body).not.toEqual({ error: 'affiliate_coupon_already_used' });
+    expect(mocks.add).not.toHaveBeenCalled();
+  });
+
+  it('pedido limpo passa sem registrar nada', async () => {
+    mocks.banco.set(`cpf_index/${CPF}`, { productIds: [], affiliateCodes: [] });
+    const res = resposta();
+
+    await handleCreate(pedidoAfiliado(), res);
+
+    expect(res.body).not.toEqual({ error: 'affiliate_coupon_already_used' });
     expect(mocks.add).not.toHaveBeenCalled();
   });
 });

@@ -463,6 +463,17 @@ async function handleCreate(req, res) {
       await registrarTentativaFraude(db, customer, { attemptType: 'product_limit', productId: produtoBloqueado });
       throw new HttpError(409, 'promotion_limit');
     }
+    // Restaurado (era removido em 70b6c7b como parte de uma correção maior de
+    // afiliados que descartou este guarda por engano — decisão confirmada:
+    // código de afiliado GENÉRICO é 1 uso por CPF, para sempre; código
+    // amarrado a produto (`affiliateProductId`) fica de fora de propósito,
+    // pois é o caso de promoção específica onde reuso pelo mesmo CPF é
+    // esperado enquanto ela estiver ativa. Espelhado em `fulfillment.js` como
+    // segunda barreira no momento em que o pagamento é confirmado.
+    if (coupon?.affiliateCode && !coupon.affiliateProductId && cpfData?.affiliateCodes?.length) {
+      await registrarTentativaFraude(db, customer, { attemptType: 'affiliate_reuse', affiliateCode: coupon.affiliateCode });
+      throw new HttpError(409, 'affiliate_coupon_already_used');
+    }
 
     const now = new Date().toISOString();
     const trackingPrefix = country === 'Japão' ? 'JP' : country === 'Brasil' ? 'NX' : 'EX';

@@ -129,6 +129,14 @@ export async function fulfillOrder(orderId, { provider, reference, confirmedBy }
     const cpfData = cpfSnap?.exists ? cpfSnap.data() : { productIds: [], affiliateCodes: [] };
     const limitedProducts = items.filter((item) => item.homePromo).map((item) => item.productId);
     if (limitedProducts.some((productId) => cpfData.productIds?.includes(productId))) throw new HttpError(409, 'promotion_limit');
+    // Espelha o guarda de `orders.js:parseCustomer` no momento em que o
+    // dinheiro de fato entra — segunda barreira, não a única: um checkout que
+    // passou pela primeira checagem (ex.: corrida entre duas criações de
+    // pedido do mesmo CPF) ainda é pego aqui antes da comissão ser gerada.
+    // Código de afiliado amarrado a produto (`affiliateProductId`) fica de
+    // fora de propósito — é o caso de promoção específica onde reuso pelo
+    // mesmo CPF é esperado enquanto a promoção estiver no ar.
+    if (order.affiliateCode && !order.affiliateProductId && cpfData.affiliateCodes?.length) throw new HttpError(409, 'affiliate_coupon_already_used');
     if (promoUsageRef && byPath.get(promoUsageRef.path).exists) throw new HttpError(409, 'promotion_already_used');
 
     let nextHomePromo = null;
@@ -215,6 +223,7 @@ export async function fulfillOrder(orderId, { provider, reference, confirmedBy }
     if (cpfRef) {
       transaction.set(cpfRef, {
         productIds: unique([...(cpfData.productIds || []), ...limitedProducts]),
+        affiliateCodes: unique([...(cpfData.affiliateCodes || []), ...(order.affiliateCode && !order.affiliateProductId ? [order.affiliateCode] : [])]),
       }, { merge: true });
     }
     if (promoUsageRef) {
