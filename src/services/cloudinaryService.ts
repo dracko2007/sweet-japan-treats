@@ -41,12 +41,20 @@ function dataUrlToBlob(dataUrl: string): Blob {
   return new Blob([bytes], { type: mime });
 }
 
+// Cache-Control longo e imutável: cada upload gera um nome de arquivo novo
+// (timestamp + sufixo aleatório), então a URL nunca muda de conteúdo — é
+// seguro deixar o navegador (e qualquer CDN na frente) guardar para sempre
+// sem revalidar. Sem isso o Firebase Storage aplica `private, max-age=0` por
+// padrão: toda visita repetida refaz a requisição em vez de servir do disco,
+// que era o motivo do carregamento parecer mais lento que o Cloudinary.
+const IMMUTABLE_CACHE = 'public, max-age=31536000, immutable';
+
 async function uploadToFirebase(blob: Blob, folder: string): Promise<string> {
   if (!storage) throw new Error('Firebase Storage indisponível.');
   const ext = blob.type.includes('webp') ? 'webp' : blob.type.includes('png') ? 'png' : 'jpg';
   const path = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
   const storageRef = ref(storage, path);
-  await uploadBytes(storageRef, blob, { contentType: blob.type });
+  await uploadBytes(storageRef, blob, { contentType: blob.type, cacheControl: IMMUTABLE_CACHE });
   return getDownloadURL(storageRef);
 }
 
@@ -55,7 +63,7 @@ async function uploadVideoToFirebase(blob: Blob, folder: string): Promise<string
   const ext = blob.type.includes('webm') ? 'webm' : blob.type.includes('quicktime') ? 'mov' : 'mp4';
   const path = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
   const storageRef = ref(storage, path);
-  await uploadBytes(storageRef, blob, { contentType: blob.type });
+  await uploadBytes(storageRef, blob, { contentType: blob.type, cacheControl: IMMUTABLE_CACHE });
   return getDownloadURL(storageRef);
 }
 
