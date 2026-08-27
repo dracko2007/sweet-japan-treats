@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { safeStorage } from '@/utils/storage';
+import { getLenis } from '@/lib/smoothScroll';
 
 // Extrai o productId de rotas como /produto/:id ou /produto/:id?ref=CODE
 const extractProductId = (pathname: string): string | null => {
@@ -13,7 +14,18 @@ const ScrollToTop = () => {
   const firstLoadRef = useRef(true);
 
   useEffect(() => {
-    window.scrollTo(0, 0);
+    // O Lenis (smooth scroll global, ver `lib/smoothScroll.tsx`) mantém sua
+    // própria posição interna e não escuta `window.scrollTo`. Resetar só o
+    // nativo deixava o Lenis "puxando" de volta pra posição antiga no frame
+    // seguinte — era isso que fazia a página às vezes abrir no meio/fim do
+    // scroll da rota anterior. `immediate: true` pula a animação: é troca de
+    // página, não deve haver scroll suave visível.
+    const lenis = getLenis();
+    if (lenis) {
+      lenis.scrollTo(0, { immediate: true });
+    } else {
+      window.scrollTo(0, 0);
+    }
   }, [pathname]);
 
   // A referência capturada é válida apenas para a navegação iniciada pelo link.
