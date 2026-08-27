@@ -46,7 +46,7 @@ describe('cloudinaryService.uploadDataUrl', () => {
   it('lança quando Firebase Storage falha e nunca devolve base64 ou Cloudinary', async () => {
     storageMocks.uploadBytes.mockRejectedValue(new Error('storage indisponível'));
     await expect(cloudinaryService.uploadDataUrl(IMAGEM, 'japanexpress/products/p1'))
-      .rejects.toThrow(/Não foi possível enviar a imagem/);
+      .rejects.toThrow(/Erro ao enviar foto para o Firebase Storage/);
   });
 });
 

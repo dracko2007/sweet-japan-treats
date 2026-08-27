@@ -74,6 +74,7 @@ function responder(docs: FakeDoc[]): void {
   }
   fetchMocks.fetch.mockResolvedValueOnce({
     ok: true,
+    headers: { get: (name: string) => (name.toLowerCase() === 'content-type' ? 'application/json' : null) },
     json: async () => ({ items, deleted, maxMs }),
   });
 }
