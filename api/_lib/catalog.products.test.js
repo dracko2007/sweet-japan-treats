@@ -4,18 +4,18 @@ const mocks = vi.hoisted(() => ({
   adminDb: vi.fn(),
 }));
 
-vi.mock('./_lib/firebase-admin.js', () => ({ adminDb: mocks.adminDb }));
-vi.mock('./_lib/http.js', () => ({
+vi.mock('./firebase-admin.js', () => ({ adminDb: mocks.adminDb }));
+vi.mock('./http.js', () => ({
   handleCors: () => true,
   HttpError: class HttpError extends Error {},
   sendError: (res, err) => res.status(500).json({ error: String(err) }),
 }));
-vi.mock('./_handlers/geo.js', () => ({ default: vi.fn() }));
-vi.mock('./_handlers/product-enrich.js', () => ({ default: vi.fn() }));
-vi.mock('./_handlers/sitemap.js', () => ({ default: vi.fn() }));
-vi.mock('./_handlers/wise-rate.js', () => ({ default: vi.fn() }));
+vi.mock('../_handlers/geo.js', () => ({ default: vi.fn() }));
+vi.mock('../_handlers/product-enrich.js', () => ({ default: vi.fn() }));
+vi.mock('../_handlers/sitemap.js', () => ({ default: vi.fn() }));
+vi.mock('../_handlers/wise-rate.js', () => ({ default: vi.fn() }));
 
-import catalog from './catalog.js';
+import catalog from '../catalog.js';
 
 function response() {
   return {
