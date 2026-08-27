@@ -77,6 +77,10 @@ describe('customer receipt confirmation API', () => {
   });
 
   it('accepts the authenticated email as the legacy ownership key', async () => {
+    // O fallback de dono-por-e-mail exige `email_verified: true`
+    // (orders.js:271-272) — o mock padrão do beforeEach não tem essa
+    // claim porque os outros testes deste arquivo dependem de `userId`.
+    injected.user = { ...injected.user, email_verified: true };
     injected.db = database({
       userId: 'legacy-id',
       customerEmail: 'U1@example.com',

@@ -59,7 +59,10 @@ function pedido({ country, cpf }) {
 
 beforeEach(() => {
   mocks.limitar.mockReset().mockResolvedValue(undefined);
-  mocks.verify.mockReset().mockResolvedValue({ uid: 'u1', email: 'cliente@exemplo.com' });
+  // `email_verified: true` — sem isso a rota recusa antes mesmo de chegar à
+  // validação de CPF (guarda separado, ver `orders.js:64`), e não é isso que
+  // este arquivo testa.
+  mocks.verify.mockReset().mockResolvedValue({ uid: 'u1', email: 'cliente@exemplo.com', email_verified: true });
 });
 
 describe('CPF obrigatório no destino Brasil', () => {

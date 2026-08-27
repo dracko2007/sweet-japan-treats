@@ -167,13 +167,18 @@ function banco(overrides = {}) {
       holds: [],
     },
     'users/u1': { email: 'cliente@exemplo.com', points: 0 },
+    // `pix` está em TOGGLEABLE_PAYMENT_METHODS (orders.js) — sem este doc a
+    // rota recusa com 503 antes de chegar na reserva de promoção sob teste.
+    'settings/payments': { pixEnabled: true },
     ...overrides,
   });
 }
 
 beforeEach(() => {
   mocks.limitar.mockReset().mockResolvedValue(undefined);
-  mocks.verify.mockReset().mockResolvedValue({ uid: 'u1', email: 'cliente@exemplo.com' });
+  // `email_verified: true` — sem isso a rota recusa antes de chegar à reserva
+  // de promoção que este arquivo testa (guarda separado em orders.js:64).
+  mocks.verify.mockReset().mockResolvedValue({ uid: 'u1', email: 'cliente@exemplo.com', email_verified: true });
   injected.db = null;
 });
 

@@ -4,6 +4,14 @@
 // justamente quem tem motivo para não executar esse código.
 //
 // Agora quem registra é o servidor, no ponto em que ele de fato recusa.
+//
+// O gatilho original aqui era reuso de cupom de afiliado por CPF
+// (`affiliate_reuse`/`affiliate_coupon_already_used`). O commit 70b6c7b
+// ("fix: allow affiliate codes for every customer") removeu essa trava de
+// propósito — decisão de produto, não regressão. O gatilho que sobrou para
+// exercitar `registrarTentativaFraude` é o limite por produto da promoção da
+// home (`product_limit`/`promotion_limit`), então o cenário abaixo usa esse
+// caminho para continuar defendendo "log falhar não pode virar 500".
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
@@ -56,20 +64,21 @@ function resposta() {
 
 const CPF = '39053344705';
 
-/** Pedido com cupom de afiliado, vindo de um CPF que já usou outro afiliado. */
+/** Pedido de um produto que está na promoção da home, vindo de um CPF que já
+ *  usou o limite daquele produto (gatilho de `product_limit`). */
 function pedido() {
   return {
     method: 'POST',
     headers: { authorization: 'Bearer t' },
     body: {
       orderId: 'SC-JP-123456',
-      items: [{ productId: 'p1', variantId: 'small', quantity: 1 }],
+      items: [{ productId: 'p1_promo', variantId: 'small', quantity: 1 }],
       country: 'Brasil',
       prefecture: '',
       state: 'SP',
       shippingCarrier: 'ems',
       paymentMethod: 'wise',
-      couponCode: 'ANA10',
+      couponCode: '',
       redeemPoints: 0,
       negotiationId: '',
       promoCode: '',
@@ -81,31 +90,48 @@ function pedido() {
   };
 }
 
+const HORA = 60 * 60 * 1000;
+
 beforeEach(() => {
   mocks.add.mockReset().mockResolvedValue({ id: 'f1' });
   mocks.limitar.mockReset().mockResolvedValue(undefined);
-  mocks.verify.mockReset().mockResolvedValue({ uid: 'u1', email: 'cliente@exemplo.com' });
+  // `email_verified: true` — sem isso a rota recusa antes de chegar à lógica
+  // de fraude que este arquivo testa (guarda separado em orders.js:64).
+  mocks.verify.mockReset().mockResolvedValue({ uid: 'u1', email: 'cliente@exemplo.com', email_verified: true });
   mocks.banco.clear();
   mocks.banco.set('products/p1', { name: 'Produto', prices: { small: 1000 }, weightGrams: 500, stock: { unlimited: true } });
-  mocks.banco.set('affiliates/ANA10', { active: true, discountPercent: 10, commissionPercent: 10, ownerEmail: 'ana@exemplo.com' });
-  // Este CPF já usou desconto de afiliado numa compra anterior.
-  mocks.banco.set(`cpf_index/${CPF}`, { productIds: [], affiliateCodes: ['OUTRO'] });
+  // `wise` está em TOGGLEABLE_PAYMENT_METHODS (orders.js) — sem este doc a
+  // rota recusa com 503 antes de chegar na lógica de fraude sob teste.
+  mocks.banco.set('settings/payments', { wiseEnabled: true });
+  // p1 é o produto da promoção da home — necessário para que `buildQuote`
+  // marque o item como `homePromo` e o guarda de `product_limit` dispare.
+  mocks.banco.set('siteContent/homePromotion', {
+    productId: 'p1',
+    promoPriceYen: 500,
+    maxProducts: 100,
+    soldCount: 0,
+    limitPerPerson: 1,
+    expiresAt: Date.now() + 24 * HORA,
+  });
+  mocks.banco.set('promo_state/homePromotion', { rodada: 'p1|' + (Date.now() + 24 * HORA), holds: [] });
+  // Este CPF já usou o limite de p1 numa compra anterior.
+  mocks.banco.set(`cpf_index/${CPF}`, { productIds: ['p1'], affiliateCodes: [] });
 });
 
 describe('registro de tentativa de fraude', () => {
-  it('grava a tentativa quando recusa a reutilização de cupom de afiliado', async () => {
+  it('grava a tentativa quando recusa por limite de produto da promoção', async () => {
     const res = resposta();
 
     await handleCreate(pedido(), res);
 
     expect(res.statusCode).toBe(409);
-    expect(res.body).toEqual({ error: 'affiliate_coupon_already_used' });
+    expect(res.body).toEqual({ error: 'promotion_limit' });
 
     const [colecaoRef] = mocks.add.mock.calls;
     expect(mocks.add).toHaveBeenCalledTimes(1);
     expect(colecaoRef[0]).toMatchObject({
-      attemptType: 'affiliate_reuse',
-      affiliateCode: 'ANA10',
+      attemptType: 'product_limit',
+      productId: 'p1',
       cpfFull: CPF,
       customerEmail: 'cliente@exemplo.com',
       customerName: 'Cliente Teste',
@@ -124,7 +150,7 @@ describe('registro de tentativa de fraude', () => {
     await handleCreate(pedido(), res);
 
     expect(res.statusCode).toBe(409);
-    expect(res.body).toEqual({ error: 'affiliate_coupon_already_used' });
+    expect(res.body).toEqual({ error: 'promotion_limit' });
   });
 
   it('pedido limpo passa sem registrar nada', async () => {

@@ -168,12 +168,17 @@ function banco(usuario) {
   return new FakeDb({
     'products/p1': { name: 'Produto', prices: { small: 10000 }, weightGrams: 500, stock: { unlimited: true } },
     'users/u1': usuario,
+    // `wise` está em TOGGLEABLE_PAYMENT_METHODS (orders.js) — sem este doc a
+    // rota recusa com 503 antes de chegar na reserva de pontos sob teste.
+    'settings/payments': { wiseEnabled: true },
   });
 }
 
 beforeEach(() => {
   mocks.limitar.mockReset().mockResolvedValue(undefined);
-  mocks.verify.mockReset().mockResolvedValue({ uid: 'u1', email: 'cliente@exemplo.com' });
+  // `email_verified: true` — sem isso a rota recusa antes de chegar à reserva
+  // de pontos que este arquivo testa (guarda separado em orders.js:64).
+  mocks.verify.mockReset().mockResolvedValue({ uid: 'u1', email: 'cliente@exemplo.com', email_verified: true });
   injected.db = null;
 });
 
