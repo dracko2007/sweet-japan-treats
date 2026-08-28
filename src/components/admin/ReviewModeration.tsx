@@ -12,7 +12,12 @@ export default function ReviewModeration() {
   const [filterStars, setFilterStars] = useState<'all' | '1' | '2' | '3' | '4' | '5'>('all');
   const [filterPhotos, setFilterPhotos] = useState(false);
 
-  const load = () => setReviews(reviewService.getAllReviews());
+  const [loading, setLoading] = useState(true);
+
+  const load = () => {
+    setLoading(true);
+    reviewService.getAllReviews().then(setReviews).finally(() => setLoading(false));
+  };
 
   useEffect(() => { load(); }, []);
 
@@ -33,17 +38,16 @@ export default function ReviewModeration() {
     return new Date(b.date).getTime() - new Date(a.date).getTime();
   });
 
-  function deleteReview(id: string, userName: string) {
+  async function deleteReview(id: string, userName: string) {
     if (!confirm(`Excluir a avaliação de "${userName}"?\n\nEsta ação não pode ser desfeita.`)) return;
-    reviewService.deleteReview(id);
+    await reviewService.deleteReview(id);
     load();
     toast({ title: '🗑️ Avaliação excluída', description: `Review de ${userName} removida.` });
   }
 
-  function removePhotos(review: Review) {
+  async function removePhotos(review: Review) {
     if (!confirm(`Remover apenas as fotos da avaliação de "${review.userName}"?`)) return;
-    const all = reviewService.getAllReviews();
-    reviewService.saveReviews(all.map(r => r.id === review.id ? { ...r, images: [] } : r));
+    await reviewService.updateReviewImages(review.id, []);
     load();
     toast({ title: '🖼️ Fotos removidas', description: `Fotos de ${review.userName} apagadas. Nota e comentário mantidos.` });
   }
@@ -122,7 +126,9 @@ export default function ReviewModeration() {
       </div>
 
       {/* Lista */}
-      {sorted.length === 0 ? (
+      {loading ? (
+        <p className="text-center text-muted-foreground py-12">Carregando avaliações…</p>
+      ) : sorted.length === 0 ? (
         <p className="text-center text-muted-foreground py-12">Nenhuma avaliação encontrada.</p>
       ) : (
         <div className="space-y-3">

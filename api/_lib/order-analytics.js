@@ -34,17 +34,30 @@ export function toYen(amount, currency) {
   return Math.round(rate ? value * rate : value);
 }
 
+// Ordem de prioridade: `totalYen` é o campo gravado pelo checkout normal
+// (api/orders.js, via `quote.totalYen` de `buildQuote`). `grandTotalYen` só
+// existe nos pedidos de "venda posterior" criados manualmente pelo admin
+// (src/services/orderService.ts `createManualSale`, sempre em ¥) — mantido
+// como fallback para não zerar a receita desses pedidos. `grandTotalYen`
+// NUNCA foi gravado pelo checkout normal, então usá-lo como primeira opção
+// (como este arquivo fazia antes) zerava a receita de todo pedido normal
+// sempre que `totalPrice`/`totalAmount` (em moeda local) não convertiam 1:1
+// para ¥ — ou seja, para qualquer pedido fora do Japão.
 export function orderRevenueYen(order) {
-  return number(order?.grandTotalYen)
+  return number(order?.totalYen)
+    || number(order?.grandTotalYen)
     || toYen(number(order?.totalPrice ?? order?.totalAmount), order?.currency);
 }
 
+// `shippingCostYen` (e o espelho `shipping.cost`) já são gravados em ¥ puro
+// por `api/orders.js` (`quote.shippingYen`, calculado inteiramente em ¥ por
+// `shippingYen()` em `commerce.js`) — nunca precisaram de conversão de
+// moeda. O código antigo lia o campo inexistente `shippingCost` (sempre 0)
+// e, quando caía no fallback, ainda multiplicava pela razão
+// `grandTotalYen / totalPrice` — uma conversão que não fazia sentido para
+// um valor que já estava em ¥.
 function orderShippingYen(order) {
-  const shipping = number(order?.shippingCost ?? order?.shipping?.cost);
-  const localTotal = number(order?.totalPrice ?? order?.totalAmount);
-  const grandTotalYen = number(order?.grandTotalYen);
-  if (grandTotalYen > 0 && localTotal > 0) return Math.round(shipping * (grandTotalYen / localTotal));
-  return toYen(shipping, order?.currency);
+  return number(order?.shippingCostYen ?? order?.shipping?.cost);
 }
 
 // `orders.js` grava `couponDiscountYen` (já em ¥, congelado no checkout) —
@@ -94,6 +107,30 @@ function monthLabel(epoch) {
   });
 }
 
+// Ciclo real de status do pedido (confirmado lendo `api/orders.js`,
+// `api/_lib/fulfillment.js` e `src/services/orderService.ts`):
+//   'pending_payment' — criado no checkout, aguardando confirmação do
+//                        pagamento (Stripe webhook / PIX-Wise-Yucho manual).
+//   'payment_review'  — o cliente foi cobrado mas a separação falhou
+//                        (ex.: estoque insuficiente); fica preso esperando
+//                        decisão manual/estorno (`refundPending`).
+//   'confirmed'        — pagamento confirmado e pedido liberado para
+//                        separação. Inclui os sub-estados manuais
+//                        'processing'/'packing' que só existem dentro do
+//                        fluxo de admin (`src/pages/Admin.tsx`
+//                        `handleUpdateStatus`) entre "confirmado" e
+//                        "enviado" — nenhum deles é um estado final.
+//   'shipped'          — admin marcou como enviado.
+//   'delivered'        — cliente confirmou o recebimento, ou admin marcou
+//                        manualmente.
+//   'cancelled'        — cancelado.
+// Nenhum destes literais é o antigo 'pending' solto que este arquivo
+// comparava antes (o que zerava `pendingOrders` para sempre); mantido só
+// como sinônimo defensivo de 'pending_payment'.
+const PENDING_PAYMENT_STATUSES = new Set(['pending_payment', 'pending']);
+const PAYMENT_REVIEW_STATUSES = new Set(['payment_review']);
+const CONFIRMED_STATUSES = new Set(['confirmed', 'processing', 'packing']);
+
 export function buildDashboardAnalytics(orders, products = [], now = new Date()) {
   const costs = productCostLookup(products);
   const active = orders.filter((order) => order?.status !== 'cancelled');
@@ -119,7 +156,7 @@ export function buildDashboardAnalytics(orders, products = [], now = new Date())
     const withoutShipping = Math.max(revenue - orderShippingYen(order), 0);
     receitaComFrete += revenue;
     receitaSemFrete += withoutShipping;
-    receitaPS += number(order?.psFeeFinalYen);
+    receitaPS += number(order?.psFeeYen);
     custo += orderCostYen(order, costs);
     descontosCupomYen += orderDiscountYen(order);
     pontosResgatadosYen += orderPointsYen(order);
@@ -170,7 +207,9 @@ export function buildDashboardAnalytics(orders, products = [], now = new Date())
   return {
     stats: {
       totalOrders: active.length,
-      pendingOrders: orders.filter((order) => order?.status === 'pending').length,
+      pendingOrders: orders.filter((order) => PENDING_PAYMENT_STATUSES.has(order?.status)).length,
+      paymentReviewOrders: orders.filter((order) => PAYMENT_REVIEW_STATUSES.has(order?.status)).length,
+      confirmedOrders: orders.filter((order) => CONFIRMED_STATUSES.has(order?.status)).length,
       shippedOrders: orders.filter((order) => order?.status === 'shipped').length,
       deliveredOrders: orders.filter((order) => order?.status === 'delivered').length,
       cancelledOrders: orders.filter((order) => order?.status === 'cancelled').length,
@@ -214,7 +253,7 @@ export function couponRow(order) {
     couponDiscount,
     currency: String(order?.currency || 'BRL'),
     discountYen: orderDiscountYen(order),
-    grandTotalYen: number(order?.grandTotalYen),
+    grandTotalYen: orderRevenueYen(order),
     isAffiliate: Boolean(affiliateCode),
     affiliateCode,
   };

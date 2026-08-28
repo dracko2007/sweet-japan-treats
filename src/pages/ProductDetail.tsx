@@ -6,10 +6,11 @@ import { Button } from '@/components/ui/button';
 import ProductGallery from '@/components/products/ProductGallery';
 import ProductReviews from '@/components/products/ProductReviews';
 import { useProducts } from '@/context/ProductsContext';
-import { useCart } from '@/context/CartContext';
+import { useCart, getMaxQty } from '@/context/CartContext';
 import { useUser } from '@/context/UserContext';
 import { wishlistService } from '@/services/wishlistService';
 import { reviewService } from '@/services/reviewService';
+import type { ProductRating } from '@/types/review';
 import { registrarEvento } from '@/services/eventosService';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -71,6 +72,31 @@ const ProductDetail: React.FC = () => {
   const [isFavorite, setIsFavorite] = useState(
     user?.email ? wishlistService.isInWishlist(user.email, id || '') : false
   );
+
+  // Rating real vem do Firestore (coleção `reviews`) — async, então carrega
+  // via efeito em vez de leitura síncrona no corpo do componente.
+  const [productRating, setProductRating] = useState<ProductRating>({
+    productId: id || '',
+    averageRating: 0,
+    totalReviews: 0,
+    ratings: { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 },
+  });
+  useEffect(() => {
+    if (!product) return;
+    let cancelled = false;
+    reviewService.getProductRating(product.id).then((r) => { if (!cancelled) setProductRating(r); });
+    return () => { cancelled = true; };
+  }, [product?.id]);
+
+  // Reseta a quantidade se o produto trocar para um com estoque menor do que
+  // o já selecionado (ex: navegação direta entre produtos). `Math.max(1, max)`
+  // aqui prendia a quantidade em 1 mesmo com estoque zerado — produto
+  // esgotado nunca mostrava "0" nem travava o botão de adicionar.
+  useEffect(() => {
+    if (!product) return;
+    const max = getMaxQty(product);
+    if (Number.isFinite(max)) setQuantity((q) => Math.max(0, Math.min(q, max)));
+  }, [product?.id]);
 
   // SEO: cada produto ganha título/descrição/imagem/canonical próprios.
   // Antes TODAS as páginas de produto exibiam o mesmo título — péssimo p/ Google.
@@ -142,7 +168,8 @@ const ProductDetail: React.FC = () => {
   const currentPrice = getDisplayPrice(selectedSize);
   const promoActive = hasDiscount(product);
   const originalPrice = convertYen(baseYen(product, selectedSize));
-  const productRating = reviewService.getProductRating(product.id);
+  const maxQty = getMaxQty(product);
+  const isSoldOut = Number.isFinite(maxQty) && maxQty <= 0;
   const images = product.gallery && product.gallery.length > 0 ? product.gallery : [product.image];
 
   // Restrição de destino
@@ -174,11 +201,29 @@ const ProductDetail: React.FC = () => {
       toast({ title: '🚫 ' + deliveryBlockTitle, variant: 'destructive' });
       return;
     }
+    if (isSoldOut) {
+      toast({ title: 'Produto esgotado', description: 'Este produto está sem estoque no momento.', variant: 'destructive' });
+      return;
+    }
     addToCart(product, selectedSize, quantity, selectedVariant?.label);
     toast({
       title: t('productDetail.added'),
       description: `${translatedName} (${selectedVariant?.label || ''}) x${quantity}`,
     });
+  };
+
+  const handleIncrementQuantity = () => {
+    if (quantity >= maxQty) {
+      toast({
+        title: 'Limite de estoque atingido',
+        description: Number.isFinite(maxQty)
+          ? `Apenas ${maxQty} unidade${maxQty === 1 ? '' : 's'} ${maxQty === 1 ? 'disponível' : 'disponíveis'}.`
+          : 'Este produto está esgotado no momento.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    setQuantity(q => Math.min(q + 1, maxQty));
   };
 
   const handleToggleFavorite = () => {
@@ -266,24 +311,34 @@ const ProductDetail: React.FC = () => {
 
                 <h1 className="font-display text-4xl font-bold mb-4">{translatedName}</h1>
                 
-                {productRating.totalReviews > 0 && (
-                  <div className="flex items-center gap-2 mb-4">
-                    <div className="flex items-center">
-                      {[...Array(5)].map((_, i) => (
-                        <Star
-                          key={i}
-                          className={cn(
-                            "w-5 h-5",
-                            i < Math.floor(productRating.averageRating)
-                              ? "text-yellow-500 fill-yellow-500"
-                              : "text-gray-300"
-                          )}
-                        />
-                      ))}
-                    </div>
-                    <span className="text-sm text-muted-foreground">
-                      {productRating.averageRating.toFixed(1)} ({productRating.totalReviews} {t('productDetail.reviews')})
-                    </span>
+                {(productRating.totalReviews > 0 || (product.salesCount || 0) > 0) && (
+                  <div className="flex items-center gap-2 mb-4 flex-wrap">
+                    {productRating.totalReviews > 0 && (
+                      <>
+                        <div className="flex items-center">
+                          {[...Array(5)].map((_, i) => (
+                            <Star
+                              key={i}
+                              className={cn(
+                                "w-5 h-5",
+                                i < Math.floor(productRating.averageRating)
+                                  ? "text-yellow-500 fill-yellow-500"
+                                  : "text-gray-300"
+                              )}
+                            />
+                          ))}
+                        </div>
+                        <span className="text-sm text-muted-foreground">
+                          {productRating.averageRating.toFixed(1)} ({productRating.totalReviews} {t('productDetail.reviews')})
+                        </span>
+                      </>
+                    )}
+                    {(product.salesCount || 0) > 0 && (
+                      <span className="text-sm text-muted-foreground">
+                        {productRating.totalReviews > 0 && <span className="text-gray-300 mr-2">·</span>}
+                        {product.salesCount!.toLocaleString('pt-BR')} vendidos
+                      </span>
+                    )}
                   </div>
                 )}
 
@@ -363,21 +418,35 @@ const ProductDetail: React.FC = () => {
                   <DeliveryEstimateBadge country={selectedCountry} className="mb-4" />
                 )}
                 <StockUrgency stock={product.stock} className="mb-4" />
+                {isSoldOut && (
+                  <div className="flex items-center gap-2 rounded-xl bg-red-600 text-white px-3 py-2 shadow-sm mb-4">
+                    <span className="text-xs sm:text-sm font-black leading-tight">🚫 ESGOTADO — sem estoque no momento</span>
+                  </div>
+                )}
 
                 {/* Bloco de Quantidade + Botão Adicionar ao Carrinho */}
-                <div className="flex flex-wrap sm:flex-nowrap items-center gap-3 mb-6">
+                <div className="mb-6">
+                <div className="flex flex-wrap sm:flex-nowrap items-center gap-3">
                   <div className="flex items-center border-2 border-border rounded-xl h-11 shrink-0 bg-background">
                     <button
                       onClick={() => setQuantity(q => Math.max(1, q - 1))}
-                      className="px-3.5 h-full hover:bg-secondary rounded-l-lg transition-colors font-bold text-base"
+                      disabled={isSoldOut}
+                      className={cn(
+                        "px-3.5 h-full rounded-l-lg transition-colors font-bold text-base",
+                        isSoldOut ? "opacity-40 cursor-not-allowed" : "hover:bg-secondary"
+                      )}
                       aria-label="Diminuir quantidade"
                     >
                       -
                     </button>
                     <span className="px-4 font-bold text-sm min-w-[2.5rem] text-center">{quantity}</span>
                     <button
-                      onClick={() => setQuantity(q => q + 1)}
-                      className="px-3.5 h-full hover:bg-secondary rounded-r-lg transition-colors font-bold text-base"
+                      onClick={handleIncrementQuantity}
+                      disabled={isSoldOut || quantity >= maxQty}
+                      className={cn(
+                        "px-3.5 h-full rounded-r-lg transition-colors font-bold text-base",
+                        (isSoldOut || quantity >= maxQty) ? "opacity-40 cursor-not-allowed" : "hover:bg-secondary"
+                      )}
                       aria-label="Aumentar quantidade"
                     >
                       +
@@ -387,11 +456,11 @@ const ProductDetail: React.FC = () => {
                   <Button
                     onClick={handleAddToCart}
                     size="lg"
-                    disabled={deliveryBlocked}
-                    className={`flex-1 h-11 gap-2 text-base font-bold shadow-md hover:shadow-lg transition-all ${deliveryBlocked ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    disabled={deliveryBlocked || isSoldOut}
+                    className={`flex-1 h-11 gap-2 text-base font-bold shadow-md hover:shadow-lg transition-all ${(deliveryBlocked || isSoldOut) ? 'opacity-50 cursor-not-allowed' : ''}`}
                   >
                     <ShoppingCart className="w-5 h-5" />
-                    {deliveryBlocked ? deliveryBlockBtn : t('productDetail.addToCart')}
+                    {deliveryBlocked ? deliveryBlockBtn : isSoldOut ? 'Esgotado' : t('productDetail.addToCart')}
                   </Button>
 
                   <Button
@@ -413,6 +482,12 @@ const ProductDetail: React.FC = () => {
                   >
                     <Share2 className="w-5 h-5" />
                   </Button>
+                </div>
+                {!isSoldOut && Number.isFinite(maxQty) && quantity >= maxQty && (
+                  <p className="text-xs font-semibold text-red-600 mt-2">
+                    Apenas {maxQty} unidade{maxQty === 1 ? '' : 's'} {maxQty === 1 ? 'disponível' : 'disponíveis'} em estoque.
+                  </p>
+                )}
                 </div>
 
                 <ProductTrustBadges productName={translatedName} className="mt-6" />

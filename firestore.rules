@@ -177,6 +177,25 @@ service cloud.firestore {
     match /products/{productId} {
       allow read: if true;
       allow create, update, delete: if isAdmin();
+
+      // Agregado rating/reviewCount vindo de avaliações reais (reviews/{id}).
+      // Só aceita quando, na MESMA escrita, o doc `reviews/{productId}_{uid}`
+      // do próprio usuário está sendo CRIADO agora (não existia antes, existe
+      // depois) — isso amarra a atualização a uma avaliação nova e genuína,
+      // sem abrir escrita livre no produto para qualquer conta. reviewCount
+      // só pode subir exatamente 1 por vez. A validação de compra real já
+      // rodou no servidor antes do review ser gravado (api/user-rewards.js).
+      // O valor exato de `rating` depende do cálculo do cliente — regras não
+      // conseguem agregar a coleção `reviews` inteira para conferir a média.
+      allow update: if signedIn()
+        && !exists(/databases/$(database)/documents/reviews/$(productId + '_' + request.auth.uid))
+        && existsAfter(/databases/$(database)/documents/reviews/$(productId + '_' + request.auth.uid))
+        && getAfter(/databases/$(database)/documents/reviews/$(productId + '_' + request.auth.uid)).data.userId == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rating', 'reviewCount'])
+        && request.resource.data.reviewCount is int
+        && request.resource.data.reviewCount == resource.data.get('reviewCount', 0) + 1
+        && request.resource.data.rating is number
+        && request.resource.data.rating >= 0 && request.resource.data.rating <= 5;
     }
 
     match /siteContent/{docId} {
@@ -315,6 +334,35 @@ service cloud.firestore {
         || (signedIn() && resource.data.get('userId', '') == request.auth.uid)
         || ownsByEmail(resource.data, 'userEmail');
       allow update, delete: if isAdmin();
+    }
+
+    // Avaliações de produto (nota + comentário + fotos). Compra já validada
+    // pelo servidor antes do doc ser gravado (api/user-rewards.js
+    // claimProductReview) — aqui só garantimos autenticação, dono do doc e
+    // o formato dos dados. Um doc por usuário por produto, id determinístico
+    // `{productId}_{uid}`, o que também impede duplicidade.
+    match /reviews/{reviewId} {
+      function validReview(data) {
+        return data.keys().hasAll(['id', 'productId', 'userId', 'userName', 'rating', 'comment', 'verified', 'date'])
+          && data.keys().hasOnly(['id', 'productId', 'userId', 'userName', 'rating', 'comment', 'verified', 'date', 'images', 'videoUrl', 'pointsAwarded'])
+          && data.id == reviewId
+          && data.userId == request.auth.uid
+          && reviewId == data.productId + '_' + request.auth.uid
+          && validText(data.productId, 1, 160)
+          && validText(data.userName, 1, 120)
+          && data.rating is int && data.rating >= 1 && data.rating <= 5
+          && validText(data.comment, 1, 3000)
+          && data.verified == true
+          && validText(data.date, 10, 40)
+          && (!data.keys().hasAny(['images']) || (data.images is list && data.images.size() <= 10))
+          && (!data.keys().hasAny(['videoUrl']) || validText(data.videoUrl, 0, 1000))
+          && (!data.keys().hasAny(['pointsAwarded']) || data.pointsAwarded is number);
+      }
+      allow read: if true;
+      allow create: if signedIn() && validReview(request.resource.data);
+      allow update: if isAdmin()
+        || (signedIn() && resource.data.userId == request.auth.uid && validReview(request.resource.data));
+      allow delete: if isAdmin() || (signedIn() && resource.data.userId == request.auth.uid);
     }
 
     match /negotiations/{negotiationId} {

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Star, Camera, X, Video, Gift, Link2 } from 'lucide-react';
+import { Star, Camera, X, Video, Gift, Link2, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { useUser } from '@/context/UserContext';
@@ -28,6 +28,7 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ productId, productName, onClo
   const [hoverRating, setHoverRating] = useState(0);
   const [comment, setComment] = useState('');
   const [images, setImages] = useState<string[]>([]);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [videoMode, setVideoMode] = useState<'file' | 'link'>('file');
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [videoPreview, setVideoPreview] = useState('');
@@ -40,14 +41,27 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ productId, productName, onClo
     if (user) pointsService.hasVideoForProduct(user.id, productId).then(setAlreadyHasVideo);
   }, [user, productId]);
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
-    if (!files) return;
-    Array.from(files).forEach((file) => {
-      const reader = new FileReader();
-      reader.onloadend = () => setImages((prev) => [...prev, reader.result as string]);
-      reader.readAsDataURL(file);
-    });
+    if (!files || files.length === 0) return;
+    const remaining = Math.max(0, 5 - images.length);
+    const toUpload = Array.from(files).slice(0, remaining);
+    setUploadingPhoto(true);
+    try {
+      for (const file of toUpload) {
+        const { url } = await uploadMedia(file, `review-photos/${productId}`);
+        setImages((prev) => [...prev, url]);
+      }
+    } catch (err: unknown) {
+      toast({
+        title: 'Falha ao enviar a foto',
+        description: err instanceof Error ? err.message : 'Tente novamente.',
+        variant: 'destructive',
+      });
+    } finally {
+      setUploadingPhoto(false);
+      e.target.value = '';
+    }
   };
 
   const handleVideoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -102,17 +116,28 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ productId, productName, onClo
       return;
     }
 
-    reviewService.addReview({
-      productId,
-      userId: user.id,
-      userName: user.name,
-      rating: selectedRating,
-      comment: comment.trim(),
-      images: images.length > 0 ? images : undefined,
-      videoUrl: videoUrl || undefined,
-      pointsAwarded: reward.awarded,
-      verified: true,
-    });
+    try {
+      await reviewService.addReview({
+        productId,
+        userId: user.id,
+        userName: user.name,
+        rating: selectedRating,
+        comment: comment.trim(),
+        images: images.length > 0 ? images : undefined,
+        videoUrl: videoUrl || undefined,
+        pointsAwarded: reward.awarded,
+        verified: true,
+      });
+    } catch (err: unknown) {
+      const alreadyReviewed = err instanceof Error && err.message === 'already_reviewed';
+      toast({
+        title: alreadyReviewed ? 'Você já avaliou este produto' : 'Não foi possível salvar a avaliação',
+        description: alreadyReviewed ? undefined : (err instanceof Error ? err.message : 'Tente novamente.'),
+        variant: 'destructive',
+      });
+      setSaving(false);
+      return;
+    }
     if (reward.awarded > 0) addPoints(reward.awarded);
 
     let videoMsg = '';
@@ -187,9 +212,14 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ productId, productName, onClo
                 </div>
               ))}
               {images.length < 5 && (
-                <label className="w-16 h-16 border-2 border-dashed border-border rounded-lg flex items-center justify-center cursor-pointer hover:border-primary">
-                  <Camera className="w-5 h-5 text-muted-foreground" />
-                  <input type="file" accept="image/*" multiple className="hidden" onChange={handleImageUpload} />
+                <label className={cn(
+                  'w-16 h-16 border-2 border-dashed border-border rounded-lg flex items-center justify-center transition-colors',
+                  uploadingPhoto ? 'opacity-50 cursor-wait' : 'cursor-pointer hover:border-primary'
+                )}>
+                  {uploadingPhoto
+                    ? <Loader2 className="w-5 h-5 text-muted-foreground animate-spin" />
+                    : <Camera className="w-5 h-5 text-muted-foreground" />}
+                  <input type="file" accept="image/*" multiple className="hidden" disabled={uploadingPhoto} onChange={handleImageUpload} />
                 </label>
               )}
             </div>
@@ -267,7 +297,7 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ productId, productName, onClo
         </div>
 
         <div className="p-5 border-t border-border flex gap-3">
-          <Button onClick={submit} disabled={saving} className="flex-1">Enviar avaliação</Button>
+          <Button onClick={submit} disabled={saving || uploadingPhoto} className="flex-1">Enviar avaliação</Button>
           <Button variant="outline" onClick={onClose}>Cancelar</Button>
         </div>
       </div>

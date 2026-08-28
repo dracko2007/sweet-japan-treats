@@ -7,6 +7,13 @@ import { useProducts } from '@/context/ProductsContext';
 
 const CART_STORAGE_KEY = 'sakura_cart';
 
+// Limite de quantidade de um produto no carrinho: estoque real, ou sem
+// limite quando o produto é ilimitado (ou não tem controle de estoque).
+// Reaproveitado pelo seletor de quantidade da página do produto para manter
+// o mesmo comportamento de clamping em toda a loja.
+export const getMaxQty = (product: Product): number =>
+  product.stock && !product.stock.unlimited ? product.stock.quantity : Infinity;
+
 const loadCart = (): CartItem[] => {
   try {
     const raw = safeStorage.getItem(CART_STORAGE_KEY);
@@ -127,7 +134,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const addToCart = useCallback((product: Product, size: string, quantity = 1, variantLabel?: string) => {
     setRawItems(prev => {
-      const maxQty = product.stock && !product.stock.unlimited ? product.stock.quantity : Infinity;
+      const maxQty = getMaxQty(product);
       const existingIndex = prev.findIndex(
         item => item.product.id === product.id && item.size === size
       );
@@ -168,7 +175,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
     setRawItems(prev => prev.map(item => {
       if (item.product.id !== productId || item.size !== size) return item;
-      const maxQty = item.product.stock && !item.product.stock.unlimited ? item.product.stock.quantity : Infinity;
+      const maxQty = getMaxQty(item.product);
       return { ...item, quantity: Math.min(quantity, maxQty) };
     }));
   }, []);

@@ -682,6 +682,9 @@ const ProductManager: React.FC = () => {
                       {p.sku && (
                         <p className="text-[10px] font-mono text-muted-foreground/80 tracking-wide">SKU: {p.sku}</p>
                       )}
+                      {(p.salesCount || 0) > 0 && (
+                        <p className="text-[10px] text-muted-foreground mt-0.5">📊 {p.salesCount!.toLocaleString('pt-BR')} vendido{p.salesCount === 1 ? '' : 's'}</p>
+                      )}
                       {p.discountPercent ? (
                         <p className="text-xs mt-1">
                           <s className="text-gray-400">¥{p.prices.small.toLocaleString()}</s>{' '}
@@ -1120,13 +1123,12 @@ const ProductManager: React.FC = () => {
                   <label className="text-sm font-semibold block mb-1">📊 Qtd. vendida</label>
                   <input
                     type="number"
-                    min={0}
-                    value={editing?.salesCount ?? ''}
-                    onChange={e => setEditing({ ...editing!, salesCount: Number(e.target.value) || 0 })}
-                    placeholder="0"
-                    className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm"
+                    value={editing?.salesCount ?? 0}
+                    readOnly
+                    disabled
+                    className="w-full px-3 py-2 rounded-lg border border-border bg-secondary/60 text-sm text-muted-foreground cursor-not-allowed"
                   />
-                  <p className="text-[11px] text-muted-foreground mt-1.5">Usado no filtro "Mais Vendidos".</p>
+                  <p className="text-[11px] text-muted-foreground mt-1.5">Somente leitura — incrementado automaticamente a cada pedido confirmado.</p>
                 </div>
 
                 <div className="bg-secondary/40 border border-border rounded-lg p-3">

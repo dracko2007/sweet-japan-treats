@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { TrendingUp, TrendingDown, Package, DollarSign, ShoppingBag, CheckCircle, XCircle, ChevronDown, ChevronUp, RefreshCw } from 'lucide-react';
+import { TrendingUp, TrendingDown, Package, DollarSign, ShoppingBag, CheckCircle, XCircle, AlertTriangle, ChevronDown, ChevronUp, RefreshCw } from 'lucide-react';
 import {
   BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
@@ -42,8 +42,17 @@ interface FinanceSummary {
   lucroLiquido: number;
 }
 
+// `OrderStatistics` (`@/types`) só tem os 4 buckets antigos (pending/shipped/
+// delivered/cancelled), que não cobrem o ciclo real do pedido. Em vez de
+// mexer no tipo compartilhado, estende localmente com os 2 buckets novos que
+// `buildDashboardAnalytics` (api/_lib/order-analytics.js) passou a devolver.
+type DashboardOrderStats = OrderStatistics & {
+  paymentReviewOrders: number;
+  confirmedOrders: number;
+};
+
 interface DashboardPayload {
-  stats: OrderStatistics;
+  stats: DashboardOrderStats;
   finance: Pick<
     FinanceSummary,
     'receitaComFrete' | 'receitaSemFrete' | 'receitaProduto' | 'receitaPS'
@@ -57,6 +66,8 @@ interface DashboardPayload {
 const statsSchema = z.object({
   totalOrders: z.number(),
   pendingOrders: z.number(),
+  paymentReviewOrders: z.number(),
+  confirmedOrders: z.number(),
   shippedOrders: z.number(),
   deliveredOrders: z.number(),
   cancelledOrders: z.number(),
@@ -104,10 +115,10 @@ function SectionHeader({ title, open, onToggle }: { title: string; open: boolean
 }
 
 const Dashboard: React.FC = () => {
-  const EMPTY_STATS: OrderStatistics = {
-    totalOrders: 0, pendingOrders: 0, shippedOrders: 0, deliveredOrders: 0,
-    cancelledOrders: 0, totalRevenue: 0, revenueThisMonth: 0, revenueLastMonth: 0,
-    ordersThisMonth: 0, ordersLastMonth: 0,
+  const EMPTY_STATS: DashboardOrderStats = {
+    totalOrders: 0, pendingOrders: 0, paymentReviewOrders: 0, confirmedOrders: 0,
+    shippedOrders: 0, deliveredOrders: 0, cancelledOrders: 0, totalRevenue: 0,
+    revenueThisMonth: 0, revenueLastMonth: 0, ordersThisMonth: 0, ordersLastMonth: 0,
   };
   const EMPTY_FINANCE: FinanceSummary = {
     receitaComFrete: 0, receitaSemFrete: 0, receitaProduto: 0, receitaPS: 0,
@@ -115,7 +126,7 @@ const Dashboard: React.FC = () => {
     marketingBRL: 0, marketingJPY: 0, salariosBRL: 0, salariosJPY: 0,
     descontosCupomYen: 0, lucroLiquido: 0,
   };
-  const [stats, setStats] = useState<OrderStatistics | null>(null);
+  const [stats, setStats] = useState<DashboardOrderStats | null>(null);
   const [finance, setFinance] = useState<FinanceSummary>(EMPTY_FINANCE);
   const [monthlyData, setMonthlyData] = useState<MonthlyFin[]>([]);
   const [topProducts, setTopProducts] = useState<{ name: string; count: number }[]>([]);
@@ -232,6 +243,8 @@ const Dashboard: React.FC = () => {
 
   const statusData = [
     { name: 'Pendentes', value: stats.pendingOrders, color: '#f59e0b' },
+    { name: 'Revisão de Pagamento', value: stats.paymentReviewOrders, color: '#d97706' },
+    { name: 'Confirmados', value: stats.confirmedOrders, color: '#06b6d4' },
     { name: 'Enviados', value: stats.shippedOrders, color: '#8b5cf6' },
     { name: 'Entregues', value: stats.deliveredOrders, color: '#22c55e' },
     { name: 'Cancelados', value: stats.cancelledOrders, color: '#ef4444' },
@@ -296,7 +309,25 @@ const Dashboard: React.FC = () => {
               </div>
               <p className="text-xs text-muted-foreground mb-0.5">Pendentes</p>
               <p className="text-2xl font-bold text-yellow-600">{stats.pendingOrders}</p>
-              <p className="text-[11px] text-muted-foreground mt-1">Aguardando ação</p>
+              <p className="text-[11px] text-muted-foreground mt-1">Aguardando pagamento</p>
+            </div>
+
+            <div className="bg-card rounded-xl border border-border p-5">
+              <div className="w-9 h-9 rounded-full bg-cyan-500/10 flex items-center justify-center mb-3">
+                <CheckCircle className="w-5 h-5 text-cyan-500" />
+              </div>
+              <p className="text-xs text-muted-foreground mb-0.5">Confirmados</p>
+              <p className="text-2xl font-bold text-cyan-600">{stats.confirmedOrders}</p>
+              <p className="text-[11px] text-muted-foreground mt-1">Pagos, em preparo</p>
+            </div>
+
+            <div className="bg-card rounded-xl border border-border p-5">
+              <div className="w-9 h-9 rounded-full bg-amber-500/10 flex items-center justify-center mb-3">
+                <AlertTriangle className="w-5 h-5 text-amber-600" />
+              </div>
+              <p className="text-xs text-muted-foreground mb-0.5">Revisão de Pagamento</p>
+              <p className="text-2xl font-bold text-amber-700">{stats.paymentReviewOrders}</p>
+              <p className="text-[11px] text-muted-foreground mt-1">Cobrado, separação falhou</p>
             </div>
 
             <div className="bg-card rounded-xl border border-border p-5">

@@ -258,6 +258,12 @@ const Admin: React.FC = () => {
 
   // Pedidos a processar (= novos): tudo que não foi enviado/entregue/cancelado.
   // Robusto a variações de status ('pending', 'Pendente', 'paid', 'processing'...).
+  // Única fonte de "pendente" nesta tela — reaproveitada tanto pelo badge do
+  // menu (linha ~750) quanto pelo card "Pendentes carregados" (aba
+  // Notificações) — para não voltar a ter 2 lógicas divergentes (uma delas
+  // comparava com o literal solto 'pending', que nenhum pedido real usa, e
+  // sempre mostrava 0). Calculado sobre `allOrders`, que é paginado: reflete
+  // só os pedidos já carregados no navegador, não o total do banco.
   const DONE_STATUSES = ['shipped', 'delivered', 'cancelled', 'enviado', 'entregue', 'cancelado'];
   const pendingOrdersCount = allOrders.filter(
     (o) => !DONE_STATUSES.includes(String(o.status || 'pending').toLowerCase())
@@ -620,7 +626,7 @@ _This is an automated test message_
       <tr>
         <td>Frete ${order.shippingCarrier ? `(${escapeHtml(order.shippingCarrier)})` : ''}</td>
         <td></td>
-        <td>${shippingCost != null ? (shippingCost === 0 ? 'Grátis' : `R$ ${shippingCost.toFixed(2)}`) : 'N/A'}</td>
+        <td>${shippingCost != null ? (shippingCost === 0 ? 'Grátis' : `¥ ${Math.round(shippingCost).toLocaleString('pt-BR')}`) : 'N/A'}</td>
       </tr>
       ${(order.federalTax > 0 || order.icmsTax > 0 || order.taxAmount > 0) ? `<tr><td style="color:#888;font-size:12px;">Impostos (II + ICMS)</td><td></td><td style="color:#888;font-size:12px;">R$ ${Number(order.federalTax && order.icmsTax ? (order.federalTax + order.icmsTax) : order.taxAmount || 0).toFixed(2)}</td></tr>` : ''}
       <tr class="grand">
@@ -942,7 +948,7 @@ _This is an automated test message_
                   <h3 className="font-semibold text-lg">Pendentes carregados</h3>
                 </div>
                 <p className="text-3xl font-bold text-yellow-600">
-                  {allOrders.filter(o => o.status === 'pending').length}
+                  {pendingOrdersCount}
                 </p>
               </div>
               
@@ -1106,7 +1112,7 @@ _This is an automated test message_
                                     <Truck className="w-3 h-3" />
                                     Frete {order.shippingCarrier && <span className="text-muted-foreground text-xs">({order.shippingCarrier})</span>}
                                   </span>
-                                  <span className="font-mono">{shippingCost != null ? (shippingCost === 0 ? <span className="text-green-600">Grátis</span> : `R$ ${shippingCost.toFixed(2)}`) : 'N/A'}</span>
+                                  <span className="font-mono">{shippingCost != null ? (shippingCost === 0 ? <span className="text-green-600">Grátis</span> : `¥ ${Math.round(shippingCost).toLocaleString('pt-BR')}`) : 'N/A'}</span>
                                 </div>
 
                                 {/* Impostos */}

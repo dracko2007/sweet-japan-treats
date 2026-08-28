@@ -6,6 +6,7 @@ import { buildPaymentReviewEmail, sendMail } from './mailer.js';
 import { semReserva } from './points-hold.js';
 import { indiceDePessoaId, promoUsageId } from './promo-identity.js';
 import { refEstadoPromo, semReservaPromo } from './promo-reserve.js';
+import { refReservaEstoque, semReservaEstoque } from './stock-reserve.js';
 
 function unique(values) {
   return [...new Set(values.filter(Boolean))];
@@ -64,6 +65,7 @@ export async function fulfillOrder(orderId, { provider, reference, confirmedBy }
     for (const item of items) quantities.set(item.productId, (quantities.get(item.productId) || 0) + Number(item.quantity || 0));
 
     const productRefs = [...quantities.keys()].map((productId) => db.collection('products').doc(productId));
+    const stockReserveRefs = [...quantities.keys()].map((productId) => refReservaEstoque(db, productId));
     const eventRef = db.collection('fulfillment_events').doc(eventId(provider, reference));
     const userRef = db.collection('users').doc(order.userId);
     const homePromoRef = db.collection('siteContent').doc('homePromotion');
@@ -84,6 +86,7 @@ export async function fulfillOrder(orderId, { provider, reference, confirmedBy }
 
     const refs = [
       ...productRefs,
+      ...stockReserveRefs,
       eventRef,
       userRef,
       ...(order.homePromoQuantity ? [homePromoRef] : []),
@@ -205,6 +208,15 @@ export async function fulfillOrder(orderId, { provider, reference, confirmedBy }
       const update = { salesCount: Number(product.salesCount || 0) + quantity };
       if (product.stock?.unlimited === false) update['stock.quantity'] = Number(product.stock.quantity || 0) - quantity;
       transaction.update(ref, update);
+    }
+    // Pedido pago: a reserva de estoque vira baixa de verdade na linha acima
+    // e sai da lista — senão a unidade ficaria contada duas vezes (reservada
+    // E decrementada) até o prazo da reserva vencer sozinho.
+    for (const stockReserveRef of stockReserveRefs) {
+      const stockReserveAtual = byPath.get(stockReserveRef.path);
+      const stockReserveData = stockReserveAtual?.exists ? stockReserveAtual.data() : null;
+      if (!stockReserveData?.holds?.length) continue;
+      transaction.set(stockReserveRef, semReservaEstoque(stockReserveData, orderId));
     }
     transaction.create(eventRef, { orderId, provider, reference, createdAt: new Date().toISOString() });
 
@@ -388,6 +400,11 @@ export async function markFulfillmentReview(orderId, reason, { paymentIntentId =
   await liberarReservaPromo(db, orderId).catch((erro) => {
     console.error('[fulfillment] falha ao liberar reserva promo do pedido em revisao:', erro instanceof Error ? erro.message : erro);
   });
+  // E o estoque comum: pedido morto não pode continuar segurando unidade de
+  // nenhum produto — outro cliente pode estar esperando exatamente essa.
+  await liberarReservaEstoque(db, order, orderId).catch((erro) => {
+    console.error('[fulfillment] falha ao liberar reserva de estoque do pedido em revisao:', erro instanceof Error ? erro.message : erro);
+  });
   const paraEmail = { ...order, stripePaymentIntentId: referencia, totalPrice: valorCobrado, currency: moedaCobrada };
   return { notified: await notificarRevisao(paraEmail, codigo) };
 }
@@ -433,6 +450,28 @@ async function liberarReservaPromo(db, orderId) {
     const novoEstado = semReservaPromo(promoStateData, homePromoData, orderId);
     transaction.set(promoStateRef, novoEstado);
   });
+}
+
+/**
+ * Devolve ao estoque comum as unidades de todos os produtos que o pedido
+ * segurava. Diferente da promoção (um documento global), cada produto tem o
+ * seu próprio `stock_reserve/{productId}` — libera um por um, sem transação
+ * única entre eles (não precisam ser atômicos entre si, só cada um consigo
+ * mesmo contra outros checkouts do mesmo produto).
+ */
+async function liberarReservaEstoque(db, order, orderId) {
+  const items = Array.isArray(order?.items) ? order.items : [];
+  const productIds = [...new Set(items.map((item) => item.productId).filter(Boolean))];
+  await Promise.all(productIds.map(async (productId) => {
+    const ref = refReservaEstoque(db, productId);
+    await db.runTransaction(async (transaction) => {
+      const snap = await transaction.get(ref);
+      if (!snap.exists) return;
+      const data = snap.data();
+      if (!data?.holds?.length) return;
+      transaction.set(ref, semReservaEstoque(data, orderId));
+    });
+  }));
 }
 
 /**

@@ -107,7 +107,7 @@ function printOrder(order) {
     const discount =
       order.couponDiscount ||
       (itemsSubtotal > order.totalPrice ? itemsSubtotal - order.totalPrice : 0);
-    const shippingCost = order.shipping?.cost ?? null;
+    const shippingCostYen = order.shippingCostYen ?? order.shipping?.cost ?? null;
     const grandTotal = order.totalPrice ?? order.total ?? 0;
     const grandTotalYen = order.grandTotalYen;
 
@@ -185,12 +185,12 @@ function printOrder(order) {
           printer.text(cols2(couponLabel, `-R$${discount.toFixed(2)}`));
         }
 
-        if (shippingCost != null) {
+        if (shippingCostYen != null) {
           const freteLabel = order.shippingCarrier
             ? `Frete (${order.shippingCarrier})`
             : 'Frete';
           printer.text(
-            cols2(freteLabel, shippingCost === 0 ? 'GRATIS' : `R$${shippingCost.toFixed(2)}`)
+            cols2(freteLabel, shippingCostYen === 0 ? 'GRATIS' : `¥${Math.round(shippingCostYen).toLocaleString()}`)
           );
         }
 

@@ -319,8 +319,14 @@ export function buildQuote({ requestedItems, products, country, prefecture, stat
   const productsDisplay = normalizeMoney(convertYen(netProductsYen, currency, rates), currency);
   const shippingDisplay = normalizeMoney(convertYen(finalShippingYen, currency, rates), currency);
   const psFeeDisplay = normalizeMoney(convertYen(psFeeYen - psDiscountYen, currency, rates, { exact: true }), currency);
+  // O imposto é só informativo (ver shared/tax-disclosure.js): a loja nunca
+  // cobra tributo de importação do cliente, quem cobra é a alfândega do país
+  // de destino na entrega. `taxDisplay`/`tax`/`display.tax` seguem calculados
+  // e expostos para o aviso na tela, mas ficam de fora de `total`/`totalYen`
+  // — que é o valor que vira `order.totalPrice` e é o que de fato é cobrado
+  // no Stripe/PIX/Wise (ver `stripeIntent` em `api/orders.js`).
   const taxDisplay = country === 'Japão' ? 0 : normalizeMoney(displayTax(productsDisplay, country, state || prefecture), currency);
-  const total = normalizeMoney(productsDisplay + shippingDisplay + psFeeDisplay + taxDisplay, currency);
+  const total = normalizeMoney(productsDisplay + shippingDisplay + psFeeDisplay, currency);
   if (!(total > 0)) throw new HttpError(400, 'invalid_total');
 
   // O defeito era só nas linhas de cima da conta: subtotal saía com cushion e
@@ -360,7 +366,7 @@ export function buildQuote({ requestedItems, products, country, prefecture, stat
   return {
     currency,
     total,
-    totalYen: netProductsYen + finalShippingYen + (psFeeYen - psDiscountYen) + Math.round(taxDisplay / (currency === 'JPY' ? 1 : rates[currency])),
+    totalYen: netProductsYen + finalShippingYen + (psFeeYen - psDiscountYen),
     productSubtotalYen,
     netProductsYen,
     productCostYen: lineItems.reduce((sum, item) => sum + Math.max(0, Number(item.product.cost || 0)) * item.quantity, 0),
@@ -377,10 +383,11 @@ export function buildQuote({ requestedItems, products, country, prefecture, stat
     tax: normalizeMoney(taxDisplay, currency),
     // A conta decomposta, com as linhas já coerentes entre si:
     // `subtotal - couponDiscount - pointsDiscount - paymentDiscount == products`
-    // e `products + shipping + psFee + tax == total`. Vai gravada no pedido
-    // (`orders.js`, campo `priceBreakdown`) para congelar o que o cliente viu no
-    // momento da compra — sem isso, uma variação de câmbio depois torna
-    // impossível reconstruir a conta numa contestação.
+    // e `products + shipping + psFee == total` (tax é só informativo, ver
+    // comentário acima). Vai gravada no pedido (`orders.js`, campo
+    // `priceBreakdown`) para congelar o que o cliente viu no momento da
+    // compra — sem isso, uma variação de câmbio depois torna impossível
+    // reconstruir a conta numa contestação.
     display: {
       subtotal: subtotalDisplay,
       couponDiscount: couponDiscountDisplay,

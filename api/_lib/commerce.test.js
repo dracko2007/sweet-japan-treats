@@ -149,8 +149,9 @@ describe('authoritative checkout quote', () => {
   // por linha, enquanto cupom, pontos e taxa PS iam pela taxa exata. O cushion
   // nunca alcançava os descontos, então a conta da tela ficava 4% dos descontos
   // acima do total cobrado — cerca de R$2 num pedido com ¥1.500 de cupom.
-  // A prova é que a soma das linhas exibidas agora fecha com o total.
-  it('a soma das linhas exibidas fecha com o total', () => {
+  // A prova é que a soma das linhas exibidas (SEM o imposto, que é só
+  // informativo — ver BUG1/commerce.js `buildQuote`) fecha exatamente com o total.
+  it('a soma das linhas exibidas (produtos+frete+taxa PS) fecha com o total, sem o imposto', () => {
     const result = quote({
       requestedItems: [{ productId: 'p1', variantId: 'small', quantity: 3 }],
       coupon: { code: 'GLOBAL10', discountType: 'percentage', discount: 10 },
@@ -163,10 +164,11 @@ describe('authoritative checkout quote', () => {
     expect(psFee).toBeGreaterThan(0);
     expect(tax).toBeGreaterThan(0);
 
-    // A invariante essencial: as linhas exibidas devem somar exatamente o total,
-    // em centavos inteiros (para evitar ruído de float).
+    // A invariante essencial: as linhas cobradas devem somar exatamente o total,
+    // em centavos inteiros (para evitar ruído de float). O imposto é informativo
+    // (loja não cobra tributo de importação) e fica de fora do total cobrado.
     const centavos = (valor) => Math.round(valor * 100);
-    expect(centavos(products) + centavos(shipping) + centavos(psFee) + centavos(tax))
+    expect(centavos(products) + centavos(shipping) + centavos(psFee))
       .toBe(centavos(result.total));
   });
 

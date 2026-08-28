@@ -567,9 +567,18 @@ const OrderConfirmation: React.FC = () => {
                       {order.currency === 'JPY' ? t('order.shipping.local') : t('order.shipping.intl')}
                     </span>
                     <span className="font-semibold text-gray-800">
-                      {order.shippingCost === 0 ? t('order.shipping.free') : formatPrice(order.shippingCost, order.currency || 'BRL')}
+                      {order.shippingCostYen === 0 ? t('order.shipping.free') : formatPrice(order.shippingCostYen, 'JPY')}
                     </span>
                   </div>
+
+                  {order.psFeeYen > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Taxa Personal Shopper</span>
+                      <span className="font-semibold text-gray-800">
+                        {formatPrice(order.psFeeYen, 'JPY')}
+                      </span>
+                    </div>
+                  )}
 
                   <div className="flex justify-between pt-3 border-t font-black text-base md:text-lg">
                     <span>{t('order.total')}</span>

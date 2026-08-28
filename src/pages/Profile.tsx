@@ -44,6 +44,54 @@ const TIER_TROPHY: Record<string, string> = {
   ouro: 'text-yellow-300',
 };
 
+// Badge/botão de "avaliar produto" no histórico de pedidos. canUserReview()
+// agora é assíncrono (consulta o Firestore), então o status de "já avaliado"
+// precisa ser resolvido em efeito próprio deste subcomponente — não dá para
+// chamá-lo de forma síncrona dentro do .map() do componente pai.
+function OrderItemReviewAction({
+  userId,
+  productId,
+  reviewLabel,
+  reviewedLabel,
+  refreshKey,
+  onReview,
+}: {
+  userId: string;
+  productId: string;
+  reviewLabel: string;
+  reviewedLabel: string;
+  refreshKey: number;
+  onReview: () => void;
+}) {
+  const [reviewed, setReviewed] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setReviewed(null);
+    reviewService.canUserReview(userId, productId).then((canReview) => {
+      if (!cancelled) setReviewed(!canReview);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [userId, productId, refreshKey]);
+
+  if (reviewed === null) return null;
+
+  return reviewed ? (
+    <span className="text-[11px] text-green-600 font-semibold flex items-center gap-1 shrink-0">
+      <Star className="w-3.5 h-3.5 fill-green-600" /> {reviewedLabel}
+    </span>
+  ) : (
+    <button
+      onClick={onReview}
+      className="text-[11px] font-semibold text-primary border border-primary/30 rounded-full px-2.5 py-1 hover:bg-primary/5 flex items-center gap-1 shrink-0"
+    >
+      <Star className="w-3.5 h-3.5" /> {reviewLabel}
+    </button>
+  );
+}
+
 const Profile: React.FC = () => {
   const {
     user,
@@ -1284,28 +1332,26 @@ const Profile: React.FC = () => {
                       <div className="space-y-2">
                         {order.items.map((item, idx) => {
                           const pid = findProductId(item.productName);
-                          const reviewed = pid && user ? !reviewService.canUserReview(user.id, pid) : false;
-                          void reviewBump; // dependência p/ recalcular após avaliar
                           return (
                             <div key={idx} className="flex justify-between items-center gap-2 text-sm">
                               <span className="text-muted-foreground flex-1 min-w-0">
                                 {item.productName} ({item.size}) × {item.quantity}
                               </span>
-                              {pid && (
-                                reviewed ? (
-                                  <span className="text-[11px] text-green-600 font-semibold flex items-center gap-1 shrink-0">
-                                    <Star className="w-3.5 h-3.5 fill-green-600" /> {t('profile.orders.reviewed')}
-                                  </span>
-                                ) : (
-                                  <button
-                                    onClick={() => setReviewTarget({ id: pid, name: item.productName })}
-                                    className="text-[11px] font-semibold text-primary border border-primary/30 rounded-full px-2.5 py-1 hover:bg-primary/5 flex items-center gap-1 shrink-0"
-                                  >
-                                    <Star className="w-3.5 h-3.5" /> {t('profile.orders.review')}
-                                  </button>
-                                )
+                              {pid && user && (
+                                <OrderItemReviewAction
+                                  userId={user.id}
+                                  productId={pid}
+                                  reviewLabel={t('profile.orders.review')}
+                                  reviewedLabel={t('profile.orders.reviewed')}
+                                  refreshKey={reviewBump}
+                                  onReview={() => setReviewTarget({ id: pid, name: item.productName })}
+                                />
                               )}
-                              <span className="font-medium shrink-0">{formatPrice(item.price * item.quantity, (order as any).currency || 'JPY')}</span>
+                              <span className="font-medium shrink-0">
+                                {item.price != null
+                                  ? formatPrice(item.price * item.quantity, (order as any).currency || 'JPY')
+                                  : formatPrice(((item as any).unitYen || 0) * item.quantity, 'JPY')}
+                              </span>
                             </div>
                           );
                         })}
@@ -1313,8 +1359,18 @@ const Profile: React.FC = () => {
 
                       {/* Order breakdown: subtotal, coupon, shipping, total */}
                       {(() => {
-                        const itemsSubtotal = order.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
-                        const discount = (order as any).couponDiscount || (itemsSubtotal > order.totalAmount ? itemsSubtotal - order.totalAmount : 0);
+                        // `priceBreakdown` (gravado pelo checkout real, api/_lib/commerce.js
+                        // `buildQuote`) já vem convertido para `order.currency` — fonte de
+                        // verdade. Pedidos legados (venda manual, sem priceBreakdown) caem no
+                        // cálculo antigo a partir de `item.price` (que ali já é local).
+                        const pb = (order as any).priceBreakdown as
+                          | { subtotal?: number; couponDiscount?: number; psFee?: number }
+                          | undefined;
+                        const itemsSubtotal = pb?.subtotal ?? order.items.reduce((sum, item) => sum + (item.price || 0) * item.quantity, 0);
+                        const discount = pb
+                          ? (pb.couponDiscount || 0)
+                          : ((order as any).couponDiscount || (itemsSubtotal > order.totalAmount ? itemsSubtotal - order.totalAmount : 0));
+                        const psFee = pb?.psFee || 0;
                         const shippingData = (order as any).shipping;
                         const shippingCost = shippingData?.cost ?? null;
                         const carrierName = shippingData?.carrier || '';
@@ -1342,7 +1398,13 @@ const Profile: React.FC = () => {
                                   <Truck className="w-3 h-3" />
                                   {t('profile.orders.shipping')} {carrierName && <span className="text-xs">({carrierName})</span>}
                                 </span>
-                                <span>{shippingCost === 0 ? <span className="text-green-600">{t('profile.orders.free')}</span> : formatPrice(shippingCost, oc)}</span>
+                                <span>{shippingCost === 0 ? <span className="text-green-600">{t('profile.orders.free')}</span> : formatPrice(shippingCost, 'JPY')}</span>
+                              </div>
+                            )}
+                            {psFee > 0 && (
+                              <div className="flex justify-between text-muted-foreground">
+                                <span>Taxa Personal Shopper</span>
+                                <span>{formatPrice(psFee, oc)}</span>
                               </div>
                             )}
                             <div className="flex justify-between font-semibold pt-1 border-t border-border">

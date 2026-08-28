@@ -470,11 +470,34 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
         id: order.id || order.orderNumber,
         orderNumber: order.orderNumber || order.id,
         date: order.orderDate || order.date || order.syncedAt,
+        // `unitYen` (o campo real gravado pelo checkout) é sempre em ¥,
+        // independente de `order.currency` — não fabricar aqui um `price`
+        // formatável na moeda do pedido, isso exigiria a taxa de câmbio
+        // exata usada no momento da compra, que não é persistida por item.
+        // As telas devem formatar `item.unitYen` sempre em JPY (ver Profile.tsx).
         items: order.items || [],
         totalAmount: order.totalAmount || order.totalPrice || 0,
         paymentMethod: order.paymentMethod || '',
         status: order.status || 'pending',
         shippingAddress: order.shippingAddress || {},
+        // `currency` é obrigatório para os valores em ¥ (frete, taxa PS) não
+        // serem exibidos por engano na moeda de fallback ('JPY' vira ¥ mesmo
+        // em pedidos brasileiros sem isso). `psFeeYen`/`taxAmount` alimentam
+        // os blocos de detalhamento do pedido; `couponCode`/`couponDiscount`/
+        // `appliedCoupon`/`grandTotalYen`/`paymentConfirmed` são lidos direto
+        // do pedido bruto em Profile.tsx (`(order as any).campo`).
+        currency: order.currency || 'JPY',
+        ...(order.psFeeYen != null && { psFeeYen: order.psFeeYen }),
+        ...(order.taxAmount != null && { taxAmount: order.taxAmount }),
+        ...(order.couponCode && { couponCode: order.couponCode }),
+        ...(order.couponDiscount != null && { couponDiscount: order.couponDiscount }),
+        ...(order.appliedCoupon && { appliedCoupon: order.appliedCoupon }),
+        // Breakdown já convertido para `order.currency` pelo checkout
+        // (api/_lib/commerce.js `buildQuote`) — fonte de verdade para
+        // subtotal/desconto, evita reconstruir a partir de itens em ¥.
+        ...(order.priceBreakdown && { priceBreakdown: order.priceBreakdown }),
+        ...(order.grandTotalYen != null && { grandTotalYen: order.grandTotalYen }),
+        ...(order.paymentConfirmed != null && { paymentConfirmed: order.paymentConfirmed }),
         ...(order.trackingNumber && { trackingNumber: order.trackingNumber }),
         ...(order.trackingUrl && { trackingUrl: order.trackingUrl }),
         ...(order.carrier && { carrier: order.carrier }),

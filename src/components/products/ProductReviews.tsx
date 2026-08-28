@@ -20,8 +20,10 @@ const ProductReviews: React.FC<ProductReviewsProps> = ({ productId }) => {
   const [rating, setRating] = useState<ProductRating | null>(null);
 
   useEffect(() => {
-    setReviews(reviewService.getProductReviews(productId));
-    setRating(reviewService.getProductRating(productId));
+    let cancelled = false;
+    reviewService.getProductReviews(productId).then((r) => { if (!cancelled) setReviews(r); });
+    reviewService.getProductRating(productId).then((r) => { if (!cancelled) setRating(r); });
+    return () => { cancelled = true; };
   }, [productId]);
 
   const renderStars = (value: number, size: 'sm' | 'md' | 'lg' = 'md') => {

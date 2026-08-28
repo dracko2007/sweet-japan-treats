@@ -7,6 +7,7 @@ import { adminDb } from './_lib/firebase-admin.js';
 import { comReserva, pontosDisponiveis } from './_lib/points-hold.js';
 import { comReservaPromo, quantidadeReservada, refEstadoPromo, semReservaPromo } from './_lib/promo-reserve.js';
 import { indiceDePessoaId, promoUsageId } from './_lib/promo-identity.js';
+import { comReservaEstoque, quantidadeReservadaEstoque, refReservaEstoque } from './_lib/stock-reserve.js';
 import { fulfillOrder } from './_lib/fulfillment.js';
 import { recentProductSpendYen } from './_lib/loyalty-tier.js';
 import { issuePsFeeWaiver, verifyPsFeeWaiver } from './_lib/ps-fee-waiver.js';
@@ -445,9 +446,27 @@ async function handleCreate(req, res) {
 
     const stockByProduct = new Map();
     for (const item of quote.items) stockByProduct.set(item.productId, (stockByProduct.get(item.productId) || 0) + item.quantity);
+    // Só produtos com controle de estoque precisam de reserva — ilimitado
+    // nunca disputa unidade com ninguém.
+    const stockControlledProducts = [...stockByProduct.keys()]
+      .filter((productId) => products.get(productId)?.stock?.unlimited === false);
+    const stockReserveSnaps = stockControlledProducts.length
+      ? await db.getAll(...stockControlledProducts.map((productId) => refReservaEstoque(db, productId)))
+      : [];
+    const stockReserveByProduct = new Map(
+      stockReserveSnaps.map((snap) => [snap.ref.id, snap.exists ? snap.data() : null])
+    );
     for (const [productId, quantity] of stockByProduct) {
       const product = products.get(productId);
-      if (product?.stock?.unlimited === false && Number(product.stock.quantity || 0) < quantity) throw new HttpError(409, 'insufficient_stock');
+      if (product?.stock?.unlimited === false) {
+        // Desconta o que pedidos concorrentes (cartão em checkout, PIX/Wise
+        // ainda não confirmado) já estão segurando para este produto — sem
+        // isso, dois checkouts na última unidade passariam os dois aqui, e o
+        // segundo só descobriria o problema na hora de confirmar o pagamento.
+        const reservadoPorOutros = quantidadeReservadaEstoque(stockReserveByProduct.get(productId), orderId);
+        const disponivel = Number(product.stock.quantity || 0) - reservadoPorOutros;
+        if (disponivel < quantity) throw new HttpError(409, 'insufficient_stock');
+      }
     }
     const cpfData = cpfSnap?.exists ? cpfSnap.data() : null;
     const promoProducts = quote.items.filter((item) => item.homePromo).map((item) => item.productId);
@@ -555,13 +574,15 @@ async function handleCreate(req, res) {
     // e a promoção está ativa.
     const promoStateRef = quote.homePromoQuantity > 0 ? refEstadoPromo(db) : null;
     const negotiationRef = negotiationId ? db.collection('negotiations').doc(negotiationId) : null;
+    const stockReserveRefs = stockControlledProducts.map((productId) => refReservaEstoque(db, productId));
     await db.runTransaction(async (transaction) => {
-      const [current, waiverClaim, userAtual, promoStateAtual, negotiationAtual] = await Promise.all([
+      const [current, waiverClaim, userAtual, promoStateAtual, negotiationAtual, stockReserveAtual] = await Promise.all([
         transaction.get(orderRef),
         waiverClaimRef ? transaction.get(waiverClaimRef) : Promise.resolve(null),
         userRefParaReserva ? transaction.get(userRefParaReserva) : Promise.resolve(null),
         promoStateRef ? transaction.get(promoStateRef) : Promise.resolve(null),
         negotiationRef ? transaction.get(negotiationRef) : Promise.resolve(null),
+        stockReserveRefs.length ? Promise.all(stockReserveRefs.map((ref) => transaction.get(ref))) : Promise.resolve([]),
       ]);
       if (negotiationRef) {
         const currentNegotiation = negotiationAtual?.exists ? negotiationAtual.data() : null;
@@ -623,6 +644,21 @@ async function handleCreate(req, res) {
         });
         transaction.set(promoStateRef, novoEstado);
       }
+      // Revalidação atômica do estoque comum: a checagem lá em cima roda fora
+      // de transação. Se dois checkouts saem dela e chegam aqui disputando a
+      // mesma última unidade, um vê a reserva do outro já gravada e é
+      // recusado agora — não horas depois, na hora de confirmar um PIX/Wise
+      // já pago. Mesma defesa da promoção da home, por produto.
+      stockControlledProducts.forEach((productId, index) => {
+        const product = products.get(productId);
+        const quantity = stockByProduct.get(productId);
+        const stockReserveAgora = stockReserveAtual[index]?.exists ? stockReserveAtual[index].data() : null;
+        const reservadoPorOutros = quantidadeReservadaEstoque(stockReserveAgora, orderId);
+        const disponivel = Number(product.stock.quantity || 0) - reservadoPorOutros;
+        if (disponivel < quantity) throw new HttpError(409, 'insufficient_stock');
+        const novoEstadoEstoque = comReservaEstoque(stockReserveAgora, { orderId, quantity, paymentMethod });
+        transaction.set(stockReserveRefs[index], novoEstadoEstoque);
+      });
       transaction.create(orderRef, order);
       if (waiverClaimRef) {
         transaction.create(waiverClaimRef, {

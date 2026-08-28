@@ -14,10 +14,16 @@ import { enforceRateLimit } from './_lib/rate-limit.js';
 import { buildDashboardAnalytics, couponRow, matchesCouponFilters, orderEpoch } from './_lib/order-analytics.js';
 
 // ── admin-dashboard.js ───────────────────────────────────────────────
+// Nomes reais gravados por `api/orders.js` (ver `handleCreate`/`publicOrder`):
+// `totalYen` (checkout normal) e `grandTotalYen` (venda posterior manual,
+// `src/services/orderService.ts`) são as duas fontes possíveis de receita em
+// ¥; `shippingCost` e `psFeeFinalYen` nunca existiram — os campos reais são
+// `shippingCostYen`/`shipping.cost` e `psFeeYen`. Ver `order-analytics.js`
+// (`orderRevenueYen`/`orderShippingYen`) para como cada um é lido.
 const ORDER_FIELDS = [
   'orderDate', 'date', 'syncedAt', 'status', 'paymentMethod', 'currency',
-  'grandTotalYen', 'totalPrice', 'totalAmount', 'shippingCost', 'shipping',
-  'psFeeFinalYen', 'couponDiscountYen', 'redeemPoints', 'items',
+  'totalYen', 'grandTotalYen', 'totalPrice', 'totalAmount', 'shippingCostYen', 'shipping',
+  'psFeeYen', 'couponDiscountYen', 'redeemPoints', 'items',
 ];
 
 async function handleDashboard(req, res) {
