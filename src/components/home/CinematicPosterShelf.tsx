@@ -175,7 +175,7 @@ const CinematicPosterShelf: React.FC<CinematicPosterShelfProps> = ({
                 layoutId={`poster-img-${selected.id}`}
                 src={selected.image}
                 alt={productEnglishName(selected)}
-                className="hidden w-2/5 object-cover md:block"
+                className="hidden w-2/5 shrink-0 bg-white object-contain p-4 md:block"
               />
 
               <div className="flex-1 p-7 md:p-9">
