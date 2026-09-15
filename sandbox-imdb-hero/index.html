@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Sandbox — Intro estilo IMDb/Dune (Japan Express)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --accent: #db2777;
+    --accent-glow: #f472b6;
+    --bg: #0b0708;
+    --panel: rgba(20,10,12,0.72);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: #f5eee9;
+    font-family: 'Inter', system-ui, sans-serif;
+    overflow-x: hidden;
+    min-height: 100vh;
+  }
+  .display { font-family: 'Bebas Neue', 'Inter', sans-serif; letter-spacing: 0.02em; }
+
+  /* ---------- Aviso de sandbox ---------- */
+  .sandbox-badge {
+    position: fixed; top: 12px; left: 12px; z-index: 999;
+    background: #fbbf24; color: #1a1005; font-weight: 700; font-size: 11px;
+    padding: 6px 12px; border-radius: 999px; letter-spacing: 0.08em; text-transform: uppercase;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.4);
+  }
+  .view-switch {
+    position: fixed; top: 12px; right: 12px; z-index: 999;
+    display: flex; gap: 6px; background: rgba(0,0,0,0.5); padding: 5px; border-radius: 999px;
+    backdrop-filter: blur(8px);
+  }
+  .view-switch button {
+    border: none; background: transparent; color: #cbb; font-size: 11px; font-weight: 600;
+    padding: 7px 14px; border-radius: 999px; cursor: pointer; letter-spacing: 0.04em;
+    text-transform: uppercase; transition: all 0.25s;
+  }
+  .view-switch button.active { background: var(--accent); color: #fff; }
+
+  /* ==================================================================
+     VIEW 1 — "Director's page": categoria + tira de pôsteres + wordmark
+     gigante ao fundo (referência: página do Denis Villeneuve no shot).
+     ================================================================== */
+  .view {
+    position: absolute; inset: 0; min-height: 100vh; overflow-y: auto;
+    opacity: 0; visibility: hidden; pointer-events: none;
+    transition: opacity 1.1s ease, visibility 1.1s;
+  }
+  .view.active { opacity: 1; visibility: visible; pointer-events: auto; z-index: 3; }
+
+  @keyframes revealUp { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: translateY(0); } }
+  .reveal { opacity: 0; }
+  .intro-playing .reveal { animation: revealUp 0.85s cubic-bezier(.2,.8,.2,1) forwards; }
+
+  .brand-reveal {
+    position: absolute; left: 48px; bottom: 152px; z-index: 10;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .brand-reveal img { width: 30px; height: 30px; border-radius: 50%; object-fit: cover; border: 1.5px solid rgba(255,255,255,0.5); }
+  .brand-reveal span { font-weight: 700; font-size: 14px; letter-spacing: 0.02em; }
+  .brand-reveal span b { color: var(--accent-glow); }
+
+  .cat-view { padding-top: 90px; padding-bottom: 40px; }
+  .breadcrumb {
+    text-align: center; font-size: 11px; color: #9a8a86; letter-spacing: 0.15em;
+    text-transform: uppercase; margin-bottom: 56px;
+  }
+  .breadcrumb b { color: #f5eee9; }
+
+  .poster-strip {
+    display: flex; gap: 14px; justify-content: center; padding: 0 24px; flex-wrap: wrap;
+    position: relative; z-index: 2;
+  }
+  .poster {
+    width: 150px; height: 220px; border-radius: 10px; overflow: hidden; position: relative;
+    background: #1a1114; cursor: pointer; transition: transform 0.4s cubic-bezier(.2,.8,.2,1), box-shadow 0.4s;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+  }
+  .poster:hover { transform: translateY(-14px) scale(1.04); box-shadow: 0 24px 50px rgba(219,39,119,0.35); }
+  .poster img {
+    width: 100%; height: 100%; object-fit: cover;
+    filter: grayscale(1) brightness(0.85); transition: filter 0.5s ease;
+  }
+  .poster:hover img { filter: grayscale(0) brightness(1); }
+  .poster .price-tag {
+    position: absolute; left: 8px; bottom: 8px; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px);
+    font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 999px; color: #fff;
+  }
+
+  .giant-word {
+    position: absolute; bottom: -6vw; left: 50%; transform: translateX(-50%);
+    font-size: 22vw; line-height: 1; color: rgba(245,238,233,0.05); white-space: nowrap;
+    pointer-events: none; z-index: 1; user-select: none;
+  }
+
+  /* Barra de navegação flutuante (pill), fixa embaixo — igual referência */
+  .pill-nav {
+    position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); z-index: 50;
+    display: flex; align-items: center; gap: 4px;
+    background: rgba(15,8,10,0.85); backdrop-filter: blur(14px);
+    border: 1px solid rgba(255,255,255,0.08);
+    padding: 8px; border-radius: 999px; box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+  }
+  .pill-nav .brand {
+    background: var(--accent); color: #fff; font-weight: 800; font-size: 12px;
+    padding: 8px 14px; border-radius: 999px; margin-right: 4px;
+  }
+  .pill-nav button {
+    background: transparent; border: none; color: #cbb2ae; font-size: 12px; font-weight: 500;
+    padding: 8px 14px; border-radius: 999px; cursor: pointer; transition: 0.2s;
+  }
+  .pill-nav button:hover, .pill-nav button.on { background: rgba(255,255,255,0.08); color: #fff; }
+  .pill-nav .icon-btn {
+    width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    background: rgba(255,255,255,0.06); font-size: 14px; padding: 0;
+  }
+
+  /* ==================================================================
+     VIEW 2 — "Movie page": hero full-bleed, título gigante sangrando,
+     rail de ícones à direita, pills de specs embaixo à esquerda, botão
+     de play central que abre o painel de especificações.
+     ================================================================== */
+  .prod-view { min-height: 100vh; position: relative; overflow: hidden; }
+  .prod-bg {
+    position: absolute; inset: 0; z-index: 0;
+    background:
+      radial-gradient(120% 90% at 68% 30%, rgba(219,39,119,0.35) 0%, transparent 55%),
+      radial-gradient(90% 70% at 20% 85%, rgba(120,20,60,0.4) 0%, transparent 60%),
+      linear-gradient(180deg, #150a0d 0%, #0b0708 70%);
+  }
+  .prod-hero-img {
+    position: absolute; right: 2%; bottom: 0; z-index: 1;
+    height: 92%; width: auto; object-fit: contain;
+    filter: drop-shadow(0 40px 60px rgba(0,0,0,0.6));
+    transition: opacity 0.5s ease;
+  }
+  .prod-top {
+    position: relative; z-index: 5; padding: 90px 48px 0; display: flex; justify-content: space-between; gap: 40px;
+  }
+  .prod-title { font-size: 5.4vw; line-height: 0.92; max-width: 640px; }
+  .prod-desc {
+    max-width: 360px; font-size: 13px; line-height: 1.7; color: #d8c6c2; text-align: right;
+  }
+  .prod-desc .imdb-score {
+    display: inline-flex; align-items: center; gap: 6px; margin-top: 12px; background: #fbbf24;
+    color: #1a1005; font-weight: 800; font-size: 12px; padding: 5px 10px; border-radius: 6px;
+  }
+
+  .icon-rail {
+    position: absolute; right: 40px; top: 50%; transform: translateY(-50%); z-index: 10;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .icon-rail button {
+    width: 42px; height: 42px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1);
+    background: rgba(10,5,6,0.6); backdrop-filter: blur(6px); color: #f5eee9; font-size: 16px;
+    cursor: pointer; transition: 0.2s;
+  }
+  .icon-rail button:hover { background: var(--accent); border-color: var(--accent); }
+
+  .play-btn {
+    position: absolute; left: 50%; top: 56%; transform: translate(-50%, -50%); z-index: 10;
+    width: 76px; height: 76px; border-radius: 50%; border: 1.5px solid rgba(255,255,255,0.5);
+    background: rgba(20,10,12,0.45); backdrop-filter: blur(6px); color: #fff; font-size: 22px;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    transition: transform 0.3s, background 0.3s;
+  }
+  .play-btn:hover { transform: translate(-50%, -50%) scale(1.08); background: var(--accent); }
+
+  .spec-pills {
+    position: absolute; left: 48px; bottom: 96px; z-index: 10; display: flex; flex-wrap: wrap; gap: 8px; max-width: 60%;
+  }
+  .spec-pill {
+    background: rgba(10,5,6,0.65); backdrop-filter: blur(6px); border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 999px; padding: 7px 14px; font-size: 11.5px; white-space: nowrap;
+  }
+  .spec-pill b { color: #f5c8dc; font-weight: 600; }
+
+  /* Painel de especificações — abre ao clicar no play, estilo escuro/cinema */
+  .spec-modal {
+    position: fixed; inset: 0; z-index: 200; display: none; align-items: center; justify-content: center;
+    background: rgba(4,2,3,0.85); backdrop-filter: blur(10px);
+  }
+  .spec-modal.open { display: flex; }
+  .spec-card {
+    width: min(760px, 92vw); background: linear-gradient(160deg, #1a0f12 0%, #0d0708 100%);
+    border: 1px solid rgba(255,255,255,0.08); border-radius: 20px; overflow: hidden;
+    display: flex; box-shadow: 0 40px 100px rgba(0,0,0,0.6);
+  }
+  .spec-card img { width: 42%; object-fit: cover; }
+  .spec-card .body { padding: 32px; flex: 1; }
+  .spec-card h3 { font-size: 26px; margin-bottom: 10px; }
+  .spec-card p { font-size: 13px; color: #cbb2ae; line-height: 1.6; margin-bottom: 18px; }
+  .spec-card .close { position: absolute; top: 18px; right: 18px; background: rgba(255,255,255,0.08); border: none; color: #fff; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; font-size: 16px; }
+  .spec-card .buy { background: var(--accent); color: #fff; border: none; padding: 11px 22px; border-radius: 999px; font-weight: 700; font-size: 13px; cursor: pointer; }
+
+  @media (max-width: 768px) {
+    .prod-title { font-size: 11vw; }
+    .prod-top { flex-direction: column; padding: 90px 20px 0; }
+    .prod-desc { text-align: left; max-width: 100%; }
+    .prod-hero-img { right: 50%; transform: translateX(50%); height: 40%; bottom: 90px; }
+    .spec-pills { left: 20px; bottom: 90px; max-width: 90%; }
+    .icon-rail { right: 14px; }
+    .spec-card { flex-direction: column; }
+    .spec-card img { width: 100%; height: 220px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="sandbox-badge">🧪 Sandbox — não afeta o site</div>
+<div class="view-switch">
+  <button id="replayBtn">↻ Replay intro</button>
+  <button data-view="cat">Categoria</button>
+  <button class="active" data-view="prod">Produto</button>
+</div>
+
+<!-- VIEW 1: estilo "Director's page" -->
+<section class="view cat-view" id="view-cat">
+  <div class="breadcrumb">Japan Express &nbsp;›&nbsp; Cosméticos &nbsp;›&nbsp; <b>Shampoo &amp; Tratamento</b></div>
+
+  <div class="poster-strip" id="posterStrip"></div>
+
+  <div class="giant-word display">Shampoo</div>
+</section>
+
+<!-- VIEW 2: estilo "Movie page" -->
+<section class="view prod-view active" id="view-prod">
+  <div class="prod-bg"></div>
+  <img class="prod-hero-img reveal" id="prodHeroImg" src="assets/fino-kit.jpg" alt="" style="animation-delay:0.1s" />
+
+  <div class="prod-top">
+    <h1 class="prod-title display reveal" id="prodTitle" style="animation-delay:0.5s">Fino<br>Premium<br>Touch</h1>
+    <div class="prod-desc reveal" style="animation-delay:0.9s">
+      <p id="prodDesc">Máscara capilar de luxo com Royal Jelly, PCA e Lipjuia EX — repara fios danificados, secos ou coloridos com 7 essências que protegem contra raios UV.</p>
+      <span class="imdb-score">★ 4.8</span>
+    </div>
+  </div>
+
+  <div class="icon-rail reveal" style="animation-delay:1.3s">
+    <button title="Favoritar">♡</button>
+    <button title="Compartilhar">↗</button>
+    <button title="Carrinho">🛒</button>
+  </div>
+
+  <button class="play-btn reveal" id="playBtn" style="animation-delay:1.1s">▶</button>
+
+  <div class="spec-pills reveal" id="specPills" style="animation-delay:1.5s"></div>
+
+  <div class="brand-reveal reveal" style="animation-delay:1.9s">
+    <img src="assets/logo.jpg" alt="" />
+    <span>Japan <b>Express</b></span>
+  </div>
+</section>
+
+<!-- Nav pill flutuante -->
+<div class="pill-nav">
+  <span class="brand">JE</span>
+  <button class="on">Shampoo</button>
+  <button>Skincare</button>
+  <button>Doces</button>
+  <button>Acessórios</button>
+  <span class="icon-btn">🔍</span>
+  <span class="icon-btn">🛒</span>
+</div>
+
+<!-- Modal de especificações -->
+<div class="spec-modal" id="specModal">
+  <div class="spec-card" style="position:relative">
+    <button class="close" id="closeModal">✕</button>
+    <img id="modalImg" src="assets/fino-kit.jpg" alt="" />
+    <div class="body">
+      <h3 id="modalTitle">Fino Premium Touch Hair Mask</h3>
+      <p id="modalDesc">Máscara capilar de luxo com Royal Jelly, PCA e Lipjuia EX.</p>
+      <p style="font-size:12px;color:#9a8a86;margin-bottom:6px">Peso: <b style="color:#f5c8dc">230g</b> &nbsp;·&nbsp; Origem: <b style="color:#f5c8dc">Japão</b></p>
+      <div style="display:flex;align-items:center;gap:14px;margin-top:18px">
+        <span style="font-size:22px;font-weight:700" id="modalPrice">R$ 50</span>
+        <button class="buy">Adicionar ao Carrinho</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const PRODUCTS = [
+    { img: 'assets/fino-kit.jpg', name: 'Fino Premium Touch Kit', desc: 'Kit completo shampoo + condicionador + máscara, para cabelos danificados e sem brilho.', price: 'R$ 208', weight: '450g' },
+    { img: 'assets/fino-hair-mask.jpg', name: 'Fino Premium Touch Hair Mask', desc: 'Máscara capilar de luxo com Royal Jelly, PCA e Lipjuia EX — repara fios danificados e secos.', price: 'R$ 50', weight: '230g' },
+    { img: 'assets/fino-hair-oil.jpg', name: 'Fino Premium Touch Hair Oil', desc: 'Óleo capilar de secagem rápida, textura sedosa, protege contra o calor do secador.', price: 'R$ 82', weight: '70ml' },
+    { img: 'assets/fino-serum.jpg', name: 'Fino Premium Touch Serum', desc: 'Sérum leave-in de brilho instantâneo, finaliza sem pesar os fios.', price: 'R$ 90', weight: '80ml' },
+    { img: 'assets/honey-melty.jpg', name: '&honey Melty Melt Treatment', desc: 'Tratamento capilar derretido com mel, hidratação profunda em 3 minutos.', price: 'R$ 118', weight: '445g' },
+    { img: 'assets/honey-milky-pack.jpg', name: '&honey Milky Pack', desc: 'Pack de nutrição intensiva com extrato de mel e óleo de camélia.', price: 'R$ 76', weight: '400g' },
+    { img: 'assets/honey-pixie-kit.jpg', name: '&honey Pixie Kit', desc: 'Kit shampoo + tratamento para cabelos finos, com efeito volumizador.', price: 'R$ 188', weight: '440g' },
+    { img: 'assets/honey-pixie-oil.jpg', name: '&honey Pixie Oil', desc: 'Óleo leve para cabelos finos, sem peso, com aroma floral de mel.', price: 'R$ 109', weight: '80ml' },
+  ];
+
+  const strip = document.getElementById('posterStrip');
+  PRODUCTS.forEach((p, i) => {
+    const el = document.createElement('div');
+    el.className = 'poster';
+    el.innerHTML = `<img src="${p.img}" alt="${p.name}" /><span class="price-tag">${p.price}</span>`;
+    el.addEventListener('click', () => openProduct(p));
+    strip.appendChild(el);
+  });
+
+  const specPills = document.getElementById('specPills');
+  function renderPills(p) {
+    specPills.innerHTML = `
+      <span class="spec-pill">Origem <b>Japão</b></span>
+      <span class="spec-pill">Peso <b>${p.weight}</b></span>
+      <span class="spec-pill">Entrega <b>7–14 dias</b></span>
+      <span class="spec-pill">Preço <b>${p.price}</b></span>
+    `;
+  }
+
+  let current = PRODUCTS[1];
+  function setHero(p) {
+    current = p;
+    document.getElementById('prodHeroImg').src = p.img;
+    document.getElementById('prodTitle').innerHTML = p.name.split(' ').slice(0, 3).join('<br>');
+    document.getElementById('prodDesc').textContent = p.desc;
+    renderPills(p);
+  }
+  setHero(current);
+
+  function openProduct(p) {
+    setHero(p);
+    switchView('prod');
+  }
+
+  const modal = document.getElementById('specModal');
+  document.getElementById('playBtn').addEventListener('click', () => {
+    document.getElementById('modalImg').src = current.img;
+    document.getElementById('modalTitle').textContent = current.name;
+    document.getElementById('modalDesc').textContent = current.desc;
+    document.getElementById('modalPrice').textContent = current.price;
+    modal.classList.add('open');
+  });
+  document.getElementById('closeModal').addEventListener('click', () => modal.classList.remove('open'));
+  modal.addEventListener('click', (e) => { if (e.target === modal) modal.classList.remove('open'); });
+  function switchView(name) {
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    document.getElementById('view-' + name).classList.add('active');
+    document.querySelectorAll('.view-switch button').forEach(b => b.classList.toggle('active', b.dataset.view === name));
+  }
+  document.querySelectorAll('.view-switch button').forEach(b => b.addEventListener('click', () => { stopIntroTimer(); switchView(b.dataset.view); }));
+
+  // ---- Sequência de introdução: hero colorido revela título/specs/marca em
+  // cascata e, depois de um tempo parado, esmaece sozinho para o catálogo
+  // em preto-e-branco (mesma lógica do vídeo de referência: cor -> detalhes
+  // -> P&B). Qualquer clique manual nas abas cancela o timer automático.
+  const INTRO_HOLD_MS = 4200;
+  let introTimer;
+  function playIntro() {
+    document.body.classList.remove('intro-playing');
+    // força reflow para reiniciar as animações CSS mesmo se já tocaram
+    void document.body.offsetWidth;
+    document.body.classList.add('intro-playing');
+    switchView('prod');
+    clearTimeout(introTimer);
+    introTimer = setTimeout(() => switchView('cat'), INTRO_HOLD_MS);
+  }
+  function stopIntroTimer() { clearTimeout(introTimer); }
+
+  document.getElementById('replayBtn').addEventListener('click', playIntro);
+  playIntro();
+</script>
+</body>
+</html>

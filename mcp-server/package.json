@@ -1,0 +1,16 @@
+{
+  "name": "japanexpress-mcp",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Servidor MCP do catálogo e conteúdo da home do Japan Express (japanexpress-store.com) — leitura/escrita direta no Firestore via service account, sem passar pelo painel /admin.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "firebase-admin": "^14.2.0",
+    "zod": "^3.25.0"
+  }
+}
