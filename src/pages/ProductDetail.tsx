@@ -69,6 +69,7 @@ const ProductDetail: React.FC = () => {
   const [selectedSize, setSelectedSize] = useState<string>('small');
   const selectedVariant = productVariants.find((v) => v.id === selectedSize) || productVariants[0];
   const [quantity, setQuantity] = useState(1);
+  const [descExpanded, setDescExpanded] = useState(false);
   const [isFavorite, setIsFavorite] = useState(
     user?.email ? wishlistService.isInWishlist(user.email, id || '') : false
   );
@@ -342,11 +343,24 @@ const ProductDetail: React.FC = () => {
                   </div>
                 )}
 
-                <div className="text-lg text-muted-foreground mb-6 space-y-2">
-                  {translatedDesc.split('\n').map((line, i) =>
-                    line.trim() === ''
-                      ? <br key={i} />
-                      : <p key={i}>{line}</p>
+                <div className="text-lg text-muted-foreground mb-6">
+                  <div className={cn(
+                    "space-y-2 transition-all duration-300",
+                    !descExpanded && "line-clamp-4"
+                  )}>
+                    {translatedDesc.split('\n').map((line, i) =>
+                      line.trim() === ''
+                        ? <br key={i} />
+                        : <p key={i}>{line}</p>
+                    )}
+                  </div>
+                  {translatedDesc.length > 150 && (
+                    <button
+                      onClick={() => setDescExpanded(!descExpanded)}
+                      className="text-primary font-semibold text-sm hover:underline mt-2"
+                    >
+                      {descExpanded ? 'Ler menos' : 'Ler mais'}
+                    </button>
                   )}
                 </div>
 

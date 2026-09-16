@@ -58,6 +58,11 @@ const CinematicPosterShelf: React.FC<CinematicPosterShelfProps> = ({
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected = items.find((p) => p.id === selectedId) || null;
+  const [descExpanded, setDescExpanded] = useState(false);
+
+  useEffect(() => {
+    setDescExpanded(false);
+  }, [selectedId]);
 
   useEffect(() => {
     if (!selected) return;
@@ -155,7 +160,7 @@ const CinematicPosterShelf: React.FC<CinematicPosterShelfProps> = ({
             onClick={() => setSelectedId(null)}
           >
             <motion.div
-              className="relative flex w-full max-w-2xl overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br from-[#1a0f12] to-[#0d0708] shadow-2xl"
+              className="relative flex w-full max-w-2xl max-h-[90vh] overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br from-[#1a0f12] to-[#0d0708] shadow-2xl"
               initial={{ scale: 0.96, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.97, opacity: 0 }}
@@ -178,13 +183,23 @@ const CinematicPosterShelf: React.FC<CinematicPosterShelfProps> = ({
                 className="hidden w-2/5 shrink-0 bg-white object-contain p-4 md:block"
               />
 
-              <div className="flex-1 p-7 md:p-9">
+              <div className="flex-1 max-h-[90vh] overflow-y-auto p-7 md:p-9">
                 <h3 className="mb-2 font-display text-2xl font-light text-white md:text-3xl">
                   {productEnglishName(selected)}
                 </h3>
-                <p className="mb-5 text-sm leading-relaxed text-white/60">
-                  {i18nDesc(selected, language) || selected.description}
-                </p>
+                <div className="mb-5 text-sm leading-relaxed text-white/60">
+                  <div className={descExpanded ? "" : "line-clamp-4"}>
+                    {i18nDesc(selected, language) || selected.description}
+                  </div>
+                  {String(i18nDesc(selected, language) || selected.description || '').length > 150 && (
+                    <button 
+                      onClick={() => setDescExpanded(!descExpanded)} 
+                      className="text-pink-400 font-semibold text-xs mt-1 hover:underline focus:outline-none"
+                    >
+                      {descExpanded ? 'Ler menos' : 'Ler mais'}
+                    </button>
+                  )}
+                </div>
 
                 <div className="mb-5 flex flex-wrap gap-2">
                   {selected.weightGrams && (
