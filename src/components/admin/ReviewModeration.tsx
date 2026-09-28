@@ -4,9 +4,11 @@ import { Button } from '@/components/ui/button';
 import { reviewService } from '@/services/reviewService';
 import { Review } from '@/types/review';
 import { useToast } from '@/hooks/use-toast';
+import { useConfirm } from '@/components/ConfirmDialog';
 
 export default function ReviewModeration() {
   const { toast } = useToast();
+  const confirm = useConfirm();
   const [reviews, setReviews] = useState<Review[]>([]);
   const [search, setSearch] = useState('');
   const [filterStars, setFilterStars] = useState<'all' | '1' | '2' | '3' | '4' | '5'>('all');
@@ -39,15 +41,28 @@ export default function ReviewModeration() {
   });
 
   async function deleteReview(id: string, userName: string) {
-    if (!confirm(`Excluir a avaliação de "${userName}"?\n\nEsta ação não pode ser desfeita.`)) return;
-    await reviewService.deleteReview(id);
+    const ok = await confirm({
+      title: `Excluir a avaliação de ${userName}?`,
+      details: ['Nota, comentário e fotos são removidos', 'O produto e os pedidos do cliente não são afetados'],
+      destructive: true,
+      permission: 'delete',
+      onConfirm: () => reviewService.deleteReview(id),
+    });
+    if (!ok) return;
     load();
     toast({ title: '🗑️ Avaliação excluída', description: `Review de ${userName} removida.` });
   }
 
   async function removePhotos(review: Review) {
-    if (!confirm(`Remover apenas as fotos da avaliação de "${review.userName}"?`)) return;
-    await reviewService.updateReviewImages(review.id, []);
+    const ok = await confirm({
+      title: `Remover as fotos da avaliação de ${review.userName}?`,
+      details: ['Apenas as fotos são apagadas', 'Nota e comentário são mantidos'],
+      destructive: true,
+      confirmLabel: 'Remover fotos',
+      permission: 'delete',
+      onConfirm: () => reviewService.updateReviewImages(review.id, []),
+    });
+    if (!ok) return;
     load();
     toast({ title: '🖼️ Fotos removidas', description: `Fotos de ${review.userName} apagadas. Nota e comentário mantidos.` });
   }

@@ -3,6 +3,7 @@ import { SmoothScroll } from '@/lib/smoothScroll';
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { ConfirmProvider } from "@/components/ConfirmDialog";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { CartProvider } from "@/context/CartContext";
@@ -155,6 +156,7 @@ const FullApp: React.FC = () => (
       <ProductsProvider>
       <CartProvider>
         <TooltipProvider>
+        <ConfirmProvider>
           {!firebaseConfigReady && (
             <div className="bg-red-600 text-white text-sm text-center py-2 px-4">
               Firebase não configurado. Verifique as variáveis VITE_FIREBASE_* no Vercel e faça redeploy.
@@ -210,6 +212,7 @@ const FullApp: React.FC = () => (
           <CartAbandonmentTracker />
           <CartRecoveryBanner />
           <PushSubscriptionSync />
+        </ConfirmProvider>
         </TooltipProvider>
       </CartProvider>
       </ProductsProvider>

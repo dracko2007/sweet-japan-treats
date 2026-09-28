@@ -6,6 +6,7 @@ import {
 import { Trash2, Plus, Megaphone, Users, TrendingDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
+import { useConfirm } from '@/components/ConfirmDialog';
 
 export interface MarketingExpense {
   id?: string;
@@ -42,6 +43,7 @@ const empty = (): Omit<MarketingExpense, 'id' | 'createdAt'> => ({
 
 const MarketingManager: React.FC = () => {
   const { toast } = useToast();
+  const confirm = useConfirm();
   const [expenses, setExpenses] = useState<MarketingExpense[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -74,10 +76,27 @@ const MarketingManager: React.FC = () => {
     setSaving(false);
   };
 
-  const handleDelete = async (id: string) => {
-    if (!db) return;
-    await deleteDoc(doc(db, COL, id));
-    setExpenses(prev => prev.filter(e => e.id !== id));
+  const handleDelete = async (e: MarketingExpense) => {
+    const amount = e.currency === 'BRL'
+      ? `R$ ${e.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+      : `¥${e.amount.toLocaleString()}`;
+    const values = await confirm({
+      title: `Excluir o gasto de marketing com ${e.platform}?`,
+      details: [
+        `O valor de ${amount} (${new Date(e.date).toLocaleDateString('pt-BR')}) deixa de contar nos relatórios financeiros`,
+        'Os demais gastos não são afetados',
+      ],
+      destructive: true,
+      password: true,
+      permission: 'financial',
+      onConfirm: async () => {
+        if (!db || !e.id) throw new Error('Firebase indisponível.');
+        try { await deleteDoc(doc(db, COL, e.id)); }
+        catch { throw new Error('Não foi possível excluir o gasto. Tente novamente.'); }
+      },
+    });
+    if (!values) return;
+    setExpenses(prev => prev.filter(x => x.id !== e.id));
     toast({ title: 'Gasto removido' });
   };
 
@@ -274,7 +293,7 @@ const MarketingManager: React.FC = () => {
                       : `¥${e.amount.toLocaleString()}`}
                   </span>
                   <button
-                    onClick={() => e.id && handleDelete(e.id)}
+                    onClick={() => handleDelete(e)}
                     className="text-muted-foreground hover:text-red-500 transition-colors"
                   >
                     <Trash2 className="w-4 h-4" />

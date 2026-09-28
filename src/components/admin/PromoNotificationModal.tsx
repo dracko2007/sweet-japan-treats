@@ -9,6 +9,8 @@ import { collection, getDocs, doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '@/config/firebase';
 import { promoOffer } from '../../../shared/promo-offer.js';
 import { authenticatedFetch } from '@/services/authenticatedFetch';
+import { useToast } from '@/hooks/use-toast';
+import { useConfirm } from '@/components/ConfirmDialog';
 
 const STORE_URL = 'https://japanexpress-store.com';
 
@@ -30,6 +32,8 @@ interface PromoOffer {
 interface Props { onClose: () => void }
 
 const PromoNotificationModal: React.FC<Props> = ({ onClose }) => {
+  const { toast } = useToast();
+  const confirm = useConfirm();
   // Reaproveita a lista já carregada pelo ProductsContext (mesma fonte da aba "Produtos") em
   // vez de refazer o fetch no Firestore — evita o dropdown aparecer vazio enquanto essa 2ª
   // consulta ainda está em andamento (sem indicador de carregamento próprio).
@@ -267,16 +271,20 @@ const PromoNotificationModal: React.FC<Props> = ({ onClose }) => {
 
   const sendPromo = async () => {
     if (targets.length === 0) {
-      alert('Selecione ao menos um cliente.');
+      toast({ title: 'Selecione ao menos um cliente.', variant: 'destructive' });
       return;
     }
 
     const cancelHomePromotion = conflictActive && conflictChoice === 'cancel';
-    if (
-      cancelHomePromotion
-      && !window.confirm(`Isto vai CANCELAR a promoção atual do site ("${homePromo?.productName ?? ''}") antes de enviar. Continuar?`)
-    ) {
-      return;
+    if (cancelHomePromotion) {
+      const ok = await confirm({
+        title: `Cancelar a promoção ${homePromo?.productName ?? 'atual'} do site?`,
+        description: 'A promoção atual do site será cancelada antes do envio desta campanha.',
+        details: ['A campanha só é enviada depois do cancelamento'],
+        destructive: true,
+        confirmLabel: 'Cancelar promoção e enviar',
+      });
+      if (!ok) return;
     }
 
     setSending(true);
@@ -329,9 +337,21 @@ const PromoNotificationModal: React.FC<Props> = ({ onClose }) => {
   };
 
   const clearNotifications = async () => {
-    if (!db || !window.confirm('Apagar todas as notificações promocionais do perfil dos clientes?')) return;
-    await setDoc(doc(db, 'siteContent', 'promoNotifications'), { items: [], updatedAt: Date.now() });
-    alert('Notificações apagadas.');
+    if (!db) return;
+    const firestore = db;
+    const ok = await confirm({
+      title: 'Apagar todas as notificações promocionais?',
+      description: 'As notificações somem do perfil de todos os clientes.',
+      details: ['E-mails já enviados não são afetados', 'Cupons e pontos já concedidos continuam válidos'],
+      destructive: true,
+      confirmLabel: 'Apagar',
+      permission: 'delete',
+      onConfirm: async () => {
+        await setDoc(doc(firestore, 'siteContent', 'promoNotifications'), { items: [], updatedAt: Date.now() });
+      },
+    });
+    if (!ok) return;
+    toast({ title: 'Notificações apagadas.' });
   };
 
   const successCount = results.filter(r => r.ok).length;

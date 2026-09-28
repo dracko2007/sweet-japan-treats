@@ -3,7 +3,7 @@ import { Building2, Loader2, Trash2, Phone, Check, RotateCcw, Ship } from 'lucid
 import { Button } from '@/components/ui/button';
 import { b2bRequestService, B2BRequest } from '@/services/b2bRequestService';
 import { useToast } from '@/hooks/use-toast';
-import { requireAdminPassword } from '@/utils/adminGuard';
+import { useConfirm } from '@/components/ConfirmDialog';
 
 const STATUS_LABEL: Record<B2BRequest['status'], string> = {
   new: '🆕 Novo', negotiating: '🤝 Negociando', closed: '✅ Fechado',
@@ -19,17 +19,34 @@ const SHIPPING_LABEL: Record<string, string> = {
 
 const B2BRequestManager: React.FC = () => {
   const { toast } = useToast();
+  const confirm = useConfirm();
   const [list, setList] = useState<B2BRequest[]>([]);
   const [loading, setLoading] = useState(true);
 
   const load = async () => { setLoading(true); setList(await b2bRequestService.getAll()); setLoading(false); };
   useEffect(() => { load(); }, []);
 
-  const setStatus = async (id: string, status: B2BRequest['status']) => { await b2bRequestService.updateStatus(id, status); load(); };
-  const remove = async (id: string) => {
-    if (!confirm('Excluir esta cotação B2B?')) return;
-    if (!(await requireAdminPassword('excluir esta cotação B2B'))) return;
-    await b2bRequestService.remove(id);
+  const setStatus = async (id: string, status: B2BRequest['status']) => {
+    const ok = await b2bRequestService.updateStatus(id, status);
+    if (ok) toast({ title: `Status alterado para ${STATUS_LABEL[status]}` });
+    else toast({ title: 'Não foi possível alterar o status', variant: 'destructive' });
+    load();
+  };
+  const remove = async (r: B2BRequest) => {
+    const values = await confirm({
+      title: `Excluir a cotação B2B de ${r.razaoSocial}?`,
+      details: [
+        'A solicitação e os dados de contato da empresa serão removidos',
+        'Conversas já feitas por WhatsApp/e-mail não são afetadas',
+      ],
+      destructive: true,
+      password: true,
+      permission: 'delete',
+      onConfirm: async () => {
+        if (!(await b2bRequestService.remove(r.id))) throw new Error('Não foi possível excluir a cotação. Tente novamente.');
+      },
+    });
+    if (!values) return;
     toast({ title: 'Cotação excluída' });
     load();
   };
@@ -93,7 +110,7 @@ const B2BRequestManager: React.FC = () => {
                   {r.status !== 'new' && (
                     <Button onClick={() => setStatus(r.id, 'new')} variant="outline" size="sm">Reabrir</Button>
                   )}
-                  <Button onClick={() => remove(r.id)} variant="outline" size="sm" className="gap-1.5 text-red-600 ml-auto"><Trash2 className="w-4 h-4" /> Excluir</Button>
+                  <Button onClick={() => remove(r)} variant="outline" size="sm" className="gap-1.5 text-red-600 ml-auto"><Trash2 className="w-4 h-4" /> Excluir</Button>
                 </div>
               </div>
             );

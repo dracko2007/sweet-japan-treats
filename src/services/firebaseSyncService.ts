@@ -607,7 +607,8 @@ export const firebaseSyncService = {
   },
 
   /**
-   * Remove os pedidos de um usuário (limpa o array orders no doc do usuário).
+   * Limpa o array legado `orders` no doc do usuário. Os pedidos de verdade ficam
+   * na coleção 'orders' — use orderService.deleteOrdersByCustomer, que chama isto.
    */
   async clearUserOrdersByEmail(email: string) {
     try {
@@ -1007,12 +1008,6 @@ export const firebaseSyncService = {
       devError('❌ [FIREBASE] resetAllPoints error:', error);
       return { success: false, users: 0, error: String(error) };
     }
-  },
-
-  clearAllReviews(): void {
-    try {
-      localStorage.removeItem('japan-express-reviews');
-    } catch { /* ignora */ }
   },
 
   async resetAllUsersData(): Promise<{ success: boolean; users: number; error?: unknown }> {

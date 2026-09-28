@@ -12,10 +12,11 @@ import { useToast } from '@/hooks/use-toast';
 import { useProducts } from '@/context/ProductsContext';
 import { raffleService, Raffle, RafflePrize, RaffleParticipant, RaffleAdminWinner, MAX_RAFFLE_PRIZES } from '@/services/raffleService';
 import { ensureAdminAuth } from '@/utils/adminAuth';
-import { requireAdminPassword } from '@/utils/adminGuard';
+import { useConfirm } from '@/components/ConfirmDialog';
 
 const SorteioManager: React.FC = () => {
   const { toast } = useToast();
+  const confirm = useConfirm();
   const { products: allProducts, loading: productsLoading } = useProducts();
   const products = allProducts.filter((p) => !p.hidden);
 
@@ -73,19 +74,19 @@ const SorteioManager: React.FC = () => {
   }, []);
 
   // Função: salvar regras
+  // Função: salvar regras
   const handleSaveRules = async () => {
-    if (!(await requireAdminPassword('atualizar regras do sorteio'))) return;
-    setSaving(true);
-    try {
-      await ensureAdminAuth();
-      await raffleService.saveConfig({ rules });
-      toast({ title: '✅ Regras salvas', description: 'As regras do sorteio foram atualizadas.' });
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'Erro desconhecido';
-      toast({ title: 'Erro', description: message, variant: 'destructive' });
-    } finally {
-      setSaving(false);
-    }
+    const done = await confirm({
+      title: 'Salvar regras do sorteio?',
+      password: true,
+      confirmLabel: 'Salvar regras',
+      onConfirm: async () => {
+        await ensureAdminAuth();
+        await raffleService.saveConfig({ rules });
+      },
+    });
+    if (!done) return;
+    toast({ title: '✅ Regras salvas', description: 'As regras do sorteio foram atualizadas.' });
   };
 
   // Função: atualizar contagem de prêmios
@@ -123,29 +124,17 @@ const SorteioManager: React.FC = () => {
       toast({ title: 'Sorteio já realizado', description: 'Inicie um novo sorteio antes de alterar os prêmios.', variant: 'destructive' });
       return;
     }
-    if (!(await requireAdminPassword('atualizar prêmios do sorteio'))) return;
-    // Valida que cada prêmio tem um tipo e valor
-    for (const prize of prizes) {
-      if (prize.type === 'product' && !prize.productId) {
-        toast({ title: 'Erro', description: `Rank ${prize.rank}: selecione um produto`, variant: 'destructive' });
-        return;
-      }
-      if (prize.type === 'points' && !prize.points) {
-        toast({ title: 'Erro', description: `Rank ${prize.rank}: insira um valor em pontos`, variant: 'destructive' });
-        return;
-      }
-    }
-    setSaving(true);
-    try {
-      await ensureAdminAuth();
-      await raffleService.saveConfig({ prizeCount, prizes });
-      toast({ title: '✅ Prêmios salvos', description: 'A configuração de prêmios foi atualizada.' });
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'Erro desconhecido';
-      toast({ title: 'Erro', description: message, variant: 'destructive' });
-    } finally {
-      setSaving(false);
-    }
+    const done = await confirm({
+      title: 'Salvar prêmios do sorteio?',
+      password: true,
+      confirmLabel: 'Salvar prêmios',
+      onConfirm: async () => {
+        await ensureAdminAuth();
+        await raffleService.saveConfig({ prizeCount, prizes });
+      },
+    });
+    if (!done) return;
+    toast({ title: '✅ Prêmios salvos', description: `${prizes.length} prêmio(s) configurado(s).` });
   };
 
   // Função: realizar sorteio
@@ -154,62 +143,60 @@ const SorteioManager: React.FC = () => {
       toast({ title: 'Sorteio já realizado', description: 'Use “Iniciar novo sorteio” para não premiar a mesma rodada duas vezes.', variant: 'destructive' });
       return;
     }
-    if (!(await requireAdminPassword('realizar sorteio'))) return;
-    if (prizes.length === 0) {
-      toast({ title: 'Erro', description: 'Configure pelo menos um prêmio primeiro', variant: 'destructive' });
-      return;
-    }
-    if (participants.length === 0) {
-      toast({ title: 'Erro', description: 'Nenhum participante cadastrado', variant: 'destructive' });
-      return;
-    }
-    setDrawing(true);
-    try {
-      await ensureAdminAuth();
-      const winners = await raffleService.draw(prizes, participants);
-      setDrawResult(winners);
-      await loadParticipants(); // Recarrega para mostrar status
-      toast({ title: '✅ Sorteio realizado', description: `${winners.length} vencedor(es) selecionado(s)` });
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'Erro desconhecido';
-      toast({ title: 'Erro ao sortear', description: message, variant: 'destructive' });
-    } finally {
-      setDrawing(false);
-    }
-  };
-  const handleResetDraw = async () => {
-    if (!(await requireAdminPassword('iniciar novo sorteio'))) return;
-    setDrawing(true);
-    try {
-      await raffleService.resetDraw();
-      setDrawResult(null);
-      toast({ title: 'Novo sorteio iniciado', description: 'Os prêmios anteriores continuam entregues; esta rodada está pronta para nova configuração.' });
-    } catch (error: unknown) {
-      toast({
-        title: 'Erro ao iniciar novo sorteio',
-        description: error instanceof Error ? error.message : 'Erro desconhecido',
-        variant: 'destructive',
-      });
-    } finally {
-      setDrawing(false);
-    }
+    const done = await confirm({
+      title: 'Realizar sorteio agora?',
+      details: ['Os vencedores serão selecionados aleatoriamente entre os participantes qualificados.'],
+      password: true,
+      confirmLabel: 'Sortear',
+      onConfirm: async () => {
+        await ensureAdminAuth();
+        const winners = await raffleService.draw(prizes, participants);
+        setDrawResult(winners);
+        await loadParticipants();
+      },
+    });
+    if (!done) return;
+    toast({ title: '✅ Sorteio realizado', description: 'Vencedores selecionados com sucesso.' });
   };
 
+  const handleResetDraw = async () => {
+    const done = await confirm({
+      title: 'Iniciar novo sorteio?',
+      details: ['Limpa os vencedores da rodada atual e prepara o sorteio para nova configuração.'],
+      destructive: true,
+      password: true,
+      confirmLabel: 'Iniciar novo',
+      onConfirm: async () => {
+        await raffleService.resetDraw();
+        setDrawResult(null);
+      },
+    });
+    if (!done) return;
+    toast({ title: 'Novo sorteio iniciado', description: 'Os prêmios anteriores continuam entregues; esta rodada está pronta para nova configuração.' });
+  };
 
   // Função: publicar/despublicar
   const handleTogglePublish = async () => {
-    if (!(await requireAdminPassword(`${raffle?.published ? 'despublicar' : 'publicar'} sorteio`))) return;
-    try {
-      await ensureAdminAuth();
-      await raffleService.publish(!raffle?.published);
-      toast({
-        title: '✅ Status atualizado',
-        description: `Sorteio ${raffle?.published ? 'despublicado' : 'publicado'}`,
-      });
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'Erro desconhecido';
-      toast({ title: 'Erro', description: message, variant: 'destructive' });
-    }
+    const action = raffle?.published ? 'Despublicar' : 'Publicar';
+    const done = await confirm({
+      title: `${action} sorteio?`,
+      details: [
+        raffle?.published
+          ? 'O sorteio deixará de aparecer para os clientes no site.'
+          : 'O sorteio ficará visível publicamente na página /sorteio.',
+      ],
+      password: true,
+      confirmLabel: action,
+      onConfirm: async () => {
+        await ensureAdminAuth();
+        await raffleService.publish(!raffle?.published);
+      },
+    });
+    if (!done) return;
+    toast({
+      title: '✅ Status atualizado',
+      description: `Sorteio ${raffle?.published ? 'despublicado' : 'publicado'}`,
+    });
   };
 
   if (loading) {

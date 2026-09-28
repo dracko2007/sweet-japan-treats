@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { TrendingUp, TrendingDown, Package, DollarSign, ShoppingBag, CheckCircle, XCircle, AlertTriangle, ChevronDown, ChevronUp, RefreshCw } from 'lucide-react';
+import { TrendingUp, TrendingDown, Package, DollarSign, ShoppingBag, CheckCircle, XCircle, AlertTriangle, ChevronDown, ChevronUp, RefreshCw, ChevronRight, Handshake, Megaphone, Sparkles } from 'lucide-react';
 import {
   BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
@@ -14,8 +14,20 @@ import { getEmployeePayments } from '@/components/admin/EmployeeManager';
 import type { EmployeePayment } from '@/components/admin/EmployeeManager';
 import type { OrderStatistics } from '@/types';
 import MaintenanceToggle from '@/components/admin/MaintenanceToggle';
-import ResetOrdersButton from '@/components/admin/ResetOrdersButton';
+import DangerZone from '@/components/admin/DangerZone';
 import WisePaymentSettings from '@/components/admin/WisePaymentSettings';
+
+// Cotação fixa usada para converter despesas em R$ (marketing, salários) para ¥.
+const YEN_PER_BRL = 28;
+
+type PendingTab = 'orders' | 'negotiations' | 'affiliates' | 'requests';
+
+interface DashboardProps {
+  /** Contagens que o painel já mantém (badges do menu). */
+  pending: { negotiations: number; affiliates: number; requests: number };
+  onNavigate: (tab: PendingTab) => void;
+}
+
 interface MonthlyFin {
   month: string;
   orders: number;
@@ -114,7 +126,7 @@ function SectionHeader({ title, open, onToggle }: { title: string; open: boolean
   );
 }
 
-const Dashboard: React.FC = () => {
+const Dashboard: React.FC<DashboardProps> = ({ pending, onNavigate }) => {
   const EMPTY_STATS: DashboardOrderStats = {
     totalOrders: 0, pendingOrders: 0, paymentReviewOrders: 0, confirmedOrders: 0,
     shippedOrders: 0, deliveredOrders: 0, cancelledOrders: 0, totalRevenue: 0,
@@ -184,8 +196,8 @@ const Dashboard: React.FC = () => {
       const salariosBRL = salaries.filter((item) => item.currency === 'BRL').reduce((sum, item) => sum + item.amount, 0);
       const salariosJPY = salaries.filter((item) => item.currency === 'JPY').reduce((sum, item) => sum + item.amount, 0);
       const totalComissoesYen = comissoesYen + comissoesConfirmYen;
-      const marketingYen = marketingJPY + Math.round(marketingBRL * 28);
-      const salariosYen = salariosJPY + Math.round(salariosBRL * 28);
+      const marketingYen = marketingJPY + Math.round(marketingBRL * YEN_PER_BRL);
+      const salariosYen = salariosJPY + Math.round(salariosBRL * YEN_PER_BRL);
       const lucroLiquido = dashboard.finance.receitaProduto
         + dashboard.finance.receitaPS
         - dashboard.finance.custo
@@ -217,11 +229,14 @@ const Dashboard: React.FC = () => {
 
   if (!stats) {
     return (
-      <div className="space-y-6">
-        <MaintenanceToggle />
-        <div className="flex items-center justify-center py-12">
-          <p className="text-muted-foreground">Carregando dados...</p>
+      <div className="space-y-4" aria-busy="true" aria-label="Carregando dashboard">
+        <div className="h-24 animate-pulse rounded-xl bg-muted" />
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
+          {Array.from({ length: 6 }, (_, i) => (
+            <div key={i} className="h-28 animate-pulse rounded-xl bg-muted" />
+          ))}
         </div>
+        <div className="h-40 animate-pulse rounded-xl bg-muted" />
       </div>
     );
   }
@@ -252,6 +267,19 @@ const Dashboard: React.FC = () => {
 
   const maxProductCount = Math.max(...topProducts.map(p => p.count), 1);
 
+  const totalComissoesYen = finance.comissoesYen + finance.comissoesConfirmYen;
+  const marketingYen = finance.marketingJPY + Math.round(finance.marketingBRL * YEN_PER_BRL);
+  const salariosYen = finance.salariosJPY + Math.round(finance.salariosBRL * YEN_PER_BRL);
+
+  // O que espera uma ação do admin; cada item abre a aba onde se resolve.
+  const actionItems = [
+    { tab: 'orders' as const, count: stats.pendingOrders, label: 'Pedidos aguardando pagamento', icon: Package, tone: 'text-yellow-600 bg-yellow-500/10' },
+    { tab: 'orders' as const, count: stats.paymentReviewOrders, label: 'Pagamentos em revisão', icon: AlertTriangle, tone: 'text-amber-700 bg-amber-500/10' },
+    { tab: 'negotiations' as const, count: pending.negotiations, label: 'Negociações pendentes', icon: Handshake, tone: 'text-blue-600 bg-blue-500/10' },
+    { tab: 'affiliates' as const, count: pending.affiliates, label: 'Afiliados aguardando', icon: Megaphone, tone: 'text-purple-600 bg-purple-500/10' },
+    { tab: 'requests' as const, count: pending.requests, label: 'Pedidos personalizados novos', icon: Sparkles, tone: 'text-pink-600 bg-pink-500/10' },
+  ].filter((item) => item.count > 0);
+
   return (
     <div className="space-y-4">
       {loadError && (
@@ -259,6 +287,32 @@ const Dashboard: React.FC = () => {
           {loadError}
         </p>
       )}
+
+      {/* ── Precisa de ação ── */}
+      <div className="bg-card rounded-xl border border-border p-4">
+        <p className="mb-3 text-sm font-semibold">Precisa de ação</p>
+        {actionItems.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Nada pendente agora.</p>
+        ) : (
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {actionItems.map(({ tab, count, label, icon: Icon, tone }) => (
+              <button
+                key={label}
+                type="button"
+                onClick={() => onNavigate(tab)}
+                className="flex items-center gap-3 rounded-lg border border-border px-3 py-2.5 text-left transition-colors hover:bg-muted/60"
+              >
+                <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${tone}`}>
+                  <Icon className="h-4 w-4" aria-hidden />
+                </span>
+                <span className="flex-1 text-sm">{label}</span>
+                <span className="text-lg font-bold tabular-nums">{count}</span>
+                <ChevronRight className="h-4 w-4 text-muted-foreground" aria-hidden />
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* ── Configurações ── */}
       <div className="flex items-center gap-2">
@@ -278,7 +332,7 @@ const Dashboard: React.FC = () => {
         <div className="space-y-4">
           <MaintenanceToggle />
           <WisePaymentSettings />
-          <ResetOrdersButton />
+          <DangerZone />
         </div>
       )}
 
@@ -482,35 +536,27 @@ const Dashboard: React.FC = () => {
           )}
 
           {/* Lucro Líquido */}
-          {(() => {
-            const YEN_PER_BRL = 28;
-            const totalComissoesYen = finance.comissoesYen + finance.comissoesConfirmYen;
-            const marketingYen = finance.marketingJPY + Math.round(finance.marketingBRL * YEN_PER_BRL);
-            const salariosYen = finance.salariosJPY + Math.round(finance.salariosBRL * YEN_PER_BRL);
-            return (
-              <div className={`rounded-xl border-2 p-5 ${finance.lucroLiquido >= 0 ? 'bg-green-50 dark:bg-green-950/20 border-green-400 dark:border-green-700' : 'bg-red-50 dark:bg-red-950/20 border-red-400'}`}>
-                <div className="flex items-center justify-between flex-wrap gap-2">
-                  <div>
-                    <p className="text-sm font-semibold text-muted-foreground mb-1">💵 Lucro Líquido</p>
-                    <p className={`text-3xl font-bold ${finance.lucroLiquido >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      ¥{finance.lucroLiquido.toLocaleString()}
-                    </p>
-                    <p className="text-[11px] text-muted-foreground mt-1">
-                      (Produto + PS) − Custo − Afiliados − Marketing − Salários
-                    </p>
-                  </div>
-                  <div className="text-right text-xs text-muted-foreground space-y-0.5">
-                    <p>Produto: <span className="font-semibold text-foreground">+¥{finance.receitaProduto.toLocaleString()}</span></p>
-                    <p>PS: <span className="font-semibold text-foreground">+¥{finance.receitaPS.toLocaleString()}</span></p>
-                    <p>Custo: <span className="font-semibold text-foreground">−¥{finance.custo.toLocaleString()}</span></p>
-                    <p>Afiliados: <span className="font-semibold text-foreground">−¥{totalComissoesYen.toLocaleString()}</span></p>
-                    <p>Marketing: <span className="font-semibold text-foreground">−¥{marketingYen.toLocaleString()}</span></p>
-                    <p>Salários: <span className="font-semibold text-foreground">−¥{salariosYen.toLocaleString()}</span></p>
-                  </div>
-                </div>
+          <div className={`rounded-xl border-2 p-5 ${finance.lucroLiquido >= 0 ? 'bg-green-50 dark:bg-green-950/20 border-green-400 dark:border-green-700' : 'bg-red-50 dark:bg-red-950/20 border-red-400'}`}>
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div>
+                <p className="text-sm font-semibold text-muted-foreground mb-1">💵 Lucro Líquido</p>
+                <p className={`text-3xl font-bold ${finance.lucroLiquido >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  ¥{finance.lucroLiquido.toLocaleString()}
+                </p>
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  (Produto + PS) − Custo − Afiliados − Marketing − Salários
+                </p>
               </div>
-            );
-          })()}
+              <div className="text-right text-xs text-muted-foreground space-y-0.5">
+                <p>Produto: <span className="font-semibold text-foreground">+¥{finance.receitaProduto.toLocaleString()}</span></p>
+                <p>PS: <span className="font-semibold text-foreground">+¥{finance.receitaPS.toLocaleString()}</span></p>
+                <p>Custo: <span className="font-semibold text-foreground">−¥{finance.custo.toLocaleString()}</span></p>
+                <p>Afiliados: <span className="font-semibold text-foreground">−¥{totalComissoesYen.toLocaleString()}</span></p>
+                <p>Marketing: <span className="font-semibold text-foreground">−¥{marketingYen.toLocaleString()}</span></p>
+                <p>Salários: <span className="font-semibold text-foreground">−¥{salariosYen.toLocaleString()}</span></p>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

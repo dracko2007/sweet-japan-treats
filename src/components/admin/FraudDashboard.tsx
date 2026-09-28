@@ -4,6 +4,7 @@ import { collection, getDocs, doc, setDoc, deleteDoc } from 'firebase/firestore'
 import { ShieldAlert, ShieldCheck, Eye, Trash2, AlertTriangle, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
+import { useConfirm } from '@/components/ConfirmDialog';
 import { normalizeCPF } from '@/utils/validation';
 import CpfMigration from './CpfMigration';
 
@@ -33,6 +34,7 @@ const maskCpf = (cpf: string) => {
 
 const FraudDashboard: React.FC = () => {
   const { toast } = useToast();
+  const confirm = useConfirm();
   const [attempts, setAttempts] = useState<FraudAttempt[]>([]);
   const [cpfEntries, setCpfEntries] = useState<CpfEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -64,17 +66,44 @@ const FraudDashboard: React.FC = () => {
     setLoading(false);
   };
 
-  const handleDeleteAttempt = async (id: string) => {
-    if (!db) return;
-    await deleteDoc(doc(db, 'fraud_attempts', id));
-    setAttempts(a => a.filter(x => x.id !== id));
+  const handleDeleteAttempt = async (a: FraudAttempt) => {
+    const values = await confirm({
+      title: `Excluir a tentativa de fraude do CPF ${maskCpf(a.cpf)}?`,
+      details: [
+        'Apenas este registro de tentativa bloqueada é removido',
+        'O CPF continua no índice e segue bloqueado',
+      ],
+      destructive: true,
+      permission: 'delete',
+      onConfirm: async () => {
+        if (!db) throw new Error('Firebase indisponível.');
+        try { await deleteDoc(doc(db, 'fraud_attempts', a.id)); }
+        catch { throw new Error('Não foi possível excluir o registro. Tente novamente.'); }
+      },
+    });
+    if (!values) return;
+    setAttempts(list => list.filter(x => x.id !== a.id));
     toast({ title: 'Registro removido' });
   };
 
   const handleDeleteCpfEntry = async (cpf: string) => {
-    if (!confirm(`Remover CPF ${maskCpf(cpf)} do índice? Isso permite que ele compre novamente produtos/cupons bloqueados.`)) return;
-    if (!db) return;
-    await deleteDoc(doc(db, 'cpf_index', cpf));
+    const values = await confirm({
+      title: `Remover o CPF ${maskCpf(cpf)} do índice?`,
+      details: [
+        'O CPF poderá ser reutilizado em um novo cadastro',
+        'Poderá comprar novamente produtos limitados e usar cupons de afiliado já usados',
+        'Os pedidos e as tentativas de fraude registradas continuam salvos',
+      ],
+      destructive: true,
+      confirmLabel: 'Remover',
+      permission: 'delete',
+      onConfirm: async () => {
+        if (!db) throw new Error('Firebase indisponível.');
+        try { await deleteDoc(doc(db, 'cpf_index', cpf)); }
+        catch { throw new Error('Não foi possível remover o CPF do índice. Tente novamente.'); }
+      },
+    });
+    if (!values) return;
     setCpfEntries(e => e.filter(x => x.cpf !== cpf));
     toast({ title: 'CPF removido do índice' });
   };
@@ -169,7 +198,7 @@ const FraudDashboard: React.FC = () => {
                       )}
                     </div>
                   </div>
-                  <Button variant="ghost" size="sm" onClick={() => handleDeleteAttempt(a.id)}
+                  <Button variant="ghost" size="sm" onClick={() => handleDeleteAttempt(a)}
                     className="text-muted-foreground hover:text-red-500 h-8 w-8 p-0 flex-shrink-0">
                     <Trash2 className="w-4 h-4" />
                   </Button>

@@ -5,6 +5,8 @@ import { safeStorage } from '@/utils/storage';
  */
 
 import { firebaseSyncService } from '@/services/firebaseSyncService';
+import { collection, getDocs, query, where } from 'firebase/firestore';
+import { db } from '@/config/firebase';
 import type { OrderPageCursor } from '@/services/firebaseSyncService';
 import { ensureAdminAuth } from '@/utils/adminAuth';
 import type { Order } from '@/types';
@@ -174,7 +176,8 @@ export const orderService = {
     }
   },
 
-  // Exclui o pedido de verdade (localStorage + Firestore)
+  // Exclui o pedido de verdade (localStorage + Firestore). O sucesso é o do
+  // Firestore: é de lá que Pedidos, financeiro e o perfil do cliente leem.
   deleteOrder: async (orderNumber: string): Promise<boolean> => {
     let deletedLocal = false;
 
@@ -204,7 +207,49 @@ export const orderService = {
       devError('❌ [ORDER] Firestore delete failed:', err);
     }
 
-    return deletedLocal || deletedRemote;
+    return deletedRemote;
+  },
+
+  // Exclui TODOS os pedidos de um cliente da coleção 'orders', um a um pelo
+  // mesmo caminho da aba Pedidos (deleteOrder). Busca por customerEmail (o
+  // checkout grava normalizado em minúsculas; pedidos antigos podem ter a
+  // grafia original) e por userId (uid do cliente), quando informado.
+  // Também limpa o espelho legado `users/{id}.orders`. Lança erro se o
+  // Firestore não responder; retorna quantos pedidos foram excluídos.
+  deleteOrdersByCustomer: async (email: string, userId?: string): Promise<number> => {
+    await ensureAdminAuth();
+    if (!db) throw new Error('Firestore indisponível: nenhum pedido foi excluído.');
+
+    const trimmedEmail = email.trim();
+    const emails = Array.from(new Set([trimmedEmail, trimmedEmail.toLowerCase()])).filter(Boolean);
+    const uid = userId?.trim();
+    const filters = [
+      ...emails.map((value) => where('customerEmail', '==', value)),
+      ...(uid ? [where('userId', '==', uid)] : []),
+    ];
+    if (filters.length === 0) throw new Error('Cliente sem e-mail: não há como localizar os pedidos.');
+
+    const orderNumbers = new Set<string>();
+    try {
+      const snaps = await Promise.all(filters.map((f) => getDocs(query(collection(db, 'orders'), f))));
+      snaps.forEach((snap) => snap.docs.forEach((d) => orderNumbers.add(d.id)));
+    } catch (err) {
+      devError('❌ [ORDER] deleteOrdersByCustomer: busca falhou:', err);
+      throw new Error('Não foi possível buscar os pedidos do cliente. Nada foi excluído.');
+    }
+
+    let deleted = 0;
+    for (const orderNumber of orderNumbers) {
+      if (await orderService.deleteOrder(orderNumber)) deleted++;
+    }
+    if (deleted < orderNumbers.size) {
+      throw new Error(`Só ${deleted} de ${orderNumbers.size} pedidos foram excluídos. Tente de novo.`);
+    }
+
+    if (trimmedEmail && !(await firebaseSyncService.clearUserOrdersByEmail(trimmedEmail))) {
+      throw new Error(`${deleted} pedido(s) excluído(s), mas não foi possível limpar o histórico antigo do perfil. Tente de novo.`);
+    }
+    return deleted;
   },
 
   // RESET TOTAL: apaga TODO o histórico de pedidos (localStorage + Firestore).

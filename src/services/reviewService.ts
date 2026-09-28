@@ -153,6 +153,24 @@ export const reviewService = {
     }
   },
 
+  // Ação em massa do admin: apaga TODAS as avaliações e zera o agregado
+  // rating/reviewCount de cada produto avaliado — o mesmo resultado que
+  // deleteReview grava quando não sobra nenhuma avaliação do produto.
+  // Retorna quantas avaliações foram apagadas.
+  async deleteAllReviews(): Promise<number> {
+    if (!db) throw new Error('Banco de dados indisponível. Tente novamente.');
+    await ensureAdminAuth();
+    const snap = await getDocs(collection(db, REVIEWS_COL));
+    const productIds = new Set(snap.docs.map((d) => (d.data() as Review).productId).filter(Boolean));
+
+    await Promise.all(snap.docs.map((d) => deleteDoc(d.ref)));
+    // Produto pode ter sido removido — recontagem do agregado não é crítica.
+    await Promise.allSettled(
+      [...productIds].map((productId) => updateDoc(doc(db, PRODUCTS_COL, productId), { rating: 0, reviewCount: 0 }))
+    );
+    return snap.size;
+  },
+
   // Moderação: remove só as fotos de um review, mantendo nota e comentário.
   async updateReviewImages(reviewId: string, images: string[]): Promise<void> {
     if (!db) return;

@@ -6,6 +6,7 @@ import {
 import { Trash2, Plus, User, Briefcase } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
+import { useConfirm } from '@/components/ConfirmDialog';
 
 export interface Employee {
   id?: string;
@@ -54,6 +55,7 @@ const emptyPay = (employees: Employee[]): Omit<EmployeePayment, 'id' | 'createdA
 
 const EmployeeManager: React.FC = () => {
   const { toast } = useToast();
+  const confirm = useConfirm();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [payments, setPayments] = useState<EmployeePayment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -102,9 +104,26 @@ const EmployeeManager: React.FC = () => {
     setSaving(false);
   };
 
-  const handleDeleteEmployee = async (id: string) => {
-    if (!confirm('Excluir este funcionário?') || !db) return;
-    await deleteDoc(doc(db, COL_EMP, id));
+  const handleDeleteEmployee = async (emp: Employee) => {
+    const paymentCount = payments.filter(p => p.employeeId === emp.id).length;
+    const values = await confirm({
+      title: `Excluir o funcionário ${emp.name}?`,
+      details: [
+        'O cadastro (telefone, endereço, cargo) será removido',
+        paymentCount > 0
+          ? `Os ${paymentCount} pagamento(s) já registrados continuam no histórico e nos relatórios financeiros, com o nome ${emp.name}`
+          : 'Não há pagamentos registrados para este funcionário',
+      ],
+      destructive: true,
+      password: true,
+      permission: 'financial',
+      onConfirm: async () => {
+        if (!db || !emp.id) throw new Error('Firebase indisponível.');
+        try { await deleteDoc(doc(db, COL_EMP, emp.id)); }
+        catch { throw new Error('Não foi possível excluir o funcionário. Tente novamente.'); }
+      },
+    });
+    if (!values) return;
     toast({ title: 'Funcionário removido' });
     load();
   };
@@ -131,9 +150,23 @@ const EmployeeManager: React.FC = () => {
     setSaving(false);
   };
 
-  const handleDeletePayment = async (id: string) => {
-    if (!confirm('Excluir este pagamento?') || !db) return;
-    await deleteDoc(doc(db, COL_PAY, id));
+  const handleDeletePayment = async (pay: EmployeePayment) => {
+    const values = await confirm({
+      title: `Excluir o pagamento de ${fmt(pay.amount, pay.currency)} para ${pay.employeeName}?`,
+      details: [
+        `Pagamento de ${new Date(pay.date + 'T00:00:00').toLocaleDateString('pt-BR')} deixa de contar nos relatórios financeiros`,
+        'O cadastro do funcionário e os demais pagamentos continuam salvos',
+      ],
+      destructive: true,
+      password: true,
+      permission: 'financial',
+      onConfirm: async () => {
+        if (!db || !pay.id) throw new Error('Firebase indisponível.');
+        try { await deleteDoc(doc(db, COL_PAY, pay.id)); }
+        catch { throw new Error('Não foi possível excluir o pagamento. Tente novamente.'); }
+      },
+    });
+    if (!values) return;
     toast({ title: 'Pagamento removido' });
     load();
   };
@@ -237,7 +270,7 @@ const EmployeeManager: React.FC = () => {
                       {emp.address && <p className="text-xs text-muted-foreground">{emp.address}</p>}
                     </div>
                   </div>
-                  <Button variant="ghost" size="sm" onClick={() => handleDeleteEmployee(emp.id!)}
+                  <Button variant="ghost" size="sm" onClick={() => handleDeleteEmployee(emp)}
                     className="text-red-500 hover:text-red-700 hover:bg-red-50">
                     <Trash2 className="w-4 h-4" />
                   </Button>
@@ -322,7 +355,7 @@ const EmployeeManager: React.FC = () => {
                   </div>
                   <div className="flex items-center gap-3">
                     <span className="font-bold text-red-500">−{fmt(pay.amount, pay.currency)}</span>
-                    <Button variant="ghost" size="sm" onClick={() => handleDeletePayment(pay.id!)}
+                    <Button variant="ghost" size="sm" onClick={() => handleDeletePayment(pay)}
                       className="text-red-500 hover:text-red-700 hover:bg-red-50 h-8 w-8 p-0">
                       <Trash2 className="w-4 h-4" />
                     </Button>

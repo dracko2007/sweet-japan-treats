@@ -3,7 +3,7 @@ import { PackagePlus, Loader2, Trash2, ExternalLink, Phone, Check, RotateCcw, Do
 import { Button } from '@/components/ui/button';
 import { customRequestService, CustomRequest } from '@/services/customRequestService';
 import { useToast } from '@/hooks/use-toast';
-import { requireAdminPassword } from '@/utils/adminGuard';
+import { useConfirm } from '@/components/ConfirmDialog';
 import { useUser } from '@/context/UserContext';
 import RegisterSaleModal from '@/components/admin/RegisterSaleModal';
 
@@ -18,6 +18,7 @@ const STATUS_COLOR: Record<CustomRequest['status'], string> = {
 
 const CustomRequestManager: React.FC = () => {
   const { toast } = useToast();
+  const confirm = useConfirm();
   const { user } = useUser();
   const [list, setList] = useState<CustomRequest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -32,13 +33,26 @@ const CustomRequestManager: React.FC = () => {
   useEffect(() => { load(); }, []);
 
   const setStatus = async (id: string, status: CustomRequest['status']) => {
-    await customRequestService.updateStatus(id, status);
+    const ok = await customRequestService.updateStatus(id, status);
+    if (ok) toast({ title: `Status alterado para ${STATUS_LABEL[status]}` });
+    else toast({ title: 'Não foi possível alterar o status', variant: 'destructive' });
     load();
   };
-  const remove = async (id: string) => {
-    if (!confirm('Excluir este pedido personalizado?')) return;
-    if (!(await requireAdminPassword('excluir este pedido personalizado'))) return;
-    await customRequestService.remove(id);
+  const remove = async (r: CustomRequest) => {
+    const values = await confirm({
+      title: `Excluir o pedido personalizado de ${r.name}?`,
+      details: [
+        'O pedido e os dados de contato do cliente serão removidos',
+        'Vendas já registradas a partir deste pedido continuam no financeiro',
+      ],
+      destructive: true,
+      password: true,
+      permission: 'delete',
+      onConfirm: async () => {
+        if (!(await customRequestService.remove(r.id))) throw new Error('Não foi possível excluir o pedido. Tente novamente.');
+      },
+    });
+    if (!values) return;
     toast({ title: 'Pedido excluído' });
     load();
   };
@@ -125,7 +139,7 @@ const CustomRequestManager: React.FC = () => {
                       Reabrir
                     </Button>
                   )}
-                  <Button onClick={() => remove(r.id)} variant="outline" size="sm" className="gap-1.5 text-red-600 ml-auto">
+                  <Button onClick={() => remove(r)} variant="outline" size="sm" className="gap-1.5 text-red-600 ml-auto">
                     <Trash2 className="w-4 h-4" /> Excluir
                   </Button>
                 </div>

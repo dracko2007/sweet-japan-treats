@@ -23,6 +23,7 @@ import { convertYen as fxConvertYen } from '@/services/fxService';
 import { formatPrice } from '@/utils/currency';
 
 import { categoryService, DEFAULT_CATEGORIES, type ProductCategory } from '@/services/categoryService';
+import { useConfirm } from '@/components/ConfirmDialog';
 import { authenticatedFetch } from '@/services/authenticatedFetch';
 
 const slugify = (s: string) =>
@@ -134,6 +135,7 @@ const ProductManager: React.FC = () => {
   const { toast } = useToast();
   const { permissions } = useUser();
   const { language } = useLanguage();
+  const confirm = useConfirm();
   const canPrice = permissions.canFinancial; // preço/custo só nível 3
   const [editing, setEditing] = useState<Product | null>(null);
   const [isNew, setIsNew] = useState(false);
@@ -159,18 +161,25 @@ const ProductManager: React.FC = () => {
 
   // Adicionar nova categoria
   const handleAddCategory = async () => {
-    const label = window.prompt('Nome da nova categoria:');
-    if (!label || !label.trim()) return;
-    const icon = window.prompt('Emoji/ícone (opcional):', '🏷️') || '🏷️';
-    const cat = await categoryService.add(label.trim(), icon.trim());
-    if (cat) {
-      const updated = await categoryService.getAll();
-      setCategories(updated);
-      if (editing) setEditing({ ...editing, category: cat.id });
-      toast({ title: '✅ Categoria adicionada', description: `${cat.icon} ${cat.label}` });
-    } else {
-      toast({ title: 'Erro ao adicionar categoria', variant: 'destructive' });
-    }
+    let cat = null as ProductCategory | null;
+    const ok = await confirm({
+      title: 'Adicionar nova categoria',
+      confirmLabel: 'Adicionar',
+      fields: [
+        { name: 'label', label: 'Nome da categoria', required: true },
+        { name: 'icon', label: 'Emoji/ícone (opcional)', defaultValue: '🏷️' },
+      ],
+      onConfirm: async (v) => {
+        const label = (v.label || '').trim();
+        if (!label) throw new Error('Informe o nome da categoria.');
+        cat = await categoryService.add(label, (v.icon || '').trim() || '🏷️');
+        if (!cat) throw new Error('Não foi possível adicionar a categoria.');
+      },
+    });
+    if (!ok || !cat) return;
+    setCategories(await categoryService.getAll());
+    if (editing) setEditing({ ...editing, category: cat.id });
+    toast({ title: '✅ Categoria adicionada', description: `${cat.icon} ${cat.label}` });
   };
 
   // Editar categoria personalizada (nome + emoji)
@@ -182,16 +191,25 @@ const ProductManager: React.FC = () => {
       toast({ title: 'Categoria padrão não pode ser editada', variant: 'destructive' });
       return;
     }
-    const label = window.prompt('Novo nome da categoria:', current.label);
-    if (!label || !label.trim()) return;
-    const icon = window.prompt('Novo emoji/ícone:', current.icon) || current.icon;
-    const ok = await categoryService.update(id, label.trim(), icon.trim());
-    if (ok) {
-      setCategories(await categoryService.getAll());
-      toast({ title: '✅ Categoria atualizada', description: `${icon} ${label}` });
-    } else {
-      toast({ title: 'Erro ao editar categoria', variant: 'destructive' });
-    }
+    let icon = current.icon;
+    let label = current.label;
+    const ok = await confirm({
+      title: `Editar a categoria ${current.label}`,
+      confirmLabel: 'Salvar',
+      fields: [
+        { name: 'label', label: 'Nome da categoria', defaultValue: current.label, required: true },
+        { name: 'icon', label: 'Emoji/ícone', defaultValue: current.icon },
+      ],
+      onConfirm: async (v) => {
+        label = (v.label || '').trim();
+        if (!label) throw new Error('Informe o nome da categoria.');
+        icon = (v.icon || '').trim() || current.icon;
+        if (!(await categoryService.update(id, label, icon))) throw new Error('Não foi possível editar a categoria.');
+      },
+    });
+    if (!ok) return;
+    setCategories(await categoryService.getAll());
+    toast({ title: '✅ Categoria atualizada', description: `${icon} ${label}` });
   };
 
   // Deletar categoria personalizada
@@ -204,19 +222,26 @@ const ProductManager: React.FC = () => {
       return;
     }
     const inUse = products.filter(p => p.category === id).length;
-    const msg = inUse > 0
-      ? `Deletar "${current.label}"?\n\n⚠️ ${inUse} produto(s) usam essa categoria — eles ficarão sem categoria válida.`
-      : `Deletar a categoria "${current.label}"?`;
-    if (!window.confirm(msg)) return;
-    const ok = await categoryService.remove(id);
-    if (ok) {
-      const updated = await categoryService.getAll();
-      setCategories(updated);
-      setEditing({ ...editing, category: updated[0]?.id || 'cosmeticos' });
-      toast({ title: '🗑️ Categoria removida', description: current.label });
-    } else {
-      toast({ title: 'Erro ao remover categoria', variant: 'destructive' });
-    }
+    const ok = await confirm({
+      title: `Excluir a categoria ${current.label}?`,
+      description: 'A categoria some da lista e dos filtros da loja.',
+      details: inUse > 0
+        ? [
+            `${inUse} produto(s) continuam com o id "${id}" gravado, mas ficam sem categoria válida (não aparecem em nenhum grupo) até você escolher outra`,
+            'Os produtos em si não são excluídos',
+          ]
+        : ['Nenhum produto usa esta categoria'],
+      destructive: true,
+      permission: 'delete',
+      onConfirm: async () => {
+        if (!(await categoryService.remove(id))) throw new Error('Não foi possível remover a categoria.');
+      },
+    });
+    if (!ok) return;
+    const updated = await categoryService.getAll();
+    setCategories(updated);
+    setEditing({ ...editing, category: updated[0]?.id || 'cosmeticos' });
+    toast({ title: '🗑️ Categoria removida', description: current.label });
   };
 
   const filteredProducts = products.filter((p) => {
@@ -559,14 +584,22 @@ const ProductManager: React.FC = () => {
   };
 
   const remove = async (p: Product) => {
-    if (!window.confirm(`Remover "${p.name}" da loja?`)) return;
-    try {
-      await productService.remove(p.id);
-      await refresh();
-      toast({ title: '🗑️ Produto removido', description: p.name });
-    } catch (e: any) {
-      toast({ title: 'Erro ao remover', description: e?.message, variant: 'destructive' });
-    }
+    const ok = await confirm({
+      title: `Excluir o produto ${p.name}?`,
+      description: 'O produto deixa de aparecer na loja.',
+      details: [
+        'É uma exclusão lógica: o registro fica marcado como removido no banco',
+        'Pedidos e avaliações já existentes continuam com o nome do produto',
+      ],
+      destructive: true,
+      permission: 'delete',
+      onConfirm: async () => {
+        await productService.remove(p.id);
+        await refresh();
+      },
+    });
+    if (!ok) return;
+    toast({ title: '🗑️ Produto removido', description: p.name });
   };
 
   return (

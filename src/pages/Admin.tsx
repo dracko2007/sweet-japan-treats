@@ -45,7 +45,7 @@ import type { OrderPageCursor } from '@/services/firebaseSyncService';
 import { customRequestService } from '@/services/customRequestService';
 import SorteioManager from '@/components/admin/SorteioManager';
 import { customerService } from '@/services/customerService';
-import { requireAdminPassword } from '@/utils/adminGuard';
+import { useConfirm } from '@/components/ConfirmDialog';
 import { negotiationService } from '@/services/negotiationService';
 import { COMPANY_PROFILE } from '@/config/companyProfile';
 import { ADMIN_EMAIL } from '@/config/admin';
@@ -84,6 +84,7 @@ const Admin: React.FC = () => {
   const navigate = useNavigate();
   const { user, permissions, authReady } = useUser();
   const { toast } = useToast();
+  const confirm = useConfirm();
   const [allOrders, setAllOrders] = useState<any[]>([]);
   const [ordersLoading, setOrdersLoading] = useState(true);
   const [ordersCursor, setOrdersCursor] = useState<OrderPageCursor | null>(null);
@@ -344,30 +345,40 @@ const Admin: React.FC = () => {
   };
 
   const handleDeleteOrder = async (orderNumber: string) => {
-    if (!permissions.canDelete) {
-      toast({ title: 'Sem permissão', description: 'Seu nível de admin não permite excluir. (Nível 2+)', variant: 'destructive' });
-      return;
-    }
-    if (!confirm(`Tem certeza que deseja excluir o pedido ${orderNumber}?`)) {
-      return;
-    }
-    if (!(await requireAdminPassword(`excluir o pedido ${orderNumber}`))) return;
+    const done = await confirm({
+      title: `Excluir o pedido ${orderNumber}?`,
+      details: [
+        'O pedido é apagado do sistema: some de Pedidos, do financeiro e do perfil do cliente.',
+        'Para só interromper a venda, use "Cancelar" (o pedido fica no histórico).',
+      ],
+      destructive: true,
+      password: true,
+      permission: 'delete',
+      onConfirm: async () => {
+        if (!(await orderService.deleteOrder(orderNumber))) throw new Error('Não foi possível excluir o pedido.');
+      },
+    });
+    if (!done) return;
+    toast({ title: 'Pedido excluído', description: `Pedido ${orderNumber} foi removido` });
+    loadOrders();
+  };
 
-    const success = await orderService.deleteOrder(orderNumber);
-    
-    if (success) {
-      toast({
-        title: "Pedido excluído",
-        description: `Pedido ${orderNumber} foi removido`,
-      });
-      loadOrders();
-    } else {
-      toast({
-        title: "Erro",
-        description: "Não foi possível excluir o pedido",
-        variant: "destructive",
-      });
-    }
+  const handleCancelOrder = async (orderNumber: string) => {
+    const done = await confirm({
+      title: `Cancelar o pedido ${orderNumber}?`,
+      details: [
+        'O cliente passa a ver o pedido como cancelado.',
+        'O pedido continua no histórico, fora do faturamento.',
+      ],
+      destructive: true,
+      confirmLabel: 'Cancelar pedido',
+      onConfirm: async () => {
+        if (!(await orderService.updateOrderStatus(orderNumber, 'cancelled'))) throw new Error('Não foi possível cancelar o pedido.');
+      },
+    });
+    if (!done) return;
+    toast({ title: 'Pedido cancelado', description: `Pedido ${orderNumber} marcado como ${getStatusLabel('cancelled')}` });
+    loadOrders();
   };
 
   const getStatusLabel = (status: string) => {
@@ -879,29 +890,28 @@ _This is an automated test message_
 
             {/* COLUNA DE CONTEÚDO */}
             <div className="flex-1 min-w-0">
-              {/* Navegação mobile (scroll horizontal) */}
+              {/* Navegação mobile: seletor agrupado igual ao menu lateral
+                  (30 abas numa linha rolável não cabiam no celular). */}
               <div className="lg:hidden mb-6">
-                <nav className="flex overflow-x-auto scrollbar-hide gap-2 pb-1">
-                  {allTabs.map((item) => {
-                    const Icon = item.icon;
-                    const active = activeTab === item.id;
-                    return (
-                      <button
-                        key={item.id}
-                        onClick={() => setActiveTab(item.id)}
-                        className={`shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-semibold border transition-colors ${active ? 'bg-primary text-primary-foreground border-primary' : 'bg-card text-muted-foreground border-border'}`}
-                      >
-                        <Icon className="w-3.5 h-3.5" />
-                        {item.label}
-                        {item.badge ? (
-                          <span className="ml-0.5 min-w-[16px] h-[16px] px-1 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center">
-                            {item.badge > 99 ? '99+' : item.badge}
-                          </span>
-                        ) : null}
-                      </button>
-                    );
-                  })}
-                </nav>
+                <label htmlFor="admin-section" className="mb-1.5 block text-xs font-semibold text-muted-foreground">
+                  Seção do painel
+                </label>
+                <select
+                  id="admin-section"
+                  value={activeTab}
+                  onChange={(e) => setActiveTab(e.target.value as AdminTab)}
+                  className="h-11 w-full rounded-xl border border-border bg-card px-3 text-sm font-semibold text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                >
+                  {tabGroups.map((group) => (
+                    <optgroup key={group.title} label={group.title}>
+                      {group.items.map((item) => (
+                        <option key={item.id} value={item.id}>
+                          {item.label}{item.badge ? ` (${item.badge > 99 ? '99+' : item.badge})` : ''}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
               </div>
               <h2 className="hidden lg:block font-display text-2xl font-bold text-foreground mb-5">{activeLabel}</h2>
 
@@ -1208,19 +1218,11 @@ _This is an automated test message_
                             <CheckCircle className="w-4 h-4" />
                             ✅ Pacote Recebido pelo Admin
                           </Button>
-                          <Button
-                            onClick={() => handleUpdateStatus(order.orderNumber, 'cancelled')}
-                            variant="outline"
-                            size="sm"
-                            className="gap-2 text-orange-600 hover:text-orange-700"
-                          >
-                            Cancelar
-                          </Button>
                         </>
                       )}
                       {order.status !== 'cancelled' && order.status !== 'delivered' && (
                         <Button
-                          onClick={() => handleUpdateStatus(order.orderNumber, 'cancelled')}
+                          onClick={() => handleCancelOrder(order.orderNumber)}
                           variant="outline"
                           size="sm"
                           className="gap-2 text-orange-600 hover:text-orange-700"
@@ -1260,7 +1262,14 @@ _This is an automated test message_
             ) : activeTab === 'coupons' ? (
               <CouponManager />
             ) : activeTab === 'dashboard' ? (
-              <Dashboard />
+              <Dashboard
+                pending={{
+                  negotiations: pendingNegotiationsCount,
+                  affiliates: Math.max(affiliatePendingCount, pendingAffiliateRequestsCount),
+                  requests: newRequests,
+                }}
+                onNavigate={setActiveTab}
+              />
             ) : activeTab === 'products' ? (
               <ProductManager />
             ) : activeTab === 'home' ? (

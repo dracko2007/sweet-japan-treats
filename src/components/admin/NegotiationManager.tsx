@@ -5,6 +5,7 @@ import { Negotiation, NegotiationStatus } from '@/types/negotiation';
 import { formatPrice } from '@/utils/currency';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
+import { useConfirm } from '@/components/ConfirmDialog';
 import { useUser } from '@/context/UserContext';
 
 const STATUS_LABELS: Record<NegotiationStatus, string> = {
@@ -53,6 +54,7 @@ function ExpiryCountdown({ expiresAt }: { expiresAt: string }) {
 const NegotiationRow: React.FC<{ neg: Negotiation }> = ({ neg }) => {
   const { user } = useUser();
   const { toast } = useToast();
+  const confirm = useConfirm();
   const [expanded, setExpanded] = useState(false);
   const [approveInput, setApproveInput] = useState(String(neg.requestedDiscountYen));
   const [adminNote, setAdminNote] = useState('');
@@ -120,15 +122,19 @@ const NegotiationRow: React.FC<{ neg: Negotiation }> = ({ neg }) => {
 
   const handleDelete = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!confirm(`Deletar esta negociação de ${neg.userName}?\nEla sumirá do perfil do cliente.`)) return;
-    setDeleting(true);
-    try {
-      await negotiationService.deleteNegotiation(neg.id);
-      toast({ title: '🗑️ Negociação deletada' });
-    } catch {
-      toast({ title: 'Erro ao deletar', variant: 'destructive' });
-      setDeleting(false);
-    }
+    await confirm({
+      title: `Excluir negociação de ${neg.userName}?`,
+      details: [
+        'A proposta negociada será apagada do sistema.',
+        'Ela sumirá do perfil do cliente e desta lista.',
+      ],
+      destructive: true,
+      permission: 'delete',
+      onConfirm: async () => {
+        await negotiationService.deleteNegotiation(neg.id);
+        toast({ title: '🗑️ Negociação deletada' });
+      },
+    });
   };
 
   return (
@@ -322,20 +328,32 @@ const NegotiationManager: React.FC = () => {
   const [deletingAll, setDeletingAll] = useState(false);
   const { toast } = useToast();
 
+  const confirm = useConfirm();
   useEffect(() => {
     return negotiationService.listenAll(setNegotiations);
   }, []);
 
   const handleDeleteAll = async () => {
-    if (!confirm(`⚠️ Apagar TODAS as ${negotiations.length} negociações?\n\nElas sumirão do perfil de todos os clientes.`)) return;
-    setDeletingAll(true);
-    try {
-      await negotiationService.deleteAllNegotiations();
-      toast({ title: `🗑️ ${negotiations.length} negociações deletadas` });
-    } catch {
-      toast({ title: 'Erro ao deletar', variant: 'destructive' });
-    }
-    setDeletingAll(false);
+    await confirm({
+      title: `Apagar todas as ${negotiations.length} negociações?`,
+      details: [
+        'Todas as negociações serão apagadas do sistema.',
+        'Elas sumirão do perfil de todos os clientes.',
+      ],
+      destructive: true,
+      password: true,
+      permission: 'financial',
+      confirmLabel: 'Apagar todas',
+      onConfirm: async () => {
+        setDeletingAll(true);
+        try {
+          await negotiationService.deleteAllNegotiations();
+          toast({ title: `🗑️ ${negotiations.length} negociações deletadas` });
+        } finally {
+          setDeletingAll(false);
+        }
+      },
+    });
   };
 
   // Runtime expiry check: treat Firestore-pending-but-past-24h as expired for display

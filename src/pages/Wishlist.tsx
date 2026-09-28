@@ -8,6 +8,7 @@ import { useCart } from '@/context/CartContext';
 import { wishlistService, WishlistItem } from '@/services/wishlistService';
 import { useProducts } from '@/context/ProductsContext';
 import { useToast } from '@/hooks/use-toast';
+import { useConfirm } from '@/components/ConfirmDialog';
 import { useLanguage } from '@/context/LanguageContext';
 import { formatPrice, getCurrencyByCountry } from '@/utils/currency';
 import { convertYen as fxConvert } from '@/services/fxService';
@@ -20,6 +21,7 @@ const Wishlist: React.FC = () => {
   const { addToCart } = useCart();
   const { selectedCountry, t } = useLanguage();
   const { toast } = useToast();
+  const confirm = useConfirm();
   const [wishlistItems, setWishlistItems] = useState<WishlistItem[]>([]);
 
   useEffect(() => {
@@ -65,22 +67,26 @@ const Wishlist: React.FC = () => {
     }
   };
 
-  const handleClearAll = () => {
+  const handleClearAll = async () => {
     if (!user?.email) return;
+    const email = user.email;
 
-    if (!confirm('Deseja remover todos os produtos da lista de desejos?')) {
-      return;
-    }
+    const ok = await confirm({
+      title: 'Limpar a lista de desejos?',
+      description: 'Todos os produtos serão removidos da sua lista de desejos.',
+      destructive: true,
+      confirmLabel: 'Limpar tudo',
+      onConfirm: () => {
+        if (!wishlistService.clearWishlist(email)) throw new Error('Não foi possível limpar a lista.');
+      },
+    });
+    if (!ok) return;
 
-    const success = wishlistService.clearWishlist(user.email);
-    
-    if (success) {
-      loadWishlist();
-      toast({
-        title: "Lista limpa!",
-        description: "Todos os produtos foram removidos",
-      });
-    }
+    loadWishlist();
+    toast({
+      title: "Lista limpa!",
+      description: "Todos os produtos foram removidos",
+    });
   };
 
   if (!user) {

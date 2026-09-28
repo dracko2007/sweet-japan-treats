@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { adminService, AdminEntry, AdminRole } from '@/services/adminService';
 import { useUser } from '@/context/UserContext';
 import { useToast } from '@/hooks/use-toast';
-import { requireAdminPassword } from '@/utils/adminGuard';
+import { useConfirm } from '@/components/ConfirmDialog';
 
 const ROLE_LABEL: Record<number, string> = {
   1: 'Nível 1 — vê e gerencia (sem deletar, sem financeiro)',
@@ -20,12 +20,12 @@ const ROLE_BADGE: Record<number, string> = {
 const AdminAccessManager: React.FC = () => {
   const { user, permissions } = useUser();
   const { toast } = useToast();
+  const confirm = useConfirm();
   const [list, setList] = useState<AdminEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState<AdminRole>(1);
-  const [saving, setSaving] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -46,25 +46,43 @@ const AdminAccessManager: React.FC = () => {
   const add = async () => {
     if (!name.trim()) { toast({ title: 'Informe o nome de usuário do admin', variant: 'destructive' }); return; }
     if (password.length < 8) { toast({ title: 'Senha muito curta', description: 'Mínimo 8 caracteres.', variant: 'destructive' }); return; }
-    if (!(await requireAdminPassword(`adicionar o admin ${name}`))) return;
-    setSaving(true);
-    const res = await adminService.addAdmin(name, password, role, user?.name || '');
-    setSaving(false);
-    if (res.ok) {
-      toast({ title: '✅ Admin adicionado', description: `${name} (nível ${role})` });
-      setName(''); setPassword(''); setRole(1);
-      load();
-    } else {
-      toast({ title: 'Não foi possível adicionar', description: res.error || 'Verifique as regras do Firestore.', variant: 'destructive' });
-    }
+    const values = await confirm({
+      title: `Adicionar o admin ${name}?`,
+      details: [
+        ROLE_LABEL[role],
+        `${name} poderá entrar no painel com o nome de usuário e a senha informados`,
+      ],
+      confirmLabel: 'Adicionar',
+      password: true,
+      onConfirm: async () => {
+        const res = await adminService.addAdmin(name, password, role, user?.name || '');
+        if (!res.ok) throw new Error(res.error || 'Não foi possível adicionar. Verifique as regras do Firestore.');
+      },
+    });
+    if (!values) return;
+    toast({ title: '✅ Admin adicionado', description: `${name} (nível ${role})` });
+    setName(''); setPassword(''); setRole(1);
+    load();
   };
 
   const remove = async (username: string, displayName: string) => {
-    if (!confirm(`Remover o acesso admin de "${displayName}"?`)) return;
-    if (!(await requireAdminPassword(`remover o admin ${displayName}`))) return;
-    const ok = await adminService.removeAdmin(username);
-    if (ok) { toast({ title: 'Admin removido', description: displayName }); load(); }
-    else toast({ title: 'Não foi possível remover', variant: 'destructive' });
+    const values = await confirm({
+      title: `Remover o acesso admin de ${displayName}?`,
+      details: [
+        `${displayName} não conseguirá mais entrar no painel`,
+        'Pedidos, vendas e registros feitos por este admin continuam salvos',
+      ],
+      destructive: true,
+      confirmLabel: 'Remover',
+      password: true,
+      permission: 'delete',
+      onConfirm: async () => {
+        if (!(await adminService.removeAdmin(username))) throw new Error('Não foi possível remover o admin. Tente novamente.');
+      },
+    });
+    if (!values) return;
+    toast({ title: 'Admin removido', description: displayName });
+    load();
   };
 
   return (
@@ -99,8 +117,8 @@ const AdminAccessManager: React.FC = () => {
               <option value={3}>Nível 3</option>
             </select>
           </div>
-          <Button onClick={add} disabled={saving} className="btn-primary gap-2">
-            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />} Adicionar
+          <Button onClick={add} className="btn-primary gap-2">
+            <Plus className="w-4 h-4" /> Adicionar
           </Button>
         </div>
         <p className="text-[11px] text-muted-foreground mt-2">{ROLE_LABEL[role]}</p>

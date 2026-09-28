@@ -6,6 +6,7 @@ import { db } from '@/config/firebase';
 import { doc, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
 import { ensureAdminAuth } from '@/utils/adminAuth';
 import { useToast } from '@/hooks/use-toast';
+import { useConfirm } from '@/components/ConfirmDialog';
 import { convertYen } from '@/services/fxService';
 import { PROMO_TYPES, ActivePromo, ScheduledNextPromo } from '@/types/promotion';
 export type { ActivePromo, ScheduledNextPromo };
@@ -149,6 +150,7 @@ const emptyForm = (): Partial<ActivePromo & ScheduledNextPromo> => ({
 const PromotionManager: React.FC = () => {
   const { products } = useProducts();
   const { toast } = useToast();
+  const confirm = useConfirm();
   const [active, setActive] = useState<ActivePromo | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -167,7 +169,7 @@ const PromotionManager: React.FC = () => {
         const expiredByQty  = data.maxProducts != null && (data.soldCount ?? 0) >= data.maxProducts;
         if (expiredByDate || expiredByQty) {
           if (data.nextPromo) activateNext(data.nextPromo);
-          else removePromo(true);
+          else removeExpiredPromo();
         } else {
           setActive(data);
         }
@@ -226,17 +228,59 @@ const PromotionManager: React.FC = () => {
     } catch { /* silencia */ }
   };
 
-  const removePromo = async (silent = false) => {
+  // Remoção automática (promoção expirada), sem janela nem toast.
+  const removeExpiredPromo = async () => {
     if (!db) return;
     setSaving(true);
     try {
       await ensureAdminAuth();
       await deleteDoc(doc(db, 'siteContent', 'homePromotion'));
       setActive(null);
-      if (!silent) toast({ title: 'Promoção removida.' });
-    } catch (e: any) {
-      if (!silent) toast({ title: 'Erro', description: e?.message, variant: 'destructive' });
-    } finally { setSaving(false); }
+    } catch { /* silencia */ } finally { setSaving(false); }
+  };
+
+  const confirmRemovePromo = async () => {
+    if (!db || !active) return;
+    const firestore = db;
+    const ok = await confirm({
+      title: `Remover a promoção ${active.productName}?`,
+      description: 'A promoção sai da página inicial imediatamente.',
+      details: [
+        active.nextPromo ? 'A próxima promoção pré-programada também é descartada' : 'Não há próxima promoção pré-programada',
+        'O produto continua na loja com o preço normal; pedidos já feitos não mudam',
+      ],
+      destructive: true,
+      confirmLabel: 'Remover',
+      onConfirm: async () => {
+        await ensureAdminAuth();
+        await deleteDoc(doc(firestore, 'siteContent', 'homePromotion'));
+      },
+    });
+    if (!ok) return;
+    setActive(null);
+    toast({ title: 'Promoção removida.' });
+  };
+
+  const resetLimits = async () => {
+    if (!db || !active) { toast({ title: 'Nenhuma promoção ativa para resetar.' }); return; }
+    const firestore = db;
+    const current = active;
+    const resetAt = Date.now();
+    const ok = await confirm({
+      title: `Resetar os limites de compra da promoção ${current.productName}?`,
+      description: 'Todos os clientes poderão comprar a promoção novamente até o limite por pessoa.',
+      details: ['Compras anteriores a agora deixam de contar para o limite', 'O total vendido e os pedidos continuam registrados'],
+      confirmLabel: 'Resetar limites',
+      onConfirm: async () => {
+        await ensureAdminAuth();
+        await setDoc(doc(firestore, 'siteContent', 'homePromotion'), { ...current, limitResetAt: resetAt });
+      },
+    });
+    if (!ok) return;
+    setActive({ ...current, limitResetAt: resetAt });
+    // Limpa também o navegador local
+    Object.keys(localStorage).filter(k => k.startsWith('promo_bought_')).forEach(k => localStorage.removeItem(k));
+    toast({ title: '🔄 Limites resetados para todos os clientes', description: 'Contadores anteriores a agora serão ignorados em qualquer dispositivo.' });
   };
 
   const save = async () => {
@@ -279,20 +323,7 @@ const PromotionManager: React.FC = () => {
           <p className="text-sm text-muted-foreground mt-1">Preços em ¥ — convertidos automaticamente para R$/€ conforme o país do cliente.</p>
         </div>
         <Button variant="outline" size="sm" className="border-orange-300 text-orange-600 hover:bg-orange-50 gap-1.5 text-xs shrink-0"
-          onClick={async () => {
-            if (!db || !active) { toast({ title: 'Nenhuma promoção ativa para resetar.' }); return; }
-            try {
-              await ensureAdminAuth();
-              const resetAt = Date.now();
-              await setDoc(doc(db, 'siteContent', 'homePromotion'), { ...active, limitResetAt: resetAt });
-              setActive({ ...active, limitResetAt: resetAt });
-              // Limpa também o navegador local
-              Object.keys(localStorage).filter(k => k.startsWith('promo_bought_')).forEach(k => localStorage.removeItem(k));
-              toast({ title: '🔄 Limites resetados para todos os clientes', description: 'Contadores anteriores a agora serão ignorados em qualquer dispositivo.' });
-            } catch (e: any) {
-              toast({ title: 'Erro', description: e?.message, variant: 'destructive' });
-            }
-          }}>
+          onClick={resetLimits}>
           <RotateCcw className="w-3.5 h-3.5" /> Resetar limites de compra
         </Button>
       </div>
@@ -329,7 +360,7 @@ const PromotionManager: React.FC = () => {
               )}
             </div>
             <div className="flex flex-col gap-1 shrink-0">
-              <Button variant="destructive" size="sm" onClick={() => removePromo()} disabled={saving}><Trash2 className="w-4 h-4" /></Button>
+              <Button variant="destructive" size="sm" onClick={confirmRemovePromo} disabled={saving}><Trash2 className="w-4 h-4" /></Button>
               <Button variant="outline" size="sm" onClick={simulateExpiry} disabled={saving} title="Simular encerramento agora (teste)" className="border-orange-300 text-orange-600 hover:bg-orange-50 text-[10px] px-2 py-1 h-auto gap-1">
                 <FlaskConical className="w-3 h-3" />Simular
               </Button>

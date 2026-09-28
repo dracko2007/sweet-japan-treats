@@ -3,6 +3,7 @@ import { db } from '@/config/firebase';
 import { collection, getDocs, doc, setDoc } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
+import { useConfirm } from '@/components/ConfirmDialog';
 import { ShieldCheck, AlertTriangle, CheckCircle } from 'lucide-react';
 import { normalizeCPF } from '@/utils/validation';
 
@@ -17,13 +18,29 @@ interface MigrationResult {
 
 const CpfMigration: React.FC = () => {
   const { toast } = useToast();
+  const confirm = useConfirm();
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState<MigrationResult | null>(null);
 
   const runMigration = async () => {
     if (!db) { toast({ title: 'Firebase indisponível', variant: 'destructive' }); return; }
-    if (!confirm('Isso vai ler TODOS os pedidos e popular o índice de CPF com o histórico. Continuar?')) return;
+    await confirm({
+      title: 'Popular o índice de CPF com o histórico de pedidos?',
+      description: 'Todos os pedidos serão lidos e o índice de CPF será atualizado.',
+      details: [
+        'Produtos e cupons de afiliado já comprados por cada CPF serão gravados no índice',
+        'Entradas existentes são mescladas, nada é apagado',
+        'Esses CPFs passam a ser bloqueados em novas compras de produtos limitados',
+      ],
+      confirmLabel: 'Executar migração',
+      password: true,
+      permission: 'financial',
+      onConfirm: migrate,
+    });
+  };
 
+  const migrate = async () => {
+    if (!db) return;
     setRunning(true);
     setResult(null);
 

@@ -4,12 +4,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
+import { useConfirm } from '@/components/ConfirmDialog';
 import { affiliateService, Affiliate, PendingCommission, TIER_CONFIG, AffiliateTier } from '@/services/affiliateService';
 
 const SITE_URL = 'https://japanexpress-store.com';
 
 const AffiliateManager: React.FC = () => {
   const { toast } = useToast();
+  const confirm = useConfirm();
   const [affiliates, setAffiliates] = useState<Affiliate[]>([]);
   const [pending, setPending] = useState<PendingCommission[]>([]);
   const [loading, setLoading] = useState(true);
@@ -49,47 +51,78 @@ const AffiliateManager: React.FC = () => {
 
   const [evaluating, setEvaluating] = useState(false);
   const handleEvaluateTiers = async () => {
-    if (!confirm('Avaliar e atualizar o nível de todos os afiliados agora?\n\nIsso processa as vendas do mês atual e sobe/desce os níveis conforme as metas.')) return;
-    setEvaluating(true);
-    const res = await affiliateService.evaluateAllTiers();
-    toast({
-      title: '🏆 Níveis atualizados',
-      description: `${res.updated} afiliado(s) processado(s)${res.errors ? ` · ${res.errors} erro(s)` : ''}`,
+    await confirm({
+      title: 'Avaliar níveis dos afiliados?',
+      description: 'Processa as vendas do mês atual e atualiza os níveis conforme as metas.',
+      confirmLabel: 'Avaliar agora',
+      onConfirm: async () => {
+        setEvaluating(true);
+        try {
+          const res = await affiliateService.evaluateAllTiers();
+          toast({
+            title: '🏆 Níveis atualizados',
+            description: `${res.updated} afiliado(s) processado(s)${res.errors ? ` · ${res.errors} erro(s)` : ''}`,
+          });
+          load();
+        } finally {
+          setEvaluating(false);
+        }
+      },
     });
-    setEvaluating(false);
-    load();
   };
 
   const handleResetAllAffiliates = async () => {
-    if (!confirm('ATENÇÃO: resetar todos os afiliados?\n\nIsso apagará o nível e as vendas do mês atual de todos, retornando-os ao Bronze. O histórico total de vendas e ganhos será preservado.')) return;
-    setEvaluating(true);
-    const res = await affiliateService.resetAllAffiliates();
-    toast({
-      title: 'Afiliados resetados',
-      description: `${res.updated} afiliado(s) retornaram ao Bronze${res.errors ? ` · ${res.errors} erro(s)` : ''}`,
+    await confirm({
+      title: 'Resetar todos os afiliados?',
+      details: [
+        'Apaga o nível e as vendas do mês atual de todos, retornando-os ao Bronze.',
+        'O histórico total de vendas e ganhos é preservado.',
+      ],
+      destructive: true,
+      password: true,
+      permission: 'financial',
+      confirmLabel: 'Resetar afiliados',
+      onConfirm: async () => {
+        setEvaluating(true);
+        try {
+          const res = await affiliateService.resetAllAffiliates();
+          toast({
+            title: 'Afiliados resetados',
+            description: `${res.updated} afiliado(s) retornaram ao Bronze${res.errors ? ` · ${res.errors} erro(s)` : ''}`,
+          });
+          load();
+        } finally {
+          setEvaluating(false);
+        }
+      },
     });
-    setEvaluating(false);
-    load();
   };
 
   const handleConfirm = async (pc: PendingCommission) => {
-    if (!confirm(`Confirmar entrega e liberar comissão de ${pc.affiliateCode}?`)) return;
-    const ok = await affiliateService.confirmPendingCommission(pc.id);
-    if (ok) {
-      toast({ title: '✅ Comissão liberada', description: `${pc.affiliateCode} · ¥${pc.commissionYen.toLocaleString()}` });
-      load();
-    } else {
-      toast({ title: 'Erro ao confirmar', variant: 'destructive' });
-    }
+    await confirm({
+      title: `Liberar comissão de ${pc.affiliateCode}?`,
+      details: [`Valor da comissão: ¥${pc.commissionYen.toLocaleString()}`],
+      confirmLabel: 'Liberar comissão',
+      onConfirm: async () => {
+        if (!(await affiliateService.confirmPendingCommission(pc.id))) throw new Error('Erro ao confirmar comissão.');
+        toast({ title: '✅ Comissão liberada', description: `${pc.affiliateCode} · ¥${pc.commissionYen.toLocaleString()}` });
+        load();
+      },
+    });
   };
 
   const handleCancelPending = async (pc: PendingCommission) => {
-    if (!confirm(`Cancelar a comissão pendente de ${pc.affiliateCode} (pedido cancelado)?`)) return;
-    const ok = await affiliateService.cancelPendingCommission(pc.id);
-    if (ok) {
-      toast({ title: 'Comissão cancelada' });
-      load();
-    }
+    await confirm({
+      title: `Cancelar comissão de ${pc.affiliateCode}?`,
+      details: ['A comissão pendente deste pedido será cancelada.'],
+      destructive: true,
+      confirmLabel: 'Cancelar comissão',
+      onConfirm: async () => {
+        if (!(await affiliateService.cancelPendingCommission(pc.id))) throw new Error('Não foi possível cancelar a comissão.');
+        toast({ title: 'Comissão cancelada' });
+        load();
+      },
+    });
   };
 
   const handleSave = async () => {
@@ -124,20 +157,18 @@ const AffiliateManager: React.FC = () => {
   };
 
   const handleDelete = async (code: string) => {
-    if (!confirm(`Remover o afiliado ${code}?`)) return;
-    const res = await affiliateService.remove(code);
-    if (res.ok) {
-      toast({ title: '🗑️ Afiliado removido', description: code });
-      load();
-    } else {
-      toast({
-        title: 'Não foi possível remover',
-        description: res.error?.includes('permission')
-          ? 'Sem permissão (sessão de admin expirou). Saia e entre de novo como Administrador.'
-          : (res.error || 'Tente novamente.'),
-        variant: 'destructive',
-      });
-    }
+    await confirm({
+      title: `Excluir o afiliado ${code}?`,
+      details: ['O código de afiliado e as configurações deste afiliado serão removidos.'],
+      destructive: true,
+      permission: 'delete',
+      onConfirm: async () => {
+        const res = await affiliateService.remove(code);
+        if (!res.ok) throw new Error(res.error || 'Não foi possível remover o afiliado.');
+        toast({ title: '🗑️ Afiliado removido', description: code });
+        load();
+      },
+    });
   };
   const startEdit = (affiliate: Affiliate) => {
     const settings = affiliate.tierSettings;

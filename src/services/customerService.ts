@@ -19,6 +19,8 @@ const devError = isDev ? console.error.bind(console) : () => {};
 
 
 export interface CustomerStats {
+  /** Id do doc em `users` (= uid no Firebase Auth); ausente em clientes só-locais. */
+  id?: string;
   email: string;
   name: string;
   phone: string;
@@ -255,6 +257,7 @@ export const customerService = {
         orderHistory.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
         customerMap.set(email, {
+          id: doc.id,
           email,
           name: data.name || 'N/A',
           phone: data.phone || 'N/A',
@@ -335,9 +338,9 @@ export const customerService = {
     };
   },
 
-  // Delete um cliente específico (localStorage + Firestore)
+  // Exclui a conta/perfil de um cliente (localStorage + Firestore). Os pedidos
+  // (coleção 'orders') ficam como registro financeiro. Sucesso = Firestore.
   async deleteCustomer(email: string): Promise<boolean> {
-    let deletedLocal = false;
     try {
       const usersData = safeStorage.getItem('japan-express-users');
       if (usersData) {
@@ -345,7 +348,6 @@ export const customerService = {
         if (users[email]) {
           delete users[email];
           safeStorage.setItem('japan-express-users', JSON.stringify(users));
-          deletedLocal = true;
         }
       }
     } catch (error) {
@@ -361,39 +363,11 @@ export const customerService = {
       devError('❌ Erro ao deletar cliente (Firestore):', error);
     }
 
-    return deletedLocal || deletedRemote;
+    return deletedRemote;
   },
 
-  // Delete apenas os pedidos de um cliente (mantém cliente)
-  async deleteCustomerOrders(email: string): Promise<boolean> {
-    let updatedLocal = false;
-    try {
-      const usersData = safeStorage.getItem('japan-express-users');
-      if (usersData) {
-        const users = JSON.parse(usersData);
-        if (users[email]) {
-          users[email].orders = [];
-          safeStorage.setItem('japan-express-users', JSON.stringify(users));
-          updatedLocal = true;
-        }
-      }
-    } catch (error) {
-      devError('❌ Erro ao deletar histórico (local):', error);
-    }
-
-    // Limpa também no Firestore
-    let updatedRemote = false;
-    try {
-      await ensureAdminAuth();
-      updatedRemote = await firebaseSyncService.clearUserOrdersByEmail(email);
-    } catch (error) {
-      devError('❌ Erro ao deletar histórico (Firestore):', error);
-    }
-
-    return updatedLocal || updatedRemote;
-  },
-
-  // Delete todos os clientes (localStorage + Firestore)
+  // Exclui todos os clientes (localStorage + Firestore). Só a coleção 'users':
+  // os pedidos ficam como registro financeiro. Sucesso = Firestore.
   async deleteAllCustomers(): Promise<boolean> {
     try {
       safeStorage.setItem('japan-express-users', JSON.stringify({}));
@@ -402,48 +376,10 @@ export const customerService = {
     }
     try {
       await ensureAdminAuth();
-      await firebaseSyncService.deleteAllUsersFromFirestore();
+      return await firebaseSyncService.deleteAllUsersFromFirestore();
     } catch (error) {
       devError('❌ Erro ao deletar todos os clientes (Firestore):', error);
+      return false;
     }
-    return true;
-  },
-
-  // Delete todo o histórico (pedidos de todos os clientes, localStorage + Firestore)
-  async deleteAllOrderHistory(): Promise<boolean> {
-    // 1. Limpa orders no japan-express-users
-    try {
-      const usersData = safeStorage.getItem('japan-express-users');
-      if (usersData) {
-        const users = JSON.parse(usersData);
-        Object.keys(users).forEach(email => {
-          users[email].orders = [];
-        });
-        safeStorage.setItem('japan-express-users', JSON.stringify(users));
-      }
-    } catch (error) {
-      devError('❌ Erro ao deletar histórico (local):', error);
-    }
-    // 2. Remove chaves orders_${userId} (storage por userId)
-    try {
-      const keysToRemove: string[] = [];
-      for (let i = 0; i < localStorage.length; i++) {
-        const k = localStorage.key(i);
-        if (k && k.startsWith('orders_')) keysToRemove.push(k);
-      }
-      keysToRemove.forEach(k => safeStorage.removeItem(k));
-    } catch { /* ignora */ }
-    // 3. Limpa sakura_orders
-    safeStorage.removeItem('sakura_orders');
-    // 4. Firestore
-    try {
-      await ensureAdminAuth();
-      await firebaseSyncService.deleteAllOrdersFromFirestore();
-      // Zera orders nos documentos de usuário no Firestore
-      await firebaseSyncService.resetAllUsersData();
-    } catch (error) {
-      devError('❌ Erro ao deletar histórico (Firestore):', error);
-    }
-    return true;
   },
 };

@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { couponService } from '@/services/couponService';
 import type { Coupon } from '@/types';
 import { useToast } from '@/hooks/use-toast';
+import { useConfirm } from '@/components/ConfirmDialog';
 import { firebaseSyncService } from '@/services/firebaseSyncService';
 import { ensureAdminAuth } from '@/utils/adminAuth';
 import { useUser } from '@/context/UserContext';
@@ -14,6 +15,7 @@ const CouponManager: React.FC = () => {
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [isCreating, setIsCreating] = useState(false);
   const { toast } = useToast();
+  const confirm = useConfirm();
   const { addCoupon } = useUser();
 
   const [formData, setFormData] = useState({
@@ -173,15 +175,23 @@ const CouponManager: React.FC = () => {
     });
   };
 
-  const handleDelete = (code: string) => {
-    if (confirm(`Tem certeza que deseja excluir o cupom ${code}?`)) {
-      couponService.delete(code);
-      loadCoupons();
-      toast({
-        title: "Cupom excluído",
-        description: `Cupom ${code} foi excluído`,
-      });
-    }
+  const handleDelete = async (code: string) => {
+    const ok = await confirm({
+      title: `Excluir o cupom ${code}?`,
+      description: 'Clientes não poderão mais usar este código.',
+      details: ['Pedidos que já usaram o cupom continuam com o desconto aplicado'],
+      destructive: true,
+      permission: 'delete',
+      onConfirm: () => {
+        if (!couponService.delete(code)) throw new Error('Não foi possível excluir o cupom.');
+      },
+    });
+    if (!ok) return;
+    loadCoupons();
+    toast({
+      title: "Cupom excluído",
+      description: `Cupom ${code} foi excluído`,
+    });
   };
 
   return (

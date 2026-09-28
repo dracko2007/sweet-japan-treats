@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
+import { useConfirm } from '@/components/ConfirmDialog';
 import { authenticatedFetch } from '@/services/authenticatedFetch';
 import { affiliateService } from '@/services/affiliateService';
 import type { Affiliate, PendingCommission } from '@/services/affiliateService';
@@ -107,6 +108,7 @@ const brl = (v: number) => `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigi
 
 const FinanceDetailManager: React.FC = () => {
   const { toast } = useToast();
+  const confirm = useConfirm();
   const [subTab, setSubTab] = useState<SubTab>('resumo');
 
   // ── Dados consolidados (Resumo) ──
@@ -191,10 +193,25 @@ const FinanceDetailManager: React.FC = () => {
     setSavingExp(false);
   };
 
-  const handleDeleteExpense = async (id: string) => {
-    if (!db) return;
-    await deleteDoc(doc(db, EXPENSE_COL, id));
-    setExpenses((prev) => prev.filter((e) => e.id !== id));
+  const handleDeleteExpense = async (e: FinanceExpense) => {
+    const values = await confirm({
+      title: `Excluir a despesa ${e.description}?`,
+      details: [
+        `O valor de ${e.currency === 'BRL' ? brl(e.amount) : yen(e.amount)} deixa de contar no resumo financeiro`,
+        'As demais despesas não são afetadas',
+      ],
+      destructive: true,
+      password: true,
+      permission: 'financial',
+      onConfirm: async () => {
+        if (!db || !e.id) throw new Error('Firebase indisponível.');
+        try { await deleteDoc(doc(db, EXPENSE_COL, e.id)); }
+        catch { throw new Error('Não foi possível excluir a despesa. Tente novamente.'); }
+      },
+    });
+    if (!values) return;
+    setExpenses((prev) => prev.filter((x) => x.id !== e.id));
+    toast({ title: 'Despesa removida' });
   };
 
   // ── Importação Brasil ──
@@ -398,7 +415,7 @@ const FinanceDetailManager: React.FC = () => {
                       </div>
                       <div className="flex items-center gap-3 shrink-0">
                         <span className="font-bold text-sm">{e.currency === 'BRL' ? brl(e.amount) : yen(e.amount)}</span>
-                        <button onClick={() => e.id && handleDeleteExpense(e.id)} className="text-muted-foreground hover:text-red-500">
+                        <button onClick={() => handleDeleteExpense(e)} className="text-muted-foreground hover:text-red-500">
                           <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
