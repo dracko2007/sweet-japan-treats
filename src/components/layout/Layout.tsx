@@ -5,8 +5,6 @@ import Header from './Header';
 import HeaderPro from './HeaderPro';
 import Footer from './Footer';
 import AdminPreviewBar from './AdminPreviewBar';
-import NavVariantSwitch from './NavVariantSwitch';
-import { useNavVariant } from './navVariant';
 import { useBirthdayBonus } from '@/hooks/useBirthdayBonus';
 import OrganizationJsonLd from '@/components/OrganizationJsonLd';
 import { useUser } from '@/context/UserContext';
@@ -24,8 +22,8 @@ interface LayoutProps {
 const Layout: React.FC<LayoutProps> = ({ children }) => {
   // KimiClaw e WhatsApp são assistentes do cliente — não aparecem no painel admin
   const isAdminPage = useLocation().pathname.startsWith('/admin');
-  // SANDBOX: o painel admin continua sempre com o header original.
-  const pro = useNavVariant() === 'pro' && !isAdminPage;
+  // O painel admin continua com o header original.
+  const pro = !isAdminPage;
   const reduce = useReducedMotion();
   const { user } = useUser();
 
@@ -81,7 +79,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         </>
       )}
       <AdminPreviewBar />
-      {!isAdminPage && <NavVariantSwitch />}
     </div>
   );
 };

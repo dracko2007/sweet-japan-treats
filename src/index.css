@@ -572,8 +572,8 @@ html.lenis body {
   pointer-events: none;
 }
 
-/* SANDBOX — navegação "pro": altura da barra inferior mobile, usada pelos
-   botões flutuantes para subir acima dela. 0 no desktop e na versão original. */
+/* Navegação "pro": altura da barra inferior mobile, usada pelos botões
+   flutuantes para subir acima dela. 0 no desktop e no painel admin. */
 :root {
   --bottom-nav-h: 0px;
 }

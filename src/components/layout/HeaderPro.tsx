@@ -25,7 +25,7 @@ const HOVER_OPEN_MS = 80;
 const HOVER_CLOSE_MS = 160;
 
 /**
- * SANDBOX — header de navegação "pro". Mantém as mesmas alturas do Header
+ * Header de navegação "pro". Mantém as mesmas alturas do Header
  * original no topo da página (o <main> do Layout continua com o mesmo padding).
  */
 const HeaderPro: React.FC = () => {

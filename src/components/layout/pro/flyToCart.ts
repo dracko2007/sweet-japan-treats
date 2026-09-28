@@ -1,5 +1,5 @@
 /**
- * SANDBOX — animação "voar até o carrinho". Não depende de quem chamou o
+ * Animação "voar até o carrinho". Não depende de quem chamou o
  * addToCart: usa o último toque/clique (capturado globalmente) para achar a
  * foto do produto na tela e a lança em arco até o ícone do carrinho visível.
  */
