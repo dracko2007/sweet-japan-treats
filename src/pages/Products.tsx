@@ -100,6 +100,10 @@ const Products: React.FC = () => {
   useEffect(() => { setTypeFilter(null); }, [category, catFilter]);
   // Reset catFilter when navigating to a specific category
   useEffect(() => { if (category && category !== 'all') setCatFilter(null); }, [category]);
+  // Busca feita pelo header sem recarregar a página (SPA) só muda a URL — o
+  // useState acima lê `?q=` apenas na montagem. Mantém o campo em sincronia.
+  const urlQuery = searchParams.get('q') || '';
+  useEffect(() => { setQuery(urlQuery); }, [urlQuery]);
 
   const isAllRoute = !category || category === 'all';
 

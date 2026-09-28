@@ -571,3 +571,14 @@ html.lenis body {
 .lenis.lenis-smooth iframe {
   pointer-events: none;
 }
+
+/* SANDBOX — navegação "pro": altura da barra inferior mobile, usada pelos
+   botões flutuantes para subir acima dela. 0 no desktop e na versão original. */
+:root {
+  --bottom-nav-h: 0px;
+}
+@media (max-width: 767px) {
+  html.nav-pro {
+    --bottom-nav-h: calc(64px + env(safe-area-inset-bottom));
+  }
+}

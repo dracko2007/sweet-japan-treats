@@ -80,7 +80,7 @@ const FloatingWhatsAppButton: React.FC<FloatingWhatsAppButtonProps> = () => {
   ];
 
   return (
-    <div className="fixed bottom-6 left-6 z-50 flex flex-col items-start font-sans select-none print:hidden">
+    <div className="fixed bottom-[calc(1.5rem+var(--bottom-nav-h))] left-6 z-50 flex flex-col items-start font-sans select-none print:hidden">
       {/* Modal / Card Interativo de Atendimento */}
       {isOpen && (
         <div className="mb-3 w-[340px] sm:w-[380px] max-w-[calc(100vw-2rem)] bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200/80 dark:border-slate-800 overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-300">

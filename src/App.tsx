@@ -28,6 +28,7 @@ import PushSubscriptionSync from "./components/PushSubscriptionSync";
 import AnimatedPlaneLogo from "./components/AnimatedPlaneLogo";
 import MaintenancePage from "./pages/Maintenance";
 import RouteLoader from "./components/RouteLoader";
+import { useNavVariant } from "./components/layout/navVariant";
 
 // Code splitting: cada página carregada apenas quando necessária
 const Index            = lazy(() => import("./pages/Index"));
@@ -254,14 +255,21 @@ const MaintenanceShell: React.FC = () => {
 };
 
 // CookieBanner e InstallPrompt ficam FORA do MaintenanceShell — aparecem em qualquer estado
-const App = () => (
-  <BrowserRouter>
-    <LanguageProvider>
-      <CookieBanner />
-      <InstallPrompt />
-      <MaintenanceShell />
-    </LanguageProvider>
-  </BrowserRouter>
-);
+//
+// SANDBOX: na navegação "pro", `v7_startTransition` mantém a página atual na
+// tela enquanto o chunk da próxima rota baixa, em vez de trocar tudo (header
+// incluso) pelo spinner do <Suspense>.
+const App = () => {
+  const navVariant = useNavVariant();
+  return (
+    <BrowserRouter future={{ v7_startTransition: navVariant === 'pro' }}>
+      <LanguageProvider>
+        <CookieBanner />
+        <InstallPrompt />
+        <MaintenanceShell />
+      </LanguageProvider>
+    </BrowserRouter>
+  );
+};
 
 export default App;

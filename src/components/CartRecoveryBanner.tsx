@@ -50,7 +50,7 @@ const CartRecoveryBanner: React.FC = () => {
   if (!visible || !abandoned) return null;
 
   return (
-    <div className="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-4 sm:bottom-4 sm:w-96 z-50 animate-in slide-in-from-bottom-4 duration-300">
+    <div className="fixed bottom-[calc(1rem+var(--bottom-nav-h))] left-4 right-4 sm:left-auto sm:right-4 sm:w-96 z-50 animate-in slide-in-from-bottom-4 duration-300">
       <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border-2 border-pink-400 overflow-hidden">
         <button
           onClick={dismiss}
