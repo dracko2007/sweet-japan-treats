@@ -12,6 +12,8 @@
     --accent-glow: #f472b6;
     --bg: #0b0708;
     --panel: rgba(20,10,12,0.72);
+    --ease-out: cubic-bezier(.16,1,.3,1);
+    --ease-spring: cubic-bezier(.34,1.56,.64,1);
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
@@ -22,6 +24,7 @@
     min-height: 100vh;
   }
   .display { font-family: 'Bebas Neue', 'Inter', sans-serif; letter-spacing: 0.02em; }
+  :focus-visible { outline: 2px solid var(--accent-glow); outline-offset: 3px; }
 
   /* ---------- Aviso de sandbox ---------- */
   .sandbox-badge {
@@ -42,6 +45,16 @@
   }
   .view-switch button.active { background: var(--accent); color: #fff; }
 
+  /* Barra fina de progresso do avanço automático da intro; some quando o
+     usuário interage (o avanço é cancelado). */
+  .intro-bar {
+    position: fixed; top: 0; left: 0; right: 0; height: 2px; z-index: 1000;
+    background: linear-gradient(90deg, var(--accent), var(--accent-glow));
+    transform: scaleX(0); transform-origin: left; opacity: 0;
+    transition: opacity 0.3s;
+  }
+  .intro-bar.run { opacity: 1; transform: scaleX(1); transition: transform var(--hold) linear, opacity 0.3s; }
+
   /* ==================================================================
      VIEW 1 — "Director's page": categoria + tira de pôsteres + wordmark
      gigante ao fundo (referência: página do Denis Villeneuve no shot).
@@ -52,10 +65,21 @@
     transition: opacity 1.1s ease, visibility 1.1s;
   }
   .view.active { opacity: 1; visibility: visible; pointer-events: auto; z-index: 3; }
+  .vt-running .view { transition: none; }
 
-  @keyframes revealUp { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: translateY(0); } }
+  /* As animações usam as propriedades individuais `translate`/`scale` (não
+     `transform`) para não sobrescrever o posicionamento dos elementos —
+     ex.: translate(-50%,-50%) do play e translateY(-50%) do rail. */
+  @keyframes revealUp {
+    from { opacity: 0; translate: 0 18px; filter: blur(6px); }
+    to   { opacity: 1; translate: 0 0;    filter: none; }
+  }
+  @keyframes lineUp { from { translate: 0 110%; } to { translate: 0 0; } }
   .reveal { opacity: 0; }
-  .intro-playing .reveal { animation: revealUp 0.85s cubic-bezier(.2,.8,.2,1) forwards; }
+  .intro-playing .reveal {
+    animation: revealUp 0.85s cubic-bezier(.2,.8,.2,1) both;
+    animation-delay: calc(var(--base) + var(--i) * var(--step));
+  }
 
   .brand-reveal {
     position: absolute; left: 48px; bottom: 152px; z-index: 10;
@@ -65,7 +89,7 @@
   .brand-reveal span { font-weight: 700; font-size: 14px; letter-spacing: 0.02em; }
   .brand-reveal span b { color: var(--accent-glow); }
 
-  .cat-view { padding-top: 90px; padding-bottom: 40px; }
+  .cat-view { padding-top: 90px; padding-bottom: 40px; --px: 0; }
   .breadcrumb {
     text-align: center; font-size: 11px; color: #9a8a86; letter-spacing: 0.15em;
     text-transform: uppercase; margin-bottom: 56px;
@@ -74,29 +98,52 @@
 
   .poster-strip {
     display: flex; gap: 14px; justify-content: center; padding: 0 24px; flex-wrap: wrap;
-    position: relative; z-index: 2;
+    position: relative; z-index: 2; perspective: 900px;
+  }
+  @keyframes posterIn {
+    from { opacity: 0; translate: 0 40px; scale: 0.92; }
+    to   { opacity: 1; translate: 0 0;    scale: 1; }
   }
   .poster {
+    --rx: 0deg; --ry: 0deg; --gx: 50%; --gy: 50%;
     width: 150px; height: 220px; border-radius: 10px; overflow: hidden; position: relative;
     background: #1a1114; cursor: pointer; transition: transform 0.4s cubic-bezier(.2,.8,.2,1), box-shadow 0.4s;
     box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    transform: rotateX(var(--rx)) rotateY(var(--ry));
   }
-  .poster:hover { transform: translateY(-14px) scale(1.04); box-shadow: 0 24px 50px rgba(219,39,119,0.35); }
+  .cat-view.active .poster { animation: posterIn 0.8s var(--ease-out) both; animation-delay: calc(0.15s + var(--i) * 70ms); }
+  .poster:hover, .poster:focus-visible {
+    transform: translateY(-14px) scale(1.04) rotateX(var(--rx)) rotateY(var(--ry));
+    box-shadow: 0 24px 50px rgba(219,39,119,0.35);
+  }
   .poster img {
     width: 100%; height: 100%; object-fit: cover;
     filter: grayscale(1) brightness(0.85); transition: filter 0.5s ease;
   }
-  .poster:hover img { filter: grayscale(0) brightness(1); }
+  .poster:hover img, .poster:focus-visible img { filter: grayscale(0) brightness(1); }
+  /* Reflexo de luz que acompanha o cursor no hover */
+  .poster::after {
+    content: ""; position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity 0.3s;
+    background: radial-gradient(220px circle at var(--gx) var(--gy), rgba(255,255,255,0.3), transparent 45%);
+    mix-blend-mode: soft-light;
+  }
+  .poster:hover::after { opacity: 1; }
   .poster .price-tag {
     position: absolute; left: 8px; bottom: 8px; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px);
     font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 999px; color: #fff;
   }
 
+  @keyframes giantIn {
+    from { opacity: 0; letter-spacing: 0.3em; }
+    to   { opacity: 1; letter-spacing: 0.02em; }
+  }
   .giant-word {
     position: absolute; bottom: -6vw; left: 50%; transform: translateX(-50%);
+    translate: calc(var(--px) * -40px) 0; transition: translate 0.6s var(--ease-out);
     font-size: 22vw; line-height: 1; color: rgba(245,238,233,0.05); white-space: nowrap;
     pointer-events: none; z-index: 1; user-select: none;
   }
+  .cat-view.active .giant-word { animation: giantIn 1.4s var(--ease-out) both; }
 
   /* Barra de navegação flutuante (pill), fixa embaixo — igual referência */
   .pill-nav {
@@ -110,39 +157,81 @@
     background: var(--accent); color: #fff; font-weight: 800; font-size: 12px;
     padding: 8px 14px; border-radius: 999px; margin-right: 4px;
   }
+  /* Fundo do item ativo desliza entre os botões */
+  .pill-indicator {
+    position: absolute; top: 8px; height: calc(100% - 16px); left: 0; width: 0;
+    background: rgba(255,255,255,0.08); border-radius: 999px; pointer-events: none;
+    transition: left 0.45s var(--ease-spring), width 0.45s var(--ease-spring);
+  }
   .pill-nav button {
-    background: transparent; border: none; color: #cbb2ae; font-size: 12px; font-weight: 500;
+    position: relative; background: transparent; border: none; color: #cbb2ae; font-size: 12px; font-weight: 500;
     padding: 8px 14px; border-radius: 999px; cursor: pointer; transition: 0.2s;
   }
-  .pill-nav button:hover, .pill-nav button.on { background: rgba(255,255,255,0.08); color: #fff; }
+  .pill-nav button:hover { background: rgba(255,255,255,0.08); color: #fff; }
+  .pill-nav button.on { color: #fff; }
   .pill-nav .icon-btn {
-    width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    position: relative; width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
     background: rgba(255,255,255,0.06); font-size: 14px; padding: 0;
   }
+  .cart-badge {
+    position: absolute; top: -4px; right: -4px; min-width: 17px; height: 17px; padding: 0 4px;
+    border-radius: 999px; background: var(--accent); color: #fff; font-size: 10px; font-weight: 800;
+    display: flex; align-items: center; justify-content: center; border: 2px solid #0f080a;
+    scale: 0; transition: scale 0.4s var(--ease-spring);
+  }
+  .cart-badge.has { scale: 1; }
+
+  /* Toast de feedback das ações */
+  .toast {
+    position: fixed; left: 50%; bottom: 88px; z-index: 400;
+    background: rgba(20,10,12,0.92); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1);
+    padding: 10px 18px; border-radius: 999px; font-size: 12.5px; font-weight: 600;
+    transform: translateX(-50%); translate: 0 16px; opacity: 0; pointer-events: none;
+    transition: opacity 0.3s, translate 0.4s var(--ease-out);
+  }
+  .toast.show { opacity: 1; translate: 0 0; }
 
   /* ==================================================================
      VIEW 2 — "Movie page": hero full-bleed, título gigante sangrando,
      rail de ícones à direita, pills de specs embaixo à esquerda, botão
      de play central que abre o painel de especificações.
+     --mx/--my (-1..1) vêm do cursor e movem as camadas em paralaxe.
      ================================================================== */
-  .prod-view { min-height: 100vh; position: relative; overflow: hidden; }
+  .prod-view { --mx: 0; --my: 0; --base: 0.1s; --step: 0.4s; min-height: 100vh; position: relative; overflow: hidden; }
+  .prod-view.swap { --base: 0.2s; --step: 0.09s; }
   .prod-bg {
-    position: absolute; inset: 0; z-index: 0;
+    position: absolute; inset: -40px; z-index: 0;
     background:
       radial-gradient(120% 90% at 68% 30%, rgba(219,39,119,0.35) 0%, transparent 55%),
       radial-gradient(90% 70% at 20% 85%, rgba(120,20,60,0.4) 0%, transparent 60%),
       linear-gradient(180deg, #150a0d 0%, #0b0708 70%);
+    transform: translate(calc(var(--mx) * -24px), calc(var(--my) * -16px));
+    transition: transform 0.8s var(--ease-out);
   }
   .prod-hero-img {
+    --hx: 0px;
     position: absolute; right: 2%; bottom: 0; z-index: 1;
     height: 92%; width: auto; object-fit: contain;
     filter: drop-shadow(0 40px 60px rgba(0,0,0,0.6));
-    transition: opacity 0.5s ease;
+    transform: translateX(var(--hx)) translate(calc(var(--mx) * -18px), calc(var(--my) * -10px));
+    transition: opacity 0.5s ease, transform 0.8s var(--ease-out), filter 1.1s ease;
   }
+  /* Ao sair do produto a foto esmaece para P&B junto com o fade da view */
+  .prod-view:not(.active) .prod-hero-img { filter: grayscale(1) drop-shadow(0 40px 60px rgba(0,0,0,0.6)); }
+  .prod-view.swap .prod-hero-img { animation: none; opacity: 1; }
   .prod-top {
     position: relative; z-index: 5; padding: 90px 48px 0; display: flex; justify-content: space-between; gap: 40px;
+    transform: translate(calc(var(--mx) * 10px), calc(var(--my) * 6px));
+    transition: transform 0.8s var(--ease-out);
   }
   .prod-title { font-size: 5.4vw; line-height: 0.92; max-width: 640px; }
+  /* Título: cada linha sobe de dentro de uma máscara, com atraso próprio */
+  .prod-title .line { display: block; overflow: hidden; }
+  .prod-title .line > span { display: inline-block; translate: 0 110%; }
+  .intro-playing .prod-title .line > span {
+    animation: lineUp 1s var(--ease-out) both;
+    animation-delay: calc(var(--base) + var(--step) + var(--l) * 0.12s);
+  }
   .prod-desc {
     max-width: 360px; font-size: 13px; line-height: 1.7; color: #d8c6c2; text-align: right;
   }
@@ -156,12 +245,18 @@
     display: flex; flex-direction: column; gap: 10px;
   }
   .icon-rail button {
-    width: 42px; height: 42px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1);
+    position: relative; width: 42px; height: 42px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1);
     background: rgba(10,5,6,0.6); backdrop-filter: blur(6px); color: #f5eee9; font-size: 16px;
-    cursor: pointer; transition: 0.2s;
+    cursor: pointer; transition: background 0.2s, border-color 0.2s, scale 0.3s var(--ease-spring);
   }
-  .icon-rail button:hover { background: var(--accent); border-color: var(--accent); }
+  .icon-rail button:hover { background: var(--accent); border-color: var(--accent); scale: 1.08; }
+  .icon-rail button:active { scale: 0.92; }
+  .burst {
+    position: absolute; left: 50%; top: 50%; width: 6px; height: 6px; margin: -3px 0 0 -3px;
+    border-radius: 50%; background: var(--accent-glow); pointer-events: none;
+  }
 
+  @keyframes ring { from { scale: 1; opacity: 0.6; } to { scale: 1.9; opacity: 0; } }
   .play-btn {
     position: absolute; left: 50%; top: 56%; transform: translate(-50%, -50%); z-index: 10;
     width: 76px; height: 76px; border-radius: 50%; border: 1.5px solid rgba(255,255,255,0.5);
@@ -169,6 +264,12 @@
     cursor: pointer; display: flex; align-items: center; justify-content: center;
     transition: transform 0.3s, background 0.3s;
   }
+  /* Anéis pulsando para chamar o clique */
+  .play-btn::before, .play-btn::after {
+    content: ""; position: absolute; inset: -1.5px; border-radius: 50%;
+    border: 1.5px solid var(--accent-glow); animation: ring 2.4s ease-out infinite; pointer-events: none;
+  }
+  .play-btn::after { animation-delay: 1.2s; }
   .play-btn:hover { transform: translate(-50%, -50%) scale(1.08); background: var(--accent); }
 
   .spec-pills {
@@ -177,42 +278,87 @@
   .spec-pill {
     background: rgba(10,5,6,0.65); backdrop-filter: blur(6px); border: 1px solid rgba(255,255,255,0.08);
     border-radius: 999px; padding: 7px 14px; font-size: 11.5px; white-space: nowrap;
+    transition: border-color 0.25s, translate 0.3s var(--ease-out);
   }
+  .spec-pill:hover { border-color: rgba(244,114,182,0.5); translate: 0 -3px; }
   .spec-pill b { color: #f5c8dc; font-weight: 600; }
 
-  /* Painel de especificações — abre ao clicar no play, estilo escuro/cinema */
+  /* Painel de especificações — abre ao clicar no play, estilo escuro/cinema.
+     Opacidade/visibility em vez de display:none para poder animar. */
   .spec-modal {
-    position: fixed; inset: 0; z-index: 200; display: none; align-items: center; justify-content: center;
+    position: fixed; inset: 0; z-index: 200; display: flex; align-items: center; justify-content: center;
     background: rgba(4,2,3,0.85); backdrop-filter: blur(10px);
+    opacity: 0; visibility: hidden; transition: opacity 0.35s ease, visibility 0.35s;
   }
-  .spec-modal.open { display: flex; }
+  /* visibility 0s ao abrir: fica visível já no 1º frame, senão focus() é ignorado */
+  .spec-modal.open { opacity: 1; visibility: visible; transition: opacity 0.35s ease, visibility 0s; }
   .spec-card {
     width: min(760px, 92vw); background: linear-gradient(160deg, #1a0f12 0%, #0d0708 100%);
     border: 1px solid rgba(255,255,255,0.08); border-radius: 20px; overflow: hidden;
     display: flex; box-shadow: 0 40px 100px rgba(0,0,0,0.6);
+    translate: 0 30px; scale: 0.95; transition: translate 0.55s var(--ease-out), scale 0.55s var(--ease-out);
   }
-  .spec-card img { width: 42%; object-fit: cover; }
+  .spec-modal.open .spec-card { translate: 0 0; scale: 1; }
+  .spec-card img { width: 42%; object-fit: cover; scale: 1.12; transition: scale 1.2s var(--ease-out); }
+  .spec-modal.open .spec-card img { scale: 1; }
   .spec-card .body { padding: 32px; flex: 1; }
+  .spec-card .body > * { opacity: 0; translate: 0 12px; transition: opacity 0.4s, translate 0.5s var(--ease-out); }
+  .spec-modal.open .body > * { opacity: 1; translate: 0 0; }
+  .spec-modal.open .body > :nth-child(2) { transition-delay: 0.06s; }
+  .spec-modal.open .body > :nth-child(3) { transition-delay: 0.12s; }
+  .spec-modal.open .body > :nth-child(4) { transition-delay: 0.18s; }
   .spec-card h3 { font-size: 26px; margin-bottom: 10px; }
   .spec-card p { font-size: 13px; color: #cbb2ae; line-height: 1.6; margin-bottom: 18px; }
-  .spec-card .close { position: absolute; top: 18px; right: 18px; background: rgba(255,255,255,0.08); border: none; color: #fff; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; font-size: 16px; }
-  .spec-card .buy { background: var(--accent); color: #fff; border: none; padding: 11px 22px; border-radius: 999px; font-weight: 700; font-size: 13px; cursor: pointer; }
+  .spec-card .close { position: absolute; top: 18px; right: 18px; z-index: 2; background: rgba(255,255,255,0.08); border: none; color: #fff; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; font-size: 16px; transition: background 0.2s, rotate 0.35s var(--ease-out); }
+  .spec-card .close:hover { background: var(--accent); rotate: 90deg; }
+  .spec-card .buy {
+    position: relative; overflow: hidden;
+    background: var(--accent); color: #fff; border: none; padding: 11px 22px; border-radius: 999px; font-weight: 700; font-size: 13px; cursor: pointer;
+    transition: scale 0.3s var(--ease-spring), box-shadow 0.3s;
+  }
+  .spec-card .buy:hover { scale: 1.04; box-shadow: 0 8px 26px rgba(219,39,119,0.45); }
+  .spec-card .buy:active { scale: 0.96; }
+  .spec-card .buy::after {
+    content: ""; position: absolute; inset: 0; translate: -120% 0;
+    background: linear-gradient(100deg, transparent 30%, rgba(255,255,255,0.35) 50%, transparent 70%);
+    transition: translate 0.7s ease;
+  }
+  .spec-card .buy:hover::after { translate: 120% 0; }
+
+  .fly-clone {
+    position: fixed; z-index: 500; pointer-events: none; object-fit: cover;
+    border-radius: 14px; box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+  }
+
+  /* Transição de elemento compartilhado pôster -> hero (View Transitions API) */
+  ::view-transition-group(hero-img) { animation-duration: 0.75s; animation-timing-function: cubic-bezier(.16,1,.3,1); }
+  ::view-transition-old(root), ::view-transition-new(root) { animation-duration: 0.5s; }
 
   @media (max-width: 768px) {
     .prod-title { font-size: 11vw; }
     .prod-top { flex-direction: column; padding: 90px 20px 0; }
     .prod-desc { text-align: left; max-width: 100%; }
-    .prod-hero-img { right: 50%; transform: translateX(50%); height: 40%; bottom: 90px; }
+    .prod-hero-img { right: 50%; --hx: 50%; height: 40%; bottom: 90px; }
     .spec-pills { left: 20px; bottom: 90px; max-width: 90%; }
     .icon-rail { right: 14px; }
     .spec-card { flex-direction: column; }
     .spec-card img { width: 100%; height: 220px; }
+  }
+
+  /* Acessibilidade: sem movimento para quem pediu isso ao sistema */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important; animation-delay: 0s !important;
+      animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; transition-delay: 0s !important;
+    }
+    .play-btn::before, .play-btn::after { display: none; }
   }
 </style>
 </head>
 <body>
 
 <div class="sandbox-badge">🧪 Sandbox — não afeta o site</div>
+<div class="intro-bar" id="introBar"></div>
 <div class="view-switch">
   <button id="replayBtn">↻ Replay intro</button>
   <button data-view="cat">Categoria</button>
@@ -231,55 +377,58 @@
 <!-- VIEW 2: estilo "Movie page" -->
 <section class="view prod-view active" id="view-prod">
   <div class="prod-bg"></div>
-  <img class="prod-hero-img reveal" id="prodHeroImg" src="assets/fino-kit.jpg" alt="" style="animation-delay:0.1s" />
+  <img class="prod-hero-img reveal" id="prodHeroImg" src="assets/fino-kit.jpg" alt="" style="--i:0" />
 
   <div class="prod-top">
-    <h1 class="prod-title display reveal" id="prodTitle" style="animation-delay:0.5s">Fino<br>Premium<br>Touch</h1>
-    <div class="prod-desc reveal" style="animation-delay:0.9s">
+    <h1 class="prod-title display" id="prodTitle">Fino<br>Premium<br>Touch</h1>
+    <div class="prod-desc reveal" style="--i:2">
       <p id="prodDesc">Máscara capilar de luxo com Royal Jelly, PCA e Lipjuia EX — repara fios danificados, secos ou coloridos com 7 essências que protegem contra raios UV.</p>
       <span class="imdb-score">★ 4.8</span>
     </div>
   </div>
 
-  <div class="icon-rail reveal" style="animation-delay:1.3s">
-    <button title="Favoritar">♡</button>
-    <button title="Compartilhar">↗</button>
-    <button title="Carrinho">🛒</button>
+  <div class="icon-rail reveal" style="--i:3">
+    <button id="favBtn" title="Favoritar" aria-label="Favoritar" aria-pressed="false">♡</button>
+    <button id="shareBtn" title="Compartilhar" aria-label="Compartilhar">↗</button>
+    <button id="railCartBtn" title="Carrinho" aria-label="Adicionar ao carrinho">🛒</button>
   </div>
 
-  <button class="play-btn reveal" id="playBtn" style="animation-delay:1.1s">▶</button>
+  <button class="play-btn reveal" id="playBtn" style="--i:2.5" aria-label="Ver especificações">▶</button>
 
-  <div class="spec-pills reveal" id="specPills" style="animation-delay:1.5s"></div>
+  <div class="spec-pills reveal" id="specPills" style="--i:3.5"></div>
 
-  <div class="brand-reveal reveal" style="animation-delay:1.9s">
+  <div class="brand-reveal reveal" style="--i:4.5">
     <img src="assets/logo.jpg" alt="" />
     <span>Japan <b>Express</b></span>
   </div>
 </section>
 
 <!-- Nav pill flutuante -->
-<div class="pill-nav">
+<div class="pill-nav" id="pillNav">
+  <span class="pill-indicator" id="pillIndicator"></span>
   <span class="brand">JE</span>
   <button class="on">Shampoo</button>
   <button>Skincare</button>
   <button>Doces</button>
   <button>Acessórios</button>
   <span class="icon-btn">🔍</span>
-  <span class="icon-btn">🛒</span>
+  <span class="icon-btn" id="navCart">🛒<span class="cart-badge" id="cartBadge">0</span></span>
 </div>
 
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
 <!-- Modal de especificações -->
-<div class="spec-modal" id="specModal">
+<div class="spec-modal" id="specModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" aria-hidden="true">
   <div class="spec-card" style="position:relative">
-    <button class="close" id="closeModal">✕</button>
+    <button class="close" id="closeModal" aria-label="Fechar">✕</button>
     <img id="modalImg" src="assets/fino-kit.jpg" alt="" />
     <div class="body">
       <h3 id="modalTitle">Fino Premium Touch Hair Mask</h3>
       <p id="modalDesc">Máscara capilar de luxo com Royal Jelly, PCA e Lipjuia EX.</p>
-      <p style="font-size:12px;color:#9a8a86;margin-bottom:6px">Peso: <b style="color:#f5c8dc">230g</b> &nbsp;·&nbsp; Origem: <b style="color:#f5c8dc">Japão</b></p>
+      <p style="font-size:12px;color:#9a8a86;margin-bottom:6px">Peso: <b style="color:#f5c8dc" id="modalWeight">230g</b> &nbsp;·&nbsp; Origem: <b style="color:#f5c8dc">Japão</b></p>
       <div style="display:flex;align-items:center;gap:14px;margin-top:18px">
         <span style="font-size:22px;font-weight:700" id="modalPrice">R$ 50</span>
-        <button class="buy">Adicionar ao Carrinho</button>
+        <button class="buy" id="buyBtn">Adicionar ao Carrinho</button>
       </div>
     </div>
   </div>
@@ -297,75 +446,292 @@
     { img: 'assets/honey-pixie-oil.jpg', name: '&honey Pixie Oil', desc: 'Óleo leve para cabelos finos, sem peso, com aroma floral de mel.', price: 'R$ 109', weight: '80ml' },
   ];
 
-  const strip = document.getElementById('posterStrip');
+  const $ = (id) => document.getElementById(id);
+  const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const finePointer = matchMedia('(hover: hover) and (pointer: fine)').matches;
+  const prodView = $('view-prod');
+  const catView = $('view-cat');
+  const heroImg = $('prodHeroImg');
+
+  let toastTimer;
+  function toast(msg) {
+    const t = $('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove('show'), 2200);
+  }
+
+  const strip = $('posterStrip');
   PRODUCTS.forEach((p, i) => {
     const el = document.createElement('div');
     el.className = 'poster';
-    el.innerHTML = `<img src="${p.img}" alt="${p.name}" /><span class="price-tag">${p.price}</span>`;
-    el.addEventListener('click', () => openProduct(p));
+    el.tabIndex = 0;
+    el.setAttribute('role', 'button');
+    el.setAttribute('aria-label', `${p.name} — ${p.price}`);
+    el.style.setProperty('--i', i);
+    const img = document.createElement('img');
+    img.src = p.img; img.alt = p.name;
+    const tag = document.createElement('span');
+    tag.className = 'price-tag'; tag.textContent = p.price;
+    el.append(img, tag);
+    el.addEventListener('click', () => openProduct(p, img));
+    el.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openProduct(p, img); } });
+    if (finePointer && !reducedMotion) attachTilt(el);
     strip.appendChild(el);
   });
 
-  const specPills = document.getElementById('specPills');
-  function renderPills(p) {
-    specPills.innerHTML = `
-      <span class="spec-pill">Origem <b>Japão</b></span>
-      <span class="spec-pill">Peso <b>${p.weight}</b></span>
-      <span class="spec-pill">Entrega <b>7–14 dias</b></span>
-      <span class="spec-pill">Preço <b>${p.price}</b></span>
-    `;
+  // Inclinação 3D + reflexo seguindo o cursor
+  function attachTilt(el) {
+    el.addEventListener('pointermove', (e) => {
+      const r = el.getBoundingClientRect();
+      const x = (e.clientX - r.left) / r.width, y = (e.clientY - r.top) / r.height;
+      el.style.setProperty('--ry', `${(x - 0.5) * 14}deg`);
+      el.style.setProperty('--rx', `${(0.5 - y) * 14}deg`);
+      el.style.setProperty('--gx', `${x * 100}%`);
+      el.style.setProperty('--gy', `${y * 100}%`);
+    });
+    el.addEventListener('pointerleave', () => {
+      el.style.setProperty('--rx', '0deg');
+      el.style.setProperty('--ry', '0deg');
+    });
   }
 
+  const specPills = $('specPills');
+  function renderPills(p) {
+    const rows = [['Origem', 'Japão'], ['Peso', p.weight], ['Entrega', '7–14 dias'], ['Preço', p.price]];
+    specPills.replaceChildren(...rows.map(([k, v]) => {
+      const s = document.createElement('span');
+      s.className = 'spec-pill';
+      const b = document.createElement('b');
+      b.textContent = v;
+      s.append(`${k} `, b);
+      return s;
+    }));
+  }
+
+  const favorites = new Set();
   let current = PRODUCTS[1];
   function setHero(p) {
     current = p;
-    document.getElementById('prodHeroImg').src = p.img;
-    document.getElementById('prodTitle').innerHTML = p.name.split(' ').slice(0, 3).join('<br>');
-    document.getElementById('prodDesc').textContent = p.desc;
+    heroImg.src = p.img;
+    // Mesmas 3 primeiras palavras em linhas; cada linha é mascarada para a animação
+    $('prodTitle').replaceChildren(...p.name.split(' ').slice(0, 3).map((word, l) => {
+      const line = document.createElement('span');
+      line.className = 'line';
+      const inner = document.createElement('span');
+      inner.style.setProperty('--l', l);
+      inner.textContent = word;
+      line.append(inner);
+      return line;
+    }));
+    $('prodDesc').textContent = p.desc;
     renderPills(p);
+    const fav = favorites.has(p.name);
+    $('favBtn').setAttribute('aria-pressed', String(fav));
+    $('favBtn').textContent = fav ? '♥' : '♡';
   }
   setHero(current);
 
-  function openProduct(p) {
-    setHero(p);
-    switchView('prod');
+  // Reinicia a cascata. `swap` = troca de produto: cascata curta e a foto não
+  // some (ela chega pela transição de elemento compartilhado).
+  function restartReveal(swap) {
+    document.body.classList.remove('intro-playing');
+    prodView.classList.toggle('swap', swap);
+    void document.body.offsetWidth; // força reflow para reiniciar as animações CSS
+    document.body.classList.add('intro-playing');
   }
 
-  const modal = document.getElementById('specModal');
-  document.getElementById('playBtn').addEventListener('click', () => {
-    document.getElementById('modalImg').src = current.img;
-    document.getElementById('modalTitle').textContent = current.name;
-    document.getElementById('modalDesc').textContent = current.desc;
-    document.getElementById('modalPrice').textContent = current.price;
-    modal.classList.add('open');
+  function openProduct(p, fromImg) {
+    stopIntroTimer();
+    const apply = () => { setHero(p); switchView('prod'); restartReveal(true); };
+    if (!document.startViewTransition || reducedMotion || !fromImg) { apply(); return; }
+    fromImg.style.viewTransitionName = 'hero-img';
+    document.documentElement.classList.add('vt-running');
+    const vt = document.startViewTransition(() => {
+      fromImg.style.viewTransitionName = '';
+      heroImg.style.viewTransitionName = 'hero-img';
+      apply();
+    });
+    vt.finished.finally(() => {
+      heroImg.style.viewTransitionName = '';
+      document.documentElement.classList.remove('vt-running');
+    });
+  }
+
+  // Paralaxe seguindo o cursor (rAF para não recalcular a cada evento)
+  if (finePointer && !reducedMotion) {
+    let raf = 0, mx = 0, my = 0;
+    prodView.addEventListener('pointermove', (e) => {
+      mx = (e.clientX / innerWidth) * 2 - 1;
+      my = (e.clientY / innerHeight) * 2 - 1;
+      if (!raf) raf = requestAnimationFrame(() => {
+        raf = 0;
+        prodView.style.setProperty('--mx', mx.toFixed(3));
+        prodView.style.setProperty('--my', my.toFixed(3));
+      });
+    });
+    prodView.addEventListener('pointerleave', () => {
+      prodView.style.setProperty('--mx', 0);
+      prodView.style.setProperty('--my', 0);
+    });
+    catView.addEventListener('pointermove', (e) => {
+      catView.style.setProperty('--px', ((e.clientX / innerWidth) * 2 - 1).toFixed(3));
+    });
+  }
+
+  // ---- Favoritar / compartilhar / carrinho ---------------------------------
+  function burst(host) {
+    if (reducedMotion) return;
+    for (let k = 0; k < 8; k++) {
+      const dot = document.createElement('span');
+      dot.className = 'burst';
+      host.append(dot);
+      const a = (k / 8) * Math.PI * 2;
+      dot.animate(
+        [{ transform: 'translate(0,0) scale(1)', opacity: 1 },
+         { transform: `translate(${Math.cos(a) * 30}px, ${Math.sin(a) * 30}px) scale(0.2)`, opacity: 0 }],
+        { duration: 600, easing: 'cubic-bezier(.16,1,.3,1)' }
+      ).finished.then(() => dot.remove());
+    }
+  }
+  $('favBtn').addEventListener('click', (e) => {
+    const btn = e.currentTarget;
+    const on = !favorites.has(current.name);
+    if (on) favorites.add(current.name); else favorites.delete(current.name);
+    btn.setAttribute('aria-pressed', String(on));
+    btn.textContent = on ? '♥' : '♡';
+    if (on) {
+      burst(btn);
+      if (!reducedMotion) btn.animate([{ scale: 1 }, { scale: 1.35 }, { scale: 1 }], { duration: 450, easing: 'cubic-bezier(.34,1.56,.64,1)' });
+    }
+    toast(on ? 'Adicionado aos favoritos' : 'Removido dos favoritos');
   });
-  document.getElementById('closeModal').addEventListener('click', () => modal.classList.remove('open'));
-  modal.addEventListener('click', (e) => { if (e.target === modal) modal.classList.remove('open'); });
+
+  $('shareBtn').addEventListener('click', async () => {
+    const data = { title: current.name, text: `${current.name} — ${current.price}`, url: location.href };
+    try {
+      if (navigator.share) { await navigator.share(data); return; }
+      await navigator.clipboard.writeText(`${data.text} ${data.url}`);
+      toast('Link copiado');
+    } catch (err) {
+      if (err.name !== 'AbortError') toast('Não foi possível compartilhar');
+    }
+  });
+
+  let cartCount = 0;
+  function bumpCart() {
+    cartCount += 1;
+    const badge = $('cartBadge');
+    badge.textContent = cartCount;
+    badge.classList.add('has');
+    if (!reducedMotion) badge.animate([{ scale: 1 }, { scale: 1.6 }, { scale: 1 }], { duration: 450, easing: 'cubic-bezier(.34,1.56,.64,1)' });
+  }
+  // Miniatura "voa" em arco até o carrinho da nav e então incrementa o contador
+  function flyToCart(sourceImg) {
+    const from = sourceImg.getBoundingClientRect();
+    const to = $('navCart').getBoundingClientRect();
+    if (reducedMotion || !from.width) { bumpCart(); return; }
+    const clone = sourceImg.cloneNode();
+    clone.className = 'fly-clone';
+    clone.removeAttribute('id');
+    clone.removeAttribute('style');
+    Object.assign(clone.style, { left: `${from.left}px`, top: `${from.top}px`, width: `${from.width}px`, height: `${from.height}px` });
+    document.body.append(clone);
+    const dx = to.left + to.width / 2 - (from.left + from.width / 2);
+    const dy = to.top + to.height / 2 - (from.top + from.height / 2);
+    const s = 24 / Math.max(from.width, from.height);
+    clone.animate([
+      { transform: 'translate(0,0) scale(1)', opacity: 1 },
+      { transform: `translate(${dx * 0.5}px, ${dy * 0.5 - 140}px) scale(${(1 + s) / 2}) rotate(-8deg)`, opacity: 1, offset: 0.5 },
+      { transform: `translate(${dx}px, ${dy}px) scale(${s})`, opacity: 0.2 },
+    ], { duration: 850, easing: 'cubic-bezier(.5,0,.3,1)' }).finished.then(() => { clone.remove(); bumpCart(); });
+  }
+  function addToCart(sourceImg) {
+    flyToCart(sourceImg);
+    toast(`${current.name} adicionado ao carrinho`);
+  }
+  $('railCartBtn').addEventListener('click', () => addToCart(heroImg));
+
+  // ---- Modal de especificações ---------------------------------------------
+  const modal = $('specModal');
+  let lastFocus = null;
+  function openModal() {
+    stopIntroTimer();
+    $('modalImg').src = current.img;
+    $('modalTitle').textContent = current.name;
+    $('modalDesc').textContent = current.desc;
+    $('modalWeight').textContent = current.weight;
+    $('modalPrice').textContent = current.price;
+    lastFocus = document.activeElement;
+    modal.classList.add('open');
+    modal.setAttribute('aria-hidden', 'false');
+    $('closeModal').focus({ preventScroll: true });
+  }
+  function closeModal() {
+    if (!modal.classList.contains('open')) return;
+    modal.classList.remove('open');
+    modal.setAttribute('aria-hidden', 'true');
+    lastFocus?.focus({ preventScroll: true });
+  }
+  $('playBtn').addEventListener('click', openModal);
+  $('closeModal').addEventListener('click', closeModal);
+  modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal(); });
+  $('buyBtn').addEventListener('click', () => {
+    addToCart($('modalImg')); // mede a posição da foto antes de fechar
+    closeModal();
+  });
+
+  // ---- Nav pill: fundo do item ativo desliza ------------------------------
+  const pillNav = $('pillNav');
+  const indicator = $('pillIndicator');
+  function moveIndicator() {
+    const on = pillNav.querySelector('button.on');
+    indicator.style.left = `${on.offsetLeft}px`;
+    indicator.style.width = `${on.offsetWidth}px`;
+  }
+  pillNav.querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
+    pillNav.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
+    moveIndicator();
+  }));
+  addEventListener('resize', moveIndicator);
+  document.fonts.ready.then(moveIndicator);
+
   function switchView(name) {
     document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-    document.getElementById('view-' + name).classList.add('active');
+    $('view-' + name).classList.add('active');
     document.querySelectorAll('.view-switch button').forEach(b => b.classList.toggle('active', b.dataset.view === name));
   }
-  document.querySelectorAll('.view-switch button').forEach(b => b.addEventListener('click', () => { stopIntroTimer(); switchView(b.dataset.view); }));
+  document.querySelectorAll('.view-switch button[data-view]').forEach(b => b.addEventListener('click', () => { stopIntroTimer(); switchView(b.dataset.view); }));
 
   // ---- Sequência de introdução: hero colorido revela título/specs/marca em
   // cascata e, depois de um tempo parado, esmaece sozinho para o catálogo
   // em preto-e-branco (mesma lógica do vídeo de referência: cor -> detalhes
-  // -> P&B). Qualquer clique manual nas abas cancela o timer automático.
+  // -> P&B). Qualquer interação do usuário (clique, tecla, rolagem, toque)
+  // cancela o timer automático; a barra no topo mostra o tempo restante.
   const INTRO_HOLD_MS = 4200;
-  let introTimer;
+  const introBar = $('introBar');
+  introBar.style.setProperty('--hold', `${INTRO_HOLD_MS}ms`);
+  let introTimer = 0;
   function playIntro() {
-    document.body.classList.remove('intro-playing');
-    // força reflow para reiniciar as animações CSS mesmo se já tocaram
-    void document.body.offsetWidth;
-    document.body.classList.add('intro-playing');
+    restartReveal(false);
     switchView('prod');
     clearTimeout(introTimer);
-    introTimer = setTimeout(() => switchView('cat'), INTRO_HOLD_MS);
+    introBar.classList.remove('run');
+    void introBar.offsetWidth;
+    introBar.classList.add('run');
+    introTimer = setTimeout(() => { introTimer = 0; introBar.classList.remove('run'); switchView('cat'); }, INTRO_HOLD_MS);
   }
-  function stopIntroTimer() { clearTimeout(introTimer); }
+  function stopIntroTimer() {
+    clearTimeout(introTimer);
+    introTimer = 0;
+    introBar.classList.remove('run');
+  }
+  ['pointerdown', 'keydown', 'wheel', 'touchstart'].forEach(type =>
+    addEventListener(type, (e) => { if (introTimer && !e.target.closest?.('#replayBtn')) stopIntroTimer(); }, { passive: true }));
 
-  document.getElementById('replayBtn').addEventListener('click', playIntro);
+  $('replayBtn').addEventListener('click', playIntro);
   playIntro();
 </script>
 </body>
