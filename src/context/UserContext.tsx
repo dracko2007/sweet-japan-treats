@@ -4,6 +4,7 @@ import { firebaseSyncService } from '@/services/firebaseSyncService';
 import type { OrderPageCursor, SocialProvider } from '@/services/firebaseSyncService';
 import { firebaseConfigReady, allowLocalOnly, auth } from '@/config/firebase';
 import { purgeUserData, SESSION_END_EVENT, storedSessionUserId } from '@/utils/localData';
+import { wishlistService } from '@/services/wishlistService';
 import { signInWithCustomToken, signInWithEmailAndPassword } from 'firebase/auth';
 import type { ConfirmationResult, RecaptchaVerifier } from 'firebase/auth';
 import { ADMIN_EMAIL, ADMIN_USER_ID, isAdminEmail } from '@/config/admin';
@@ -696,6 +697,15 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       safeStorage.removeItem('user');
     }
   }, [user]);
+
+  // Favoritos ficam no Firestore; ao abrir a sessão (e quando o Auth fica
+  // pronto depois de restaurar do storage) trazemos a cópia da nuvem.
+  useEffect(() => {
+    if (!user?.id || !authReady) return;
+    wishlistService.syncFromCloud(user.id, user.email)
+      .catch((error) => devWarn('[wishlist] falha ao carregar da nuvem:', error));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, authReady]);
 
   // Save user-specific coupons to safeStorage
   useEffect(() => {

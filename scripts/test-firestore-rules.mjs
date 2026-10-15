@@ -10,6 +10,7 @@ import {
   doc,
   getDoc,
   getDocs,
+  serverTimestamp,
   setDoc,
   updateDoc,
 } from 'firebase/firestore';
@@ -314,6 +315,16 @@ try {
   await fails(setDoc(doc(userDb, 'promo_state', 'homePromotion'), { holds: [] }), 'user cannot write promo_state');
   await fails(getDoc(doc(anonymousDb, 'promo_state', 'homePromotion')), 'anonymous cannot read promo_state');
   await fails(setDoc(doc(anonymousDb, 'promo_state', 'homePromotion'), { holds: [] }), 'anonymous cannot write promo_state');
+
+  const favorito = { productId: 'p1', productName: 'Pocky', productImage: '', productPrice: 300, addedAt: '2026-10-16T00:00:00.000Z' };
+  await succeeds(setDoc(doc(userDb, 'wishlists', 'u1'), { items: [favorito], updatedAt: serverTimestamp() }), 'owner saves wishlist');
+  await succeeds(getDoc(doc(userDb, 'wishlists', 'u1')), 'owner reads wishlist');
+  await fails(getDoc(doc(otherDb, 'wishlists', 'u1')), 'other user cannot read wishlist');
+  await fails(setDoc(doc(otherDb, 'wishlists', 'u1'), { items: [], updatedAt: serverTimestamp() }), 'other user cannot overwrite wishlist');
+  await fails(getDoc(doc(anonymousDb, 'wishlists', 'u1')), 'anonymous cannot read wishlist');
+  await fails(setDoc(doc(userDb, 'wishlists', 'u1'), { items: [], updatedAt: serverTimestamp(), points: 999 }), 'wishlist rejects extra fields');
+  await fails(setDoc(doc(userDb, 'wishlists', 'u1'), { items: Array.from({ length: 201 }, () => favorito), updatedAt: serverTimestamp() }), 'wishlist capped at 200 items');
+  await fails(setDoc(doc(userDb, 'wishlists', 'u1'), { items: [], updatedAt: new Date('2020-01-01') }), 'wishlist requires server timestamp');
   console.log(`Firestore rules preflight passed: ${checks} checks`);
 } finally {
   await environment.cleanup();

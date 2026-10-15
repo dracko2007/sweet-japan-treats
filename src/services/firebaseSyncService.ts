@@ -597,7 +597,10 @@ export const firebaseSyncService = {
       const q = query(usersRef, where('email', '==', email));
       const snap = await getDocs(q);
       if (snap.empty) return true; // nada no Firestore, ok
-      await Promise.all(snap.docs.map((d) => deleteDoc(doc(db, 'users', d.id))));
+      await Promise.all(snap.docs.flatMap((d) => [
+        deleteDoc(doc(db, 'users', d.id)),
+        deleteDoc(doc(db, 'wishlists', d.id)),
+      ]));
       devLog('🗑️ [FIREBASE] User deleted:', email);
       return true;
     } catch (error) {
@@ -634,8 +637,14 @@ export const firebaseSyncService = {
     try {
       await ensureAdminAuth();
       ensureFirebaseReady();
-      const snap = await getDocs(collection(db, 'users'));
-      await Promise.all(snap.docs.map((d) => deleteDoc(doc(db, 'users', d.id))));
+      const [snap, wishlists] = await Promise.all([
+        getDocs(collection(db, 'users')),
+        getDocs(collection(db, 'wishlists')),
+      ]);
+      await Promise.all([
+        ...snap.docs.map((d) => deleteDoc(doc(db, 'users', d.id))),
+        ...wishlists.docs.map((d) => deleteDoc(doc(db, 'wishlists', d.id))),
+      ]);
       devLog('🗑️ [FIREBASE] All users deleted:', snap.size);
       return true;
     } catch (error) {

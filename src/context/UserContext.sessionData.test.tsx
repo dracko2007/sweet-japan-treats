@@ -62,7 +62,7 @@ const DADOS_DA_CONTA = [
   'sakura_cart',
   'orders_cli-1',
   'coupons_cli-1',
-  'japan-express-wishlist_cliente@example.com',
+  'japan-express-wishlist_cli-1',
   'japan-express-users',
   'kimiclaw_messages_v1',
   'sandbox_recent_searches',
@@ -125,6 +125,6 @@ describe('dados locais da conta', () => {
     act(() => { contexto.updateProfile({ name: 'Novo Nome' }); });
 
     expect(localStorage.getItem('orders_cli-1')).toBe('[]');
-    expect(localStorage.getItem('japan-express-wishlist_cliente@example.com')).toBe('[]');
+    expect(localStorage.getItem('japan-express-wishlist_cli-1')).toBe('[]');
   });
 });

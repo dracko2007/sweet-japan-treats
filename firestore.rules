@@ -167,6 +167,17 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // Lista de desejos: um doc por conta, só o dono lê e grava. O teto de 200
+    // itens acompanha MAX_ITEMS do wishlistService.
+    match /wishlists/{userId} {
+      allow read, delete: if isAdmin() || owns(userId);
+      allow create, update: if owns(userId)
+        && request.resource.data.keys().hasOnly(['items', 'updatedAt'])
+        && request.resource.data.items is list
+        && request.resource.data.items.size() <= 200
+        && request.resource.data.updatedAt == request.time;
+    }
+
     match /orders/{orderId} {
       allow read: if isAdmin()
         || (signedIn() && resource.data.get('userId', '') == request.auth.uid)

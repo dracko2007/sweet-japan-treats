@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Heart, Plus, Star } from 'lucide-react';
 import { Product } from '@/types';
@@ -13,6 +13,7 @@ import { convertYen as fxConvert } from '@/services/fxService';
 import { productEnglishName } from '@/utils/productName';
 import { cdnVideo } from '@/services/cloudinaryService';
 import { wishlistService } from '@/services/wishlistService';
+import { useWishlist } from '@/hooks/useWishlist';
 
 interface CompactProductCardProps {
   product: Product;
@@ -31,12 +32,9 @@ const CompactProductCard: React.FC<CompactProductCardProps> = ({ product }) => {
   const { user } = useUser();
   const { toast } = useToast();
   const { selectedCountry } = useLanguage();
-  const [isFavorite, setIsFavorite] = useState(false);
+  const wishlist = useWishlist(user?.id);
+  const isFavorite = wishlist.some((w) => w.productId === product.id);
   const [isHovered, setIsHovered] = useState(false);
-
-  useEffect(() => {
-    if (user?.email) setIsFavorite(wishlistService.isInWishlist(user.email, product.id));
-  }, [user, product.id]);
 
   const variants = getVariants(product);
   const firstVariant = [...variants].sort((a, b) => a.price - b.price)[0];
@@ -54,21 +52,19 @@ const CompactProductCard: React.FC<CompactProductCardProps> = ({ product }) => {
 
   const handleToggleFavorite = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!user?.email) {
+    if (!user) {
       toast({ title: 'Entre para favoritar', variant: 'destructive' });
       return;
     }
     if (isFavorite) {
-      wishlistService.removeFromWishlist(user.email, product.id);
-      setIsFavorite(false);
+      wishlistService.removeFromWishlist(user.id, product.id);
     } else {
-      wishlistService.addToWishlist(user.email, {
+      wishlistService.addToWishlist(user.id, {
         productId: product.id,
         productName: name,
         productImage: product.image,
         productPrice: product.prices.small,
       });
-      setIsFavorite(true);
     }
   };
 

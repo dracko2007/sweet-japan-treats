@@ -1,11 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Heart, ShoppingCart, Trash2, ArrowLeft } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { useUser } from '@/context/UserContext';
 import { useCart } from '@/context/CartContext';
-import { wishlistService, WishlistItem } from '@/services/wishlistService';
+import { wishlistService } from '@/services/wishlistService';
+import { useWishlist } from '@/hooks/useWishlist';
 import { useProducts } from '@/context/ProductsContext';
 import { useToast } from '@/hooks/use-toast';
 import { useConfirm } from '@/components/ConfirmDialog';
@@ -22,37 +23,19 @@ const Wishlist: React.FC = () => {
   const { selectedCountry, t } = useLanguage();
   const { toast } = useToast();
   const confirm = useConfirm();
-  const [wishlistItems, setWishlistItems] = useState<WishlistItem[]>([]);
+  const wishlistItems = useWishlist(user?.id);
 
   useEffect(() => {
-    if (!authReady) return;
-    if (!isAuthenticated) {
-      navigate('/cadastro');
-      return;
-    }
-
-    loadWishlist();
-  }, [isAuthenticated, authReady, navigate, user]);
-
-  const loadWishlist = () => {
-    if (user?.email) {
-      const items = wishlistService.getWishlist(user.email);
-      setWishlistItems(items);
-    }
-  };
+    if (authReady && !isAuthenticated) navigate('/cadastro');
+  }, [isAuthenticated, authReady, navigate]);
 
   const handleRemove = (productId: string) => {
-    if (!user?.email) return;
-
-    const success = wishlistService.removeFromWishlist(user.email, productId);
-    
-    if (success) {
-      loadWishlist();
-      toast({
-        title: "Removido dos favoritos",
-        description: "Produto removido da sua lista de desejos",
-      });
-    }
+    if (!user) return;
+    wishlistService.removeFromWishlist(user.id, productId);
+    toast({
+      title: "Removido dos favoritos",
+      description: "Produto removido da sua lista de desejos",
+    });
   };
 
   const handleAddToCart = (productId: string) => {
@@ -68,21 +51,18 @@ const Wishlist: React.FC = () => {
   };
 
   const handleClearAll = async () => {
-    if (!user?.email) return;
-    const email = user.email;
+    if (!user) return;
+    const userId = user.id;
 
     const ok = await confirm({
       title: 'Limpar a lista de desejos?',
       description: 'Todos os produtos serão removidos da sua lista de desejos.',
       destructive: true,
       confirmLabel: 'Limpar tudo',
-      onConfirm: () => {
-        if (!wishlistService.clearWishlist(email)) throw new Error('Não foi possível limpar a lista.');
-      },
+      onConfirm: () => wishlistService.clearWishlist(userId),
     });
     if (!ok) return;
 
-    loadWishlist();
     toast({
       title: "Lista limpa!",
       description: "Todos os produtos foram removidos",

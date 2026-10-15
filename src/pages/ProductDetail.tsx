@@ -9,6 +9,7 @@ import { useProducts } from '@/context/ProductsContext';
 import { useCart, getMaxQty } from '@/context/CartContext';
 import { useUser } from '@/context/UserContext';
 import { wishlistService } from '@/services/wishlistService';
+import { useWishlist } from '@/hooks/useWishlist';
 import { reviewService } from '@/services/reviewService';
 import type { ProductRating } from '@/types/review';
 import { registrarEvento } from '@/services/eventosService';
@@ -70,9 +71,8 @@ const ProductDetail: React.FC = () => {
   const selectedVariant = productVariants.find((v) => v.id === selectedSize) || productVariants[0];
   const [quantity, setQuantity] = useState(1);
   const [descExpanded, setDescExpanded] = useState(false);
-  const [isFavorite, setIsFavorite] = useState(
-    user?.email ? wishlistService.isInWishlist(user.email, id || '') : false
-  );
+  const wishlist = useWishlist(user?.id);
+  const isFavorite = wishlist.some((w) => w.productId === id);
 
   // Rating real vem do Firestore (coleção `reviews`) — async, então carrega
   // via efeito em vez de leitura síncrona no corpo do componente.
@@ -228,7 +228,7 @@ const ProductDetail: React.FC = () => {
   };
 
   const handleToggleFavorite = () => {
-    if (!user?.email) {
+    if (!user) {
       toast({
         title: t('productDetail.loginRequired'),
         description: t('productDetail.loginFavorite'),
@@ -238,20 +238,18 @@ const ProductDetail: React.FC = () => {
     }
 
     if (isFavorite) {
-      wishlistService.removeFromWishlist(user.email, product.id);
-      setIsFavorite(false);
+      wishlistService.removeFromWishlist(user.id, product.id);
       toast({
         title: t('productDetail.removedFavorite'),
         description: `${translatedName}`,
       });
     } else {
-      wishlistService.addToWishlist(user.email, {
+      wishlistService.addToWishlist(user.id, {
         productId: product.id,
         productName: translatedName,
         productImage: product.image,
         productPrice: product.prices.small,
       });
-      setIsFavorite(true);
       toast({
         title: t('productDetail.addedFavorite'),
         description: translatedName,
