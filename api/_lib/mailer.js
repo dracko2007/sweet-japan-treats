@@ -1,7 +1,12 @@
 import { encodeEmail, unsubscribeToken } from './email-optout.js';
 import { escapeHtml, HttpError } from './http.js';
 
-export const MAIL_FROM = 'noreply@japanexpress-store.com';
+// Remetente padrão: subdomínio dedicado ao envio (`mail.`), com reputação
+// separada do domínio principal (que recebe e-mail pela Zoho). Endereço de
+// gente, não "no-reply" — o Resend e os provedores penalizam no-reply.
+export const MAIL_FROM = 'contato@mail.japanexpress-store.com';
+// Só a confirmação de cadastro sai daqui: é automática e ninguém responde.
+export const MAIL_FROM_NOREPLY = 'noreply@japanexpress-store.com';
 export const MAIL_REPLY_TO = 'contato@japanexpress-store.com';
 export const BRAND = 'Japan Express';
 
@@ -87,10 +92,10 @@ function htmlParaTexto(html) {
  * de quem envia em volume. `One-Click` promete que um POST na URL basta, sem
  * tela intermediaria: `api/unsubscribe` cumpre isso.
  */
-export async function sendMail({ to, subject, html, unsubscribe = '' }) {
+export async function sendMail({ to, subject, html, unsubscribe = '', from = MAIL_FROM }) {
   const chave = chaveResend();
   const corpo = {
-    from: `"${BRAND}" <${MAIL_FROM}>`,
+    from: `"${BRAND}" <${from}>`,
     reply_to: MAIL_REPLY_TO,
     to: [to],
     subject,

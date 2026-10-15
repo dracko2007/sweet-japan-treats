@@ -5,7 +5,7 @@ import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 
 const fetchMock = vi.fn();
 
-const { sendMail, unsubscribeUrl, wrapEmail, MAIL_FROM } = await import('./mailer.js');
+const { sendMail, unsubscribeUrl, wrapEmail, MAIL_FROM, MAIL_FROM_NOREPLY } = await import('./mailer.js');
 
 const CARTA = { to: 'cliente@exemplo.com', subject: 'Confirme seu e-mail', html: '<p>oi</p>' };
 
@@ -38,6 +38,13 @@ describe('sendMail via API do Resend', () => {
     expect(opcoes.headers.Authorization).toBe('Bearer re_chave_de_teste');
     expect(enviado().from).toContain(MAIL_FROM);
     expect(enviado().to).toEqual(['cliente@exemplo.com']);
+  });
+
+  it('usa o remetente pedido quando informado (confirmação de cadastro sai do noreply)', async () => {
+    await sendMail({ ...CARTA, from: MAIL_FROM_NOREPLY });
+
+    expect(enviado().from).toBe(`"Japan Express" <${MAIL_FROM_NOREPLY}>`);
+    expect(enviado().reply_to).toBe('contato@japanexpress-store.com');
   });
 
   it('devolve o aceite e o id da mensagem quando a API aceita', async () => {

@@ -14,7 +14,7 @@ import {
   requiredText,
   sendError,
 } from './_lib/http.js';
-import { buildOrderEmail, sendMail, siteOrigin, unsubscribeUrl, wrapEmail } from './_lib/mailer.js';
+import { buildOrderEmail, MAIL_FROM_NOREPLY, sendMail, siteOrigin, unsubscribeUrl, wrapEmail } from './_lib/mailer.js';
 import { sendPush } from './_lib/push.js';
 import { enforceRateLimit } from './_lib/rate-limit.js';
 
@@ -28,6 +28,8 @@ async function accountTemplate(type, to, name) {
     });
     const safeLink = escapeHtml(link);
     return {
+      // Confirmação de cadastro: único e-mail que sai do noreply.
+      from: MAIL_FROM_NOREPLY,
       subject: 'Confirme seu e-mail - Japan Express',
       html: wrapEmail(`<p>${salutation}</p><p>Confirme que este e-mail pertence a voce:</p><p><a href="${safeLink}" style="display:inline-block;background:#ec4899;color:#fff;text-decoration:none;padding:12px 18px;border-radius:10px;font-weight:bold">Confirmar meu e-mail</a></p><p style="word-break:break-all">${safeLink}</p><p>Se voce nao criou esta conta, ignore esta mensagem.</p>`),
     };
