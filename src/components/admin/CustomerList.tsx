@@ -143,14 +143,15 @@ const CustomerList: React.FC = () => {
       return;
     }
     // Cada causa pede uma ação diferente do dono da loja — um "não deu" genérico
-    // deixaria ele sem saber se o problema é a própria sessão, permissão ou o SMTP.
+    // deixaria ele sem saber se o problema é a própria sessão, permissão ou o envio de e-mail.
     const motivos: Record<string, string> = {
       sem_sessao: 'Sua sessão do Firebase expirou. Saia e entre de novo no painel.',
       unauthorized: 'Sessão expirada ou sem token. Saia e entre de novo no painel.',
       forbidden: 'Esta conta não é reconhecida como admin pelo servidor. Confira ADMIN_EMAIL na Vercel e se o e-mail está verificado no Firebase Auth.',
-      email_not_configured: 'Falta a variável NOREPLY_EMAIL_PASSWORD na Vercel.',
-      email_auth_failed: 'O Gmail recusou a credencial de SMTP (535). Confira SMTP_USER (precisa ser conta real, não alias) e a App Password na Vercel.',
-      email_rejected_by_smtp: `O Gmail recusou o endereço ${email}. Confira se está escrito certo.`,
+      email_not_configured: 'Falta a variável RESEND_API_KEY na Vercel.',
+      email_auth_failed: 'O Resend recusou a chave de API ou o domínio do remetente não está verificado. Confira RESEND_API_KEY na Vercel e o domínio em resend.com/domains.',
+      email_rejected_by_smtp: `O Resend recusou o endereço ${email}. Confira se está escrito certo.`,
+      email_provider_error: 'O Resend não aceitou o envio. Veja os logs da função na Vercel.',
       rate_limited: 'Limite de envios por hora atingido. Tente daqui a pouco.',
       firebase_admin_not_configured: 'Firebase Admin sem credencial na Vercel (FIREBASE_SERVICE_ACCOUNT_JSON).',
     };

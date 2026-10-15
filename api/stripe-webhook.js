@@ -3,6 +3,7 @@ import { adminDb } from './_lib/firebase-admin.js';
 import { fulfillOrder, markFulfillmentReview } from './_lib/fulfillment.js';
 import { getHeader, HttpError, sendError } from './_lib/http.js';
 import { buildOrderEmail, sendMail } from './_lib/mailer.js';
+import { assinaturaResendValida } from './_lib/resend-webhook.js';
 
 // `api.bodyParser` é convenção do Next.js. Em função avulsa na Vercel ele é
 // IGNORADO: o corpo `application/json` chega já convertido em objeto, e o
@@ -83,10 +84,61 @@ async function notifyOrder(orderId) {
   }
 }
 
+/**
+ * Webhook do Resend (Svix). Eventos de bounce, reclamação e atraso chegam aqui.
+ * Hoje só confere a assinatura e registra o evento: nenhum estado é alterado.
+ */
+async function handleResendWebhook(req, res) {
+  const segredo = process.env.RESEND_WEBHOOK_SECRET;
+  if (!segredo) {
+    res.status(503).json({ error: 'resend_webhook_not_configured' });
+    return;
+  }
+
+  try {
+    const { bytes, autentico } = await rawBody(req);
+    const valida = assinaturaResendValida({
+      bytes,
+      id: getHeader(req, 'svix-id'),
+      timestamp: getHeader(req, 'svix-timestamp'),
+      assinatura: getHeader(req, 'svix-signature'),
+      segredo,
+      agoraSegundos: Math.floor(Date.now() / 1000),
+    });
+    if (!valida) {
+      // `autentico: false` = corpo reconstruído com JSON.stringify. A falha pode ser
+      // só diferença de bytes; o log indica qual dos dois casos aconteceu.
+      console.warn('[resend-webhook] assinatura inválida', { autentico });
+      res.status(401).json({ error: 'invalid_resend_signature' });
+      return;
+    }
+
+    let evento;
+    try {
+      evento = JSON.parse(bytes.toString('utf8'));
+    } catch {
+      res.status(400).json({ error: 'invalid_json' });
+      return;
+    }
+    console.log('[resend-webhook]', evento?.type, evento?.data?.email_id ?? '-');
+    res.status(200).json({ received: true });
+  } catch (error) {
+    console.error('[resend-webhook]', error instanceof Error ? error.message : error);
+    sendError(res, error);
+  }
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
     res.status(405).json({ error: 'method_not_allowed' });
+    return;
+  }
+
+  // Webhook do Resend roda nesta mesma função (o plano Hobby limita a 12 funções).
+  // Chega por /api/resend-webhook via rewrite em vercel.json.
+  if (req.query?.provider === 'resend') {
+    await handleResendWebhook(req, res);
     return;
   }
 

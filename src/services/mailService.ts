@@ -34,10 +34,10 @@ async function sendDetailed(to: string, type: AccountMailType, name?: string): P
   // Códigos que o servidor pode devolver:
   //   unauthorized          → token ausente ou expirado
   //   forbidden             → o token não é de um admin (ou e-mail não confere)
-  //   email_not_configured  → falta NOREPLY_EMAIL_PASSWORD na Vercel
-  //   email_auth_failed     → o Gmail recusou a credencial (535): SMTP_USER é
-  //                           alias, ou a App Password não é da conta que autentica
-  //   email_rejected_by_smtp→ o Gmail recusou o destinatário
+  //   email_not_configured  → falta RESEND_API_KEY na Vercel
+  //   email_auth_failed     → o Resend recusou a chave ou o domínio do remetente não está verificado
+  //   email_rejected_by_smtp→ o Resend recusou o destinatário
+  //   email_provider_error  → o Resend não aceitou o envio (ver logs da função)
   //   rate_limited          → estourou o limite por hora
   const corpo = await response.json().catch(() => ({}));
   const error = String(corpo?.error || 'sem_codigo');

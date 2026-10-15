@@ -47,6 +47,7 @@
     { "source": "/api/analytics", "destination": "/api/public-forms?action=analytics" },
     { "source": "/api/unsubscribe", "destination": "/api/public-forms?action=unsubscribe" },
     { "source": "/api/email-preference", "destination": "/api/notify?action=email-preference" },
+    { "source": "/api/resend-webhook", "destination": "/api/stripe-webhook?provider=resend" },
     {
       "source": "/((?!api/)(?!.*\\.[a-zA-Z0-9]+$).*)",
       "destination": "/index.html"

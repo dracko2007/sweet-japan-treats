@@ -417,10 +417,9 @@ const Admin: React.FC = () => {
       let emailResult = false;
       let whatsappResult = false;
       
-      // Try Resend first
-      if (import.meta.env.VITE_RESEND_API_KEY) {
-        devLog('📧 Testing Resend...');
-        const testEmailHTML = `
+      // Resend via /api/send-email (servidor). A chave fica só na Vercel.
+      devLog('📧 Testing Resend...');
+      const testEmailHTML = `
           <!DOCTYPE html>
           <html>
             <head>
@@ -434,34 +433,14 @@ const Admin: React.FC = () => {
             </body>
           </html>
         `;
-        
-        emailResult = await emailService.sendOrderConfirmation({
-          to: ADMIN_EMAIL,
-          subject: '🧪 Test Email (Resend) - Japan Express',
-          html: testEmailHTML,
-          orderNumber: 'TEST-' + Date.now(),
-          customerName: 'Test User'
-        });
-      } else {
-        // Try EmailJS
-        devLog('📧 Testing EmailJS...');
-        emailResult = await emailServiceSimple.sendOrderConfirmation({
-          formData: {
-            name: 'Test User',
-            email: ADMIN_EMAIL,
-            phone: COMPANY_PROFILE.whatsapp.domestic,
-            postalCode: COMPANY_PROFILE.fulfillmentOrigin.postalCode,
-            prefecture: COMPANY_PROFILE.fulfillmentOrigin.prefecture,
-            city: COMPANY_PROFILE.fulfillmentOrigin.city,
-            address: COMPANY_PROFILE.fulfillmentOrigin.addressLine1,
-            building: ''
-          },
-          items: [],
-          totalPrice: 1000,
-          orderNumber: 'TEST-' + Date.now(),
-          paymentMethod: 'bank'
-        });
-      }
+
+      emailResult = await emailService.sendOrderConfirmation({
+        to: ADMIN_EMAIL,
+        subject: '🧪 Test Email (Resend) - Japan Express',
+        html: testEmailHTML,
+        orderNumber: 'TEST-' + Date.now(),
+        customerName: 'Test User'
+      });
       
       devLog('📧 Email test result:', emailResult);
       

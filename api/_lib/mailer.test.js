@@ -1,78 +1,104 @@
-// Contrato do envio de e-mail: nunca reportar sucesso sem entrega.
-//
-// O caso que motivou este arquivo: o SMTP aceita a conexão, recusa o
-// destinatário, e o `sendMail` do nodemailer resolve normalmente com o
-// endereço dentro de `rejected`. Sem checar isso, o endpoint respondia 200 e o
-// cadastro do cliente ficava travado esperando um e-mail que nunca saiu — sem
-// erro em lugar nenhum.
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+// Contrato do envio de e-mail pela API do Resend: nunca reportar sucesso sem o
+// aceite da API, e traduzir falhas de credencial e de destinatário em códigos
+// que o painel entende.
+import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 
-const sendMailMock = vi.fn();
-const transportesCriados = [];
-
-vi.mock('nodemailer', () => ({
-  default: {
-    createTransport: (opcoes) => {
-      transportesCriados.push(opcoes);
-      return { sendMail: sendMailMock };
-    },
-  },
-}));
+const fetchMock = vi.fn();
 
 const { sendMail, unsubscribeUrl, wrapEmail, MAIL_FROM } = await import('./mailer.js');
 
 const CARTA = { to: 'cliente@exemplo.com', subject: 'Confirme seu e-mail', html: '<p>oi</p>' };
 
-describe('sendMail', () => {
-  beforeEach(() => {
-    sendMailMock.mockReset();
-    process.env.NOREPLY_EMAIL_PASSWORD = 'senha-de-teste';
+const resposta = (status, corpo) => new Response(JSON.stringify(corpo), {
+  status,
+  headers: { 'Content-Type': 'application/json' },
+});
+
+const enviado = () => JSON.parse(fetchMock.mock.calls.at(-1)[1].body);
+
+beforeEach(() => {
+  fetchMock.mockReset().mockResolvedValue(resposta(200, { id: 're_123' }));
+  vi.stubGlobal('fetch', fetchMock);
+  process.env.RESEND_API_KEY = 're_chave_de_teste';
+  process.env.UNSUBSCRIBE_SECRET = 'segredo-de-teste';
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+  delete process.env.RESEND_API_KEY;
+});
+
+describe('sendMail via API do Resend', () => {
+  it('envia para a API do Resend com a chave e o remetente da loja', async () => {
+    await sendMail(CARTA);
+
+    const [url, opcoes] = fetchMock.mock.calls[0];
+    expect(url).toBe('https://api.resend.com/emails');
+    expect(opcoes.method).toBe('POST');
+    expect(opcoes.headers.Authorization).toBe('Bearer re_chave_de_teste');
+    expect(enviado().from).toContain(MAIL_FROM);
+    expect(enviado().to).toEqual(['cliente@exemplo.com']);
   });
 
-  it('devolve o resultado quando o destinatário é aceito', async () => {
-    sendMailMock.mockResolvedValue({ accepted: ['cliente@exemplo.com'], rejected: [], messageId: '<abc@mail>' });
-
+  it('devolve o aceite e o id da mensagem quando a API aceita', async () => {
     const r = await sendMail(CARTA);
 
     expect(r.accepted).toEqual(['cliente@exemplo.com']);
-    expect(r.messageId).toBe('<abc@mail>');
+    expect(r.rejected).toEqual([]);
+    expect(r.messageId).toBe('re_123');
   });
 
-  it('falha quando o SMTP recusa o destinatário', async () => {
-    sendMailMock.mockResolvedValue({ accepted: [], rejected: ['cliente@exemplo.com'], messageId: '<abc@mail>' });
+  it('falha sem chamar a API quando falta RESEND_API_KEY', async () => {
+    delete process.env.RESEND_API_KEY;
 
-    await expect(sendMail(CARTA)).rejects.toMatchObject({ code: 'email_rejected_by_smtp' });
+    await expect(sendMail(CARTA)).rejects.toMatchObject({ statusCode: 503, code: 'email_not_configured' });
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('falha quando ninguém é aceito, mesmo sem recusa explícita', async () => {
-    sendMailMock.mockResolvedValue({ accepted: [], rejected: [], messageId: '<abc@mail>' });
+  it('chave inválida ou domínio não verificado chega como email_auth_failed', async () => {
+    fetchMock.mockResolvedValue(resposta(403, { name: 'validation_error', message: 'The domain is not verified' }));
 
-    await expect(sendMail(CARTA)).rejects.toMatchObject({ code: 'email_rejected_by_smtp' });
+    await expect(sendMail(CARTA)).rejects.toMatchObject({ statusCode: 503, code: 'email_auth_failed' });
   });
 
-  it('falha claramente quando falta a credencial de SMTP', async () => {
-    delete process.env.NOREPLY_EMAIL_PASSWORD;
-    delete process.env.GMAIL_APP_PASSWORD;
+  it('chave recusada (401) também chega como email_auth_failed', async () => {
+    fetchMock.mockResolvedValue(resposta(401, { name: 'missing_api_key', message: 'Missing API key' }));
 
-    await expect(sendMail(CARTA)).rejects.toMatchObject({ code: 'email_not_configured' });
-    expect(sendMailMock).not.toHaveBeenCalled();
+    await expect(sendMail(CARTA)).rejects.toMatchObject({ code: 'email_auth_failed' });
+  });
+
+  it('destinatário recusado pela API (422) falha, não reporta sucesso', async () => {
+    fetchMock.mockResolvedValue(resposta(422, { name: 'validation_error', message: 'Invalid to field' }));
+
+    await expect(sendMail(CARTA)).rejects.toMatchObject({ statusCode: 502, code: 'email_rejected_by_smtp' });
+  });
+
+  it('resposta 200 sem id não é tratada como envio', async () => {
+    fetchMock.mockResolvedValue(resposta(200, {}));
+
+    await expect(sendMail(CARTA)).rejects.toMatchObject({ statusCode: 502, code: 'email_provider_error' });
+  });
+
+  it('falha de rede sobe como ele mesmo', async () => {
+    fetchMock.mockRejectedValue(new TypeError('fetch failed'));
+
+    await expect(sendMail(CARTA)).rejects.toThrow(/fetch failed/);
   });
 });
+
 describe('alternativa em texto puro', () => {
   beforeEach(() => {
-    sendMailMock.mockReset();
-    sendMailMock.mockResolvedValue({ accepted: ['cliente@exemplo.com'], rejected: [], messageId: '<x>' });
-    process.env.NOREPLY_EMAIL_PASSWORD = 'senha-de-teste';
+    fetchMock.mockResolvedValue(resposta(200, { id: 're_x' }));
   });
 
   it('acompanha o HTML em toda mensagem', async () => {
     await sendMail({ ...CARTA, html: '<p>Ola, <strong>Maria</strong>.</p>' });
 
-    const enviado = sendMailMock.mock.calls[0][0];
-    expect(enviado.text).toBeTruthy();
-    expect(enviado.html).toBeTruthy();
-    expect(enviado.text).not.toMatch(/<[a-z]/i);
-    expect(enviado.text).toContain('Ola, Maria.');
+    const { text, html } = enviado();
+    expect(text).toBeTruthy();
+    expect(html).toBeTruthy();
+    expect(text).not.toMatch(/<[a-z]/i);
+    expect(text).toContain('Ola, Maria.');
   });
 
   // Sem isto o e-mail de confirmação chega vazio para quem lê em texto puro:
@@ -81,7 +107,7 @@ describe('alternativa em texto puro', () => {
     const link = 'https://japanexpress-store.com/__/auth/action?mode=verifyEmail&oobCode=ABC123';
     await sendMail({ ...CARTA, html: `<p><a href="${link}">Confirmar meu e-mail</a></p>` });
 
-    const { text } = sendMailMock.mock.calls[0][0];
+    const { text } = enviado();
     expect(text).toContain(link);
     expect(text).toContain('Confirmar meu e-mail');
   });
@@ -95,9 +121,7 @@ describe('cancelamento de inscrição', () => {
   const ENDERECO = 'cliente@exemplo.com';
 
   beforeEach(() => {
-    sendMailMock.mockReset().mockResolvedValue({ accepted: [ENDERECO], rejected: [], messageId: '<x>' });
-    process.env.NOREPLY_EMAIL_PASSWORD = 'senha-de-teste';
-    process.env.UNSUBSCRIBE_SECRET = 'segredo-de-teste';
+    fetchMock.mockResolvedValue(resposta(200, { id: 're_x' }));
   });
 
   it('o link do rodapé chega inteiro, inclusive em texto puro', async () => {
@@ -105,7 +129,7 @@ describe('cancelamento de inscrição', () => {
 
     await sendMail({ ...CARTA, html: wrapEmail('<p>oferta</p>', { unsubscribeUrl: url }), unsubscribe: url });
 
-    const { html, text } = sendMailMock.mock.calls[0][0];
+    const { html, text } = enviado();
     expect(html).toContain(url.replace(/&/g, '&amp;'));
     expect(text).toContain('Cancelar inscricao');
     expect(text).toContain(url);
@@ -118,7 +142,7 @@ describe('cancelamento de inscrição', () => {
 
     await sendMail({ ...CARTA, html: '<p>oferta</p>', unsubscribe: url });
 
-    const { headers } = sendMailMock.mock.calls[0][0];
+    const { headers } = enviado();
     expect(headers['List-Unsubscribe']).toBe(`<${url}>`);
     expect(headers['List-Unsubscribe-Post']).toBe('List-Unsubscribe=One-Click');
   });
@@ -129,51 +153,8 @@ describe('cancelamento de inscrição', () => {
   it('e-mail transacional não ganha rodapé nem cabeçalho', async () => {
     await sendMail({ ...CARTA, html: wrapEmail('<p>Pedido recebido</p>') });
 
-    const enviado = sendMailMock.mock.calls[0][0];
-    expect(enviado.html).not.toMatch(/cancelar inscricao/i);
-    expect(enviado.headers).toBeUndefined();
-  });
-});
-
-// `noreply@` virou alias da conta principal no Workspace, e alias não autentica
-// no Gmail: só caixa real tem senha. O login estava fixo em `MAIL_FROM`, então
-// TODO envio passou a morrer em 535 — com "Enviar como" corretamente
-// configurado, porque isso governa o `From`, não a autenticação. Além disso o
-// EAUTH subia como erro desconhecido e o painel só dizia "internal_error".
-describe('login SMTP separado do remetente', () => {
-  beforeEach(() => {
-    sendMailMock.mockReset().mockResolvedValue({ accepted: ['cliente@exemplo.com'], rejected: [], messageId: '<x>' });
-    transportesCriados.length = 0;
-    process.env.NOREPLY_EMAIL_PASSWORD = 'senha-de-teste';
-    delete process.env.SMTP_USER;
-  });
-
-  it('autentica com SMTP_USER e mantém o remetente visível', async () => {
-    process.env.SMTP_USER = 'shiokawa@japanexpress-store.com';
-
-    await sendMail(CARTA);
-
-    expect(transportesCriados.at(-1).auth.user).toBe('shiokawa@japanexpress-store.com');
-    expect(sendMailMock.mock.calls.at(-1)[0].from).toContain(MAIL_FROM);
-  });
-
-  it('sem SMTP_USER, autentica no próprio remetente (instalação antiga)', async () => {
-    await sendMail(CARTA);
-
-    expect(transportesCriados.at(-1).auth.user).toBe(MAIL_FROM);
-  });
-
-  it('credencial recusada chega ao painel como email_auth_failed, não erro interno', async () => {
-    sendMailMock.mockRejectedValue(Object.assign(new Error('535-5.7.8 Username and Password not accepted'), {
-      code: 'EAUTH', responseCode: 535,
-    }));
-
-    await expect(sendMail(CARTA)).rejects.toMatchObject({ statusCode: 503, code: 'email_auth_failed' });
-  });
-
-  it('erro que não é de credencial continua subindo como ele mesmo', async () => {
-    sendMailMock.mockRejectedValue(Object.assign(new Error('sem rede'), { code: 'ECONNECTION' }));
-
-    await expect(sendMail(CARTA)).rejects.toThrow(/sem rede/);
+    const corpo = enviado();
+    expect(corpo.html).not.toMatch(/cancelar inscricao/i);
+    expect(corpo.headers).toBeUndefined();
   });
 });

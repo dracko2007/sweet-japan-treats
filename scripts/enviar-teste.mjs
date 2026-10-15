@@ -1,16 +1,19 @@
-// Envia UMA mensagem real pelo mesmo caminho da produção (`api/_lib/mailer.js`),
-// para conferir remetente, From visível e entrega depois de mexer em SMTP_USER
-// ou na App Password.
+// Envia UMA mensagem real pelo mesmo caminho da produção (`api/_lib/mailer.js`,
+// API do Resend), para conferir remetente, From visível e entrega depois de
+// mexer em RESEND_API_KEY ou no domínio verificado.
 //
 //   node scripts/enviar-teste.mjs destino@exemplo.com
 //
-// Carrega o .env manualmente (Vercel injeta em produção; aqui não há runtime).
-import { readFileSync } from 'node:fs';
+// Lê o .env local se existir (Vercel injeta em produção). Sem arquivo, usa as
+// variáveis já exportadas no shell, por exemplo RESEND_API_KEY.
+import { existsSync, readFileSync } from 'node:fs';
 
-const env = readFileSync(new URL('../.env', import.meta.url), 'utf8');
-for (const linha of env.split(/\r?\n/)) {
-  const m = linha.match(/^([A-Z0-9_]+)=(.*)$/);
-  if (m && !process.env[m[1]]) process.env[m[1]] = m[2].trim();
+const envUrl = new URL('../.env', import.meta.url);
+if (existsSync(envUrl)) {
+  for (const linha of readFileSync(envUrl, 'utf8').split(/\r?\n/)) {
+    const m = linha.match(/^([A-Z0-9_]+)=(.*)$/);
+    if (m && !process.env[m[1]]) process.env[m[1]] = m[2].trim();
+  }
 }
 
 const destino = process.argv[2];
@@ -21,7 +24,7 @@ if (!destino) {
 
 const { sendMail, MAIL_FROM, MAIL_REPLY_TO } = await import('../api/_lib/mailer.js');
 
-console.log(`login: ${process.env.SMTP_USER || MAIL_FROM} | From: ${MAIL_FROM} | Reply-To: ${MAIL_REPLY_TO}`);
+console.log(`From: ${MAIL_FROM} | Reply-To: ${MAIL_REPLY_TO}`);
 
 const agora = new Date().toISOString();
 try {
@@ -29,13 +32,13 @@ try {
     to: destino,
     subject: `Teste de envio da loja — ${agora}`,
     html: `<p>Mensagem de teste do <strong>Japan Express</strong>.</p>
-<p>Se você está lendo isso, o SMTP autenticou e entregou.</p>
+<p>Se você está lendo isso, o Resend aceitou e entregou.</p>
 <p>Confira no cabeçalho: o remetente precisa aparecer como <code>${MAIL_FROM}</code>.</p>
 <p>Enviado em ${agora}.</p>`,
   });
   console.log('ENVIADO:', JSON.stringify(r));
 } catch (erro) {
   console.log('FALHOU:', erro?.code || erro?.message, '| statusCode:', erro?.statusCode ?? '-');
-  console.log('  detalhe:', String(erro?.response || erro?.message || '').split('\n')[0]);
+  console.log('  detalhe:', String(erro?.message || '').split('\n')[0]);
   process.exitCode = 1;
 }
