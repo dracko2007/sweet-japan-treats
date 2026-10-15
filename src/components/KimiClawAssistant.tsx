@@ -8,6 +8,7 @@ import { useUser } from '@/context/UserContext';
 import { useProducts } from '@/context/ProductsContext';
 import { Product } from '@/types';
 import { safeStorage } from '@/utils/storage';
+import { SESSION_END_EVENT } from '@/utils/localData';
 import { formatPrice, getCurrencyByCountry } from '@/utils/currency';
 import { askQwen, qwenEnabled, QwenMsg, AdminCatalogItem } from '@/services/qwenService';
 import { productEnglishName } from '@/utils/productName';
@@ -158,6 +159,18 @@ const KimiClawAssistant: React.FC = () => {
       toast.info(language === 'ja' ? 'しばらく操作がなかったため、会話をリセットしました 💬' : 'Conversa reiniciada por inatividade 💬');
     }
   }, [t, language, isOpen]);
+
+  // Logout/troca de usuário: a conversa (pedidos, endereço citados) é do
+  // usuário anterior. Zera também o estado, senão o save abaixo regravaria tudo.
+  useEffect(() => {
+    const reset = () => {
+      setMessages([{ id: 'welcome', sender: 'kimi', text: t('kimiclaw.welcome'), timestamp: new Date() }]);
+      setRespondedOrders([]);
+      setShippingFlow('idle');
+    };
+    window.addEventListener(SESSION_END_EVENT, reset);
+    return () => window.removeEventListener(SESSION_END_EVENT, reset);
+  }, [t]);
 
   // Reinicia o timer a cada atividade: novas mensagens, IA digitando, abrir/fechar, digitar no input
   useEffect(() => {

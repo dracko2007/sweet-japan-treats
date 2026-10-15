@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react';
 import { CartItem, Product } from '@/types';
 import { safeStorage } from '@/utils/storage';
+import { SESSION_END_EVENT } from '@/utils/localData';
 import { effectiveYen } from '@/utils/pricing';
 import { trackAddToCart } from '@/lib/analytics';
 import { useProducts } from '@/context/ProductsContext';
@@ -187,8 +188,8 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Limpa o carrinho quando o usuário faz logout (evento disparado pelo UserContext)
   useEffect(() => {
     const onLogout = () => setRawItems([]);
-    window.addEventListener('japan-express:logout', onLogout);
-    return () => window.removeEventListener('japan-express:logout', onLogout);
+    window.addEventListener(SESSION_END_EVENT, onLogout);
+    return () => window.removeEventListener(SESSION_END_EVENT, onLogout);
   }, []);
 
   const totalItems = useMemo(

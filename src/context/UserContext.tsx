@@ -3,6 +3,7 @@ import { safeStorage } from '@/utils/storage';
 import { firebaseSyncService } from '@/services/firebaseSyncService';
 import type { OrderPageCursor, SocialProvider } from '@/services/firebaseSyncService';
 import { firebaseConfigReady, allowLocalOnly, auth } from '@/config/firebase';
+import { purgeUserData, SESSION_END_EVENT, storedSessionUserId } from '@/utils/localData';
 import { signInWithCustomToken, signInWithEmailAndPassword } from 'firebase/auth';
 import type { ConfirmationResult, RecaptchaVerifier } from 'firebase/auth';
 import { ADMIN_EMAIL, ADMIN_USER_ID, isAdminEmail } from '@/config/admin';
@@ -114,7 +115,7 @@ export interface Order {
   };
 }
 
-interface UserContextType {
+export interface UserContextType {
   user: UserProfile | null;
   isAuthenticated: boolean;
   authReady: boolean;        // true após o primeiro disparo do onAuthChange (sem flash de login)
@@ -216,9 +217,19 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     const { password: _pw, ...safe } = u;
     return safe as UserProfile;
   };
-
+  // Grava a sessão. Se o navegador guardava OUTRO usuário (troca de conta sem
+  // logout, login de admin por cima de cliente, outra aba), apaga antes todos
+  // os dados locais do anterior — carrinho, pedidos, cupons, favoritos etc.
+  const persistSessionUser = (u: UserProfile) => {
+    const previousId = storedSessionUserId();
+    if (previousId && previousId !== u.id) purgeUserData();
+    safeStorage.setItem('user', JSON.stringify(stripSensitive(u)));
+  };
 
   const clearCurrentSession = () => {
+    // Havia sessão gravada → logout ou sessão encerrada: sai tudo que é do
+    // usuário, menos fotos/catálogo e preferências do aparelho.
+    const hadSession = storedSessionUserId() !== null;
     setUser(null);
     setIsAuthenticated(false);
     setCoupons([]);
@@ -227,15 +238,20 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     setOrdersHasMore(false);
     setOrdersLoadingMore(false);
     setLoginAsState(null);
+    if (hadSession) {
+      purgeUserData();
+      return;
+    }
     safeStorage.removeItem('user');
     safeStorage.removeItem('loginAs');
-    // Limpa dados específicos do usuário — privacidade em computadores compartilhados.
-    // CartContext escuta o evento para limpar o estado React antes que o useEffect re-persista.
+    // Sem sessão gravada (ex.: conta não verificada barrada no login): só o que
+    // a visita anônima pode ter deixado. CartContext escuta o evento para limpar
+    // o estado React antes que o useEffect re-persista.
     safeStorage.removeItem('sakura_cart');
     safeStorage.removeItem('activeNegId');
     safeStorage.removeItem('redeem_points');
     safeStorage.removeItem('sakura_orders');
-    window.dispatchEvent(new Event('japan-express:logout'));
+    window.dispatchEvent(new Event(SESSION_END_EVENT));
   };
 
   // Helper functions for users database
@@ -600,7 +616,10 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
         
         if (firestoreUser) {
           // Merge Firestore data with local data (keep more complete profile)
-          const localUser = storedUser ? JSON.parse(safeStorage.getItem('user') || '{}') : {};
+          // Só aproveita o perfil local se for da MESMA conta: com outro usuário
+          // gravado, o endereço/telefone dele vazava para o perfil de quem entrou.
+          const storedProfile = JSON.parse(safeStorage.getItem('user') || '{}');
+          const localUser = storedProfile?.id === firebaseUser.uid ? storedProfile : {};
           const mergedUser: UserProfile = {
             ...localUser,
             ...firestoreUser,
@@ -632,7 +651,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
           setOrdersCursor(firestorePage.nextCursor);
           setOrdersHasMore(firestorePage.hasMore);
           
-          safeStorage.setItem('user', JSON.stringify(stripSensitive(mergedUser)));
+          persistSessionUser(mergedUser);
         }
       } else {
         devLog('🔥 [FIREBASE] Auth state changed - no Firebase user');
@@ -672,7 +691,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
   // Save current user session to safeStorage (sem senha)
   useEffect(() => {
     if (user) {
-      safeStorage.setItem('user', JSON.stringify(stripSensitive(user)));
+      persistSessionUser(user);
     } else {
       safeStorage.removeItem('user');
     }
@@ -747,7 +766,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       // `onAuthStateChanged` disparar, o guard do listener já encontra o admin
       // salvo e não sobrescreve a sessão com um perfil de cliente.
       const previousStoredUser = safeStorage.getItem('user');
-      safeStorage.setItem('user', JSON.stringify(stripSensitive(adminUser)));
+      persistSessionUser(adminUser);
 
       // O painel só funciona COM sessão do Firebase: pedidos, clientes,
       // negociações e todas as rotas /api exigem token de admin. Antes o
@@ -796,7 +815,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
         const userOrders = getUserOrders(foundUser.id, foundUser.email);
         setCoupons(userCoupons);
         setOrders(userOrders);
-        safeStorage.setItem('user', JSON.stringify(stripSensitive(foundUser)));
+        persistSessionUser(foundUser);
         return { success: true };
       }
       return { success: false, error: 'Email ou senha incorretos. Cadastre-se primeiro caso não tenha uma conta.' };
@@ -873,7 +892,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
         setOrdersCursor(firestorePage.nextCursor);
         setOrdersHasMore(firestorePage.hasMore);
         
-        safeStorage.setItem('user', JSON.stringify(stripSensitive(userData as UserProfile)));
+        persistSessionUser(userData as UserProfile);
 
         devLog('✅ User logged in successfully via Firebase:', { email: userData.email, id: userData.id });
         trackLogin('email');
@@ -1068,10 +1087,6 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     // Logout from Firebase Auth
     await firebaseSyncService.logoutUser();
     
-    // Referências de afiliado pertencem à sessão de navegação do usuário.
-    // Não podem reaplicar automaticamente um cupom depois do logout.
-    safeStorage.removeItem('affiliate_ref');
-    safeStorage.removeItem('affiliate_ref_product');
     clearCurrentSession();
     devLog('User logged out successfully');
   };
@@ -1119,7 +1134,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     setIsAuthenticated(true);
     setCoupons(resolveUserCoupons(userData as UserProfile));
     setOrders(getUserOrders((userData as UserProfile).id, email).map(fixTrackingUrl));
-    safeStorage.setItem('user', JSON.stringify(stripSensitive(userData as UserProfile)));
+    persistSessionUser(userData as UserProfile);
     return userData as UserProfile;
   };
 

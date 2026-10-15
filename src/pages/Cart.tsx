@@ -17,6 +17,7 @@ import { affiliateService, Affiliate } from '@/services/affiliateService';
 import { couponService as globalCouponService } from '@/services/couponService';
 import { promoCampaignService } from '@/services/promoCampaignService';
 import { safeStorage } from '@/utils/storage';
+import { SESSION_END_EVENT } from '@/utils/localData';
 import WelcomeCouponBanner from '@/components/WelcomeCouponBanner';
 import { taxDisclosure } from '../../shared/tax-disclosure.js';
 
@@ -151,8 +152,8 @@ const Cart: React.FC = () => {
       safeStorage.removeItem('affiliate_ref_product');
       setActiveCoupon((current) => current?.affiliateCode ? null : current);
     };
-    window.addEventListener('japan-express:logout', clearAffiliateCoupon);
-    return () => window.removeEventListener('japan-express:logout', clearAffiliateCoupon);
+    window.addEventListener(SESSION_END_EVENT, clearAffiliateCoupon);
+    return () => window.removeEventListener(SESSION_END_EVENT, clearAffiliateCoupon);
   }, []);
 
   // Produto do link da campanha (?add=ID): entra no carrinho sozinho. Sem isto o

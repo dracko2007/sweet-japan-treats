@@ -10,6 +10,7 @@ import type { Product } from '@/types';
 import { minEffectiveYen } from '@/utils/pricing';
 import { productEnglishName } from '@/utils/productName';
 import { safeStorage } from '@/utils/storage';
+import { SESSION_END_EVENT } from '@/utils/localData';
 import { cn } from '@/lib/utils';
 import { useEscape, useScrollLock } from './useScrollLock';
 import { usePrice } from './usePrice';
@@ -84,6 +85,12 @@ const SearchPalette: React.FC<Props> = ({ open, onClose, categories }) => {
   const [category, setCategory] = useState<string | null>(null);
   const [active, setActive] = useState(0);
   const [recent, setRecent] = useState<string[]>(loadRecent);
+  // Buscas recentes são do usuário: somem no logout/troca de conta.
+  useEffect(() => {
+    const reset = () => setRecent([]);
+    window.addEventListener(SESSION_END_EVENT, reset);
+    return () => window.removeEventListener(SESSION_END_EVENT, reset);
+  }, []);
 
   useScrollLock(open);
   useEscape(open, onClose);

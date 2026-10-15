@@ -54,17 +54,6 @@ export default defineConfig(({ mode }) => ({
               cacheableResponse: { statuses: [0, 200] },
             },
           },
-          // Firestore REST — NetworkFirst (tenta rede, fallback cache 1h)
-          {
-            urlPattern: /^https:\/\/firestore\.googleapis\.com\/.*/i,
-            handler: "NetworkFirst",
-            options: {
-              cacheName: "firestore-data",
-              networkTimeoutSeconds: 5,
-              expiration: { maxEntries: 100, maxAgeSeconds: 60 * 60 },
-              cacheableResponse: { statuses: [0, 200] },
-            },
-          },
           // Google Fonts — cache longo
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,

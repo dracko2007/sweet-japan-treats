@@ -2,13 +2,9 @@
 // Google OAuth: OAuth Client ID configured in Google Cloud Console with Vercel URIs
 import { initializeApp, type FirebaseApp } from 'firebase/app';
 import { getAuth, type Auth } from 'firebase/auth';
-import {
-  initializeFirestore,
-  persistentLocalCache,
-  persistentMultipleTabManager,
-  type Firestore,
-} from 'firebase/firestore';
+import { initializeFirestore, type Firestore } from 'firebase/firestore';
 import { getStorage, type FirebaseStorage } from 'firebase/storage';
+import { deleteLegacyFirestoreData } from '@/utils/localData';
 
 // Firebase Configuration
 const firebaseConfig = {
@@ -47,25 +43,14 @@ try {
   // `experimentalForceLongPolling`: onde o streaming funciona (Chrome, Android)
   // nada muda, então não se paga o preço do long-polling à toa.
   //
-  // `persistentLocalCache` guarda o catálogo em IndexedDB. O cache em
-  // localStorage do productService nunca chegava a ser escrito: o catálogo
-  // passa de 7 MB e o limite do localStorage é ~5 MB. Ou seja, TODA visita
-  // relia os ~265 documentos do Firestore do zero — no WebKit, os segundos de
-  // tela vazia. Com IndexedDB não há esse teto: a partir da segunda visita o
-  // catálogo vem do disco na hora e a rede só traz o que mudou.
-  //
-  // A persistência é tentada em separado: em aba privada do iOS o IndexedDB é
-  // bloqueado, e sem este fallback a exceção cairia no `catch` de baixo,
-  // deixaria `db = null` e derrubaria a loja inteira. Perder o cache é aceitável;
-  // perder o Firestore não é.
-  try {
-    db = initializeFirestore(app, {
-      experimentalAutoDetectLongPolling: true,
-      localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
-    });
-  } catch {
-    db = initializeFirestore(app, { experimentalAutoDetectLongPolling: true });
-  }
+  // Cache só em memória (padrão do SDK), de propósito. A persistência em
+  // IndexedDB guardava no disco os documentos de usuário e pedidos — e eles
+  // ficavam lá depois do logout. O catálogo, que era o motivo dela, já tem
+  // cache próprio com sincronização por delta (`jp_catalog`, ver catalogCache).
+  db = initializeFirestore(app, { experimentalAutoDetectLongPolling: true });
+  // Apaga o banco da persistência antiga, ainda com dados de quem usou a loja
+  // antes desta versão.
+  void deleteLegacyFirestoreData(firebaseConfig.projectId);
   storage = getStorage(app);
   if (import.meta.env.DEV) console.log('✅ Firebase initialized with project:', firebaseConfig.projectId);
 } catch (error) {

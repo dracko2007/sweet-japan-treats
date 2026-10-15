@@ -34,6 +34,7 @@ const CookiePolicy: React.FC = () => (
                   <li><code>cookie_consent</code> — registro da sua escolha de consentimento</li>
                   <li><code>pwa_install_dismissed</code> — se você fechou o banner de instalação do app</li>
                 </ul>
+                <p className="text-sm mt-2">Ao sair da conta ou entrar com outro usuário, apagamos deste navegador todos os dados da conta (perfil, carrinho, pedidos, cupons, favoritos, histórico). Ficam apenas as fotos e o catálogo dos produtos, e as preferências do aparelho (idioma, país e esta escolha de cookies).</p>
               </div>
 
               <div className="p-4 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-xl">
