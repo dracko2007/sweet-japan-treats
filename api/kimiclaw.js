@@ -1,10 +1,16 @@
-// Função serverless (Vercel) — "cérebro" do KimiClaw via GLM-5.2 (Z.ai).
-// Prioriza ZAI_API_KEY (GLM-5.2); se ausente, cai no Groq (GROQ_API_KEY) — retrocompat.
-// A chave fica SÓ no servidor e nunca vai pro navegador.
-// Sem nenhuma chave configurada, retorna 503 e o KimiClaw responde pelas regras (fallback).
+// Função serverless (Vercel) — "cérebro" do assistente virtual da loja.
+// Provedores (ver api/_lib/ai-providers.js): Groq (GROQ_API_KEY) como principal;
+// Google AI Studio/Gemini (GEMINI_API_KEY), OpenRouter (OPENROUTER_API_KEY) e
+// Z.ai/GLM (ZAI_API_KEY) como reserva, nessa ordem.
+// As chaves ficam SÓ no servidor e nunca vão pro navegador.
+// Sem nenhuma chave configurada, retorna 503 e o assistente responde pelas regras (fallback).
 import { cert, getApps, initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { superAdminEmail } from './_lib/auth.js';
+import { buildProviders, chatWithFallback } from './_lib/ai-providers.js';
+import { AGENT_TOOLS, LANGUAGE_NAMES, agentGroundingText, buildAgentPrompt, detectLanguage, sanitizeAgentMessages } from './_lib/assistant-agent.js';
+
+// Tempo máximo da função: vercel.json → functions (a IA tem orçamento de 25s dentro disso).
 
 function firebaseAdminAuth() {
   if (!getApps().length) {
@@ -15,49 +21,11 @@ function firebaseAdminAuth() {
   return getAuth();
 }
 
-// ---------- Provedores de IA ----------
-// GLM-5.2 via Z.ai é o provedor PRINCIPAL (mesma família do agente core da loja).
-// Groq permanece como fallback opcional — mantém o assistente no ar se faltar a chave da Z.ai.
-const ZAI_API_URL = 'https://api.z.ai/api/coding/paas/v4/chat/completions'; // conta usa GLM Coding Plan, não o PaaS padrão
-const DEFAULT_ZAI_MODELS = [
-  'glm-5.2',   // principal — GLM-5.2 (janela de contexto de 1M), raciocínio avançado
-  'glm-4.6',   // fallback estável
-  'glm-4.5',   // fallback adicional
-];
-const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
-const DEFAULT_GROQ_MODELS = [
-  'llama-3.3-70b-versatile',        // principal — 70B, rápido
-  'llama-3.3-70b-specdec',          // variante especulativa do 70B (alta disponibilidade)
-  'deepseek-r1-distill-llama-70b',  // fallback 70B com raciocínio
-  'llama-3.1-8b-instant',           // último recurso leve
-];
-const DISABLED_MODELS = new Set(['moonshotai/kimi-k2-instruct', 'openai/gpt-oss-120b']);
-const uniqueNonEmpty = (values) => {
-  const seen = new Set();
-  const out = [];
-  for (const value of values) {
-    const s = String(value || '').trim();
-    if (!s || seen.has(s)) continue;
-    seen.add(s);
-    out.push(s);
-  }
-  return out;
-};
-const ZAI_MODELS = uniqueNonEmpty([
-  ...(process.env.ZAI_MODEL || '').split(','),
-  ...DEFAULT_ZAI_MODELS,
-]).filter((model) => !DISABLED_MODELS.has(model));
-const GROQ_MODELS = uniqueNonEmpty([
-  ...(process.env.GROQ_MODEL || '').split(','),
-  ...DEFAULT_GROQ_MODELS,
-]).filter((model) => !DISABLED_MODELS.has(model));
-
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-
 // ---------- Rate limiting simples em memória (por IP, reseta ao cold start) ----------
 // Suficiente para barrar bots no tier gratuito; em produção de alta escala usar Upstash/Redis.
 const RATE_WINDOW_MS = 60_000; // 1 minuto
-const RATE_MAX = 15;           // máximo de requisições por IP por janela
+// Uma pergunta no modo agente gasta 2–4 chamadas (ferramentas + resposta final).
+const RATE_MAX = 40;           // máximo de requisições por IP por janela
 const ipMap = new Map();       // ip → { count, resetAt }
 
 function checkRateLimit(ip) {
@@ -112,8 +80,13 @@ const DEFAULT_ORIGINS = [
 const VALID_ORIGINS = ALLOWED_ORIGINS.length ? ALLOWED_ORIGINS : DEFAULT_ORIGINS;
 
 // ---------- System prompts ----------
-const SYSTEM_PROMPT = `Você é o KimiClaw, o assistente de compras da loja "Japan Express" (japanexpress-store.com),
+const SYSTEM_PROMPT = `Você é o assistente virtual de compras da loja "Japan Express" (japanexpress-store.com),
 que importa produtos do Japão (cosméticos, doces e chás, snacks, papelaria, eletrônicos, vestuário, higiene & saúde).
+
+IDENTIDADE: você NÃO tem nome próprio — é apenas "o assistente virtual da Japan Express", aqui para ajudar nas compras.
+Se perguntarem quem você é, qual inteligência artificial, modelo, empresa ou tecnologia está por trás de você, responda
+só que é o assistente virtual da Japan Express e que está aqui para ajudar — NUNCA cite nomes de modelos, empresas de IA
+ou tecnologias (ex.: Gemini, Google, GLM, Llama, Groq, OpenAI, KimiClaw, OpenClaw).
 Contato para falar com um vendedor/administrador: WhatsApp +81 70-1367-1679 (wa.me/817013671679) e e-mail contato@japanexpress-store.com.
 Responda SEMPRE em português do Brasil, de forma amigável e útil. Respostas curtas (no máximo 4 frases). Use emojis com moderação.
 
@@ -162,6 +135,82 @@ calculadora de frete do site — nunca tente calcular de cabeça, mesmo que pare
 
 Responda de forma direta, técnica e completa. Pode usar mais de 4 frases quando a pergunta for complexa.`;
 
+// ---------- Modo agente (ferramentas executadas no navegador) ----------
+// Cada chamada devolve OU pedidos de ferramenta ({ toolCalls }) OU a resposta
+// final ({ text }). O navegador executa as ferramentas e chama de novo com os
+// resultados. Nenhum valor monetário passa sem ter vindo de uma ferramenta.
+async function handleAgent(body, providers, res) {
+  const rawLocale = body.locale && typeof body.locale === 'object' ? body.locale : {};
+  const str = (v, max, fallback) => (typeof v === 'string' && v.trim() ? v.slice(0, max) : fallback);
+  const systemPrompt = buildAgentPrompt({
+    country: str(rawLocale.country, 64, 'Brasil').replace(/[\r\n]/g, ' '),
+    currency: str(rawLocale.currencyCode, 8, 'BRL').replace(/[^A-Z]/gi, ''),
+    language: ['pt', 'en', 'ja'].includes(rawLocale.language) ? rawLocale.language : 'pt',
+  });
+  const messages = sanitizeAgentMessages(body.messages);
+  if (!messages.length) {
+    res.status(400).json({ error: 'no-messages' });
+    return;
+  }
+  // Modelos menores ignoram a regra de idioma do início; o lembrete junto da
+  // própria mensagem do cliente funciona (cliente em japonês recebia português).
+  const lastUserIdx = messages.map((m) => m.role).lastIndexOf('user');
+  const replyLang = detectLanguage(messages[lastUserIdx]?.content);
+  if (replyLang && replyLang !== 'pt') {
+    messages[lastUserIdx] = { ...messages[lastUserIdx], content: `${messages[lastUserIdx].content}\n\n(responda em ${LANGUAGE_NAMES[replyLang]})` };
+  }
+
+  const afterTools = messages[messages.length - 1]?.role === 'tool';
+  const grounding = agentGroundingText(systemPrompt, messages);
+  // Texto que vem junto com pedidos de ferramenta também passa pela checagem.
+  const toolReply = (r) => ({
+    toolCalls: r.toolCalls.slice(0, 6),
+    text: r.text && !containsUngroundedMoney(r.text, grounding) ? r.text : '',
+    model: r.model,
+  });
+  const ask = (extraMessages = []) => chatWithFallback({
+    providers,
+    messages: [{ role: 'system', content: systemPrompt }, ...messages, ...extraMessages],
+    tools: AGENT_TOOLS,
+    allowEmpty: afterTools,
+    maxTokens: 700,
+    temperature: 0.3,
+    deadlineMs: 24_000,
+  });
+
+  let out = await ask();
+  if (!out.model) {
+    res.status(502).json({ error: 'upstream-or-empty', attempts: out.attempts });
+    return;
+  }
+  if (out.toolCalls?.length) {
+    res.status(200).json(toolReply(out));
+    return;
+  }
+  if (!out.text) {
+    // Depois das ferramentas, a IA às vezes já disse tudo junto com as chamadas.
+    res.status(200).json({ text: '', model: out.model });
+    return;
+  }
+
+  if (containsUngroundedMoney(out.text, grounding)) {
+    // Uma chance de corrigir: a IA reescreve só com valores das ferramentas.
+    out = await ask([
+      { role: 'assistant', content: out.text },
+      { role: 'user', content: '[verificação automática da loja] Sua resposta tem valores que não vieram das ferramentas. Reescreva usando só valores copiados exatamente dos resultados das ferramentas, ou chame a ferramenta que falta. Não mencione esta verificação.' },
+    ]);
+    if (out.toolCalls?.length) {
+      res.status(200).json({ ...toolReply(out), text: '' });
+      return;
+    }
+    if (!out.text || containsUngroundedMoney(out.text, grounding)) {
+      res.status(502).json({ error: 'ungrounded-money-detected' });
+      return;
+    }
+  }
+  res.status(200).json({ text: out.text, model: out.model });
+}
+
 export default async function handler(req, res) {
   // Only exact configured origins are trusted; prefix matching lets
   // attacker-controlled lookalike hosts pass the CORS gate.
@@ -198,25 +247,25 @@ export default async function handler(req, res) {
     return;
   }
 
-  // ---------- Chaves de IA (prioriza GLM-5.2 via Z.ai; Groq como fallback) ----------
-  const zaiKey = process.env.ZAI_API_KEY;
-  const groqKey = process.env.GROQ_API_KEY;
-  if (!zaiKey && !groqKey) {
+  // ---------- Provedores de IA (Gemini → GLM → Groq, conforme as chaves existentes) ----------
+  const providers = buildProviders(process.env);
+  if (!providers.length) {
     res.status(503).json({ error: 'AI not configured' });
     return;
   }
-  // Ordem de prioridade: GLM-5.2 primeiro (mais inteligente), Groq como reserva.
-  const providers = [];
-  if (zaiKey) providers.push({ name: 'glm', url: ZAI_API_URL, key: zaiKey, models: ZAI_MODELS });
-  if (groqKey) providers.push({ name: 'groq', url: GROQ_API_URL, key: groqKey, models: GROQ_MODELS });
 
   try {
     const rawBody = typeof req.body === 'string' ? req.body : JSON.stringify(req.body || {});
-    if (Buffer.byteLength(rawBody, 'utf8') > 64 * 1024) {
+    if (Buffer.byteLength(rawBody, 'utf8') > 96 * 1024) {
       res.status(413).json({ error: 'request_too_large' });
       return;
     }
     const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
+
+    if (body.mode === 'agent') {
+      await handleAgent(body, providers, res);
+      return;
+    }
 
     // Limita histórico e catálogo para controlar uso de tokens. 12 turnos (~2k
     // tokens com o corte de 500 chars por mensagem) mantêm o produto recomendado
@@ -298,37 +347,17 @@ export default async function handler(req, res) {
 
     const baseMessages = [{ role: 'system', content: systemContent }, ...safeHistory];
 
-    let text = null;
-    let usedModel = null;
-    let lastStatus = 0;
-    let lastDetail = '';
-
-    for (const provider of providers) {
-      for (const model of provider.models) {
-        let r;
-        for (let attempt = 0; attempt < 2; attempt++) {
-          r = await fetch(provider.url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${provider.key}` },
-            body: JSON.stringify({ model, max_tokens: isAdmin ? 2048 : 600, temperature: 0.5, messages: baseMessages }),
-          });
-          if (r.ok) break;
-          lastStatus = r.status;
-          lastDetail = await r.text().catch(() => '');
-          if (r.status === 429 && attempt === 0) { await sleep(300); continue; }
-          break;
-        }
-        if (r && r.ok) {
-          const data = await r.json().catch(() => null);
-          const t = data?.choices?.[0]?.message?.content?.trim();
-          if (t) { text = t; usedModel = `${provider.name}/${model}`; break; }
-        }
-      }
-      if (text) break;
-    }
+    const { text, model: usedModel, attempts } = await chatWithFallback({
+      providers,
+      messages: baseMessages,
+      maxTokens: isAdmin ? 2048 : 600,
+      temperature: 0.5,
+    });
 
     if (!text) {
-      res.status(502).json({ error: 'upstream-or-empty', status: lastStatus, detail: lastDetail.slice(0, 300) });
+      // `attempts` diz qual provedor/modelo falhou e por quê (sem chaves) — é o
+      // que permite descobrir na hora quando um modelo é aposentado.
+      res.status(502).json({ error: 'upstream-or-empty', attempts });
       return;
     }
 

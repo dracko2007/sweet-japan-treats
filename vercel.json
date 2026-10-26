@@ -1,4 +1,7 @@
 {
+  "functions": {
+    "api/kimiclaw.js": { "maxDuration": 30 }
+  },
   "headers": [
     {
       "source": "/(.*)",

@@ -10,7 +10,9 @@ import { Product } from '@/types';
 import { safeStorage } from '@/utils/storage';
 import { SESSION_END_EVENT } from '@/utils/localData';
 import { formatPrice, getCurrencyByCountry } from '@/utils/currency';
-import { askQwen, qwenEnabled, QwenMsg, AdminCatalogItem } from '@/services/qwenService';
+import { askQwen, askAgent, qwenEnabled, QwenMsg, AdminCatalogItem, type AgentMsg } from '@/services/qwenService';
+import { type AssistantAction, type ToolContext } from '@/services/assistantTools';
+import { runAgentTurn } from '@/services/assistantAgent';
 import { productEnglishName } from '@/utils/productName';
 import { effectiveYen } from '@/utils/pricing';
 import { catalogShippingYen } from '@/utils/catalogShipping';
@@ -45,17 +47,30 @@ interface Message {
   shippingResults?: ShippingOption[];
   shippingCountry?: string;
   shippingWeight?: number;
+  /** Botões de próximo passo sugeridos pelo agente. */
+  actions?: AssistantAction[];
+  /** Produtos/cotação desta resposta, enviados à IA na próxima pergunta (não aparece na tela). */
+  agentContext?: string;
 }
 
-const ClawIcon = ({ className }: { className?: string }) => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
-    <line x1="12" y1="2" x2="12" y2="7" />
-    <rect x="9" y="7" width="6" height="3" rx="1" className="fill-primary/20 stroke-primary" />
-    <path d="M9 9c-2.2 0.8-3.5 2.5-2.5 5.5c0.4 1.2 1.2 2 2.5 2" />
-    <path d="M15 9c2.2 0.8 3.5 2.5 3 5.5c-0.4 1.2-1.2 2-2.5 2" />
-    <circle cx="12" cy="9" r="0.8" className="fill-primary" />
-  </svg>
-);
+// Comandos que continuam nas regras locais (não precisam de IA nem de ferramentas).
+const LOCAL_SKILL_RE = /\b(limpar|esvaziar|clear|cupom|coupon|novidades|notificac\w*|vlog|depoimentos?|unboxing|japones|nihongo|portugues|ingles|english)\b|日本語/;
+
+const AGENT_STEP_LABELS: Record<string, Record<'pt' | 'en' | 'ja', string>> = {
+  buscar_produtos: { pt: '🔍 Buscando no catálogo…', en: '🔍 Searching the catalog…', ja: '🔍 商品を検索中…' },
+  cotar_pedido: { pt: '📦 Calculando frete e total…', en: '📦 Calculating shipping and total…', ja: '📦 送料と合計を計算中…' },
+  converter_moeda: { pt: '💱 Convertendo moeda…', en: '💱 Converting currency…', ja: '💱 通貨を換算中…' },
+  ver_carrinho: { pt: '🛒 Conferindo o carrinho…', en: '🛒 Checking your cart…', ja: '🛒 カートを確認中…' },
+  adicionar_ao_carrinho: { pt: '➕ Adicionando ao carrinho…', en: '➕ Adding to cart…', ja: '➕ カートに追加中…' },
+};
+
+const ACTION_LABELS: Record<AssistantAction, Record<'pt' | 'en' | 'ja', string>> = {
+  finalizar_compra: { pt: '✅ Finalizar compra', en: '✅ Checkout', ja: '✅ 購入手続きへ' },
+  ver_carrinho: { pt: '🛒 Ver carrinho', en: '🛒 View cart', ja: '🛒 カートを見る' },
+  continuar_comprando: { pt: '🛍️ Continuar comprando', en: '🛍️ Keep shopping', ja: '🛍️ 買い物を続ける' },
+  falar_whatsapp: { pt: '💬 Falar no WhatsApp', en: '💬 Chat on WhatsApp', ja: '💬 WhatsAppで相談' },
+  faca_seu_pedido: { pt: '📝 Faça seu Pedido', en: '📝 Custom order', ja: '📝 取り寄せ依頼' },
+};
 
 // Peso estimado (g) por categoria e variante — usado quando o produto não tem weightGrams.
 const WEIGHT_BY_CATEGORY: Record<string, { small: number; large: number }> = {
@@ -69,9 +84,11 @@ const DEFAULT_WEIGHT = { small: 300, large: 800 };
 // Turnos de conversa enviados à IA. 6 estourava rápido: uma recomendação seguida
 // de duas perguntas de acompanhamento já empurrava o produto para fora da janela.
 const AI_HISTORY_TURNS = 12;
+// Agente: menos mensagens (cada chamada reenviaria tudo; o "[contexto]" guarda os produtos).
+const AGENT_HISTORY_MESSAGES = 8;
 
 const KimiClawAssistant: React.FC = () => {
-  const { addToCart, clearCart } = useCart();
+  const { addToCart, clearCart, items: cartItems } = useCart();
   const { language, setLanguage, t, selectedCountry } = useLanguage();
   const { products } = useProducts();
   const { user, updateProfile } = useUser();
@@ -123,7 +140,12 @@ const KimiClawAssistant: React.FC = () => {
         if (saved) {
           const parsed = JSON.parse(saved);
           if (Array.isArray(parsed) && parsed.length > 0) {
-            return parsed.map((m: any) => ({ ...m, timestamp: new Date(m.timestamp) }));
+            return parsed.map((m: any) => ({
+              ...m,
+              // Conversas antigas guardavam a boas-vindas com o nome antigo do assistente.
+              text: m.id === 'welcome' ? t('kimiclaw.welcome') : m.text,
+              timestamp: new Date(m.timestamp),
+            }));
           }
         }
       } catch { /* storage corrompido — ignora */ }
@@ -1128,7 +1150,7 @@ const KimiClawAssistant: React.FC = () => {
       if (isAdmin) {
         responseText = '👋 Olá, Admin! Aqui estão seus dados de negócio. Pergunte sobre **faturamento**, **pedidos**, **margem/custo** de produtos ou **frete**. Para o painel completo acesse **/admin**.';
       } else {
-        responseText = 'Olá! Sou o KimiClaw, o assistente de compras da Japan Express. Posso buscar produtos, adicionar itens ao carrinho, montar um orçamento dentro do seu valor, mudar o idioma, calcular o frete ou inscrever você em novidades. O que deseja?';
+        responseText = 'Olá! Sou o assistente virtual da Japan Express e estou aqui para te ajudar. Posso buscar produtos, adicionar itens ao carrinho, montar um orçamento dentro do seu valor, mudar o idioma, calcular o frete ou inscrever você em novidades. O que deseja?';
       }
       await addKimiMessageWithTyping(responseText);
       return;
@@ -1141,7 +1163,7 @@ const KimiClawAssistant: React.FC = () => {
       query.includes('métricas') || query.includes('metricas') || query.includes('relatório') ||
       query.includes('vendas da loja') || query.includes('pedidos da loja')
     )) {
-      await addKimiMessageWithTyping('Sou a assistente de compras! Posso ajudar com **produtos**, **preços** e **frete** 🛍️\n\nTente: "buscar anessa", "calcular frete" ou "quanto custa o biore".');
+      await addKimiMessageWithTyping('Sou o assistente virtual da Japan Express! Posso ajudar com **produtos**, **preços** e **frete** 🛍️\n\nTente: "buscar anessa", "calcular frete" ou "quanto custa o biore".');
       return;
     }
 
@@ -1221,6 +1243,107 @@ const KimiClawAssistant: React.FC = () => {
     await addKimiMessageWithTyping(scopeRefusal);
   };
 
+  // ── AGENTE COM FERRAMENTAS ────────────────────────────────────────────────
+  // A IA conduz a conversa e pede ferramentas (buscar, cotar frete/total,
+  // converter, adicionar ao carrinho, mostrar botões); quem calcula é
+  // assistantTools.ts, com o mesmo código do checkout. Retorna false se a IA
+  // não respondeu — aí o fluxo de regras locais assume.
+  const runAgent = async (text: string): Promise<boolean> => {
+    const lang = (['pt', 'en', 'ja'].includes(language) ? language : 'pt') as 'pt' | 'en' | 'ja';
+    // Histórico curto e resumido: o plano grátis do Groq limita tokens por minuto,
+    // e os produtos/cotação anteriores já vão no "[contexto: ...]".
+    const history: AgentMsg[] = messages
+      .slice(-AGENT_HISTORY_MESSAGES)
+      .filter((m) => m.text || m.products?.length)
+      .map((m): AgentMsg => {
+        if (m.sender === 'user') return { role: 'user', content: m.text };
+        const cards = m.products?.length
+          ? `\n[cards mostrados: ${m.products.map((p) => `${productEnglishName(p)} (id: ${p.id})`).join('; ')}]`
+          : '';
+        const memory = m.agentContext ? `\n${m.agentContext}` : '';
+        const shortText = m.text.length > 500 ? `${m.text.slice(0, 500)}…` : m.text;
+        return { role: 'assistant', content: `${shortText}${cards}${memory}`.trim() };
+      });
+    const country = selectedCountry || 'Brasil';
+    const locale = { country, currencyCode: getCurrencyByCountry(country), language: lang };
+    const ctx: ToolContext = { products, cartItems, country, language: lang, addToCart };
+
+    setIsTyping(true);
+    const turn = await runAgentTurn({
+      convo: [...history, { role: 'user', content: text }],
+      locale,
+      ctx,
+      ask: askAgent,
+      onTool: (name) => {
+        const label = AGENT_STEP_LABELS[name]?.[lang];
+        if (label) setCurrentSteps((prev) => (prev.includes(label) ? prev : [...prev, label]));
+      },
+    });
+    if (!turn.ok) return false;
+
+    const fallbackText = turn.cartChanged
+      ? (lang === 'ja' ? 'カートに追加しました！🛒' : lang === 'en' ? 'Added to your cart! 🛒' : 'Adicionei ao seu carrinho! 🛒')
+      : (lang === 'ja' ? 'こちらをご覧ください：' : lang === 'en' ? 'Here are the options:' : 'Aqui estão as opções:');
+    const actions = turn.actions.length ? turn.actions
+      : turn.cartChanged ? (['finalizar_compra', 'continuar_comprando'] as AssistantAction[]) : [];
+    setMessages((prev) => [...prev, {
+      id: Math.random().toString(36).substring(7),
+      sender: 'kimi',
+      text: turn.text || fallbackText,
+      timestamp: new Date(),
+      products: turn.products.length ? turn.products : undefined,
+      actions: actions.length ? actions : undefined,
+      agentContext: turn.context || undefined,
+    }]);
+    if (turn.cartChanged) toast.success(lang === 'ja' ? 'カートを更新しました' : lang === 'en' ? 'Cart updated' : 'Carrinho atualizado');
+    return true;
+  };
+
+  const runAction = (action: AssistantAction) => {
+    if (action === 'falar_whatsapp') {
+      window.open(`https://${WHATSAPP_LINK}`, '_blank', 'noopener,noreferrer');
+      return;
+    }
+    const to = {
+      finalizar_compra: cartItems.length ? '/checkout' : '/carrinho',
+      ver_carrinho: '/carrinho',
+      continuar_comprando: '/produtos',
+      faca_seu_pedido: '/faca-seu-pedido',
+    }[action];
+    setIsOpen(false);
+    navigate(to);
+  };
+
+  // Executa o comando sem nunca deixar o chat preso em "digitando…": se algo
+  // falhar no meio (rede, dado inesperado), destrava o campo e avisa o cliente.
+  const runCommand = async (text: string, { allowAgent = true } = {}) => {
+    try {
+      const useAgent = allowAgent && !isAdmin && shippingFlow === 'idle' && qwenEnabled()
+        && !LOCAL_SKILL_RE.test(normalizeText(text));
+      if (useAgent && (await runAgent(text))) return;
+      setCurrentSteps([]);
+      await handleCommandExecution(text);
+    } catch (error) {
+      console.error('[assistente] falha ao responder:', error);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Math.random().toString(36).substring(7),
+          sender: 'kimi',
+          text: language === 'ja'
+            ? '申し訳ありません、うまく処理できませんでした。もう一度お試しいただくか、WhatsAppでお問い合わせください。'
+            : language === 'en'
+              ? "Sorry, something went wrong on my side. Please try again, or talk to us on WhatsApp."
+              : 'Desculpe, tive um problema para responder agora. Tente de novo ou fale com a gente pelo WhatsApp. 🙏',
+          timestamp: new Date(),
+        },
+      ]);
+    } finally {
+      setIsTyping(false);
+      setCurrentSteps([]);
+    }
+  };
+
   const handleSendMessage = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!inputValue.trim() || isTyping) return;
@@ -1236,7 +1359,7 @@ const KimiClawAssistant: React.FC = () => {
       },
     ]);
     setInputValue('');
-    handleCommandExecution(userText);
+    void runCommand(userText);
   };
 
   const handleSuggestionClick = (skillText: string, searchKey: string) => {
@@ -1250,7 +1373,7 @@ const KimiClawAssistant: React.FC = () => {
         timestamp: new Date(),
       },
     ]);
-    handleCommandExecution(searchKey);
+    void runCommand(searchKey, { allowAgent: false });
   };
 
   const handleConsentAction = async (accept: boolean, order?: any) => {
@@ -1320,7 +1443,7 @@ const KimiClawAssistant: React.FC = () => {
           aria-controls="kimiclaw-panel"
           className="w-14 h-14 rounded-full bg-gradient-to-tr from-primary via-accent to-primary text-white flex items-center justify-center shadow-elevated hover:shadow-[0_8px_30px_rgb(249,115,22,0.4)] transition-all duration-300 transform hover:scale-105 border border-white/20 group relative overflow-hidden focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
         >
-          <ClawIcon className="w-7 h-7 text-white transform group-hover:rotate-12 transition-transform duration-300" />
+          <Bot className="w-7 h-7 text-white transform group-hover:rotate-12 transition-transform duration-300" />
           <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-green-500 rounded-full border border-white animate-ping" />
           <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-green-500 rounded-full border border-white" />
         </button>
@@ -1341,15 +1464,12 @@ const KimiClawAssistant: React.FC = () => {
           <div className="p-4 bg-gradient-to-r from-primary/10 via-accent/5 to-transparent border-b border-border flex items-center justify-between">
             <div className="flex items-center gap-2.5">
               <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-primary to-accent flex items-center justify-center text-white shadow-soft relative">
-                <ClawIcon className="w-5.5 h-5.5 text-white" />
+                <Bot className="w-5 h-5 text-white" />
                 <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 rounded-full border border-white" />
               </div>
               <div>
                 <h3 className="font-bold text-sm text-foreground flex items-center gap-1.5">
                   {t('kimiclaw.title')}
-                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/15 text-primary-dark dark:text-primary font-mono font-medium">
-                    v1.5
-                  </span>
                   {isAdmin && (
                     <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-700 dark:text-amber-400 font-bold border border-amber-500/30">
                       ADMIN
@@ -1446,6 +1566,26 @@ const KimiClawAssistant: React.FC = () => {
                             </button>
                           </div>
                         </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* PRÓXIMOS PASSOS SUGERIDOS PELO AGENTE */}
+                  {msg.actions && msg.actions.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mt-1">
+                      {msg.actions.map((action) => (
+                        <button
+                          key={action}
+                          type="button"
+                          onClick={() => runAction(action)}
+                          className={`text-[11px] font-semibold px-3 py-1.5 rounded-lg transition-colors ${
+                            action === 'finalizar_compra'
+                              ? 'bg-primary hover:bg-primary/90 text-white shadow-soft'
+                              : 'bg-secondary hover:bg-secondary/80 text-foreground border border-border'
+                          }`}
+                        >
+                          {ACTION_LABELS[action]?.[(['pt', 'en', 'ja'].includes(language) ? language : 'pt') as 'pt' | 'en' | 'ja'] ?? action}
+                        </button>
                       ))}
                     </div>
                   )}
