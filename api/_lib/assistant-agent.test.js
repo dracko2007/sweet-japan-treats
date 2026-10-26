@@ -18,6 +18,12 @@ describe('assistant-agent', () => {
     expect(out[1].tool_calls.map((c) => c.id)).toEqual(['a']);
   });
 
+  it('ferramentas de admin só passam em sessão de admin', () => {
+    const msgs = [{ role: 'user', content: 'qual a margem?' }, { role: 'assistant', content: '', tool_calls: [call('a', 'margem_produtos')] }];
+    expect(sanitizeAgentMessages(msgs)[1]).toBeUndefined();
+    expect(sanitizeAgentMessages(msgs, { admin: true })[1].tool_calls[0].function.name).toBe('margem_produtos');
+  });
+
   it('preserva a assinatura de pensamento do Gemini nas chamadas', () => {
     const tc = { ...call('a'), extra_content: { google: { thought_signature: 'sig' } } };
     const out = sanitizeAgentMessages([{ role: 'user', content: 'oi' }, { role: 'assistant', content: '', tool_calls: [tc] }]);

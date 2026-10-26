@@ -62,6 +62,9 @@ const AGENT_STEP_LABELS: Record<string, Record<'pt' | 'en' | 'ja', string>> = {
   converter_moeda: { pt: '💱 Convertendo moeda…', en: '💱 Converting currency…', ja: '💱 通貨を換算中…' },
   ver_carrinho: { pt: '🛒 Conferindo o carrinho…', en: '🛒 Checking your cart…', ja: '🛒 カートを確認中…' },
   adicionar_ao_carrinho: { pt: '➕ Adicionando ao carrinho…', en: '➕ Adding to cart…', ja: '➕ カートに追加中…' },
+  painel_financeiro: { pt: '📊 Consultando o balanço…', en: '📊 Checking the financials…', ja: '📊 収支を確認中…' },
+  margem_produtos: { pt: '💹 Calculando margens…', en: '💹 Calculating margins…', ja: '💹 利益率を計算中…' },
+  estoque: { pt: '📦 Conferindo o estoque…', en: '📦 Checking stock…', ja: '📦 在庫を確認中…' },
 };
 
 const ACTION_LABELS: Record<AssistantAction, Record<'pt' | 'en' | 'ja', string>> = {
@@ -1266,7 +1269,7 @@ const KimiClawAssistant: React.FC = () => {
       });
     const country = selectedCountry || 'Brasil';
     const locale = { country, currencyCode: getCurrencyByCountry(country), language: lang };
-    const ctx: ToolContext = { products, cartItems, country, language: lang, addToCart };
+    const ctx: ToolContext = { products, cartItems, country, language: lang, addToCart, isAdmin };
 
     setIsTyping(true);
     const turn = await runAgentTurn({
@@ -1318,7 +1321,7 @@ const KimiClawAssistant: React.FC = () => {
   // falhar no meio (rede, dado inesperado), destrava o campo e avisa o cliente.
   const runCommand = async (text: string, { allowAgent = true } = {}) => {
     try {
-      const useAgent = allowAgent && !isAdmin && shippingFlow === 'idle' && qwenEnabled()
+      const useAgent = allowAgent && shippingFlow === 'idle' && qwenEnabled()
         && !LOCAL_SKILL_RE.test(normalizeText(text));
       if (useAgent && (await runAgent(text))) return;
       setCurrentSteps([]);

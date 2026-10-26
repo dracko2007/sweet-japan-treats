@@ -40,7 +40,26 @@ export const AGENT_TOOLS = [
     }),
 ];
 
+// Só para o administrador (o servidor confere o token antes de oferecer).
+export const ADMIN_AGENT_TOOLS = [
+  fn('painel_financeiro', 'Balanço da loja, igual ao painel /admin: pedidos por status, receita do mês e total, custo, lucro, últimos 6 meses, mais vendidos e receita por forma de pagamento.'),
+  fn('margem_produtos', 'Preço, custo, lucro por unidade e margem % de cada produto (inclui ocultos).',
+    { consulta: str('filtra por nome/marca; omita para todos'), ordem: str('maior|menor'), limite: int }),
+  fn('estoque', 'Estoque com resumo. Padrão: listas separadas de esgotados e acabando (1 a 3 un.).',
+    { filtro: str('atencao (padrão)|esgotados|acabando|ocultos|todos'), consulta: str() }),
+];
+
+export const ADMIN_AGENT_PROMPT = `
+
+MODO ADMINISTRADOR: você fala com o dono da loja. Além das ferramentas de cliente, use painel_financeiro (balanço,
+vendas, lucro, pedidos), margem_produtos (custo, lucro e margem por produto) e estoque. Os números vêm prontos das
+ferramentas — copie, não recalcule. "este_mes" é o mês atual; "acumulado_desde_o_inicio" é o total da loja: nunca
+apresente um como o outro. Em estoque e margem, LISTE os itens (nome e número), não só o resumo.
+Pode responder mais longo e técnico e sugerir ações de gestão com base nos dados (repor esgotados, promover itens de
+maior margem, rever preço de margem baixa). Não ofereça carrinho ao administrador, a não ser que ele peça.`;
+
 const TOOL_NAMES = new Set(AGENT_TOOLS.map((t) => t.function.name));
+const ADMIN_TOOL_NAMES = new Set([...TOOL_NAMES, ...ADMIN_AGENT_TOOLS.map((t) => t.function.name)]);
 
 export const LANGUAGE_NAMES = { pt: 'português do Brasil', en: 'inglês', ja: 'japonês' };
 
@@ -89,9 +108,9 @@ const MAX_MESSAGES = 30;
 
 const clip = (s, max) => (typeof s === 'string' ? s.replace(/<[^>]*>/g, '').slice(0, max) : '');
 
-function sanitizeToolCall(tc) {
+function sanitizeToolCall(tc, allowed) {
   const name = tc?.function?.name;
-  if (!TOOL_NAMES.has(name) || typeof tc?.id !== 'string') return null;
+  if (!allowed.has(name) || typeof tc?.id !== 'string') return null;
   const out = {
     id: tc.id.slice(0, 120),
     type: 'function',
@@ -104,7 +123,8 @@ function sanitizeToolCall(tc) {
 }
 
 /** Aceita user/assistant (com ou sem tool_calls) e tool; descarta o resto. */
-export function sanitizeAgentMessages(messages) {
+export function sanitizeAgentMessages(messages, { admin = false } = {}) {
+  const allowed = admin ? ADMIN_TOOL_NAMES : TOOL_NAMES;
   const list = Array.isArray(messages) ? messages.slice(-MAX_MESSAGES) : [];
   const out = [];
   const pendingIds = new Set();
@@ -112,7 +132,7 @@ export function sanitizeAgentMessages(messages) {
     if (m?.role === 'user') {
       out.push({ role: 'user', content: clip(m.content, MAX_TEXT) });
     } else if (m?.role === 'assistant') {
-      const toolCalls = Array.isArray(m.tool_calls) ? m.tool_calls.map(sanitizeToolCall).filter(Boolean).slice(0, 6) : [];
+      const toolCalls = Array.isArray(m.tool_calls) ? m.tool_calls.map((tc) => sanitizeToolCall(tc, allowed)).filter(Boolean).slice(0, 6) : [];
       const msg = { role: 'assistant', content: clip(m.content, MAX_TEXT) };
       if (toolCalls.length) {
         msg.tool_calls = toolCalls;

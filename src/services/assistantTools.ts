@@ -42,6 +42,8 @@ export interface ToolContext {
   addToCart: (product: Product, size: string, quantity?: number, variantLabel?: string) => void;
   /** false = o cliente não pediu para mexer no carrinho nesta mensagem (ver cartRequested). */
   allowCartChanges?: boolean;
+  /** Sessão de admin: libera painel financeiro, margem e estoque (assistantAdminTools.ts). */
+  isAdmin?: boolean;
 }
 
 // Pedido explícito de carrinho, em pt/en/ja.

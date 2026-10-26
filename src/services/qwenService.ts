@@ -102,11 +102,20 @@ export interface AgentReply { text: string; toolCalls: AgentToolCall[] }
 /** Uma rodada do agente: devolve a resposta final OU as ferramentas que a IA quer usar. null = falhou. */
 export async function askAgent(messages: AgentMsg[], locale: AgentLocale): Promise<AgentReply | null> {
   try {
+    // Com sessão, manda o token: o SERVIDOR decide se é admin (libera as ferramentas de admin).
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (auth?.currentUser) {
+      try {
+        headers['x-firebase-token'] = await auth.currentUser.getIdToken();
+      } catch {
+        // sem token → modo cliente
+      }
+    }
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), AI_TIMEOUT_MS);
     const res = await fetch('/api/kimiclaw', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({ mode: 'agent', messages, locale }),
       signal: controller.signal,
     }).finally(() => clearTimeout(timer));

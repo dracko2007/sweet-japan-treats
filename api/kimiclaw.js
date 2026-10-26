@@ -8,7 +8,7 @@ import { cert, getApps, initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { superAdminEmail } from './_lib/auth.js';
 import { buildProviders, chatWithFallback } from './_lib/ai-providers.js';
-import { AGENT_TOOLS, LANGUAGE_NAMES, agentGroundingText, buildAgentPrompt, detectLanguage, sanitizeAgentMessages } from './_lib/assistant-agent.js';
+import { ADMIN_AGENT_PROMPT, ADMIN_AGENT_TOOLS, AGENT_TOOLS, LANGUAGE_NAMES, agentGroundingText, buildAgentPrompt, detectLanguage, sanitizeAgentMessages } from './_lib/assistant-agent.js';
 
 // Tempo máximo da função: vercel.json → functions (a IA tem orçamento de 25s dentro disso).
 
@@ -135,19 +135,34 @@ calculadora de frete do site — nunca tente calcular de cabeça, mesmo que pare
 
 Responda de forma direta, técnica e completa. Pode usar mais de 4 frases quando a pergunta for complexa.`;
 
+// O cliente envia o token no header x-firebase-token; o servidor verifica e confere
+// se o email pertence ao admin. Sem token válido = não-admin, sem exceção.
+async function verifyAdmin(idToken) {
+  if (!idToken) return false;
+  try {
+    // `superAdminEmail()` lança quando ADMIN_EMAIL não está configurado: sem
+    // configuração ninguém é admin, mesmo desfecho de um token inválido.
+    const adminEmail = superAdminEmail();
+    const decoded = await firebaseAdminAuth().verifyIdToken(idToken);
+    return decoded.email?.toLowerCase() === adminEmail.toLowerCase();
+  } catch {
+    return false;
+  }
+}
+
 // ---------- Modo agente (ferramentas executadas no navegador) ----------
 // Cada chamada devolve OU pedidos de ferramenta ({ toolCalls }) OU a resposta
 // final ({ text }). O navegador executa as ferramentas e chama de novo com os
 // resultados. Nenhum valor monetário passa sem ter vindo de uma ferramenta.
-async function handleAgent(body, providers, res) {
+async function handleAgent(body, providers, res, isAdmin = false) {
   const rawLocale = body.locale && typeof body.locale === 'object' ? body.locale : {};
   const str = (v, max, fallback) => (typeof v === 'string' && v.trim() ? v.slice(0, max) : fallback);
   const systemPrompt = buildAgentPrompt({
     country: str(rawLocale.country, 64, 'Brasil').replace(/[\r\n]/g, ' '),
     currency: str(rawLocale.currencyCode, 8, 'BRL').replace(/[^A-Z]/gi, ''),
     language: ['pt', 'en', 'ja'].includes(rawLocale.language) ? rawLocale.language : 'pt',
-  });
-  const messages = sanitizeAgentMessages(body.messages);
+  }) + (isAdmin ? ADMIN_AGENT_PROMPT : '');
+  const messages = sanitizeAgentMessages(body.messages, { admin: isAdmin });
   if (!messages.length) {
     res.status(400).json({ error: 'no-messages' });
     return;
@@ -171,9 +186,9 @@ async function handleAgent(body, providers, res) {
   const ask = (extraMessages = []) => chatWithFallback({
     providers,
     messages: [{ role: 'system', content: systemPrompt }, ...messages, ...extraMessages],
-    tools: AGENT_TOOLS,
+    tools: isAdmin ? [...AGENT_TOOLS, ...ADMIN_AGENT_TOOLS] : AGENT_TOOLS,
     allowEmpty: afterTools,
-    maxTokens: 700,
+    maxTokens: isAdmin ? 1200 : 700,
     temperature: 0.3,
     deadlineMs: 24_000,
   });
@@ -262,8 +277,11 @@ export default async function handler(req, res) {
     }
     const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
 
+    // isAdmin é determinado pelo servidor via Firebase token — body.isAdmin é ignorado.
+    const isAdmin = await verifyAdmin(req.headers['x-firebase-token']);
+
     if (body.mode === 'agent') {
-      await handleAgent(body, providers, res);
+      await handleAgent(body, providers, res, isAdmin);
       return;
     }
 
@@ -278,24 +296,6 @@ export default async function handler(req, res) {
       currencyCode: typeof rawLocale.currencyCode === 'string' ? rawLocale.currencyCode.slice(0, 12) : 'BRL',
       currencySymbol: typeof rawLocale.currencySymbol === 'string' ? rawLocale.currencySymbol.slice(0, 8) : 'R$',
     };
-
-    // isAdmin é determinado pelo servidor via Firebase token — body.isAdmin é ignorado.
-    // O cliente envia o token no header x-firebase-token; o servidor verifica e confere
-    // se o email pertence ao admin. Sem token válido = não-admin, sem exceção.
-    let isAdmin = false;
-    const idToken = req.headers['x-firebase-token'];
-    if (idToken) {
-      try {
-        // `superAdminEmail()` lança quando ADMIN_EMAIL não está configurado, e o
-        // catch abaixo trata: sem configuração ninguém é admin, que é o mesmo
-        // desfecho de um token inválido.
-        const adminEmail = superAdminEmail();
-        const decoded = await firebaseAdminAuth().verifyIdToken(idToken);
-        isAdmin = decoded.email?.toLowerCase() === adminEmail.toLowerCase();
-      } catch {
-        // token inválido, expirado, ou admin não configurado → não-admin
-      }
-    }
 
     const adminCatalog = isAdmin && Array.isArray(body.adminCatalog) ? body.adminCatalog.slice(0, 80) : [];
 

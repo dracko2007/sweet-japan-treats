@@ -6,6 +6,7 @@
 import type { Product } from '@/types';
 import type { AgentLocale, AgentMsg, AgentReply } from '@/services/qwenService';
 import { cartRequested, runAssistantTool, type AssistantAction, type ToolContext } from '@/services/assistantTools';
+import { ADMIN_TOOL_NAMES, runAdminTool, type AdminToolContext } from '@/services/assistantAdminTools';
 
 export const AGENT_MAX_ROUNDS = 6;
 /** Tempo máximo de uma resposta; passou disso, o chat segue com o que tem (ou as regras locais). */
@@ -30,6 +31,8 @@ interface RunAgentTurnOptions {
   ask: (messages: AgentMsg[], locale: AgentLocale) => Promise<AgentReply | null>;
   onTool?: (name: string) => void;
   deadlineMs?: number;
+  /** Só para teste: substitui a leitura do painel /admin. */
+  fetchDashboard?: AdminToolContext['fetchDashboard'];
 }
 
 type ProductRef = { nome: string; variantes?: string };
@@ -113,7 +116,7 @@ export function cleanAgentText(raw: string): { text: string; actions: AssistantA
   return { text: kept.join('\n').replace(/\n{3,}/g, '\n\n').trim(), actions };
 }
 
-export async function runAgentTurn({ convo, locale, ctx, ask, onTool, deadlineMs = AGENT_DEADLINE_MS }: RunAgentTurnOptions): Promise<AgentTurnResult> {
+export async function runAgentTurn({ convo, locale, ctx, ask, onTool, deadlineMs = AGENT_DEADLINE_MS, fetchDashboard }: RunAgentTurnOptions): Promise<AgentTurnResult> {
   const startedAt = Date.now();
   const messages = [...convo];
   const lastUser = [...convo].reverse().find((m) => m.role === 'user')?.content || '';
@@ -167,7 +170,9 @@ export async function runAgentTurn({ convo, locale, ctx, ask, onTool, deadlineMs
     messages.push({ role: 'assistant', content: reply.text, tool_calls: reply.toolCalls });
     for (const call of reply.toolCalls) {
       onTool?.(call.function.name);
-      const out = runAssistantTool(call.function.name, call.function.arguments, ctx);
+      const out = ADMIN_TOOL_NAMES.has(call.function.name)
+        ? await runAdminTool(call.function.name, call.function.arguments, { products: ctx.products, isAdmin: Boolean(ctx.isAdmin), fetchDashboard })
+        : runAssistantTool(call.function.name, call.function.arguments, ctx);
       for (const p of out.ui?.products || []) if (!products.some((s) => s.id === p.id)) products.push(p);
       for (const a of out.ui?.actions || []) if (!actions.includes(a)) actions.push(a);
       if (out.ui?.cartChanged) cartChanged = true;
