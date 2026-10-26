@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Plus, Pencil, Trash2, X, Image as ImageIcon, Loader2, PackageOpen, Sparkles, GripVertical, Save, Gift, Infinity, Search, Star } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { FEATURES } from '@/config/features';
 import { Button } from '@/components/ui/button';
 import { Product, ProductVariant } from '@/types';
 import { getVariants, roundYen } from '@/utils/pricing';
@@ -568,6 +569,16 @@ const ProductManager: React.FC = () => {
         variants: cleanVariants.length ? cleanVariants : undefined,
         prices: { small, large },
         packageDimensionsCm: packageDimensionsCm || undefined,
+        // Com o 3D desligado, o campo some do formulário e o valor salvo é preservado.
+        model3d: !FEATURES.product3d
+          ? editing.model3d
+          : editing.model3d?.src?.trim()
+            ? {
+                src: editing.model3d.src.trim(),
+                iosSrc: editing.model3d.iosSrc?.trim() || undefined,
+                poster: coverUrl || undefined,
+              }
+            : undefined,
       };
       await productService.save(product);
       await refresh();
@@ -1548,6 +1559,40 @@ const ProductManager: React.FC = () => {
                 <input ref={videoRef} type="file" accept="video/mp4,video/webm,video/quicktime" hidden onChange={(e) => handleVideoFile(e.target.files)} />
                 <p className="text-xs text-muted-foreground mt-1">🎬 Mostrado ao passar o mouse sobre o produto na loja (hover). Máximo {MAX_VIDEO_MB}MB.</p>
               </div>
+
+              {/* Modelo 3D (aba "3D" + AR na página do produto) — desligado em FEATURES.product3d */}
+              {FEATURES.product3d && (
+              <div>
+                <label className="text-sm font-semibold block mb-1">Modelo 3D (opcional, .glb)</label>
+                <input
+                  type="url"
+                  inputMode="url"
+                  placeholder="https://…/produto.glb  ou  /models/produto.glb"
+                  value={editing.model3d?.src || ''}
+                  onChange={(e) => {
+                    const src = e.target.value;
+                    setEditing({ ...editing, model3d: src ? { ...editing.model3d, src } : undefined });
+                  }}
+                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                />
+                {editing.model3d?.src && (
+                  <input
+                    type="url"
+                    inputMode="url"
+                    placeholder="(opcional) .usdz para AR mais fiel no iPhone"
+                    value={editing.model3d.iosSrc || ''}
+                    onChange={(e) => editing.model3d && setEditing({
+                      ...editing,
+                      model3d: { ...editing.model3d, iosSrc: e.target.value || undefined },
+                    })}
+                    className="mt-2 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                  />
+                )}
+                <p className="text-xs text-muted-foreground mt-1">
+                  🧊 Aparece como aba “3D” na galeria: o cliente gira o produto e pode ver no próprio espaço (AR) pelo celular.
+                </p>
+              </div>
+              )}
             </div>
 
             <div className="p-4 sm:p-5 border-t border-border flex justify-end gap-3 shrink-0 bg-card rounded-b-2xl">

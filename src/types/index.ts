@@ -14,6 +14,13 @@ export interface ProductPackageDimensionsCm {
   raw?: string;
 }
 
+/** Modelo 3D do produto (aba "3D" na galeria + AR no celular). */
+export interface Product3DModel {
+  src: string;      // .glb público (Android/computador; o iPhone gera o AR a partir dele)
+  iosSrc?: string;  // .usdz opcional — AR mais fiel no iPhone (Quick Look)
+  poster?: string;  // imagem mostrada enquanto o modelo carrega
+}
+
 export interface Product {
   id: string;
   sku?: string; // Código único do produto (ex.: JE-COS-0001) — gerado automaticamente se ausente
@@ -32,6 +39,7 @@ export interface Product {
   gallery?: string[]; // Múltiplas imagens do produto
   video?: string; // Vídeo do produto (opcional)
   videoCover?: boolean; // Se true, o vídeo é a capa (toca direto no card/galeria, sem precisar de hover)
+  model3d?: Product3DModel; // Modelo 3D opcional — aparece como aba "3D" na página do produto
   flavor: string;
   // 'exterior-only' = produto japonês, só vende fora do Japão
   // 'japan-only'    = produto importado (ex: brasileiro), só vende dentro do Japão

@@ -5,6 +5,7 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { useGSAP } from '@gsap/react';
 import { ArrowRight, ArrowDown, PlaneTakeoff, ShoppingBag, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import Tilt from '@/components/Tilt';
 import { getLenis } from '@/lib/smoothScroll';
 import { useLanguage } from '@/context/LanguageContext';
 import { formatPrice, getCurrencyByCountry } from '@/utils/currency';
@@ -649,12 +650,15 @@ const CinematicHeroShelf: React.FC<CinematicHeroShelfProps> = ({
       />
       <div className="relative z-10 mx-auto flex w-full max-w-6xl flex-col items-center gap-3 px-4 md:flex-row md:gap-16 md:px-6">
         <div className="cinematic-reveal flex flex-1 justify-center">
-          <img
-            src={p.image}
-            alt={`${p.brand} ${name}`}
-            loading="lazy"
-            className="cinematic-product-img h-[18vh] max-h-[165px] w-auto object-contain md:h-[58vh] md:max-h-[440px]"
-          />
+          {/* Produto "pega" o mouse e inclina em 3D, como se estivesse na mão do cliente. */}
+          <Tilt max={14} lift={1.04} glare={false}>
+            <img
+              src={p.image}
+              alt={`${p.brand} ${name}`}
+              loading="lazy"
+              className="cinematic-product-img h-[18vh] max-h-[165px] w-auto object-contain md:h-[58vh] md:max-h-[440px]"
+            />
+          </Tilt>
         </div>
         <div className="max-w-md flex-1">
           <div className="cinematic-reveal mb-2 flex items-center gap-3 md:mb-5">

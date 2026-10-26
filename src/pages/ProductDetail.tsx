@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, ShoppingCart, Heart, Share2, Star } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
+import { FEATURES } from '@/config/features';
 import { Button } from '@/components/ui/button';
 import ProductGallery from '@/components/products/ProductGallery';
 import ProductReviews from '@/components/products/ProductReviews';
@@ -257,6 +258,12 @@ const ProductDetail: React.FC = () => {
     }
   };
 
+  // Só no `npm run dev`: /produto/x?preview3d=/models/fino-premium-touch-hair-mask.glb testa a
+  // aba 3D sem gravar nada no Firestore. Em produção isto é removido do build.
+  const devPreview3d = import.meta.env.DEV
+    ? new URLSearchParams(window.location.search).get('preview3d')
+    : null;
+
   const handleShare = () => {
     const url = window.location.href;
     const text = `${translatedName} 🍯`;
@@ -298,6 +305,7 @@ const ProductDetail: React.FC = () => {
                   productName={translatedName}
                   video={product.video}
                   videoCover={product.videoCover}
+                  model3d={!FEATURES.product3d ? undefined : devPreview3d ? { src: devPreview3d, poster: product.image } : product.model3d}
                 />
               </div>
 

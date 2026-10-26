@@ -2,14 +2,17 @@ import React, { useState } from 'react';
 import { Cookie, X, ChevronDown, ChevronUp } from 'lucide-react';
 import { useCookieConsent } from '@/hooks/useCookieConsent';
 import { useLanguage } from '@/context/LanguageContext';
+import { useNoticeSlot } from '@/lib/noticeQueue';
 
 const CookieBanner: React.FC = () => {
   const { consent, accept, decline } = useCookieConsent();
   const { t } = useLanguage();
   const [expanded, setExpanded] = useState(false);
+  // Fila de avisos: cookies têm a maior prioridade (aparecem primeiro).
+  const slot = useNoticeSlot('cookie', consent === null, { priority: 100 });
 
   // Não mostra se o usuário já escolheu (localStorage 'cookie_consent' = 'accepted' | 'declined')
-  if (consent !== null) return null;
+  if (consent !== null || !slot) return null;
 
   return (
     <div

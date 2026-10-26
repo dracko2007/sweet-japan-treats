@@ -21,10 +21,26 @@ export default defineConfig(({ mode }) => ({
       workbox: {
         skipWaiting: true,
         clientsClaim: true,
-        // Pré-cacheia os assets leves e a vinheta compacta da marca. O HTML
-        // continua vindo da rede para evitar chunks antigos após deploy.
-        globPatterns: ["**/*.{js,css,ico,jpg,jpeg,png,svg,woff2}", "videos/pwa-logo-transition.mp4"],
-        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
+        // Pré-cacheia só o essencial para abrir o app (código, ícones, logo e a
+        // vinheta da marca). Antes entravam TODAS as imagens de /public e o
+        // painel Admin: ~14,5 MB baixados por todo cliente na primeira visita.
+        // Fotos e páginas raras agora entram no cache sob demanda (runtimeCaching).
+        // O HTML continua vindo da rede para evitar chunks antigos após deploy.
+        globPatterns: [
+          "**/*.{js,css,ico,svg,woff2}",
+          "icons/icon-{192x192,512x512,maskable-512x512,splash-512x512}.png",
+          "logo.jpg",
+          "favicon.png",
+          "videos/hero-intro-poster.jpg",
+          "videos/pwa-logo-transition.mp4",
+        ],
+        globIgnores: [
+          // Só o administrador usa; não faz sentido todo cliente baixar.
+          "**/assets/Admin-*.js",
+          // Visualizador 3D (three.js) — só desce quando o cliente abre a aba 3D.
+          "**/assets/Product3DViewer-*.js",
+        ],
+        maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
         // Limpa caches de versões antigas automaticamente
         cleanupOutdatedCaches: true,
         // SPA: serve index.html para todas as rotas (network-first para HTML)
@@ -51,6 +67,16 @@ export default defineConfig(({ mode }) => ({
             options: {
               cacheName: "product-images-v2",
               expiration: { maxEntries: 800, maxAgeSeconds: 60 * 60 * 24 * 90 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+          // Imagens e modelos 3D do próprio site (/public) — guardados na 1ª vez que aparecem.
+          {
+            urlPattern: ({ sameOrigin, url }) => sameOrigin && /\.(?:png|jpe?g|gif|webp|avif|glb|usdz)$/i.test(url.pathname),
+            handler: "CacheFirst",
+            options: {
+              cacheName: "site-media-v1",
+              expiration: { maxEntries: 200, maxAgeSeconds: 60 * 60 * 24 * 30 },
               cacheableResponse: { statuses: [0, 200] },
             },
           },

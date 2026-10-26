@@ -1,6 +1,6 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence, useInView } from 'framer-motion';
 import { Plus, X, ArrowRight, Heart, Share2, ShoppingCart } from 'lucide-react';
 import { useProducts } from '@/context/ProductsContext';
 import { useLanguage } from '@/context/LanguageContext';
@@ -12,6 +12,63 @@ import { formatPrice, getCurrencyByCountry } from '@/utils/currency';
 import { convertYen as fxConvert } from '@/services/fxService';
 import { productEnglishName } from '@/utils/productName';
 import { i18nDesc } from '@/utils/productI18n';
+import { cn } from '@/lib/utils';
+import Tilt from '@/components/Tilt';
+import { useFinePointer } from '@/hooks/useTilt';
+import { useUser } from '@/context/UserContext';
+import { useWishlist } from '@/hooks/useWishlist';
+import { wishlistService } from '@/services/wishlistService';
+import { ToastAction } from '@/components/ui/toast';
+
+interface PosterCardProps {
+  product: Product;
+  name: string;
+  priceLabel: string;
+  onOpen: () => void;
+}
+
+/**
+ * Pôster da tira. Computador: P&B que ganha cor no hover + inclinação 3D.
+ * Celular (sem hover): ganha cor quando entra no meio da tela — antes ficava
+ * cinza para sempre, já que o efeito dependia só do mouse.
+ */
+const PosterCard: React.FC<PosterCardProps> = ({ product, name, priceLabel, onOpen }) => {
+  const ref = useRef<HTMLButtonElement>(null);
+  const fine = useFinePointer();
+  const inView = useInView(ref, { amount: 0.75 });
+  const colored = !fine && inView;
+  return (
+    <Tilt max={12} lift={1.04} className="shrink-0" glareClassName="rounded-lg">
+      <button
+        ref={ref}
+        type="button"
+        onClick={onOpen}
+        className="group relative block h-[210px] w-[130px] overflow-hidden rounded-lg shadow-[0_10px_30px_rgba(0,0,0,0.5)] transition-shadow duration-500 hover:shadow-[0_24px_50px_rgba(219,39,119,0.35)] focus:outline-none focus-visible:ring-2 focus-visible:ring-pink-400 md:h-[260px] md:w-[160px]"
+        aria-label={name}
+      >
+        <motion.img
+          layoutId={`poster-img-${product.id}`}
+          src={product.thumbnail || product.image}
+          alt={name}
+          loading="lazy"
+          className={cn(
+            'h-full w-full object-cover transition-[filter] duration-700 ease-out group-hover:grayscale-0 group-hover:brightness-100',
+            colored ? 'grayscale-0 brightness-100' : 'grayscale brightness-90',
+          )}
+        />
+        <span
+          className={cn(
+            'pointer-events-none absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent transition-opacity duration-500 group-hover:opacity-30',
+            colored ? 'opacity-30' : 'opacity-70',
+          )}
+        />
+        <span className="absolute bottom-2 left-2 rounded-full bg-black/60 px-2.5 py-1 text-[11px] font-bold text-white backdrop-blur-sm">
+          {priceLabel}
+        </span>
+      </button>
+    </Tilt>
+  );
+};
 
 interface CinematicPosterShelfProps {
   /** Chave de tradução base, ex: 'posterShelf.shampoo' -> usa .eyebrow/.title/.hint */
@@ -42,6 +99,9 @@ const CinematicPosterShelf: React.FC<CinematicPosterShelfProps> = ({
   const { language, t, selectedCountry } = useLanguage();
   const { addToCart } = useCart();
   const { toast } = useToast();
+  const { user } = useUser();
+  const wishlist = useWishlist(user?.id);
+  const navigate = useNavigate();
   const currency = getCurrencyByCountry(selectedCountry);
 
   const items = useMemo(
@@ -89,6 +149,43 @@ const CinematicPosterShelf: React.FC<CinematicPosterShelfProps> = ({
     };
   };
 
+  const isFav = (p: Product) => wishlist.some((w) => w.productId === p.id);
+
+  const toggleFavorite = (p: Product) => {
+    if (!user) {
+      toast({
+        title: 'Entre para salvar seus favoritos',
+        action: (
+          <ToastAction altText="Entrar" onClick={() => navigate('/login', { state: { from: '/' } })}>
+            Entrar
+          </ToastAction>
+        ),
+      });
+      return;
+    }
+    if (isFav(p)) {
+      wishlistService.removeFromWishlist(user.id, p.id);
+    } else {
+      wishlistService.addToWishlist(user.id, {
+        productId: p.id,
+        productName: productEnglishName(p),
+        productImage: p.image,
+        productPrice: p.prices.small,
+      });
+    }
+  };
+
+  const shareProduct = (p: Product) => {
+    const url = `${window.location.origin}/produto/${p.id}`;
+    const title = productEnglishName(p);
+    if (navigator.share) {
+      navigator.share({ title, url }).catch(() => {});
+    } else {
+      navigator.clipboard?.writeText(url).catch(() => {});
+      toast({ title: t('productDetail.linkCopied'), description: t('productDetail.linkCopiedDesc') });
+    }
+  };
+
   return (
     <section className="relative overflow-hidden bg-[#0b0708] py-16 sm:py-20">
       <div
@@ -112,31 +209,15 @@ const CinematicPosterShelf: React.FC<CinematicPosterShelfProps> = ({
         </div>
 
         <div className="flex flex-wrap justify-center gap-3.5 md:gap-4">
-          {items.map((p) => {
-            const name = productEnglishName(p);
-            const { price } = priceOf(p);
-            return (
-              <button
-                key={p.id}
-                type="button"
-                onClick={() => setSelectedId(p.id)}
-                className="group relative h-[210px] w-[130px] shrink-0 overflow-hidden rounded-lg shadow-[0_10px_30px_rgba(0,0,0,0.5)] transition-transform duration-500 hover:-translate-y-3 focus:outline-none md:h-[260px] md:w-[160px]"
-                aria-label={name}
-              >
-                <motion.img
-                  layoutId={`poster-img-${p.id}`}
-                  src={p.thumbnail || p.image}
-                  alt={name}
-                  loading="lazy"
-                  className="h-full w-full object-cover grayscale brightness-90 transition-[filter] duration-500 ease-out group-hover:grayscale-0 group-hover:brightness-100"
-                />
-                <span className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-70 transition-opacity duration-500 group-hover:opacity-30" />
-                <span className="absolute bottom-2 left-2 rounded-full bg-black/60 px-2.5 py-1 text-[11px] font-bold text-white backdrop-blur-sm">
-                  {formatPrice(price, currency)}
-                </span>
-              </button>
-            );
-          })}
+          {items.map((p) => (
+            <PosterCard
+              key={p.id}
+              product={p}
+              name={productEnglishName(p)}
+              priceLabel={formatPrice(priceOf(p).price, currency)}
+              onOpen={() => setSelectedId(p.id)}
+            />
+          ))}
         </div>
       </div>
 
@@ -249,13 +330,19 @@ const CinematicPosterShelf: React.FC<CinematicPosterShelfProps> = ({
                   </Link>
                   <button
                     type="button"
-                    className="ml-auto rounded-full border border-white/15 p-2.5 text-white/70 transition-colors hover:bg-white/10"
-                    aria-label="Favoritar"
+                    onClick={() => toggleFavorite(selected)}
+                    className={cn(
+                      'ml-auto rounded-full border p-2.5 transition-colors',
+                      isFav(selected) ? 'border-pink-500 bg-pink-600 text-white' : 'border-white/15 text-white/70 hover:bg-white/10',
+                    )}
+                    aria-label={isFav(selected) ? 'Remover dos favoritos' : 'Favoritar'}
+                    aria-pressed={isFav(selected)}
                   >
-                    <Heart className="h-4 w-4" />
+                    <Heart className={cn('h-4 w-4', isFav(selected) && 'fill-current')} />
                   </button>
                   <button
                     type="button"
+                    onClick={() => shareProduct(selected)}
                     className="rounded-full border border-white/15 p-2.5 text-white/70 transition-colors hover:bg-white/10"
                     aria-label="Compartilhar"
                   >
@@ -263,8 +350,9 @@ const CinematicPosterShelf: React.FC<CinematicPosterShelfProps> = ({
                   </button>
                   <button
                     type="button"
+                    onClick={() => navigate('/carrinho')}
                     className="rounded-full border border-white/15 p-2.5 text-white/70 transition-colors hover:bg-white/10"
-                    aria-label="Carrinho"
+                    aria-label="Ver carrinho"
                   >
                     <ShoppingCart className="h-4 w-4" />
                   </button>

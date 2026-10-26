@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useNoticeSlot } from '@/lib/noticeQueue';
 import { X, Download, Mail, CheckCircle2, Loader2, ShoppingBag, Gift } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
 import { useCart } from '@/context/CartContext';
@@ -97,6 +98,8 @@ const ExitIntentPopup: React.FC = () => {
   const [email, setEmail] = useState('');
   const [status, setStatus] = useState<'idle' | 'loading' | 'done'>('idle');
   const [waiverLoading, setWaiverLoading] = useState(false);
+  // Popup de saída fura a fila: entra na hora e esconde o aviso atual até fechar.
+  useNoticeSlot('exit-intent', open, { priority: 200, preempt: true });
 
   // Refs sempre atualizados para uso DENTRO dos listeners (evita stale closure).
   const itemsRef = useRef(items);

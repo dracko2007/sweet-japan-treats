@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import { Heart, Plus, Star } from 'lucide-react';
 import { Product } from '@/types';
 import { useCart } from '@/context/CartContext';
@@ -14,6 +15,8 @@ import { productEnglishName } from '@/utils/productName';
 import { cdnVideo } from '@/services/cloudinaryService';
 import { wishlistService } from '@/services/wishlistService';
 import { useWishlist } from '@/hooks/useWishlist';
+import { useTilt } from '@/hooks/useTilt';
+import { ToastAction } from '@/components/ui/toast';
 
 interface CompactProductCardProps {
   product: Product;
@@ -35,6 +38,8 @@ const CompactProductCard: React.FC<CompactProductCardProps> = ({ product }) => {
   const wishlist = useWishlist(user?.id);
   const isFavorite = wishlist.some((w) => w.productId === product.id);
   const [isHovered, setIsHovered] = useState(false);
+  const location = useLocation();
+  const tilt = useTilt();
 
   const variants = getVariants(product);
   const firstVariant = [...variants].sort((a, b) => a.price - b.price)[0];
@@ -53,7 +58,15 @@ const CompactProductCard: React.FC<CompactProductCardProps> = ({ product }) => {
   const handleToggleFavorite = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!user) {
-      toast({ title: 'Entre para favoritar', variant: 'destructive' });
+      toast({
+        title: 'Entre para salvar seus favoritos',
+        description: 'Leva poucos segundos e sua lista fica salva em qualquer aparelho.',
+        action: (
+          <ToastAction altText="Entrar" onClick={() => navigate('/login', { state: { from: location.pathname } })}>
+            Entrar
+          </ToastAction>
+        ),
+      });
       return;
     }
     if (isFavorite) {
@@ -75,157 +88,144 @@ const CompactProductCard: React.FC<CompactProductCardProps> = ({ product }) => {
     toast({ title: 'Adicionado ao carrinho', description: name });
   };
 
+  const openProduct = () => navigate(`/produto/${product.id}`);
+
   return (
-    <article
-      onClick={(e: React.MouseEvent<HTMLElement>) => {
-        const target = e.currentTarget;
-        const rect = target.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
-
-        const ripple = document.createElement('div');
-        ripple.style.position = 'absolute';
-        ripple.style.left = x + 'px';
-        ripple.style.top = y + 'px';
-        ripple.style.width = '20px';
-        ripple.style.height = '20px';
-        ripple.style.backgroundColor = 'rgba(255, 105, 180, 0.6)';
-        ripple.style.borderRadius = '50%';
-        ripple.style.pointerEvents = 'none';
-        ripple.style.animation = 'ripple-expand 0.6s ease-out forwards';
-        ripple.className = 'ripple-effect';
-
-        target.appendChild(ripple);
-        setTimeout(() => ripple.remove(), 600);
-        navigate(`/produto/${product.id}`);
-      }}
+    <motion.article
+      onClick={openProduct}
       onKeyDown={(event) => {
         if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) {
           event.preventDefault();
-          navigate(`/produto/${product.id}`);
+          openProduct();
         }
       }}
+      {...tilt.handlers}
+      style={tilt.cardStyle}
+      whileTap={tilt.enabled ? undefined : { scale: 0.97 }}
       role="link"
       tabIndex={0}
       aria-label={`${name} — ${formatPrice(price, currency)}`}
-      className="product-depth-card group relative cursor-pointer overflow-hidden rounded-2xl border border-pink-100/60 bg-white shadow-sm transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-500 focus-visible:ring-offset-2 hover:scale-110 hover:-translate-y-3 hover:border-pink-300 hover:shadow-2xl hover:shadow-pink-300/60 flex flex-col hover:z-10"
-      style={{
-        perspective: '1000px',
-      } as React.CSSProperties}
+      className="group relative flex cursor-pointer flex-col overflow-hidden rounded-2xl border border-pink-100/60 bg-white shadow-sm transition-[box-shadow,border-color] duration-300 will-change-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-500 focus-visible:ring-offset-2 hover:z-10 hover:border-pink-300 hover:shadow-2xl hover:shadow-pink-300/50"
     >
       <div
-        className="aspect-square bg-gradient-to-br from-white via-pink-50/35 to-fuchsia-50/50 relative overflow-hidden group-hover:bg-gradient-to-br group-hover:from-pink-50 group-hover:via-fuchsia-50 group-hover:to-pink-100/80 transition-all duration-500"
+        className="relative aspect-square overflow-hidden bg-gradient-to-br from-white via-pink-50/35 to-fuchsia-50/50 transition-colors duration-500 group-hover:from-pink-50 group-hover:via-fuchsia-50 group-hover:to-pink-100/80"
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
-        style={{
-          transform: 'perspective(1000px) rotateX(0deg)',
-          transformStyle: 'preserve-3d',
-        } as React.CSSProperties}
       >
-        {product.video && product.videoCover ? (
-          /* Vídeo é a capa — toca direto, sem precisar de hover. Poster cobre
-             até o vídeo carregar. Passa por `cdnVideo`: o card tem ~300px, mas
-             o arquivo original tem 2,4 MB e era baixado inteiro na home. */
-          <video
-            key={product.video}
-            src={cdnVideo(product.video, 480)}
-            poster={product.thumbnail || product.image}
-            preload="none"
-            autoPlay
-            loop
-            muted
-            playsInline
-            className="absolute inset-0 w-full h-full object-cover group-hover:scale-[1.04] transition-transform duration-500"
-            onError={(e) => { (e.target as HTMLVideoElement).style.display = 'none'; }}
-          />
-        ) : product.video ? (
-          <>
-            {/* Poster sempre visível — vídeo só carrega/toca no hover para não travar a página */}
+        {/* Camada da mídia: desliza contra a inclinação (parallax) — dá a profundidade. */}
+        <motion.div className="absolute -inset-2" style={tilt.innerStyle}>
+          {product.video && product.videoCover ? (
+            /* Vídeo é a capa — toca direto, sem precisar de hover. Poster cobre
+               até o vídeo carregar. Passa por `cdnVideo`: o card tem ~300px, mas
+               o arquivo original tem 2,4 MB e era baixado inteiro na home. */
+            <video
+              key={product.video}
+              src={cdnVideo(product.video, 480)}
+              poster={product.thumbnail || product.image}
+              preload="none"
+              autoPlay
+              loop
+              muted
+              playsInline
+              className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
+              onError={(e) => { (e.target as HTMLVideoElement).style.display = 'none'; }}
+            />
+          ) : product.video ? (
+            <>
+              {/* Poster sempre visível — vídeo só carrega/toca no hover para não travar a página */}
+              <img
+                src={product.thumbnail || product.image}
+                alt={name}
+                loading="lazy"
+                className={`absolute inset-0 h-full w-full object-contain p-5 transition-all duration-500 group-hover:scale-[1.04] ${isHovered ? 'opacity-0' : 'opacity-100'}`}
+              />
+              {isHovered && (
+                <video
+                  key={product.video}
+                  src={cdnVideo(product.video, 480)}
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
+                  className="absolute inset-0 h-full w-full object-cover"
+                  onError={(e) => { (e.target as HTMLVideoElement).style.display = 'none'; }}
+                />
+              )}
+            </>
+          ) : (
             <img
               src={product.thumbnail || product.image}
               alt={name}
               loading="lazy"
-              className={`absolute inset-0 w-full h-full object-contain p-3 group-hover:scale-[1.04] transition-all duration-500 ${isHovered ? 'opacity-0' : 'opacity-100'}`}
+              className="absolute inset-0 h-full w-full object-contain p-5 drop-shadow-[0_10px_12px_rgba(157,23,77,0.10)] transition-transform duration-500 group-hover:scale-[1.08]"
             />
-            {isHovered && (
-              <video
-                key={product.video}
-                src={cdnVideo(product.video, 480)}
-                autoPlay
-                loop
-                muted
-                playsInline
-                className="absolute inset-0 w-full h-full object-cover"
-                onError={(e) => { (e.target as HTMLVideoElement).style.display = 'none'; }}
-              />
-            )}
-          </>
-        ) : (
-          <img
-            src={product.thumbnail || product.image}
-            alt={name}
-            loading="lazy"
-            className="absolute inset-0 w-full h-full object-contain p-3 group-hover:scale-125 group-hover:-rotate-3 transition-all duration-500"
-          />
-        )}
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-tr from-transparent via-white/0 to-white/40 opacity-0 transition-opacity duration-300 group-hover:opacity-100" aria-hidden="true" />
+          )}
+        </motion.div>
+        {/* Brilho de vidro que acompanha o mouse (só no computador). */}
+        <motion.div
+          className="pointer-events-none absolute inset-0 mix-blend-soft-light"
+          style={tilt.glareStyle}
+          aria-hidden="true"
+        />
         {promoActive && (
           <span className="absolute left-2 top-2 rounded-lg bg-gradient-to-r from-red-500 to-pink-500 px-2 py-1 text-[10px] font-black text-white shadow-md">
             -{product.discountPercent}%
           </span>
         )}
         <button
+          type="button"
           onClick={handleToggleFavorite}
           className={cn(
             'absolute right-2 top-2 flex h-9 w-9 items-center justify-center rounded-xl backdrop-blur-lg transition-all duration-300 hover:scale-110 active:scale-95',
             isFavorite
-              ? 'bg-gradient-to-br from-pink-500 to-pink-600 text-white shadow-lg shadow-pink-500/40 animate-pulse'
+              ? 'bg-gradient-to-br from-pink-500 to-pink-600 text-white shadow-lg shadow-pink-500/40'
               : 'bg-white/90 text-slate-600 shadow-md ring-1 ring-white/90 hover:bg-white hover:text-pink-500 hover:shadow-lg'
           )}
           aria-label={isFavorite ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
+          aria-pressed={isFavorite}
         >
-          <Heart className={cn('w-5 h-5 transition-all', isFavorite && 'fill-current animate-bounce')} />
+          <Heart className={cn('h-5 w-5 transition-all', isFavorite && 'animate-[pop_0.35s_ease-out] fill-current')} />
         </button>
         {isSoldOut && (
-          <div className="absolute inset-0 bg-white/70 flex items-center justify-center">
+          <div className="absolute inset-0 flex items-center justify-center bg-white/70">
             <span className="text-[11px] font-black text-red-600">ESGOTADO</span>
           </div>
         )}
       </div>
 
-      <div className="flex flex-1 flex-col p-3 sm:p-3.5 gap-2 bg-gradient-to-b from-transparent to-pink-50/30 group-hover:to-pink-100/50 transition-all duration-300">
-        <p className="mb-1 min-h-[2.5em] text-[13px] font-bold leading-snug text-slate-800 line-clamp-2 group-hover:text-pink-700 transition-colors">{name}</p>
+      <div className="flex flex-1 flex-col gap-1 bg-gradient-to-b from-transparent to-pink-50/30 p-3 transition-colors duration-300 group-hover:to-pink-100/50 sm:p-3.5">
+        <p className="min-h-[2.5em] text-[13px] font-bold leading-snug text-slate-800 line-clamp-2 transition-colors group-hover:text-pink-700">{name}</p>
         {(product.rating || product.salesCount) ? (
-          <div className="mb-2 flex items-center gap-1 text-[10px] text-slate-500">
+          <div className="flex items-center gap-1 text-[10px] text-slate-500">
             {product.rating ? (
-              <span className="flex items-center gap-0.5 text-amber-500 font-bold">
-                <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+              <span className="flex items-center gap-0.5 font-bold text-amber-500">
+                <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
                 {product.rating.toFixed(1)}
               </span>
             ) : null}
             {product.rating && product.salesCount ? <span className="text-gray-300">·</span> : null}
             {product.salesCount ? <span>{formatCount(product.salesCount)} vendidos</span> : null}
           </div>
-        ) : (
-          <div className="mb-1.5" />
-        )}
-        <div className="mt-auto flex items-end justify-between gap-1">
-          <div>
+        ) : null}
+        <div className="mt-auto flex items-end justify-between gap-1 pt-1">
+          <div className="min-w-0">
             <p className={cn('text-base font-black leading-none tracking-tight', promoActive ? 'text-red-600' : 'text-pink-600')}>
               {formatPrice(price, currency)}
             </p>
             {promoActive && (
-              <p className="text-[10px] text-gray-400 line-through leading-none mt-0.5">
+              <p className="mt-0.5 text-[10px] leading-none text-gray-400 line-through">
                 {formatPrice(originalPrice, currency)}
               </p>
             )}
+          </div>
           {!isSoldOut && (
             <button
+              type="button"
               onClick={handleAddToCart}
-              className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-pink-500 via-pink-600 to-fuchsia-600 text-white shadow-lg shadow-pink-500/30 transition-all duration-300 hover:scale-125 hover:-rotate-6 hover:shadow-2xl active:scale-95 group-hover:translate-y-1"
+              className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-pink-500 via-pink-600 to-fuchsia-600 text-white shadow-lg shadow-pink-500/30 transition-all duration-300 hover:-rotate-6 hover:scale-110 hover:shadow-xl active:scale-90"
               aria-label={cartQuantity > 0 ? `Adicionar mais — ${cartQuantity} no carrinho` : 'Adicionar ao carrinho'}
             >
-              <Plus className="w-5 h-5 transition-all" />
+              <Plus className="h-5 w-5" />
               {cartQuantity > 0 && (
                 <span className="absolute -right-2 -top-2 flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-white bg-orange-500 px-1 text-[10px] font-black text-white shadow-md">
                   {cartQuantity}
@@ -235,8 +235,7 @@ const CompactProductCard: React.FC<CompactProductCardProps> = ({ product }) => {
           )}
         </div>
       </div>
-      </div>
-    </article>
+    </motion.article>
   );
 };
 

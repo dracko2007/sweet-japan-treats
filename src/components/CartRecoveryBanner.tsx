@@ -5,6 +5,7 @@ import { useCart } from '@/context/CartContext';
 import { useUser } from '@/context/UserContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { cartAbandonmentService } from '@/services/cartAbandonmentService';
+import { useNoticeSlot } from '@/lib/noticeQueue';
 
 const DISMISS_KEY = 'cart_recovery_dismissed_at';
 
@@ -20,6 +21,7 @@ const CartRecoveryBanner: React.FC = () => {
   const { t } = useLanguage();
   const [abandoned, setAbandoned] = useState<{ itemCount: number; items: Array<{ name: string }> } | null>(null);
   const [visible, setVisible] = useState(false);
+  const slot = useNoticeSlot('cart-recovery', visible && abandoned !== null, { priority: 60 });
 
   useEffect(() => {
     // Só mostra se o carrinho ATUAL está vazio (usuário voltou sem os itens).
@@ -47,7 +49,7 @@ const CartRecoveryBanner: React.FC = () => {
     navigate('/carrinho');
   };
 
-  if (!visible || !abandoned) return null;
+  if (!visible || !abandoned || !slot) return null;
 
   return (
     <div className="fixed bottom-[calc(1rem+var(--bottom-nav-h))] left-4 right-4 sm:left-auto sm:right-4 sm:w-96 z-50 animate-in slide-in-from-bottom-4 duration-300">

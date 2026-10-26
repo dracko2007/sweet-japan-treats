@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Download, Share, X, Plus } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
+import { useNoticeSlot } from '@/lib/noticeQueue';
 
 type Platform = 'android' | 'ios' | null;
 
@@ -19,6 +20,9 @@ const isStandalone = (): boolean =>
 
 const DISMISSED_KEY = 'pwa_install_dismissed';
 const DISMISS_TTL   = 7 * 24 * 60 * 60 * 1000; // 7 dias
+// Convite só depois que o cliente já conheceu a loja — antes aparecia em 3s,
+// junto com o banner de cookies, antes mesmo de ver um produto.
+const SHOW_AFTER_MS = 25_000;
 
 const wasDismissed = (): boolean => {
   try {
@@ -43,6 +47,7 @@ const InstallPrompt: React.FC = () => {
   const [visible,  setVisible]    = useState(false);
   const [iosGuide, setIosGuide]   = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const slot = useNoticeSlot('install', visible, { priority: 40 });
 
   useEffect(() => {
     // Não mostra se: já instalado, já dispensado recentemente, ou desktop
@@ -52,20 +57,27 @@ const InstallPrompt: React.FC = () => {
     if (!p) return;
     setPlatform(p);
 
+    const mountedAt = Date.now();
+
     if (p === 'android') {
       // Captura o evento nativo de instalação do Chrome
+      let showTimer: ReturnType<typeof setTimeout> | undefined;
       const handler = (e: Event) => {
         e.preventDefault();
         setDeferredPrompt(e as BeforeInstallPromptEvent);
-        setVisible(true);
+        clearTimeout(showTimer);
+        showTimer = setTimeout(() => setVisible(true), Math.max(0, SHOW_AFTER_MS - (Date.now() - mountedAt)));
       };
       window.addEventListener('beforeinstallprompt', handler);
-      return () => window.removeEventListener('beforeinstallprompt', handler);
+      return () => {
+        clearTimeout(showTimer);
+        window.removeEventListener('beforeinstallprompt', handler);
+      };
     }
 
     if (p === 'ios') {
-      // iOS não tem evento nativo — mostra instrução manual após 3s
-      const t = setTimeout(() => setVisible(true), 3_000);
+      // iOS não tem evento nativo — mostra instrução manual depois de um tempo na loja
+      const t = setTimeout(() => setVisible(true), SHOW_AFTER_MS);
       return () => clearTimeout(t);
     }
   }, []);
@@ -85,7 +97,7 @@ const InstallPrompt: React.FC = () => {
     setVisible(false);
   };
 
-  if (!visible) return null;
+  if (!visible || !slot) return null;
 
   // ── Banner Android ───────────────────────────────────────────────────────────
   if (platform === 'android') {

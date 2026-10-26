@@ -8,7 +8,7 @@ import wiseRate from './_handlers/wise-rate.js';
 
 const PUBLIC_FIELDS = [
   'sku', 'gtin', 'name', 'description', 'category', 'prices', 'variants',
-  'image', 'thumbnail', 'gallery', 'video', 'videoCover', 'flavor',
+  'image', 'thumbnail', 'gallery', 'video', 'videoCover', 'model3d', 'flavor',
   'deliveryRestrict', 'origin', 'discountPercent', 'i18n', 'weightGrams',
   'tags', 'featured', 'featuredAt', 'heroCarousel', 'heroCarouselAt',
   'isNew', 'salesCount', 'rating', 'stock', 'promoGift',
