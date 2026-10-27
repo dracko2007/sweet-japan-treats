@@ -41,12 +41,18 @@ async function handleDashboard(req, res) {
     const db = adminDb();
     // Firestore has no arbitrary GROUP BY for the product/payment breakdowns. The scan
     // remains server-side and projects only fields needed by this administrative report.
-    const [ordersSnapshot, productsSnapshot] = await Promise.all([
+    const [ordersSnapshot, productsSnapshot, costsSnapshot] = await Promise.all([
       db.collection('orders').select(...ORDER_FIELDS).get(),
       db.collection('products').select('name', 'cost').get(),
+      db.collection('productCosts').select('cost').get(),
     ]);
     const orders = ordersSnapshot.docs.map((document) => ({ id: document.id, ...document.data() }));
-    const products = productsSnapshot.docs.map((document) => ({ id: document.id, ...document.data() }));
+    // Custo de `productCosts/{id}`; o `cost` antigo do produto só como reserva.
+    const costs = new Map(costsSnapshot.docs.map((document) => [document.id, document.data().cost]));
+    const products = productsSnapshot.docs.map((document) => {
+      const data = document.data();
+      return { id: document.id, ...data, cost: costs.has(document.id) ? costs.get(document.id) : data.cost };
+    });
 
     res.setHeader('Cache-Control', 'private, no-store');
     res.status(200).json({ ok: true, ...buildDashboardAnalytics(orders, products) });

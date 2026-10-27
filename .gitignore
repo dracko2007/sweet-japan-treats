@@ -116,3 +116,6 @@ clear-storage.html
 email-template-*.html
 .claude/
 CLAUDE.md.tar.gz
+
+# Backups locais de dados de produção (scripts/migrate-*.mjs)
+backups/

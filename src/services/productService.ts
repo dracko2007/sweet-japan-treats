@@ -18,6 +18,7 @@ import {
   increment,
   serverTimestamp,
   deleteField,
+  writeBatch,
 } from 'firebase/firestore';
 import type { CatalogSnapshot } from '@/services/catalogCache';
 import { gravarCatalogo, lerCatalogo, limparCatalogo } from '@/services/catalogCache';
@@ -25,6 +26,7 @@ import { Product } from '@/types';
 import { cdnImage } from '@/services/cloudinaryService';
 import { products as defaultProducts } from '@/data/products';
 import { ensureAdminAuth } from '@/utils/adminAuth';
+import { normalizeCost, PRODUCT_COSTS_COL } from '@/services/productCostService';
 
 const isDev = import.meta.env.DEV;
 const devLog = isDev ? console.log.bind(console) : () => {};
@@ -250,16 +252,31 @@ export const productService = {
   async save(product: Product): Promise<void> {
     if (!db) throw new Error('Firebase indisponível');
     await ensureAdminAuth();
-    const { id, ...rest } = product;
+    // O custo nunca vai para `products/{id}` (leitura pública): fica em
+    // `productCosts/{id}`, que só o admin lê. `cost` ausente (undefined) quer
+    // dizer "não mexer" — o custo salvo antes é preservado.
+    const { id, cost, ...rest } = product;
     const cleanRest = stripUndefined(rest) as Record<string, unknown>;
     Object.entries(rest).forEach(([key, value]) => {
       if (value === undefined) cleanRest[key] = deleteField();
     });
-    await setDoc(
+    const batch = writeBatch(db);
+    // Junto com o custo novo, limpa o `cost` antigo que ficava no doc público.
+    // Sem custo informado, não mexe: o antigo só sai quando há um novo.
+    if (cost !== undefined) cleanRest.cost = deleteField();
+    batch.set(
       doc(db, COL, id),
       { ...cleanRest, __deleted: false, updatedAt: serverTimestamp() },
       { merge: true }
     );
+    if (cost !== undefined) {
+      batch.set(
+        doc(db, PRODUCT_COSTS_COL, id),
+        { cost: normalizeCost(cost), updatedAt: serverTimestamp() },
+        { merge: true }
+      );
+    }
+    await batch.commit();
     invalidateProductCache();
   },
 

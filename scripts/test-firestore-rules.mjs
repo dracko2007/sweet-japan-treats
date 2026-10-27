@@ -7,6 +7,7 @@ import {
 import {
   collection,
   deleteDoc,
+  deleteField,
   doc,
   getDoc,
   getDocs,
@@ -76,6 +77,10 @@ const profile = {
 
 try {
   await environment.clearFirestore();
+  // As regras exigem o registro ativo em admins/{uid}; a claim sozinha não basta.
+  await environment.withSecurityRulesDisabled(async (context) => {
+    await setDoc(doc(context.firestore(), 'admins', 'admin1'), { active: true, role: 3 });
+  });
 
   await succeeds(setDoc(doc(userDb, 'users', 'u1'), profile), 'owner creates constrained profile');
   await fails(
@@ -135,6 +140,37 @@ try {
   await succeeds(setDoc(doc(adminDb, 'products', 'p1'), { name: 'Produto' }), 'admin writes product');
   await succeeds(getDoc(doc(anonymousDb, 'products', 'p1')), 'public reads product');
   await fails(setDoc(doc(anonymousDb, 'products', 'p2'), { name: 'Ataque' }), 'public cannot write product');
+  await fails(
+    setDoc(doc(adminDb, 'products', 'p3'), { name: 'Produto', cost: 500 }),
+    'cost cannot live in the public product doc',
+  );
+  await succeeds(
+    setDoc(doc(adminDb, 'productCosts', 'p1'), { cost: 500, updatedAt: serverTimestamp() }),
+    'admin writes product cost',
+  );
+  await succeeds(getDoc(doc(adminDb, 'productCosts', 'p1')), 'admin reads product cost');
+  await succeeds(getDocs(collection(adminDb, 'productCosts')), 'admin lists product costs');
+  await fails(getDoc(doc(anonymousDb, 'productCosts', 'p1')), 'public cannot read product cost');
+  await fails(getDoc(doc(userDb, 'productCosts', 'p1')), 'customer cannot read product cost');
+  await fails(getDocs(collection(userDb, 'productCosts')), 'customer cannot list product costs');
+  await fails(setDoc(doc(userDb, 'productCosts', 'p1'), { cost: 1 }), 'customer cannot write product cost');
+  await fails(setDoc(doc(adminDb, 'productCosts', 'p1'), { cost: -1 }), 'cost cannot be negative');
+  await fails(
+    setDoc(doc(adminDb, 'productCosts', 'p1'), { cost: 500, note: 'x' }),
+    'product cost doc only takes cost/updatedAt',
+  );
+  // Produto antigo, com `cost` ainda no doc público (antes da migração).
+  await environment.withSecurityRulesDisabled(async (context) => {
+    await setDoc(doc(context.firestore(), 'products', 'legacy'), { name: 'Antigo', cost: 300 });
+  });
+  await fails(
+    updateDoc(doc(adminDb, 'products', 'legacy'), { name: 'Editado' }),
+    'editing a legacy product must also drop its public cost',
+  );
+  await succeeds(
+    setDoc(doc(adminDb, 'products', 'legacy'), { name: 'Editado', cost: deleteField() }, { merge: true }),
+    'admin save removes the legacy public cost',
+  );
 
   await succeeds(
     setDoc(doc(adminDb, 'coupons', 'PRIVATE30'), {

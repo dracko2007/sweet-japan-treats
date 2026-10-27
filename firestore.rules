@@ -187,7 +187,9 @@ service cloud.firestore {
 
     match /products/{productId} {
       allow read: if true;
-      allow create, update, delete: if isAdmin();
+      // Leitura pública: o custo NÃO pode morar aqui (vai em productCosts).
+      allow create, update: if isAdmin() && !('cost' in request.resource.data);
+      allow delete: if isAdmin();
 
       // Agregado rating/reviewCount vindo de avaliações reais (reviews/{id}).
       // Só aceita quando, na MESMA escrita, o doc `reviews/{productId}_{uid}`
@@ -207,6 +209,16 @@ service cloud.firestore {
         && request.resource.data.reviewCount == resource.data.get('reviewCount', 0) + 1
         && request.resource.data.rating is number
         && request.resource.data.rating >= 0 && request.resource.data.rating <= 5;
+    }
+
+    // Custo de aquisição de cada produto (id igual ao de products/{id}).
+    // Só o admin; o servidor lê pelo Admin SDK ao montar o pedido.
+    match /productCosts/{productId} {
+      allow read, delete: if isAdmin();
+      allow create, update: if isAdmin()
+        && request.resource.data.keys().hasOnly(['cost', 'updatedAt'])
+        && request.resource.data.cost is number
+        && request.resource.data.cost >= 0;
     }
 
     match /siteContent/{docId} {

@@ -263,15 +263,10 @@ const ProductManager: React.FC = () => {
     setTagInput('');
 };
   const openEdit = (p: Product) => {
-    const vs = getVariants(p);
-    const cost = p.cost || 0;
-    const recalcVs = cost > 0
-      ? vs.map((v, i) => i === 0 ? { ...v, price: Math.round(cost * 2) } : v)
-      : vs;
-    const recalcPrices = cost > 0
-      ? { ...p.prices, small: Math.round(cost * 2) }
-      : p.prices;
-    setEditing({ ...p, gallery: p.gallery ? [...p.gallery] : [p.image], variants: recalcVs, prices: recalcPrices });
+    // Abre com o preço salvo. O preço só é recalculado pelo custo quando o
+    // custo é digitado (campo Custo): recalcular aqui trocava sozinho o preço
+    // arredondado à mão (ex.: ¥980 virava ¥960) ao salvar qualquer outra coisa.
+    setEditing({ ...p, gallery: p.gallery ? [...p.gallery] : [p.image], variants: getVariants(p) });
     setIsNew(false);
     setTagInput('');
   };
@@ -565,7 +560,8 @@ const ProductManager: React.FC = () => {
         image: coverUrl || editing.image || '',
         thumbnail: thumbnailUrl || undefined,
         gallery: galleryUrls.filter(Boolean),
-        cost: Number(editing.cost) || 0,
+        // undefined = custo não carregado/não informado → o salvo é mantido.
+        cost: editing.cost === undefined ? undefined : Number(editing.cost) || 0,
         variants: cleanVariants.length ? cleanVariants : undefined,
         prices: { small, large },
         packageDimensionsCm: packageDimensionsCm || undefined,

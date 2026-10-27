@@ -384,8 +384,17 @@ async function handleCreate(req, res) {
     const baseProductIds = requestedItems.map((item) => item.productId.replace(/_promo$/, ''));
     if (campaign?.giftProductId) baseProductIds.push(String(campaign.giftProductId));
     const uniqueProductIds = [...new Set(baseProductIds)];
-    const productSnaps = await db.getAll(...uniqueProductIds.map((id) => db.collection('products').doc(id)));
-    const products = new Map(productSnaps.filter((snap) => snap.exists).map((snap) => [snap.id, { id: snap.id, ...snap.data() }]));
+    // O custo fica em `productCosts/{id}` (só admin lê); o `cost` antigo do
+    // doc público só vale para produto ainda não migrado.
+    const [productSnaps, costSnaps] = await Promise.all([
+      db.getAll(...uniqueProductIds.map((id) => db.collection('products').doc(id))),
+      db.getAll(...uniqueProductIds.map((id) => db.collection('productCosts').doc(id))),
+    ]);
+    const costs = new Map(costSnaps.filter((snap) => snap.exists).map((snap) => [snap.id, snap.data()?.cost]));
+    const products = new Map(productSnaps.filter((snap) => snap.exists).map((snap) => {
+      const data = snap.data();
+      return [snap.id, { id: snap.id, ...data, cost: costs.has(snap.id) ? costs.get(snap.id) : data.cost }];
+    }));
 
     const pessoa = { cpf: customer.cpf, userId: user.uid };
     const cpfIndexId = indiceDePessoaId(pessoa);

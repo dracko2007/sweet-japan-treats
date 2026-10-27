@@ -1,6 +1,8 @@
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
 import { Product } from '@/types';
 import { productService } from '@/services/productService';
+import { loadProductCosts, withCosts } from '@/services/productCostService';
+import { useUser } from '@/context/UserContext';
 
 const isDev = import.meta.env.DEV;
 const devWarn = isDev ? console.warn.bind(console) : () => {};
@@ -20,19 +22,44 @@ const ProductsContext = createContext<ProductsContextValue>({
 export const ProductsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const { isAdminAccount } = useUser();
+  // Custos (só admin). Ficam só na memória: nunca entram no cache do catálogo
+  // (IndexedDB), que é o mesmo para qualquer pessoa que use o aparelho.
+  const [costs, setCosts] = useState<Map<string, number> | null>(null);
+
+  const reloadCosts = useCallback(async () => {
+    try {
+      setCosts(await loadProductCosts());
+    } catch (e) {
+      devWarn('ProductsContext: custos indisponíveis:', e);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isAdminAccount) reloadCosts();
+    else setCosts(null);
+  }, [isAdminAccount, reloadCosts]);
 
   // refresh() sempre vai ao Firestore (ignora cache) — usado por botões manuais e após salvar
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      const merged = await productService.getMerged(true);
+      const [merged] = await Promise.all([
+        productService.getMerged(true),
+        isAdminAccount ? reloadCosts() : Promise.resolve(),
+      ]);
       setProducts(merged);
     } catch (e) {
       devWarn('ProductsContext refresh falhou:', e);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [isAdminAccount, reloadCosts]);
+
+  const visibleProducts = useMemo(
+    () => (isAdminAccount ? withCosts(products, costs) : products),
+    [products, costs, isAdminAccount],
+  );
 
   // Carregamento inicial: tenta cache primeiro (instantâneo).
   // Se retornar vazio (auth Firebase ainda não pronta), tenta de novo em 3s.
@@ -73,7 +100,7 @@ export const ProductsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   }, []);
 
   return (
-    <ProductsContext.Provider value={{ products, loading, refresh }}>
+    <ProductsContext.Provider value={{ products: visibleProducts, loading, refresh }}>
       {children}
     </ProductsContext.Provider>
   );
