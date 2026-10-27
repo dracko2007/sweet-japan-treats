@@ -179,6 +179,20 @@ export const productService = {
     throw new Error('Catálogo e Firestore indisponíveis');
   },
 
+  /** Produtos ocultos (só para o painel admin). O catálogo público não os
+   *  devolve — e nem deve, senão apareceriam na vitrine. Não entram no cache. */
+  async getHidden(): Promise<Product[]> {
+    if (!db) return [];
+    const snap = await getDocs(query(collection(db, COL), where('hidden', '==', true)));
+    const items: Product[] = [];
+    snap.forEach((d) => {
+      const data = d.data() as Record<string, unknown>;
+      if (data.__deleted === true) return;
+      items.push(withCdnImages({ id: d.id, ...data } as Product));
+    });
+    return items;
+  },
+
   /** Sincroniza o cache local com o Firestore e devolve o retrato atual.
    *  Primeira visita: leitura completa. Depois: só o delta. */
   async sync(): Promise<CatalogSnapshot | null> {

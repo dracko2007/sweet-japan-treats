@@ -132,7 +132,8 @@ const emptyForm = (): Product => ({
 });
 
 const ProductManager: React.FC = () => {
-  const { products, refresh } = useProducts();
+  // Inclui os ocultos: é aqui que o admin os encontra para republicar.
+  const { adminProducts: products, refresh } = useProducts();
   const { toast } = useToast();
   const { permissions } = useUser();
   const { language } = useLanguage();

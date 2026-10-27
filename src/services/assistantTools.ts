@@ -44,6 +44,8 @@ export interface ToolContext {
   allowCartChanges?: boolean;
   /** Sessão de admin: libera painel financeiro, margem e estoque (assistantAdminTools.ts). */
   isAdmin?: boolean;
+  /** Admin: catálogo com os ocultos, usado só pelas ferramentas de admin. */
+  adminProducts?: Product[];
 }
 
 // Pedido explícito de carrinho, em pt/en/ja.

@@ -18,7 +18,7 @@ interface Row {
 }
 
 const MarginAudit: React.FC = () => {
-  const { products } = useProducts();
+  const { adminProducts: products } = useProducts();
   const [search, setSearch] = useState('');
   const [onlyProblems, setOnlyProblems] = useState(true);
 

@@ -30,3 +30,15 @@ export function withCosts(products: Product[], costs: Map<string, number> | null
   if (!costs || costs.size === 0) return products;
   return products.map((p) => (costs.has(p.id) ? { ...p, cost: costs.get(p.id) } : p));
 }
+
+/** Lista do painel admin: os publicados e, depois, os ocultos que ainda não
+ *  estão na lista, todos com o custo junto. */
+export function mergeAdminProducts(
+  visible: Product[],
+  hidden: Product[],
+  costs: Map<string, number> | null,
+): Product[] {
+  if (hidden.length === 0) return visible;
+  const ids = new Set(visible.map((p) => p.id));
+  return [...visible, ...withCosts(hidden.filter((p) => !ids.has(p.id)), costs)];
+}

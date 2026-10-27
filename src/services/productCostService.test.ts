@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/config/firebase', () => ({ db: null }));
 
-import { loadProductCosts, normalizeCost, withCosts } from './productCostService';
+import { loadProductCosts, mergeAdminProducts, normalizeCost, withCosts } from './productCostService';
 import type { Product } from '@/types';
 
 const product = (id: string, extra: Partial<Product> = {}) => ({ id, name: id, ...extra }) as Product;
@@ -31,5 +31,18 @@ describe('productCostService', () => {
 
   it('sem Firebase devolve mapa vazio', async () => {
     await expect(loadProductCosts()).resolves.toEqual(new Map());
+  });
+
+  it('lista do admin inclui os ocultos, com custo e sem repetir', () => {
+    const visible = [product('a', { cost: 100 })];
+    const hidden = [product('h', { hidden: true }), product('a', { hidden: true })];
+    const result = mergeAdminProducts(visible, hidden, new Map([['h', 250]]));
+    expect(result.map((p) => p.id)).toEqual(['a', 'h']);
+    expect(result[1]).toMatchObject({ hidden: true, cost: 250 });
+  });
+
+  it('sem ocultos devolve a lista de publicados', () => {
+    const visible = [product('a')];
+    expect(mergeAdminProducts(visible, [], null)).toBe(visible);
   });
 });

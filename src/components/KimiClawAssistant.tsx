@@ -93,7 +93,7 @@ const AGENT_HISTORY_MESSAGES = 8;
 const KimiClawAssistant: React.FC = () => {
   const { addToCart, clearCart, items: cartItems } = useCart();
   const { language, setLanguage, t, selectedCountry } = useLanguage();
-  const { products } = useProducts();
+  const { products, adminProducts } = useProducts();
   const { user, updateProfile } = useUser();
   const navigate = useNavigate();
   const location = useLocation();
@@ -1269,7 +1269,7 @@ const KimiClawAssistant: React.FC = () => {
       });
     const country = selectedCountry || 'Brasil';
     const locale = { country, currencyCode: getCurrencyByCountry(country), language: lang };
-    const ctx: ToolContext = { products, cartItems, country, language: lang, addToCart, isAdmin };
+    const ctx: ToolContext = { products, cartItems, country, language: lang, addToCart, isAdmin, adminProducts: isAdmin ? adminProducts : undefined };
 
     setIsTyping(true);
     const turn = await runAgentTurn({

@@ -171,7 +171,7 @@ export async function runAgentTurn({ convo, locale, ctx, ask, onTool, deadlineMs
     for (const call of reply.toolCalls) {
       onTool?.(call.function.name);
       const out = ADMIN_TOOL_NAMES.has(call.function.name)
-        ? await runAdminTool(call.function.name, call.function.arguments, { products: ctx.products, isAdmin: Boolean(ctx.isAdmin), fetchDashboard })
+        ? await runAdminTool(call.function.name, call.function.arguments, { products: ctx.adminProducts ?? ctx.products, isAdmin: Boolean(ctx.isAdmin), fetchDashboard })
         : runAssistantTool(call.function.name, call.function.arguments, ctx);
       for (const p of out.ui?.products || []) if (!products.some((s) => s.id === p.id)) products.push(p);
       for (const a of out.ui?.actions || []) if (!actions.includes(a)) actions.push(a);
