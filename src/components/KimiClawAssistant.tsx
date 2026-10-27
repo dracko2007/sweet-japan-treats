@@ -1367,7 +1367,10 @@ const KimiClawAssistant: React.FC = () => {
     void runCommand(userText);
   };
 
-  const handleSuggestionClick = (skillText: string, searchKey: string) => {
+  // `agent: true` manda a pergunta escrita para o assistente com ferramentas
+  // (botões do admin: margem, faturamento…). Sem isso, vai a chave curta para as
+  // regras locais — que não sabem margem e respondiam com a recusa padrão.
+  const handleSuggestionClick = (skillText: string, searchKey: string, { agent = false } = {}) => {
     if (isTyping) return;
     setMessages(prev => [
       ...prev,
@@ -1378,7 +1381,7 @@ const KimiClawAssistant: React.FC = () => {
         timestamp: new Date(),
       },
     ]);
-    void runCommand(searchKey, { allowAgent: false });
+    void (agent ? runCommand(skillText) : runCommand(searchKey, { allowAgent: false }));
   };
 
   const handleConsentAction = async (accept: boolean, order?: any) => {
@@ -1675,25 +1678,25 @@ const KimiClawAssistant: React.FC = () => {
                 {isAdmin ? (
                   <>
                     <button
-                      onClick={() => handleSuggestionClick('Qual o faturamento desse mês?', 'faturamento')}
+                      onClick={() => handleSuggestionClick('Qual o faturamento desse mês?', 'faturamento', { agent: true })}
                       className="text-[11px] bg-green-500/10 hover:bg-green-500/20 border border-green-500/30 rounded-full px-2.5 py-1 text-green-700 dark:text-green-400 font-bold flex items-center gap-1 transition-all duration-200"
                     >
                       📊 {language === 'pt' ? 'Faturamento' : 'Revenue'}
                     </button>
                     <button
-                      onClick={() => handleSuggestionClick('Calcular frete do biore para Brasil', 'frete biore brasil')}
+                      onClick={() => handleSuggestionClick('Calcular frete do biore para Brasil', 'frete biore brasil', { agent: true })}
                       className="text-[11px] bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 rounded-full px-2.5 py-1 text-amber-700 dark:text-amber-400 font-bold flex items-center gap-1 transition-all duration-200"
                     >
                       ⚖️ {language === 'pt' ? 'Frete por Produto' : 'Product Shipping'}
                     </button>
                     <button
-                      onClick={() => handleSuggestionClick('Mostrar todos os produtos incluindo ocultos', 'mostrar produtos ocultos')}
+                      onClick={() => handleSuggestionClick('Mostrar os produtos ocultos', 'mostrar produtos ocultos', { agent: true })}
                       className="text-[11px] bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 rounded-full px-2.5 py-1 text-amber-700 dark:text-amber-400 font-medium transition-all duration-200"
                     >
                       👁️ {language === 'pt' ? 'Ver Catálogo Completo' : 'Full Catalog'}
                     </button>
                     <button
-                      onClick={() => handleSuggestionClick('Qual a margem do produto biore?', 'margem lucro produto')}
+                      onClick={() => handleSuggestionClick('Quais produtos têm a menor margem? Mostre custo e margem.', 'margem lucro produto', { agent: true })}
                       className="text-[11px] bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 rounded-full px-2.5 py-1 text-amber-700 dark:text-amber-400 font-medium transition-all duration-200"
                     >
                       📊 {language === 'pt' ? 'Margem/Custo' : 'Margin/Cost'}
