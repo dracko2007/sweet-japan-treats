@@ -282,8 +282,10 @@ const KimiClawAssistant: React.FC = () => {
   }, [location]);
 
   // Normalize text for search - remove accents and lowercase
-  const normalizeText = (text: string): string => {
-    return text.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  // Aceita campo vazio: um único produto sem descrição/sabor derrubava a busca
+  // inteira (TypeError) e o chat respondia "Desculpe, tive um problema".
+  const normalizeText = (text: string | null | undefined): string => {
+    return String(text ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
   };
 
   // Palavras de ligação/comando ignoradas na busca (pt/en)

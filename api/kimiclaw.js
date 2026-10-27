@@ -8,6 +8,7 @@ import { cert, getApps, initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { superAdminEmail } from './_lib/auth.js';
 import { buildProviders, chatWithFallback } from './_lib/ai-providers.js';
+import { containsUngroundedMoney, ungroundedMoney } from './_lib/money-grounding.js';
 import { ADMIN_AGENT_PROMPT, ADMIN_AGENT_TOOLS, AGENT_TOOLS, LANGUAGE_NAMES, agentGroundingText, buildAgentPrompt, detectLanguage, sanitizeAgentMessages } from './_lib/assistant-agent.js';
 
 // Tempo máximo da função: vercel.json → functions (a IA tem orçamento de 25s dentro disso).
@@ -48,21 +49,7 @@ setInterval(() => {
   }
 }, RATE_WINDOW_MS * 2);
 
-// ---------- Rede de segurança anti-alucinação numérica ----------
-// O prompt instrui a IA a nunca escrever preço/frete/desconto em texto, mas
-// prompt não é garantia — LLM é probabilístico. Esta é a última linha de
-// defesa: qualquer valor monetário na resposta que não apareça literalmente
-// no conteúdo injetado (catálogo real + dados admin reais) é tratado como
-// possível alucinação e descarta a resposta inteira, caindo no fallback
-// determinístico do frontend (mesmo comportamento de uma falha de rede).
-const MONEY_TOKEN = /(R\$|¥|€|US\$|\$)\s?[\d][\d.,]*/g;
-
-function containsUngroundedMoney(aiText, groundingText) {
-  const found = aiText.match(MONEY_TOKEN);
-  if (!found) return false;
-  const normalizedGrounding = groundingText.replace(/\s+/g, '');
-  return found.some((token) => !normalizedGrounding.includes(token.replace(/\s+/g, '')));
-}
+// Rede de segurança anti-alucinação numérica: ver _lib/money-grounding.js.
 
 // ---------- Domínios autorizados ----------
 const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || '')
@@ -195,6 +182,8 @@ async function handleAgent(body, providers, res, isAdmin = false) {
 
   let out = await ask();
   if (!out.model) {
+    // Só status/provedor das tentativas: nada da conversa vai para o log.
+    console.warn('[kimiclaw agent] sem resposta da IA', JSON.stringify({ admin: isAdmin, attempts: out.attempts }));
     res.status(502).json({ error: 'upstream-or-empty', attempts: out.attempts });
     return;
   }
@@ -219,6 +208,7 @@ async function handleAgent(body, providers, res, isAdmin = false) {
       return;
     }
     if (!out.text || containsUngroundedMoney(out.text, grounding)) {
+      console.warn('[kimiclaw agent] resposta descartada: valor fora das ferramentas', JSON.stringify({ admin: isAdmin, valores: ungroundedMoney(out.text || '', grounding).slice(0, 5) }));
       res.status(502).json({ error: 'ungrounded-money-detected' });
       return;
     }
