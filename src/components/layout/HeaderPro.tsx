@@ -356,18 +356,27 @@ const HeaderPro: React.FC = () => {
             </div>
           </div>
 
-          {/* Linha de navegação — some ao descer, volta ao subir */}
+          {/* Linha de navegação — some ao descer, volta ao subir. No celular
+              também: rola para o lado (o esmaecido à direita indica que há mais). */}
           <motion.div
             initial={false}
             animate={{ height: navHidden ? 0 : 'auto', opacity: navHidden ? 0 : 1 }}
             transition={collapse}
-            className="hidden overflow-hidden md:block"
+            className="overflow-hidden"
           >
             <nav
               aria-label="Navegação principal"
               onMouseLeave={() => setHoverHref(null)}
-              className="flex items-center gap-1 overflow-x-auto border-t border-pink-100/60 py-2 scrollbar-hide"
+              className="-mx-4 flex items-center gap-1 overflow-x-auto border-t border-pink-100/60 px-4 py-2 scrollbar-hide [mask-image:linear-gradient(to_right,black_85%,transparent)] md:mx-0 md:px-0 md:[mask-image:none]"
             >
+              {/* Celular: sem mega-menu (é de passar o mouse); vai direto à lista. */}
+              <Link
+                to="/produtos"
+                aria-current={productsActive ? 'page' : undefined}
+                className="shrink-0 whitespace-nowrap rounded-full bg-pink-600 px-3.5 py-1.5 text-sm font-bold text-white shadow-sm active:scale-95 md:hidden"
+              >
+                {t('nav.products')}
+              </Link>
               <button
                 type="button"
                 aria-expanded={megaOpen}
@@ -379,7 +388,7 @@ const HeaderPro: React.FC = () => {
                 }}
                 onMouseLeave={() => scheduleMega(false)}
                 className={cn(
-                  'relative flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-3.5 py-1.5 text-sm font-bold transition-colors',
+                  'relative hidden shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-3.5 py-1.5 text-sm font-bold transition-colors md:flex',
                   pillHref === '/produtos' || megaOpen ? 'text-pink-700' : 'text-pink-600',
                 )}
               >

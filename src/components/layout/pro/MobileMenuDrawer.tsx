@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { ChevronRight, Heart, UserCircle, X } from 'lucide-react';
+import { ChevronRight, Heart, LayoutGrid, UserCircle, X } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { useUser } from '@/context/UserContext';
 import type { ProductCategory } from '@/services/categoryService';
@@ -87,6 +87,22 @@ const MobileMenuDrawer: React.FC<Props> = ({ open, onClose, categories, counts, 
                 {t('navPro.shopByCategory')}
               </p>
               <motion.ul className="px-3" variants={LIST_VARIANTS} initial={reduce ? false : 'hidden'} animate="show">
+                <motion.li variants={ITEM_VARIANTS}>
+                  <Link
+                    to="/produtos"
+                    onClick={onClose}
+                    className={cn(
+                      'flex items-center gap-3 rounded-2xl px-2 py-2.5 transition-colors active:bg-pink-100',
+                      isActive('/produtos') && !categories.some((c) => isActive(`/produtos/${c.id}`)) ? 'bg-pink-50 text-pink-700' : 'text-slate-800',
+                    )}
+                  >
+                    <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-pink-600 text-white">
+                      <LayoutGrid className="h-5 w-5" aria-hidden />
+                    </span>
+                    <span className="flex-1 text-sm font-bold">{t('navPro.allProducts')}</span>
+                    <ChevronRight className="h-4 w-4 text-slate-300" aria-hidden />
+                  </Link>
+                </motion.li>
                 {categories.map((c) => (
                   <motion.li key={c.id} variants={ITEM_VARIANTS}>
                     <Link

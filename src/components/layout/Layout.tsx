@@ -53,10 +53,10 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           Nova atualização no painel de afiliado ({affiliateNotice})
         </Link>
       )}
-      {/* Cliente mobile: barra de confiança (~28px) + topo (80px) = 108px.
-          Desktop também inclui a navegação (~32px), totalizando ~140px.
+      {/* Cliente: barra de confiança (~28px) + topo (80px) + linha de
+          navegação (~49px no celular), ~157px; desktop ~140px.
           overflow-x-clip contém efeitos 3D sem criar um novo scroll container. */}
-      <main className={`flex-1 w-full max-w-full overflow-x-clip ${isAdminPage ? 'pt-20' : 'pt-[108px] md:pt-[140px]'} ${pro ? 'pb-16 md:pb-0' : ''}`}>
+      <main className={`flex-1 w-full max-w-full overflow-x-clip ${isAdminPage ? 'pt-20' : 'pt-[157px] md:pt-[140px]'} ${pro ? 'pb-16 md:pb-0' : ''}`}>
         {/* Transição de página só com opacidade: transform aqui quebraria o
             pin do ScrollTrigger no hero e os modais `fixed` das páginas. */}
         {pro && !reduce ? (
