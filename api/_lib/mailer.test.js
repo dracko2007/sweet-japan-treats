@@ -5,7 +5,7 @@ import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 
 const fetchMock = vi.fn();
 
-const { sendMail, unsubscribeUrl, wrapEmail, MAIL_FROM, MAIL_FROM_NOREPLY } = await import('./mailer.js');
+const { sendMail, unsubscribeUrl, wrapEmail, buildOrderEmail, MAIL_FROM, MAIL_FROM_NOREPLY } = await import('./mailer.js');
 
 const CARTA = { to: 'cliente@exemplo.com', subject: 'Confirme seu e-mail', html: '<p>oi</p>' };
 
@@ -163,5 +163,92 @@ describe('cancelamento de inscrição', () => {
     const corpo = enviado();
     expect(corpo.html).not.toMatch(/cancelar inscricao/i);
     expect(corpo.headers).toBeUndefined();
+  });
+});
+
+describe('buildOrderEmail: a conta inteira do pedido', () => {
+  // Pedido em reais com cupom, pontos, frete, taxa PS e PIX: as linhas fecham
+  // o total (90 − 10 − 5 = 75; 75 + 40 + 12 + 0 + 3 = 130).
+  const pedido = (extra = {}) => ({
+    orderNumber: 'SE-BR-123456',
+    customerName: 'Ana',
+    customerEmail: 'ana@exemplo.com',
+    currency: 'BRL',
+    totalPrice: 130,
+    paymentMethod: 'pix',
+    couponCode: 'BEMVINDO',
+    shippingCarrier: 'eraito',
+    shippingAddress: { name: 'Ana', phone: '119999', postalCode: '01000-000', city: 'Sao Paulo', address: 'Rua A, 1', country: 'Brasil' },
+    items: [
+      { productName: 'Pocky', variantLabel: 'Kit 3 unidades', quantity: 2, price: 45 },
+      { productName: 'Brinde KitKat', quantity: 1, price: 0, freeGift: true },
+    ],
+    priceBreakdown: {
+      subtotal: 90, couponDiscount: 10, pointsDiscount: 5, paymentDiscount: 0, products: 75,
+      shipping: 40, psFee: 12, importDuty: 0, paymentFee: 3, pixIof: 1, pixBankFee: 2, wiseYen: 0,
+    },
+    ...extra,
+  });
+
+  it('mostra itens, opção, brinde e cada linha da conta até o total', () => {
+    const { html } = buildOrderEmail(pedido());
+    expect(html).toContain('Pocky');
+    expect(html).toContain('(Kit 3 unidades)');
+    expect(html).toContain('Brinde');
+    expect(html).toContain('Subtotal dos produtos');
+    expect(html).toContain('Cupom BEMVINDO');
+    expect(html).toContain('− R$ 10');
+    expect(html).toContain('Pontos usados');
+    expect(html).toContain('Frete (Air Packet / E-Light)');
+    expect(html).toContain('R$ 40');
+    expect(html).toContain('Taxa PS');
+    expect(html).toContain('IOF do PIX');
+    expect(html).toContain('Tarifa bancaria do PIX');
+    expect(html).toContain('R$ 130');
+    expect(html).toContain('Pagamento:</strong> PIX');
+    expect(html).toContain('Rua A, 1');
+  });
+
+  it('esconde linhas zeradas e mostra o imposto dos EUA quando há', () => {
+    const { html } = buildOrderEmail(pedido({
+      currency: 'USD', paymentMethod: 'card', couponCode: '', totalPrice: 61.5,
+      priceBreakdown: { subtotal: 30, couponDiscount: 0, pointsDiscount: 0, products: 30, shipping: 20, psFee: 6, importDuty: 5.5, paymentFee: 0, pixIof: 0, pixBankFee: 0 },
+    }));
+    expect(html).not.toContain('Cupom');
+    expect(html).not.toContain('Pontos usados');
+    expect(html).not.toContain('PIX');
+    expect(html).toContain('Imposto de importacao dos EUA');
+    expect(html).toContain('$5.50');
+    expect(html).toContain('$61.50');
+  });
+
+  it('pedido Wise traz os ienes exatos para digitar, só para o cliente', () => {
+    const wise = pedido({ paymentMethod: 'wise', priceBreakdown: { ...pedido().priceBreakdown, paymentFee: 0, pixIof: 0, pixBankFee: 0, wiseYen: 3456 } });
+    expect(buildOrderEmail(wise).html).toContain('¥ 3,456');
+    expect(buildOrderEmail(wise, { store: true }).html).not.toContain('¥ 3,456');
+  });
+
+  it('pedido antigo sem priceBreakdown continua com itens e total', () => {
+    const { html } = buildOrderEmail(pedido({ priceBreakdown: undefined, currency: 'JPY', totalPrice: 5000 }));
+    expect(html).toContain('Pocky');
+    expect(html).toContain('¥5,000');
+    expect(html).not.toContain('Subtotal dos produtos');
+  });
+
+  it('escapa o que veio do cliente', () => {
+    const { html } = buildOrderEmail(pedido({
+      customerName: '<script>x</script>',
+      items: [{ productName: '<img src=x onerror=alert(1)>', variantLabel: '<b>', quantity: 1, price: 10 }],
+      shippingAddress: { address: '"><svg onload=1>' },
+    }));
+    expect(html).not.toContain('<script>');
+    expect(html).not.toContain('<img src=x');
+    expect(html).not.toContain('<svg');
+    expect(html).not.toContain('(<b>)');
+  });
+
+  it('loja recebe contato do cliente; cliente não recebe o próprio contato repetido', () => {
+    expect(buildOrderEmail(pedido(), { store: true }).html).toContain('ana@exemplo.com');
+    expect(buildOrderEmail(pedido()).html).not.toContain('119999');
   });
 });

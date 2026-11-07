@@ -105,6 +105,17 @@ function baseYen(product, variantId) {
   return roundYen(variant.price);
 }
 
+// Nome da opção como a loja mostra ("Kit 3 unidades"; nos antigos, Pequeno/Grande).
+// Vazio quando o produto só tem uma opção: não há o que distinguir.
+function variantLabel(product, variantId) {
+  if (Array.isArray(product.variants) && product.variants.length) {
+    if (product.variants.length < 2) return '';
+    return String(product.variants.find((entry) => entry.id === variantId)?.label || '');
+  }
+  if (!(product.prices?.small && product.prices?.large)) return '';
+  return variantId === 'small' ? 'Pequeno' : variantId === 'large' ? 'Grande' : '';
+}
+
 function discountedYen(product, variantId, campaign) {
   const base = baseYen(product, variantId);
   const productDiscount = Number(product.discountPercent || 0);
@@ -411,6 +422,7 @@ export function buildQuote({ requestedItems, products, country, prefecture, stat
       image: item.product.thumbnail || item.product.image || '',
       variantId: item.variantId,
       size: item.variantId,
+      variantLabel: variantLabel(item.product, item.variantId),
       quantity: item.quantity,
       unitYen: item.unitYen,
       // Preço unitário na moeda do pedido, exatamente o da tela.

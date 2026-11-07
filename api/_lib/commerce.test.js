@@ -40,6 +40,14 @@ describe('authoritative checkout quote', () => {
     expect(result.total).toBeGreaterThan(1);
   });
 
+  it('grava o nome da opção como a loja mostra (para o e-mail do pedido)', () => {
+    expect(quote().items[0].variantLabel).toBe('Pequeno');
+    const kit = { ...product, variants: [{ id: 'u', label: 'Unidade', price: 500 }, { id: 'kit-3', label: 'Kit 3 unidades', price: 1400 }] };
+    expect(quote({ products: new Map([['p1', kit]]), requestedItems: [{ productId: 'p1', variantId: 'kit-3', quantity: 1 }] }).items[0].variantLabel).toBe('Kit 3 unidades');
+    const unica = { ...product, variants: [{ id: 'u', label: 'Unidade', price: 500 }] };
+    expect(quote({ products: new Map([['p1', unica]]), requestedItems: [{ productId: 'p1', variantId: 'u', quantity: 1 }] }).items[0].variantLabel).toBe('');
+  });
+
   it('uses USD outside Brazil, Japan, and the eurozone', () => {
     expect(quote({ country: 'Canadá' }).currency).toBe('USD');
     expect(quote({ country: 'Portugal' }).currency).toBe('EUR');

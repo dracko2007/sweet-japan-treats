@@ -143,24 +143,106 @@ function money(value, currency) {
   return `R$ ${amount.toFixed(2)}`;
 }
 
+// Valores do pedido como a tela mostra: inteiro sem centavos (as linhas do
+// checkout são inteiras); com fração, duas casas.
+function orderMoney(value, currency) {
+  const amount = Number(value || 0);
+  if (currency === 'JPY') return money(amount, currency);
+  const digits = Number.isInteger(amount) ? 0 : 2;
+  const locale = currency === 'BRL' ? 'pt-BR' : 'en-US';
+  const text = amount.toLocaleString(locale, { minimumFractionDigits: digits, maximumFractionDigits: 2 });
+  if (currency === 'EUR') return `€${text}`;
+  if (currency === 'USD') return `$${text}`;
+  return `R$ ${text}`;
+}
+
+const CARRIER_LABEL = {
+  eraito: 'Air Packet / E-Light',
+  'kozutsumi-air': 'Pequeno pacote aereo',
+  ems: 'EMS',
+  yuubin: 'Yu-Pack (Japan Post)',
+  yamato: 'Yamato',
+  sagawa: 'Sagawa',
+};
+
+const PAYMENT_LABEL = {
+  wise: 'Wise',
+  pix: 'PIX',
+  card: 'Cartao',
+  paypay: 'PayPay',
+  yucho: 'Banco Yucho',
+  bank: 'Transferencia bancaria',
+};
+
+const cell = 'padding:7px;border-bottom:1px solid #eee';
+const row = (label, value, { bold = false } = {}) =>
+  `<tr><td style="${cell}">${bold ? `<strong>${label}</strong>` : label}</td>`
+  + `<td style="${cell};text-align:right;white-space:nowrap">${bold ? `<strong>${value}</strong>` : value}</td></tr>`;
+
+/**
+ * Linhas da conta como o cliente viu no checkout, a partir de `priceBreakdown`
+ * (congelado no pedido, já na moeda do pedido). Pedido antigo, sem ele: null.
+ */
+function breakdownRows(order, currency) {
+  const pb = order.priceBreakdown;
+  if (!pb || typeof pb !== 'object') return null;
+  const n = (value) => Number(value) || 0;
+  const out = [];
+  if (n(pb.subtotal) > 0) out.push(row('Subtotal dos produtos', orderMoney(pb.subtotal, currency)));
+  if (n(pb.couponDiscount) > 0) out.push(row(`Cupom${order.couponCode ? ` ${escapeHtml(order.couponCode)}` : ''}`, `− ${orderMoney(pb.couponDiscount, currency)}`));
+  if (n(pb.pointsDiscount) > 0) out.push(row('Pontos usados', `− ${orderMoney(pb.pointsDiscount, currency)}`));
+  if (n(pb.paymentDiscount) > 0) out.push(row('Desconto do pagamento', `− ${orderMoney(pb.paymentDiscount, currency)}`));
+  const carrier = CARRIER_LABEL[order.shippingCarrier || order.shipping?.carrier] || '';
+  out.push(row(`Frete${carrier ? ` (${escapeHtml(carrier)})` : ''}`, n(pb.shipping) > 0 ? orderMoney(pb.shipping, currency) : 'Gratis'));
+  if (n(pb.psFee) > 0) out.push(row('Taxa PS', orderMoney(pb.psFee, currency)));
+  if (n(pb.importDuty) > 0) out.push(row('Imposto de importacao dos EUA (pre-pago)', orderMoney(pb.importDuty, currency)));
+  if (n(pb.pixIof) > 0 || n(pb.pixBankFee) > 0) {
+    if (n(pb.pixIof) > 0) out.push(row('IOF do PIX', orderMoney(pb.pixIof, currency)));
+    if (n(pb.pixBankFee) > 0) out.push(row('Tarifa bancaria do PIX', orderMoney(pb.pixBankFee, currency)));
+  } else if (n(pb.paymentFee) > 0) {
+    out.push(row('Taxa do pagamento', orderMoney(pb.paymentFee, currency)));
+  }
+  return out.join('');
+}
+
 export function buildOrderEmail(order, { tracking = false, store = false } = {}) {
   const orderNumber = escapeHtml(order.orderNumber || order.id);
   const name = escapeHtml(order.customerName || order.shippingAddress?.name || 'cliente');
   const currency = String(order.currency || 'JPY');
-  const rows = Array.isArray(order.items)
-    ? order.items.slice(0, 50).map((item) => `<tr><td style="padding:7px;border-bottom:1px solid #eee">${escapeHtml(item.productName || item.name)} × ${Math.max(1, Number(item.quantity || 1))}</td><td style="padding:7px;text-align:right;border-bottom:1px solid #eee">${money(Number(item.price || 0) * Math.max(1, Number(item.quantity || 1)), currency)}</td></tr>`).join('')
+  const items = Array.isArray(order.items)
+    ? order.items.slice(0, 50).map((item) => {
+      const quantity = Math.max(1, Number(item.quantity || 1));
+      const value = item.freeGift ? 'Brinde' : orderMoney(Number(item.price || 0) * quantity, currency);
+      const option = item.freeGift ? '' : String(item.variantLabel || '');
+      return row(`${escapeHtml(item.productName || item.name)}${option ? ` <span style="color:#777">(${escapeHtml(option)})</span>` : ''} × ${quantity}`, value);
+    }).join('')
     : '';
+  const breakdown = breakdownRows(order, currency);
+  const total = row('Total', orderMoney(order.totalPrice ?? order.total, currency), { bold: true });
+
+  const payment = PAYMENT_LABEL[order.paymentMethod] || '';
+  const paymentBlock = payment ? `<p><strong>Pagamento:</strong> ${escapeHtml(payment)}</p>` : '';
+  // Na Wise o cliente digita o valor em ienes; o mesmo número da tela do pedido.
+  const wiseYen = Number(order.priceBreakdown?.wiseYen) || 0;
+  const wiseBlock = !tracking && !store && order.paymentMethod === 'wise' && wiseYen > 0 && currency !== 'JPY'
+    ? `<div style="margin:12px 0;padding:12px;border:1px solid #a7f3d0;background:#ecfdf5;border-radius:10px;text-align:center"><p style="margin:0;font-size:12px;color:#047857">No campo <strong>Valor</strong> da Wise, insira:</p><p style="margin:4px 0 0;font-size:22px;font-weight:bold;color:#064e3b">¥ ${Math.round(wiseYen).toLocaleString('en-US')}</p><p style="margin:2px 0 0;font-size:11px;color:#059669">A Wise converte para ${escapeHtml(orderMoney(order.totalPrice ?? order.total, currency))}. Depois de pagar, envie o comprovante pelo contato da loja.</p></div>`
+    : '';
+
   const trackingBlock = tracking
     ? `<p><strong>Rastreamento:</strong> ${escapeHtml(order.trackingCode || order.trackingNumber || 'aguardando atualizacao')}</p>`
     : '';
   const address = order.shippingAddress || {};
+  const destination = [address.name, address.postalCode, address.prefecture, address.city, address.address, address.building, address.country]
+    .filter(Boolean).map(escapeHtml).join(', ');
+  const addressBlock = destination ? `<p><strong>Entrega:</strong> ${destination}</p>` : '';
   const storeBlock = store
-    ? `<p><strong>Entrega:</strong> ${escapeHtml([address.postalCode, address.prefecture, address.city, address.address, address.building].filter(Boolean).join(' · '))}</p>`
+    ? `<p><strong>Cliente:</strong> ${escapeHtml(order.customerEmail || address.email || '')}${address.phone ? ` · ${escapeHtml(address.phone)}` : ''}</p>`
     : '';
   const subject = tracking
     ? `Pedido enviado - #${orderNumber}`
     : store ? `Novo pedido - #${orderNumber}` : `Pedido recebido - #${orderNumber}`;
-  const html = wrapEmail(`<p>Ola, <strong>${name}</strong>.</p><p>${tracking ? 'Seu pedido foi enviado.' : 'Recebemos seu pedido. O pagamento sera confirmado antes da separacao.'}</p>${trackingBlock}<table style="width:100%;border-collapse:collapse">${rows}</table><p style="text-align:right;font-size:18px"><strong>Total: ${money(order.totalPrice ?? order.total, currency)}</strong></p>${storeBlock}<p>Pedido: <strong>${orderNumber}</strong></p>`);
+  const table = `<table style="width:100%;border-collapse:collapse">${items}${breakdown ?? ''}${total}</table>`;
+  const html = wrapEmail(`<p>Ola, <strong>${name}</strong>.</p><p>${tracking ? 'Seu pedido foi enviado.' : 'Recebemos seu pedido. O pagamento sera confirmado antes da separacao.'}</p>${trackingBlock}${table}${paymentBlock}${wiseBlock}${addressBlock}${storeBlock}<p>Pedido: <strong>${orderNumber}</strong></p>`);
   return { subject, html };
 }
 
