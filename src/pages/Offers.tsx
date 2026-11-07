@@ -28,7 +28,7 @@ const Offers: React.FC = () => {
       <section className="py-12 bg-background">
         <div className="container mx-auto px-4">
           {loading ? (
-            <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-4">
               {Array.from({ length: 12 }).map((_, idx) => (
                 <div key={idx} className="rounded-lg border border-border bg-card overflow-hidden animate-pulse">
                   <div className="aspect-square bg-secondary" />
@@ -40,7 +40,7 @@ const Offers: React.FC = () => {
               ))}
             </div>
           ) : offers.length > 0 ? (
-            <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-4">
               {offers.map((product) => (
                 <CompactProductCard key={product.id} product={product} />
               ))}

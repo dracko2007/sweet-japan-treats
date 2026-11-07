@@ -23,29 +23,41 @@ export const toYen = (amount: number, currency?: string): number => {
 };
 
 /**
+ * Preço em duas partes: o valor na moeda do cliente e a referência em ¥
+ * (null quando a moeda já é ¥ ou com `noConvert`). Telas estreitas mostram
+ * uma em cima da outra (`PriceStack`); `formatPrice` junta as duas numa linha.
+ */
+export const formatPriceParts = (
+  price: number,
+  currency: 'BRL' | 'JPY' | 'EUR' | 'USD' | string,
+  noConvert = false,
+): { main: string; yen: string | null } => {
+  if (currency === 'JPY') {
+    return { main: `¥ ${Math.round(price).toLocaleString()}`, yen: null };
+  }
+  let main: string;
+  let yenRef: number;
+  if (currency === 'EUR') {
+    main = `€ ${Math.round(price).toLocaleString('pt-BR')}`;
+    yenRef = yenRefFromEur(price);
+  } else if (currency === 'USD') {
+    // USD mostra centavos (padrão americano)
+    main = `$ ${price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    yenRef = yenRefFromUsd(price);
+  } else {
+    // BRL — arredonda para inteiro (sem centavos quebrados)
+    main = `R$ ${Math.round(price).toLocaleString('pt-BR')}`;
+    yenRef = yenRefFromBrl(price);
+  }
+  return { main, yen: noConvert ? null : `¥ ${roundYen(yenRef).toLocaleString()}` };
+};
+
+/**
  * Formats a numeric price into a localized string based on the currency (JPY, BRL, or EUR).
  */
 export const formatPrice = (price: number, currency: 'BRL' | 'JPY' | 'EUR' | 'USD' | string, noConvert = false): string => {
-  if (currency === 'JPY') {
-    return `¥ ${Math.round(price).toLocaleString()}`;
-  }
-  if (currency === 'EUR') {
-    const rounded = Math.round(price);
-    const mainStr = `€ ${rounded.toLocaleString('pt-BR')}`;
-    if (noConvert) return mainStr;
-    return `${mainStr} (¥ ${roundYen(yenRefFromEur(price)).toLocaleString()})`;
-  }
-  if (currency === 'USD') {
-    // USD mostra centavos (padrão americano)
-    const mainStr = `$ ${price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-    if (noConvert) return mainStr;
-    return `${mainStr} (¥ ${roundYen(yenRefFromUsd(price)).toLocaleString()})`;
-  }
-  // BRL — arredonda para inteiro (sem centavos quebrados)
-  const rounded = Math.round(price);
-  const mainStr = `R$ ${rounded.toLocaleString('pt-BR')}`;
-  if (noConvert) return mainStr;
-  return `${mainStr} (¥ ${roundYen(yenRefFromBrl(price)).toLocaleString()})`;
+  const { main, yen } = formatPriceParts(price, currency, noConvert);
+  return yen ? `${main} (${yen})` : main;
 };
 
 /**

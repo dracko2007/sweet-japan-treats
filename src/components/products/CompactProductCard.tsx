@@ -9,6 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { useLanguage } from '@/context/LanguageContext';
 import { formatPrice, getCurrencyByCountry } from '@/utils/currency';
+import PriceStack from '@/components/PriceStack';
 import { effectiveYen, baseYen, hasDiscount, getVariants } from '@/utils/pricing';
 import { convertYen as fxConvert } from '@/services/fxService';
 import { productEnglishName } from '@/utils/productName';
@@ -210,11 +211,11 @@ const CompactProductCard: React.FC<CompactProductCardProps> = ({ product }) => {
         <div className="mt-auto flex items-end justify-between gap-1 pt-1">
           <div className="min-w-0">
             <p className={cn('text-base font-black leading-none tracking-tight', promoActive ? 'text-red-600' : 'text-pink-600')}>
-              {formatPrice(price, currency)}
+              <PriceStack value={price} currency={currency} />
             </p>
             {promoActive && (
-              <p className="mt-0.5 text-[10px] leading-none text-gray-400 line-through">
-                {formatPrice(originalPrice, currency)}
+              <p className="mt-0.5 whitespace-nowrap text-[10px] leading-none text-gray-400 line-through">
+                {formatPrice(originalPrice, currency, true)}
               </p>
             )}
           </div>
