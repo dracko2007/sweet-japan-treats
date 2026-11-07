@@ -172,6 +172,37 @@ try {
     'admin save removes the legacy public cost',
   );
 
+  // Avaliações: só o servidor grava (api/user-rewards.js, ação product-review).
+  // Antes o cliente criava a avaliação com `verified: true` sem a conferência
+  // da compra e, na mesma escrita, punha a nota que quisesse no produto.
+  const forgedReview = {
+    id: 'p1_u1',
+    productId: 'p1',
+    userId: 'u1',
+    userName: 'Usuário Um',
+    rating: 5,
+    comment: 'Produto excelente!',
+    verified: true,
+    date: '2026-08-01T00:00:00.000Z',
+  };
+  await fails(setDoc(doc(userDb, 'reviews', 'p1_u1'), forgedReview), 'customer cannot create a review directly');
+  await fails(
+    updateDoc(doc(userDb, 'products', 'p1'), { rating: 5, reviewCount: 1 }),
+    'customer cannot write the product rating',
+  );
+  await environment.withSecurityRulesDisabled(async (context) => {
+    await setDoc(doc(context.firestore(), 'reviews', 'p1_u1'), forgedReview);
+  });
+  await succeeds(getDoc(doc(anonymousDb, 'reviews', 'p1_u1')), 'public reads reviews');
+  await fails(updateDoc(doc(userDb, 'reviews', 'p1_u1'), { rating: 1 }), 'author cannot edit a saved review');
+  await fails(deleteDoc(doc(userDb, 'reviews', 'p1_u1')), 'author cannot delete and redo a review');
+  await succeeds(updateDoc(doc(adminDb, 'reviews', 'p1_u1'), { images: [] }), 'admin moderates review photos');
+  await succeeds(
+    updateDoc(doc(adminDb, 'products', 'p1'), { rating: 0, reviewCount: 0, updatedAt: serverTimestamp() }),
+    'admin recounts the product rating',
+  );
+  await succeeds(deleteDoc(doc(adminDb, 'reviews', 'p1_u1')), 'admin deletes a review');
+
   await succeeds(
     setDoc(doc(adminDb, 'coupons', 'PRIVATE30'), {
       code: 'PRIVATE30',
@@ -341,7 +372,8 @@ try {
   await fails(setDoc(doc(userDb, 'unknown', 'doc'), { value: true }), 'unknown collection is closed');
 
   await succeeds(setDoc(doc(adminDb, 'affiliates', 'CODE1'), { active: true }), 'admin writes affiliate code');
-  await succeeds(getDoc(doc(anonymousDb, 'affiliates', 'CODE1')), 'public validates one affiliate code');
+  await fails(getDoc(doc(anonymousDb, 'affiliates', 'CODE1')), 'public cannot read an affiliate (e-mail and earnings)');
+  await succeeds(getDoc(doc(adminDb, 'affiliates', 'CODE1')), 'admin reads one affiliate');
   await fails(getDocs(collection(anonymousDb, 'affiliates')), 'public cannot list affiliates');
 
 

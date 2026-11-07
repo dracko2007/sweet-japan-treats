@@ -40,3 +40,18 @@ export function taxDisclosure(lang) {
 
 /** Idiomas com aviso escrito. Serve aos testes e a quem for adicionar região. */
 export const DISCLOSURE_LANGS = Object.keys(DISCLOSURE);
+
+// Exceção dos EUA: desde 15/10/2026 o Japan Post só aceita mercadoria para os
+// EUA com o imposto PRÉ-PAGO pela loja (DDP). Lá o imposto é cobrado no site,
+// como linha separada do checkout, e nada é cobrado na entrega. O aviso geral
+// continua valendo para os outros destinos.
+const US_DDP_NOTICE = {
+  pt: 'Exceção — Estados Unidos: o imposto de importação é pré-pago pela loja (DDP), aparece como linha separada no checkout e já está no total; nada é cobrado na entrega.',
+  en: 'Exception — United States: import duties are prepaid by the store (DDP), shown as a separate line at checkout and included in the total; nothing is charged on delivery.',
+  ja: '例外（米国）：輸入関税は当店が前払い（DDP）し、チェックアウトで別項目として合計に含まれます。お届け時の請求はありません。',
+};
+
+/** Aviso do imposto pré-pago dos EUA no idioma pedido. */
+export function usDutyNotice(lang) {
+  return US_DDP_NOTICE[lang] || US_DDP_NOTICE.pt;
+}

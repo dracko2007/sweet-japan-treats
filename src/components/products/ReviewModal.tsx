@@ -3,10 +3,9 @@ import { Star, Camera, X, Video, Gift, Link2, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { useUser } from '@/context/UserContext';
-import { reviewService } from '@/services/reviewService';
 import { pointsService, POINTS } from '@/services/pointsService';
 import { uploadMedia } from '@/services/uploadService';
-import { userRewardsService } from '@/services/userRewardsService';
+import { reviewErrorMessage, userRewardsService } from '@/services/userRewardsService';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { getYouTubeId, getYouTubeEmbed } from '@/utils/youtube';
@@ -103,36 +102,22 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ productId, productName, onClo
       }
     }
 
+    // Uma chamada só: o servidor confere a compra, grava a avaliação,
+    // recalcula a nota do produto e dá o ponto.
     let reward;
     try {
-      reward = await userRewardsService.claimProductReview(productId);
-    } catch (err: unknown) {
-      toast({
-        title: 'Não foi possível validar os pontos',
-        description: err instanceof Error ? err.message : 'Confirme que esta compra já foi paga.',
-        variant: 'destructive',
-      });
-      setSaving(false);
-      return;
-    }
-
-    try {
-      await reviewService.addReview({
+      reward = await userRewardsService.submitProductReview({
         productId,
-        userId: user.id,
-        userName: user.name,
         rating: selectedRating,
         comment: comment.trim(),
-        images: images.length > 0 ? images : undefined,
-        videoUrl: videoUrl || undefined,
-        pointsAwarded: reward.awarded,
-        verified: true,
+        images,
+        videoUrl,
       });
     } catch (err: unknown) {
-      const alreadyReviewed = err instanceof Error && err.message === 'already_reviewed';
+      const code = err instanceof Error ? err.message : '';
       toast({
-        title: alreadyReviewed ? 'Você já avaliou este produto' : 'Não foi possível salvar a avaliação',
-        description: alreadyReviewed ? undefined : (err instanceof Error ? err.message : 'Tente novamente.'),
+        title: code === 'already_reviewed' ? 'Você já avaliou este produto' : 'Não foi possível salvar a avaliação',
+        description: code === 'already_reviewed' ? undefined : reviewErrorMessage(code),
         variant: 'destructive',
       });
       setSaving(false);

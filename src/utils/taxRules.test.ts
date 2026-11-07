@@ -14,6 +14,10 @@ describe('tax estimation policy', () => {
     expect(calcImportTax(500, 'Brasil')).toEqual({ tax: 0, label: '' });
   });
 
+  it('does not estimate a US tax: it is prepaid (DDP) and already in the total', () => {
+    expect(calcImportTax(500, 'Estados Unidos', 'CA')).toEqual({ tax: 0, label: '' });
+  });
+
   it('keeps estimating VAT for Portugal', () => {
     const estimate = calcImportTax(500, 'Portugal');
 

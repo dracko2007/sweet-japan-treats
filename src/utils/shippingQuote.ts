@@ -39,6 +39,10 @@ export interface ShippingQuote {
   needsPrefecture: boolean;
 }
 
+const US_COUNTRY = 'Estados Unidos';
+/** EMS com DDP para os EUA: a pré-declaração e a liberação somam dias ao EMS comum. */
+const US_DDP_EMS_DAYS = '10-12';
+
 /** Mínimo (¥) para frete grátis dentro do Japão. */
 export const JAPAN_FREE_SHIPPING_MIN_YEN = 6000;
 
@@ -84,7 +88,8 @@ export function quoteShipping(items: CartItem[], destinationCountry: string, { p
   const boxes = calculateCartShippingBoxes(items, spaceUsedOf(items));
   const hasCustomRequest = items.some((item) => item.product?.id?.includes('custom') || item.product?.category === 'custom-request');
 
-  const displaySubtotal = items.reduce((sum, item) => sum + fxConvert(effectiveYen(item.product, item.size), currency) * item.quantity, 0);
+  // Brinde não conta para o frete grátis: o servidor também tira (`productBenefits`).
+  const displaySubtotal = items.reduce((sum, item) => (item.freeGift ? sum : sum + fxConvert(effectiveYen(item.product, item.size), currency) * item.quantity), 0);
   const isFreeShipping = isJapan && items.length > 0 && displaySubtotal - couponDiscount >= JAPAN_FREE_SHIPPING_MIN_YEN;
   const isOverweight = !isJapan && boxes.totalWeightG > MAX_WEIGHT_G;
 
@@ -119,10 +124,25 @@ export function quoteShipping(items: CartItem[], destinationCountry: string, { p
   const zd = DAYS_BY_ZONE[jpZone] || DAYS_BY_ZONE[5];
   const options: ShippingQuoteOption[] = [];
 
+  // EUA: desde 15/10/2026 o Japan Post só aceita mercadoria para os EUA com o
+  // imposto pré-pago (DDP), declarado antes por app credenciado. O único
+  // serviço com DDP para loja é o EMS, então é a única opção — o servidor
+  // recusa as outras (`api/_lib/commerce.js`, `shipping_unavailable`). O
+  // imposto entra no total como linha própria (`shared/money.js`).
+  if (country === US_COUNTRY) {
+    const emsYen = getEmsRate(weightG, jpZone);
+    if (emsYen) options.push({
+      carrier: 'ems', name: 'Japan Post EMS · 国際スピード郵便 (DDP — impostos pré-pagos)', logo: '✈️',
+      cost: fxConvert(emsYen, currency), costYen: emsYen, estimatedDays: US_DDP_EMS_DAYS,
+    });
+    return { ...base, options, needsPrefecture: false };
+  }
+
   if (weightG <= 2000) {
     const eLightYen = getELightRate(weightG, jpZone);
     if (eLightYen) options.push({
-      carrier: 'eraito', name: 'Japan Post E-Light · 国際eパケットライト', logo: '📦',
+      // 国際eパケットライト virou 国際エアパケット (Air Packet) em 01/06/2026.
+      carrier: 'eraito', name: 'Japan Post Air Packet · 国際エアパケット', logo: '📦',
       cost: fxConvert(eLightYen, currency), costYen: eLightYen, estimatedDays: zd.light,
     });
   } else {

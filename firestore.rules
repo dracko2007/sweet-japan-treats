@@ -190,25 +190,10 @@ service cloud.firestore {
       // Leitura pública: o custo NÃO pode morar aqui (vai em productCosts).
       allow create, update: if isAdmin() && !('cost' in request.resource.data);
       allow delete: if isAdmin();
-
-      // Agregado rating/reviewCount vindo de avaliações reais (reviews/{id}).
-      // Só aceita quando, na MESMA escrita, o doc `reviews/{productId}_{uid}`
-      // do próprio usuário está sendo CRIADO agora (não existia antes, existe
-      // depois) — isso amarra a atualização a uma avaliação nova e genuína,
-      // sem abrir escrita livre no produto para qualquer conta. reviewCount
-      // só pode subir exatamente 1 por vez. A validação de compra real já
-      // rodou no servidor antes do review ser gravado (api/user-rewards.js).
-      // O valor exato de `rating` depende do cálculo do cliente — regras não
-      // conseguem agregar a coleção `reviews` inteira para conferir a média.
-      allow update: if signedIn()
-        && !exists(/databases/$(database)/documents/reviews/$(productId + '_' + request.auth.uid))
-        && existsAfter(/databases/$(database)/documents/reviews/$(productId + '_' + request.auth.uid))
-        && getAfter(/databases/$(database)/documents/reviews/$(productId + '_' + request.auth.uid)).data.userId == request.auth.uid
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rating', 'reviewCount'])
-        && request.resource.data.reviewCount is int
-        && request.resource.data.reviewCount == resource.data.get('reviewCount', 0) + 1
-        && request.resource.data.rating is number
-        && request.resource.data.rating >= 0 && request.resource.data.rating <= 5;
+      // A nota (rating/reviewCount) é gravada pelo servidor junto com a
+      // avaliação (api/user-rewards.js, ação `product-review`). Antes havia
+      // aqui uma exceção para o cliente gravar a nota ao criar a própria
+      // avaliação — e o valor da nota era o que o navegador mandasse.
     }
 
     // Custo de aquisição de cada produto (id igual ao de products/{id}).
@@ -262,9 +247,9 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // Tem e-mail e ganhos do afiliado: só admin. O carrinho valida o código pelo servidor (/api/affiliates).
     match /affiliates/{code} {
-      allow get: if true;
-      allow list, create, update, delete: if isAdmin();
+      allow get, list, create, update, delete: if isAdmin();
     }
 
     match /affiliate_pending/{id} {
@@ -359,33 +344,15 @@ service cloud.firestore {
       allow update, delete: if isAdmin();
     }
 
-    // Avaliações de produto (nota + comentário + fotos). Compra já validada
-    // pelo servidor antes do doc ser gravado (api/user-rewards.js
-    // claimProductReview) — aqui só garantimos autenticação, dono do doc e
-    // o formato dos dados. Um doc por usuário por produto, id determinístico
-    // `{productId}_{uid}`, o que também impede duplicidade.
+    // Avaliações de produto (nota + comentário + fotos). Quem grava é só o
+    // servidor (api/user-rewards.js, ação `product-review`): ele confere a
+    // compra paga, valida fotos e vídeo e recalcula a nota do produto na mesma
+    // transação. Antes o navegador gravava aqui com `verified: true` sem
+    // passar pela conferência da compra. O admin modera (edita/apaga).
     match /reviews/{reviewId} {
-      function validReview(data) {
-        return data.keys().hasAll(['id', 'productId', 'userId', 'userName', 'rating', 'comment', 'verified', 'date'])
-          && data.keys().hasOnly(['id', 'productId', 'userId', 'userName', 'rating', 'comment', 'verified', 'date', 'images', 'videoUrl', 'pointsAwarded'])
-          && data.id == reviewId
-          && data.userId == request.auth.uid
-          && reviewId == data.productId + '_' + request.auth.uid
-          && validText(data.productId, 1, 160)
-          && validText(data.userName, 1, 120)
-          && data.rating is int && data.rating >= 1 && data.rating <= 5
-          && validText(data.comment, 1, 3000)
-          && data.verified == true
-          && validText(data.date, 10, 40)
-          && (!data.keys().hasAny(['images']) || (data.images is list && data.images.size() <= 10))
-          && (!data.keys().hasAny(['videoUrl']) || validText(data.videoUrl, 0, 1000))
-          && (!data.keys().hasAny(['pointsAwarded']) || data.pointsAwarded is number);
-      }
       allow read: if true;
-      allow create: if signedIn() && validReview(request.resource.data);
-      allow update: if isAdmin()
-        || (signedIn() && resource.data.userId == request.auth.uid && validReview(request.resource.data));
-      allow delete: if isAdmin() || (signedIn() && resource.data.userId == request.auth.uid);
+      allow create: if false;
+      allow update, delete: if isAdmin();
     }
 
     match /negotiations/{negotiationId} {

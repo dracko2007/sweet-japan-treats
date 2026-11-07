@@ -13,16 +13,17 @@ import { formatPrice, getCurrencyByCountry } from '@/utils/currency';
 import { effectiveYen } from '@/utils/pricing';
 import { convertYen as fxConvert } from '@/services/fxService';
 import { POINTS } from '@/services/pointsService';
-import { affiliateService, Affiliate } from '@/services/affiliateService';
+import { affiliateService, type AffiliateCouponInfo } from '@/services/affiliateService';
 import { couponService as globalCouponService } from '@/services/couponService';
 import { promoCampaignService } from '@/services/promoCampaignService';
 import { safeStorage } from '@/utils/storage';
 import { SESSION_END_EVENT } from '@/utils/localData';
 import WelcomeCouponBanner from '@/components/WelcomeCouponBanner';
+import { computeCouponDiscount } from '@/components/checkout/CouponSelector';
 import { taxDisclosure } from '../../shared/tax-disclosure.js';
 
 // Converte um afiliado num "cupom" aplicável (carrega o código para gerar comissão)
-const affiliateToCoupon = (aff: Affiliate, productId?: string | null, source: 'link' | 'code' = 'code'): Coupon => ({
+const affiliateToCoupon = (aff: AffiliateCouponInfo, productId?: string | null, source: 'link' | 'code' = 'code'): Coupon => ({
   id: `aff-${aff.code}`,
   code: aff.code,
   description: `Indicação de ${aff.ownerName} — ${aff.discountPercent}% OFF`,
@@ -90,7 +91,7 @@ const Cart: React.FC = () => {
 
     // 2) Código de afiliado/influencer: público, reutilizável e disponível
     // para visitantes. Não depende de login nem de cupom pessoal.
-    const affiliateResult = await affiliateService.validate(code);
+    const affiliateResult = await affiliateService.validate(code, isAuthenticated);
     if (affiliateResult.valid && affiliateResult.affiliate) {
       applyCouponObject(affiliateToCoupon(affiliateResult.affiliate, null));
       safeStorage.setItem('affiliate_ref', affiliateResult.affiliate.code);
@@ -137,7 +138,7 @@ const Cart: React.FC = () => {
     const ref = safeStorage.getItem('affiliate_ref');
     if (ref && !activeCoupon) {
       const productId = safeStorage.getItem('affiliate_ref_product') || null;
-      affiliateService.validate(ref).then((res) => {
+      affiliateService.validate(ref, isAuthenticated).then((res) => {
         if (res.valid && res.affiliate) {
           setActiveCoupon(affiliateToCoupon(res.affiliate, productId, 'link'));
         }
@@ -231,14 +232,10 @@ const Cart: React.FC = () => {
     setActiveCoupon(null);
   };
 
-  // Desconto a partir do cupom do perfil (porcentagem ou valor fixo)
-  const computeDiscount = (coupon: Coupon, subtotal: number): number => {
-    if (coupon.freeShipping) return 0; // frete é tratado no checkout
-    if (coupon.discountType === 'percentage') {
-      return subtotal * (coupon.discount / 100);
-    }
-    return Math.min(coupon.discount, subtotal);
-  };
+  // Desconto a partir do cupom (porcentagem ou valor fixo), na moeda do
+  // cliente. Cupom fixo é em ienes — antes o valor em ¥ era descontado como se
+  // fosse R$/€/$. Mesma regra do checkout e do servidor (`shared/money.js`).
+  const computeDiscount = (coupon: Coupon, subtotal: number): number => computeCouponDiscount(coupon, subtotal, currency);
 
   // Calculations in correct currency
   const isEuro = ['Portugal', 'França', 'Itália', 'Espanha'].includes(selectedCountry);

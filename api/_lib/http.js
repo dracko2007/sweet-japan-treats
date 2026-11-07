@@ -4,11 +4,16 @@ const DEFAULT_ORIGINS = [
 ];
 
 export class HttpError extends Error {
-  constructor(statusCode, code, message = code) {
+  /**
+   * `details` vai junto na resposta JSON (ex.: a cotação nova quando o preço
+   * mudou), sem nunca sobrescrever o campo `error`.
+   */
+  constructor(statusCode, code, message = code, details = undefined) {
     super(message);
     this.name = 'HttpError';
     this.statusCode = statusCode;
     this.code = code;
+    this.details = details;
   }
 }
 
@@ -109,5 +114,8 @@ export function escapeHtml(value) {
 export function sendError(res, error) {
   const status = error instanceof HttpError ? error.statusCode : 500;
   const code = error instanceof HttpError ? error.code : 'internal_error';
-  res.status(status).json({ error: code });
+  const details = error instanceof HttpError && error.details && typeof error.details === 'object'
+    ? error.details
+    : null;
+  res.status(status).json(details ? { ...details, error: code } : { error: code });
 }

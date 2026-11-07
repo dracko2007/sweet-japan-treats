@@ -9,7 +9,22 @@ export interface UserRewardResult {
   alreadyClaimed: boolean;
 }
 
-async function claimReward(body: Record<string, string>): Promise<UserRewardResult> {
+export interface ProductReviewInput {
+  productId: string;
+  /** 1 a 5. */
+  rating: number;
+  comment: string;
+  /** URLs do Storage da loja (`review-photos/{productId}/…`). */
+  images?: string[];
+  /** Arquivo em `review-videos/{productId}/…` ou link do YouTube. */
+  videoUrl?: string;
+}
+
+export interface ProductReviewResult extends UserRewardResult {
+  reviewId: string;
+}
+
+async function claimReward(body: Record<string, unknown>): Promise<UserRewardResult> {
   const response = await authenticatedFetch('/api/user-rewards', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -39,7 +54,29 @@ export const userRewardsService = {
     return claimReward({ action: 'birthday' });
   },
 
-  claimProductReview(productId: string) {
-    return claimReward({ action: 'product-review', productId });
+  /**
+   * Grava a avaliação pelo servidor, que confere a compra paga, recalcula a
+   * nota do produto e dá o ponto. O navegador não grava avaliação no banco.
+   */
+  async submitProductReview({ productId, rating, comment, images = [], videoUrl = '' }: ProductReviewInput) {
+    const body: Record<string, unknown> = { action: 'product-review', productId, rating, comment };
+    if (images.length > 0) body.images = images;
+    if (videoUrl) body.videoUrl = videoUrl;
+    return (await claimReward(body)) as ProductReviewResult;
   },
 };
+
+/** Mensagem para o cliente a partir do código de erro da avaliação. */
+export function reviewErrorMessage(code: string): string {
+  const messages: Record<string, string> = {
+    already_reviewed: 'Você já avaliou este produto.',
+    verified_purchase_required: 'Só dá para avaliar produtos de pedidos já pagos.',
+    verified_email_required: 'Confirme seu e-mail para avaliar.',
+    invalid_rating: 'Escolha de 1 a 5 estrelas.',
+    invalid_comment: 'O comentário precisa ter de 10 a 3000 caracteres.',
+    invalid_review_media: 'Uma das fotos ou o vídeo não foi aceito. Envie de novo pelo formulário.',
+    product_not_found: 'Este produto não está mais no catálogo.',
+    rate_limited: 'Muitas tentativas seguidas. Aguarde um pouco e tente de novo.',
+  };
+  return messages[code] || 'Tente novamente.';
+}

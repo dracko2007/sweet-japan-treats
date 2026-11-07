@@ -4,23 +4,36 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { useUser, Coupon } from '@/context/UserContext';
 import { useToast } from '@/hooks/use-toast';
+import { formatPrice } from '@/utils/currency';
+import { getMoneyRates } from '@/services/fxService';
+import { couponTerms, discountYenToDisplay } from '../../../shared/money.js';
 
 interface CouponSelectorProps {
+  /** Subtotal elegível ao cupom, na moeda do cliente. */
   totalPrice: number;
+  /** Moeda do cliente (BRL/EUR/USD/JPY). */
+  currency?: string;
   onCouponApply: (coupon: Coupon, discount: number) => void;
   onCouponRemove: () => void;
   appliedCoupon: Coupon | null;
 }
 
-// Desconto a partir de um cupom do perfil (porcentagem ou valor fixo).
-export const computeCouponDiscount = (coupon: Coupon, subtotal: number): number => {
-  if (coupon.freeShipping) return 0;
-  if (coupon.discountType === 'percentage') return subtotal * (coupon.discount / 100);
-  return Math.min(coupon.discount, subtotal);
+/**
+ * Prévia do desconto de um cupom do perfil, na moeda do cliente. Mesma regra
+ * do servidor (`shared/money.js`): cupom fixo é em IENES — antes o valor em ¥
+ * era descontado como se fosse R$/€/$ (cupom de ¥500 virava R$ 500).
+ * O valor que vale é o do resumo do checkout, que usa `displayTotals`.
+ */
+export const computeCouponDiscount = (coupon: Coupon, subtotal: number, currency = 'JPY'): number => {
+  const terms = couponTerms(coupon);
+  if (!terms || terms.freeShipping || !(subtotal > 0)) return 0;
+  if (terms.fixed) return Math.min(subtotal, discountYenToDisplay(terms.fixedYen, currency, getMoneyRates()));
+  return Math.min(subtotal, Math.round(subtotal * terms.percent / 100));
 };
 
 const CouponSelector: React.FC<CouponSelectorProps> = ({
   totalPrice,
+  currency = 'JPY',
   onCouponApply,
   onCouponRemove,
   appliedCoupon,
@@ -36,14 +49,14 @@ const CouponSelector: React.FC<CouponSelectorProps> = ({
   );
 
   const handleSelectCoupon = (coupon: Coupon) => {
-    const discount = computeCouponDiscount(coupon, totalPrice);
+    const discount = computeCouponDiscount(coupon, totalPrice, currency);
     onCouponApply(coupon, discount);
     setShowCoupons(false);
     toast({
       title: 'Cupom aplicado!',
       description: coupon.freeShipping
         ? 'Frete grátis aplicado'
-        : `Desconto de ¥${Math.round(discount).toLocaleString()} aplicado`,
+        : `Desconto de ${formatPrice(discount, currency, true)} aplicado`,
     });
   };
 
@@ -79,7 +92,7 @@ const CouponSelector: React.FC<CouponSelectorProps> = ({
               {showCoupons && (
                 <div className="space-y-2 max-h-64 overflow-y-auto">
                   {availableCoupons.map((coupon) => {
-                    const discount = computeCouponDiscount(coupon, totalPrice);
+                    const discount = computeCouponDiscount(coupon, totalPrice, currency);
                     const discountText = coupon.freeShipping
                       ? 'Frete Grátis'
                       : coupon.discountType === 'fixed'
@@ -110,7 +123,7 @@ const CouponSelector: React.FC<CouponSelectorProps> = ({
                           {!coupon.freeShipping && (
                             <div className="text-right ml-2">
                               <p className="text-sm font-bold text-green-600 dark:text-green-400">
-                                -¥{Math.round(discount).toLocaleString()}
+                                -{formatPrice(discount, currency, true)}
                               </p>
                             </div>
                           )}

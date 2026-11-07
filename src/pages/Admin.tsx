@@ -732,11 +732,6 @@ _This is an automated test message_
     printWindow.document.close();
   };
 
-  // Bypassed for demo testing
-  if (false) {
-    return null;
-  }
-
   // Abas agrupadas (menu lateral) — orientado a dados
   const tabGroups: { title: string; items: AdminTabItem[] }[] = [
     { title: 'Visão geral', items: [{ id: 'dashboard', label: 'Dashboard', icon: BarChart3 }] },

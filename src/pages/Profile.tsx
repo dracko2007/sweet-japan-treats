@@ -249,7 +249,13 @@ const Profile: React.FC = () => {
   // Avaliação a partir do histórico de pedidos
   const [reviewTarget, setReviewTarget] = useState<{ id: string; name: string } | null>(null);
   const [reviewBump, setReviewBump] = useState(0); // força recálculo de "já avaliou"
-  const findProductId = (name: string) => products.find((p) => p.name === name)?.id;
+  // O id gravado no pedido é o que o servidor confere ao salvar a avaliação;
+  // o nome só vale para pedido antigo, sem id (ou produto renomeado depois).
+  const findProductId = (item: { productId?: string; productName: string }) => {
+    const id = String(item.productId || '');
+    if (id && products.some((p) => p.id === id)) return id;
+    return products.find((p) => p.name === item.productName)?.id;
+  };
 
   // Mostra o atalho do painel de afiliado só se a conta for de um influencer
   const [isAffiliate, setIsAffiliate] = useState(false);
@@ -1331,7 +1337,7 @@ const Profile: React.FC = () => {
 
                       <div className="space-y-2">
                         {order.items.map((item, idx) => {
-                          const pid = findProductId(item.productName);
+                          const pid = findProductId(item);
                           return (
                             <div key={idx} className="flex justify-between items-center gap-2 text-sm">
                               <span className="text-muted-foreground flex-1 min-w-0">
@@ -1364,7 +1370,10 @@ const Profile: React.FC = () => {
                         // verdade. Pedidos legados (venda manual, sem priceBreakdown) caem no
                         // cálculo antigo a partir de `item.price` (que ali já é local).
                         const pb = (order as any).priceBreakdown as
-                          | { subtotal?: number; couponDiscount?: number; psFee?: number }
+                          | {
+                              subtotal?: number; couponDiscount?: number; pointsDiscount?: number; psFee?: number;
+                              shipping?: number; importDuty?: number; pixIof?: number; pixBankFee?: number;
+                            }
                           | undefined;
                         const itemsSubtotal = pb?.subtotal ?? order.items.reduce((sum, item) => sum + (item.price || 0) * item.quantity, 0);
                         const discount = pb
@@ -1372,10 +1381,15 @@ const Profile: React.FC = () => {
                           : ((order as any).couponDiscount || (itemsSubtotal > order.totalAmount ? itemsSubtotal - order.totalAmount : 0));
                         const psFee = pb?.psFee || 0;
                         const shippingData = (order as any).shipping;
-                        const shippingCost = shippingData?.cost ?? null;
+                        // Pedido novo: frete já na moeda do pedido (`pb.shipping`). Legado: ¥.
+                        const shippingCost = pb?.shipping ?? shippingData?.cost ?? null;
                         const carrierName = shippingData?.carrier || '';
                         const couponCode = (order as any).couponCode || (order as any).appliedCoupon?.code || '';
                         const oc = (order as any).currency || 'JPY';
+                        const shippingCurrency = pb?.shipping != null ? oc : 'JPY';
+                        const pointsDiscount = pb?.pointsDiscount || 0;
+                        const importDuty = pb?.importDuty || 0;
+                        const pixFees = (pb?.pixIof || 0) + (pb?.pixBankFee || 0);
 
                         return (
                           <div className="mt-2 pt-2 border-t border-border space-y-1 text-sm">
@@ -1398,13 +1412,31 @@ const Profile: React.FC = () => {
                                   <Truck className="w-3 h-3" />
                                   {t('profile.orders.shipping')} {carrierName && <span className="text-xs">({carrierName})</span>}
                                 </span>
-                                <span>{shippingCost === 0 ? <span className="text-green-600">{t('profile.orders.free')}</span> : formatPrice(shippingCost, 'JPY')}</span>
+                                <span>{shippingCost === 0 ? <span className="text-green-600">{t('profile.orders.free')}</span> : formatPrice(shippingCost, shippingCurrency)}</span>
+                              </div>
+                            )}
+                            {pointsDiscount > 0 && (
+                              <div className="flex justify-between text-purple-700">
+                                <span>Desconto em pontos</span>
+                                <span>-{formatPrice(pointsDiscount, oc)}</span>
                               </div>
                             )}
                             {psFee > 0 && (
                               <div className="flex justify-between text-muted-foreground">
                                 <span>Taxa Personal Shopper</span>
                                 <span>{formatPrice(psFee, oc)}</span>
+                              </div>
+                            )}
+                            {importDuty > 0 && (
+                              <div className="flex justify-between text-muted-foreground">
+                                <span>Imposto EUA (pré-pago, DDP)</span>
+                                <span>{formatPrice(importDuty, oc)}</span>
+                              </div>
+                            )}
+                            {pixFees > 0 && (
+                              <div className="flex justify-between text-muted-foreground">
+                                <span>IOF + taxa bancária (PIX)</span>
+                                <span>{formatPrice(pixFees, oc)}</span>
                               </div>
                             )}
                             <div className="flex justify-between font-semibold pt-1 border-t border-border">

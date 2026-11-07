@@ -16,7 +16,7 @@ import {
   merchantDescription,
   merchantImagesForProduct,
 } from '../feed.js';
-import { taxDisclosure } from '../../shared/tax-disclosure.js';
+import { taxDisclosure, usDutyNotice } from '../../shared/tax-disclosure.js';
 
 describe('detectBrand', () => {
   it('usa o fabricante, nunca a loja, quando a marca está no nome', () => {
@@ -156,9 +156,16 @@ describe('merchantDescription', () => {
   it.each([
     ['br', 'pt'],
     ['eu', 'pt'],
-    ['us', 'en'],
   ])('no feed %s declara estimativa exibida e não cobrada', (region, lang) => {
     expect(feedDisclosure(region)).toBe(taxDisclosure(lang).body);
+  });
+
+  // EUA: desde 15/10/2026 o imposto é pré-pago pela loja (DDP) e cobrado no
+  // site. O feed dos EUA precisa dizer isso, além do aviso geral dos demais
+  // destinos do mesmo feed (Canadá, Reino Unido...).
+  it('no feed us acrescenta a exceção do imposto pré-pago dos EUA', () => {
+    expect(feedDisclosure('us')).toBe(`${taxDisclosure('en').body} ${usDutyNotice('en')}`);
+    expect(feedDisclosure('us')).toContain('prepaid by the store (DDP)');
   });
 
   it('avisa em inglês no feed dos EUA', () => {

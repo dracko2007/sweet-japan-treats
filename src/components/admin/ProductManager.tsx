@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Plus, Pencil, Trash2, X, Image as ImageIcon, Loader2, PackageOpen, Sparkles, GripVertical, Save, Gift, Infinity, Search, Star } from 'lucide-react';
+import { Plus, Pencil, Trash2, X, Image as ImageIcon, Loader2, PackageOpen, Sparkles, GripVertical, Save, Gift, Infinity as InfinityIcon, Search, Star } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { FEATURES } from '@/config/features';
 import { Button } from '@/components/ui/button';
@@ -1195,7 +1195,7 @@ const ProductManager: React.FC = () => {
               {/* Estoque */}
               <div className="bg-slate-50 dark:bg-slate-900/30 border border-slate-200 dark:border-slate-700 rounded-lg p-3">
                 <label className="text-sm font-semibold flex items-center gap-1.5 mb-2">
-                  <Infinity className="w-4 h-4 text-slate-500" /> Estoque
+                  <InfinityIcon className="w-4 h-4 text-slate-500" /> Estoque
                 </label>
                 <div className="flex gap-4 mb-3">
                   {(['unlimited', 'limited'] as const).map((type) => {

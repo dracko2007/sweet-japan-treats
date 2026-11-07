@@ -9,8 +9,9 @@ if (process.env.RULES_DEPLOY_OK === '1') {
 console.error(`
 [guard-rules] Deploy de regras bloqueado.
 
-  Este comando publica o firestore.rules INTEIRO. Antes de soltar, veja o que
-  muda em produção:
+  Este comando publica as regras INTEIRAS (firestore.rules e/ou storage.rules).
+  O storage.rules daqui já ficou diferente do que está no ar uma vez. Antes de
+  soltar, veja o que muda em produção:
 
       node scripts/rules-history.mjs diff
 

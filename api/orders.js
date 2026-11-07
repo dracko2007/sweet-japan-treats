@@ -12,6 +12,7 @@ import { fulfillOrder } from './_lib/fulfillment.js';
 import { recentProductSpendYen } from './_lib/loyalty-tier.js';
 import { issuePsFeeWaiver, verifyPsFeeWaiver } from './_lib/ps-fee-waiver.js';
 import { getFxRates } from './_lib/fx.js';
+import { autoApprovablePsDiscountYen, paymentMethodsForCountry } from '../shared/money.js';
 import {
   assertExactKeys,
   handleCors,
@@ -29,6 +30,7 @@ const PAYMENT_METHODS = new Set(['card', 'pix', 'bank', 'paypay', 'yucho', 'wise
 const TOGGLEABLE_PAYMENT_METHODS = new Set(['card', 'pix', 'wise']);
 const ORDER_PATTERN = /^(?:SC-JP|SE-[A-Z]{2})-\d{6}$/;
 const PERSONAL_COUPON_RESERVATION_MS = 30 * 60 * 1000;
+const PS_AUTO_PER_UNIT_LABEL = autoApprovablePsDiscountYen(1);
 
 function parseItems(raw) {
   if (!Array.isArray(raw) || raw.length < 1 || raw.length > 100) throw new HttpError(400, 'invalid_items');
@@ -99,10 +101,19 @@ function carrierId(value) {
   if (text.includes('yamato')) return 'yamato';
   if (text.includes('sagawa')) return 'sagawa';
   if (text.includes('local') || text.includes('ゆうパック')) return 'yuubin';
-  if (text.includes('e-light') || text.includes('パケットライト')) return 'eraito';
+  // 国際eパケットライト virou 国際エアパケット (Air Packet) em 01/06/2026.
+  if (text.includes('e-light') || text.includes('パケットライト') || text.includes('air packet') || text.includes('エアパケット')) return 'eraito';
   if (text.includes('kozutsumi') || text.includes('小包')) return 'kozutsumi-air';
   if (text.includes('ems')) return 'ems';
   throw new HttpError(400, 'invalid_shipping');
+}
+
+function carrierIdOrEmpty(value) {
+  try {
+    return carrierId(value);
+  } catch {
+    return '';
+  }
 }
 
 function activeByDate(value) {
@@ -131,7 +142,11 @@ function negotiationMatchesOrder(negotiation, requestedItems, customer, country,
     && String(form.country || '') === country
     && String(form.prefecture || '') === prefecture
     && String(form.email || '').trim().toLowerCase() === customer.email
-    && String(negotiation.shipping?.carrier || '') === carrier;
+    // A negociação guarda o NOME da transportadora que a calculadora mostra
+    // ("Japan Post EMS · 国際スピード郵便"), e o pedido chega aqui já como id
+    // ("ems"). Comparar o texto cru recusava toda negociação aprovada com
+    // `invalid_negotiation`.
+    && carrierIdOrEmpty(negotiation.shipping?.carrier) === carrier;
 }
 
 async function resolveCoupon(db, code, userDoc, customer, productSubtotalHint = 0, userId = '', emailVerified = false) {
@@ -207,6 +222,9 @@ function publicOrder(order) {
     shipping: order.shipping,
     psFeeYen: order.psFeeYen,
     psFeeWaiverApplied: order.psFeeWaiverApplied === true,
+    // Linhas da conta como o cliente viu (o modal de pagamento mostra os
+    // ienes da Wise e as taxas do PIX a partir daqui).
+    priceBreakdown: order.priceBreakdown || null,
     shippingAddress: order.shippingAddress,
     items: order.items.map(({ cost, ...item }) => item),
   };
@@ -333,6 +351,194 @@ async function handleIssuePsFeeWaiver(req, res) {
   }
 }
 
+// Corpo comum à cotação (`quote`) e à criação do pedido (`create`). Os dois
+// passam pela MESMA montagem e pelo mesmo `buildQuote`: o número que a tela
+// de revisão mostra é, por construção, o que o pedido cobra.
+const CHECKOUT_KEYS = [
+  'items', 'country', 'prefecture', 'state', 'shippingCarrier', 'paymentMethod',
+  'couponCode', 'redeemPoints', 'negotiationId', 'promoCode', 'psFeeWaiverToken',
+  'customer', 'expectedTotal', 'ratesId',
+];
+
+function parseExpectedTotal(value) {
+  if (value === undefined || value === null || value === '') return null;
+  const total = Number(value);
+  if (!Number.isFinite(total) || total < 0 || total > 100_000_000) throw new HttpError(400, 'invalid_request');
+  return total;
+}
+
+function parseCheckout(body, user) {
+  const requestedItems = parseItems(body.items);
+  const country = requiredText(body.country, { max: 100 });
+  // `prefecture` é a província japonesa e só existe em endereço do Japão.
+  // Exigi-la sempre rejeitava TODO pedido internacional com
+  // `400 invalid_request`, porque `requiredText` recusa string vazia e o
+  // formulário manda '' quando o país não é o Japão. Como o público da loja
+  // é o Brasil, isso zerava as vendas: 63 visitas ao checkout, 0 pedidos.
+  // Fora do Japão o frete usa `internationalZone(country)` — não precisa da
+  // província.
+  const prefecture = country === 'Japão'
+    ? requiredText(body.prefecture, { max: 100 })
+    : optionalText(body.prefecture, { max: 100 });
+  const state = optionalText(body.state, { max: 100 });
+  const carrier = carrierId(body.shippingCarrier);
+  const paymentMethod = requiredText(body.paymentMethod, { max: 20 });
+  if (!PAYMENT_METHODS.has(paymentMethod)) throw new HttpError(400, 'invalid_payment_method');
+  // PayPay, Yucho e depósito são em ienes, no Japão; PIX é real brasileiro.
+  // Sem esta trava um pedido do Brasil podia sair como "PayPay" num total em R$.
+  if (!paymentMethodsForCountry(country).includes(paymentMethod)) throw new HttpError(400, 'payment_method_unavailable');
+  const customer = parseCustomer(body.customer, user, country);
+  const ratesId = optionalText(body.ratesId, { max: 80 });
+  if (ratesId && !/^[a-z-]+-\d{10,16}$/.test(ratesId)) throw new HttpError(400, 'invalid_request');
+  return {
+    requestedItems,
+    country,
+    prefecture,
+    state,
+    carrier,
+    paymentMethod,
+    customer,
+    couponCode: optionalText(body.couponCode, { max: 60 }).toUpperCase(),
+    promoCode: optionalText(body.promoCode, { max: 60 }).toUpperCase(),
+    negotiationId: optionalText(body.negotiationId, { max: 120 }),
+    psFeeWaiverToken: optionalText(body.psFeeWaiverToken, { max: 1200 }),
+    requestedPoints: Math.max(0, Math.floor(Number(body.redeemPoints || 0))),
+    expectedTotal: parseExpectedTotal(body.expectedTotal),
+    ratesId,
+  };
+}
+
+/** O que a tela de revisão precisa para mostrar a conta do servidor. */
+function publicQuote(quote, rates) {
+  return {
+    currency: quote.currency,
+    total: quote.total,
+    totalYen: quote.totalYen,
+    ratesId: rates.id || '',
+    fxSource: rates.source,
+    display: quote.display,
+    productSubtotalYen: quote.productSubtotalYen,
+    couponDiscountYen: quote.couponDiscountYen,
+    pointsDiscountYen: quote.pointsDiscountYen,
+    redeemPoints: quote.redeemPoints,
+    earnedPoints: quote.earnedPoints,
+    pointsMultiplier: quote.pointsMultiplier,
+    shippingYen: quote.shippingYen,
+    shippingDiscountYen: quote.shippingDiscountYen,
+    psFeeYen: quote.psFeeYen,
+    psFeeDiscountYen: quote.psFeeDiscountYen,
+    psFeeWaiverApplied: quote.psFeeWaiverApplied,
+    tax: quote.tax,
+    items: quote.items.map(({ cost, stockUnlimited, ...item }) => item),
+  };
+}
+
+async function prepareQuote(db, user, input) {
+  const {
+    requestedItems, country, prefecture, state, carrier, paymentMethod, customer,
+    couponCode, promoCode, negotiationId, psFeeWaiverToken, requestedPoints, ratesId,
+  } = input;
+  const waiver = psFeeWaiverToken ? verifyPsFeeWaiver(psFeeWaiverToken, user.uid) : null;
+  if (psFeeWaiverToken && !waiver) throw new HttpError(403, 'invalid_ps_fee_waiver');
+
+  const campaignSnap = promoCode ? await db.collection('promo_campaigns').doc(promoCode.toLowerCase()).get() : null;
+  const campaign = campaignSnap?.exists ? campaignSnap.data() : null;
+  if (promoCode && (!campaign || campaign.active === false || !activeByDate(campaign.expiresAt))) throw new HttpError(409, 'promotion_unavailable');
+
+  const baseProductIds = requestedItems.map((item) => item.productId.replace(/_promo$/, ''));
+  if (campaign?.giftProductId) baseProductIds.push(String(campaign.giftProductId));
+  const uniqueProductIds = [...new Set(baseProductIds)];
+  // O custo fica em `productCosts/{id}` (só admin lê); o `cost` antigo do
+  // doc público só vale para produto ainda não migrado.
+  const [productSnaps, costSnaps] = await Promise.all([
+    db.getAll(...uniqueProductIds.map((id) => db.collection('products').doc(id))),
+    db.getAll(...uniqueProductIds.map((id) => db.collection('productCosts').doc(id))),
+  ]);
+  const costs = new Map(costSnaps.filter((snap) => snap.exists).map((snap) => [snap.id, snap.data()?.cost]));
+  const products = new Map(productSnaps.filter((snap) => snap.exists).map((snap) => {
+    const data = snap.data();
+    return [snap.id, { id: snap.id, ...data, cost: costs.has(snap.id) ? costs.get(snap.id) : data.cost }];
+  }));
+
+  const pessoa = { cpf: customer.cpf, userId: user.uid };
+  const cpfIndexId = indiceDePessoaId(pessoa);
+  const usoPromoId = promoUsageId(promoCode, pessoa);
+  const [userSnap, homePromoSnap, promoStateSnap, negotiationSnap, cpfSnap, promoUsageSnap, recentSpendYen] = await Promise.all([
+    db.collection('users').doc(user.uid).get(),
+    db.collection('siteContent').doc('homePromotion').get(),
+    refEstadoPromo(db).get(),
+    negotiationId ? db.collection('negotiations').doc(negotiationId).get() : Promise.resolve(null),
+    // Mesma âncora do `fulfillment.js`: CPF quando existe, senão a conta.
+    // Sem isso a pré-checagem olhava um documento diferente do que a
+    // transação de baixa iria travar, e cliente sem CPF passava direto.
+    cpfIndexId ? db.collection('cpf_index').doc(cpfIndexId).get() : Promise.resolve(null),
+    usoPromoId ? db.collection('promo_usage').doc(usoPromoId).get() : Promise.resolve(null),
+    recentProductSpendYen(db, user.uid),
+  ]);
+  if (promoUsageSnap?.exists) throw new HttpError(409, 'promotion_already_used');
+  const userData = userSnap.exists ? userSnap.data() : null;
+  // Só o token prova o e-mail. Convidado (`signInAnonymously`) não tem
+  // nenhum, e conta registrada sem verificar pode ter se cadastrado com o
+  // endereço de outra pessoa — os dois casos não valem como identidade.
+  const emailVerificado = user.email_verified === true && Boolean(user.email);
+  const coupon = await resolveCoupon(db, couponCode, userData, customer, 0, user.uid, emailVerificado);
+  const negotiation = negotiationSnap?.exists ? negotiationSnap.data() : null;
+  if (negotiation && negotiation.userId && negotiation.userId !== user.uid) throw new HttpError(403, 'invalid_negotiation');
+  if (negotiation && negotiation.customerEmail && String(negotiation.customerEmail).toLowerCase() !== customer.email) throw new HttpError(403, 'invalid_negotiation');
+  if (negotiationId && (!negotiation || !['approved', 'auto_approved'].includes(negotiation.status))) {
+    throw new HttpError(409, 'negotiation_unavailable');
+  }
+  if (negotiation && !negotiationMatchesOrder(negotiation, requestedItems, customer, country, prefecture, carrier)) {
+    throw new HttpError(409, 'invalid_negotiation');
+  }
+  // Recusa cedo, com a mesma conta da transação, para o cliente ver o erro
+  // antes de qualquer cobrança. A palavra final continua sendo a da transação.
+  if (requestedPoints > pontosDisponiveis(userData)) throw new HttpError(409, 'insufficient_points');
+  // A cotação que o cliente viu (`ratesId`), se ainda vale; senão a atual.
+  const rates = await getFxRates(ratesId);
+  const homePromoData = homePromoSnap.exists ? homePromoSnap.data() : null;
+  const promoStateData = promoStateSnap.exists ? promoStateSnap.data() : null;
+  const reservedCount = homePromoData ? quantidadeReservada(promoStateData, homePromoData) : 0;
+  const quote = buildQuote({
+    requestedItems,
+    products,
+    country,
+    prefecture,
+    state,
+    carrier,
+    paymentMethod,
+    coupon,
+    redeemPoints: requestedPoints,
+    negotiation,
+    campaign,
+    homePromotion: homePromoData ? { ...homePromoData, reservedCount } : null,
+    rates,
+    recentSpendYen,
+    psFeeWaived: Boolean(waiver),
+  });
+  return { quote, rates, waiver, campaign, products, coupon, cpfSnap, homePromoData };
+}
+
+async function handleQuote(req, res) {
+  if (!handleCors(req, res, { methods: ['POST'] })) return;
+
+  try {
+    const user = await requireUser(req);
+    // A revisão recalcula a cada troca de forma de pagamento, cupom ou pontos.
+    await enforceRateLimit(req, { scope: 'checkout-quote', limit: 60, windowMs: 10 * 60 * 1000, identity: user.uid });
+    const body = parseJsonObject(req.body);
+    assertExactKeys(body, CHECKOUT_KEYS);
+    const input = parseCheckout(body, user);
+    const db = adminDb();
+    await assertPaymentMethodEnabled(db, input.paymentMethod);
+    const { quote, rates } = await prepareQuote(db, user, input);
+    res.status(200).json({ ok: true, quote: publicQuote(quote, rates) });
+  } catch (error) {
+    console.error('[checkout-quote]', error instanceof Error ? error.message : error);
+    sendError(res, error);
+  }
+}
+
 async function handleCreate(req, res) {
   if (!handleCors(req, res, { methods: ['POST'] })) return;
 
@@ -340,29 +546,10 @@ async function handleCreate(req, res) {
     const user = await requireUser(req);
     await enforceRateLimit(req, { scope: 'create-order', limit: 12, windowMs: 30 * 60 * 1000, identity: user.uid });
     const body = parseJsonObject(req.body);
-    assertExactKeys(body, ['orderId', 'items', 'country', 'prefecture', 'state', 'shippingCarrier', 'paymentMethod', 'couponCode', 'redeemPoints', 'negotiationId', 'promoCode', 'psFeeWaiverToken', 'customer']);
+    assertExactKeys(body, ['orderId', ...CHECKOUT_KEYS]);
     const orderId = requiredText(body.orderId, { max: 40, pattern: ORDER_PATTERN });
-    const requestedItems = parseItems(body.items);
-    const country = requiredText(body.country, { max: 100 });
-    // `prefecture` é a província japonesa e só existe em endereço do Japão.
-    // Exigi-la sempre rejeitava TODO pedido internacional com
-    // `400 invalid_request`, porque `requiredText` recusa string vazia e o
-    // formulário manda '' quando o país não é o Japão. Como o público da loja
-    // é o Brasil, isso zerava as vendas: 63 visitas ao checkout, 0 pedidos.
-    // Fora do Japão o frete usa `internationalZone(country)` e o imposto usa
-    // `state || prefecture` — nenhum dos dois precisa da província.
-    const prefecture = country === 'Japão'
-      ? requiredText(body.prefecture, { max: 100 })
-      : optionalText(body.prefecture, { max: 100 });
-    const state = optionalText(body.state, { max: 100 });
-    const carrier = carrierId(body.shippingCarrier);
-    const paymentMethod = requiredText(body.paymentMethod, { max: 20 });
-    if (!PAYMENT_METHODS.has(paymentMethod)) throw new HttpError(400, 'invalid_payment_method');
-    const customer = parseCustomer(body.customer, user, country);
-    const couponCode = optionalText(body.couponCode, { max: 60 }).toUpperCase();
-    const promoCode = optionalText(body.promoCode, { max: 60 }).toUpperCase();
-    const negotiationId = optionalText(body.negotiationId, { max: 120 });
-    const psFeeWaiverToken = optionalText(body.psFeeWaiverToken, { max: 1200 });
+    const input = parseCheckout(body, user);
+    const { country, prefecture, carrier, paymentMethod, customer, couponCode, promoCode, negotiationId } = input;
 
     const db = adminDb();
     await assertPaymentMethodEnabled(db, paymentMethod);
@@ -374,84 +561,14 @@ async function handleCreate(req, res) {
       res.status(200).json({ ok: true, order: publicOrder(order), clientSecret: intent?.client_secret || null });
       return;
     }
-    const waiver = psFeeWaiverToken ? verifyPsFeeWaiver(psFeeWaiverToken, user.uid) : null;
-    if (psFeeWaiverToken && !waiver) throw new HttpError(403, 'invalid_ps_fee_waiver');
-
-    const campaignSnap = promoCode ? await db.collection('promo_campaigns').doc(promoCode.toLowerCase()).get() : null;
-    const campaign = campaignSnap?.exists ? campaignSnap.data() : null;
-    if (promoCode && (!campaign || campaign.active === false || !activeByDate(campaign.expiresAt))) throw new HttpError(409, 'promotion_unavailable');
-
-    const baseProductIds = requestedItems.map((item) => item.productId.replace(/_promo$/, ''));
-    if (campaign?.giftProductId) baseProductIds.push(String(campaign.giftProductId));
-    const uniqueProductIds = [...new Set(baseProductIds)];
-    // O custo fica em `productCosts/{id}` (só admin lê); o `cost` antigo do
-    // doc público só vale para produto ainda não migrado.
-    const [productSnaps, costSnaps] = await Promise.all([
-      db.getAll(...uniqueProductIds.map((id) => db.collection('products').doc(id))),
-      db.getAll(...uniqueProductIds.map((id) => db.collection('productCosts').doc(id))),
-    ]);
-    const costs = new Map(costSnaps.filter((snap) => snap.exists).map((snap) => [snap.id, snap.data()?.cost]));
-    const products = new Map(productSnaps.filter((snap) => snap.exists).map((snap) => {
-      const data = snap.data();
-      return [snap.id, { id: snap.id, ...data, cost: costs.has(snap.id) ? costs.get(snap.id) : data.cost }];
-    }));
-
-    const pessoa = { cpf: customer.cpf, userId: user.uid };
-    const cpfIndexId = indiceDePessoaId(pessoa);
-    const usoPromoId = promoUsageId(promoCode, pessoa);
-    const [userSnap, homePromoSnap, promoStateSnap, negotiationSnap, cpfSnap, promoUsageSnap, recentSpendYen] = await Promise.all([
-      db.collection('users').doc(user.uid).get(),
-      db.collection('siteContent').doc('homePromotion').get(),
-      refEstadoPromo(db).get(),
-      negotiationId ? db.collection('negotiations').doc(negotiationId).get() : Promise.resolve(null),
-      // Mesma âncora do `fulfillment.js`: CPF quando existe, senão a conta.
-      // Sem isso a pré-checagem olhava um documento diferente do que a
-      // transação de baixa iria travar, e cliente sem CPF passava direto.
-      cpfIndexId ? db.collection('cpf_index').doc(cpfIndexId).get() : Promise.resolve(null),
-      usoPromoId ? db.collection('promo_usage').doc(usoPromoId).get() : Promise.resolve(null),
-      recentProductSpendYen(db, user.uid),
-    ]);
-    if (promoUsageSnap?.exists) throw new HttpError(409, 'promotion_already_used');
-    const userData = userSnap.exists ? userSnap.data() : null;
-    // Só o token prova o e-mail. Convidado (`signInAnonymously`) não tem
-    // nenhum, e conta registrada sem verificar pode ter se cadastrado com o
-    // endereço de outra pessoa — os dois casos não valem como identidade.
-    const emailVerificado = user.email_verified === true && Boolean(user.email);
-    const coupon = await resolveCoupon(db, couponCode, userData, customer, 0, user.uid, emailVerificado);
-    const negotiation = negotiationSnap?.exists ? negotiationSnap.data() : null;
-    if (negotiation && negotiation.userId && negotiation.userId !== user.uid) throw new HttpError(403, 'invalid_negotiation');
-    if (negotiation && negotiation.customerEmail && String(negotiation.customerEmail).toLowerCase() !== customer.email) throw new HttpError(403, 'invalid_negotiation');
-    if (negotiationId && (!negotiation || !['approved', 'auto_approved'].includes(negotiation.status))) {
-      throw new HttpError(409, 'negotiation_unavailable');
+    const { quote, rates, waiver, campaign, products, coupon, cpfSnap, homePromoData } = await prepareQuote(db, user, input);
+    // O cliente manda o total que está vendo. Se a conta do servidor deu outro
+    // número, nada é criado nem cobrado: a resposta traz a cotação nova para a
+    // tela atualizar e o cliente confirmar de novo. Assim o valor pago é
+    // sempre o valor que estava na tela quando ele clicou.
+    if (input.expectedTotal !== null && Math.abs(quote.total - input.expectedTotal) > 0.0001) {
+      throw new HttpError(409, 'price_changed', 'price_changed', { quote: publicQuote(quote, rates) });
     }
-    if (negotiation && !negotiationMatchesOrder(negotiation, requestedItems, customer, country, prefecture, carrier)) {
-      throw new HttpError(409, 'invalid_negotiation');
-    }
-    const requestedPoints = Math.max(0, Math.floor(Number(body.redeemPoints || 0)));
-    // Recusa cedo, com a mesma conta da transação, para o cliente ver o erro
-    // antes de qualquer cobrança. A palavra final continua sendo a da transação.
-    if (requestedPoints > pontosDisponiveis(userData)) throw new HttpError(409, 'insufficient_points');
-    const rates = await getFxRates();
-    const homePromoData = homePromoSnap.exists ? homePromoSnap.data() : null;
-    const promoStateData = promoStateSnap.exists ? promoStateSnap.data() : null;
-    const reservedCount = homePromoData ? quantidadeReservada(promoStateData, homePromoData) : 0;
-    const quote = buildQuote({
-      requestedItems,
-      products,
-      country,
-      prefecture,
-      state,
-      carrier,
-      paymentMethod,
-      coupon,
-      redeemPoints: requestedPoints,
-      negotiation,
-      campaign,
-      homePromotion: homePromoData ? { ...homePromoData, reservedCount } : null,
-      rates,
-      recentSpendYen,
-      psFeeWaived: Boolean(waiver),
-    });
 
     const stockByProduct = new Map();
     for (const item of quote.items) stockByProduct.set(item.productId, (stockByProduct.get(item.productId) || 0) + item.quantity);
@@ -523,6 +640,7 @@ async function handleCreate(req, res) {
       totalYen: quote.totalYen,
       currency: quote.currency,
       fxSource: rates.source,
+      fxRatesId: rates.id || '',
       paymentMethod,
       trackingCode: `${trackingPrefix}${randomInt(100000000, 1000000000)}JP`,
       couponCode: couponCode || '',
@@ -693,6 +811,77 @@ async function handleCreate(req, res) {
   }
 }
 
+// Negociação da taxa PS: até ¥300 por unidade sai aprovada na hora, como a
+// tela promete. Antes a aprovação era gravada pelo navegador
+// (`status: 'auto_approved'`, `approvedBy: 'auto'`), o que deixava qualquer um
+// se dar o desconto que quisesse; aquilo foi retirado e o texto "sai aprovado
+// na hora" ficou sem ninguém que aprovasse. Agora quem aprova é o servidor,
+// conferindo o carrinho da própria negociação contra o catálogo.
+async function handleNegotiationAutoApprove(req, res) {
+  if (!handleCors(req, res, { methods: ['POST'] })) return;
+
+  try {
+    const user = await requireUser(req);
+    await enforceRateLimit(req, { scope: 'negotiation-auto-approve', limit: 10, windowMs: 60 * 60 * 1000, identity: user.uid });
+    const body = parseJsonObject(req.body);
+    assertExactKeys(body, ['negotiationId']);
+    const negotiationId = requiredText(body.negotiationId, { max: 120, pattern: /^[A-Za-z0-9_-]+$/ });
+    const db = adminDb();
+    const ref = db.collection('negotiations').doc(negotiationId);
+    const snap = await ref.get();
+    if (!snap.exists) throw new HttpError(404, 'negotiation_not_found');
+    const negotiation = snap.data();
+    if (negotiation.userId !== user.uid) throw new HttpError(403, 'forbidden');
+
+    // Unidades que pagam a taxa, pelo catálogo — não pelo que o navegador disse.
+    const cartItems = Array.isArray(negotiation.cartItems) ? negotiation.cartItems.slice(0, 100) : [];
+    const productIds = [...new Set(cartItems.map((item) => String(item.productId || '').replace(/_promo$/, '')).filter(Boolean))];
+    const productSnaps = productIds.length
+      ? await db.getAll(...productIds.map((id) => db.collection('products').doc(id)))
+      : [];
+    const catalog = new Map(productSnaps.filter((entry) => entry.exists).map((entry) => [entry.id, entry.data()]));
+    const units = cartItems.reduce((sum, item) => {
+      const product = catalog.get(String(item.productId || '').replace(/_promo$/, ''));
+      const quantity = Number(item.quantity);
+      if (!product || product.hidden === true || product.__deleted === true || product.noPsFee) return sum;
+      return Number.isInteger(quantity) && quantity > 0 && quantity <= 100 ? sum + quantity : sum;
+    }, 0);
+    const maxAutoYen = autoApprovablePsDiscountYen(units);
+
+    const result = await db.runTransaction(async (transaction) => {
+      const current = await transaction.get(ref);
+      const data = current.exists ? current.data() : null;
+      if (!data || data.userId !== user.uid) throw new HttpError(404, 'negotiation_not_found');
+      if (data.status === 'approved' || data.status === 'auto_approved') {
+        return { status: data.status, approvedDiscountYen: data.approvedDiscountYen ?? null, maxAutoYen };
+      }
+      if (data.status !== 'pending') throw new HttpError(409, 'negotiation_unavailable');
+      if (data.expiresAt && !(Date.parse(data.expiresAt) > Date.now())) throw new HttpError(409, 'negotiation_expired');
+      const requested = Math.floor(Number(data.requestedDiscountYen));
+      // Frete e pedido acima do teto continuam com a vendedora.
+      if (data.type !== 'ps_fee' || !(requested > 0) || requested > maxAutoYen || requested >= Number(data.originalAmountYen)) {
+        return { status: 'pending', approvedDiscountYen: null, maxAutoYen };
+      }
+      const now = new Date().toISOString();
+      transaction.update(ref, {
+        status: 'auto_approved',
+        autoApproved: true,
+        approvedDiscountYen: requested,
+        approvedBy: 'system',
+        approvedAt: now,
+        resolvedAt: now,
+        clientNotified: true,
+        adminNote: `Aprovado automaticamente (até ¥${PS_AUTO_PER_UNIT_LABEL} por item).`,
+      });
+      return { status: 'auto_approved', approvedDiscountYen: requested, maxAutoYen };
+    });
+    res.status(200).json({ ok: true, ...result });
+  } catch (error) {
+    console.error('[negotiation-auto-approve]', error instanceof Error ? error.message : error);
+    sendError(res, error);
+  }
+}
+
 async function handleConfirmManualPayment(req, res) {
   if (!handleCors(req, res, { methods: ['POST'] })) return;
 
@@ -739,9 +928,11 @@ export default async function handler(req, res) {
   const { action } = req.query;
   if (action === 'mark-received') return handleMarkReceived(req, res);
   if (action === 'create') return handleCreate(req, res);
+  if (action === 'quote') return handleQuote(req, res);
+  if (action === 'negotiation-auto-approve') return handleNegotiationAutoApprove(req, res);
   if (action === 'ps-fee-waiver') return handleIssuePsFeeWaiver(req, res);
   if (action === 'confirm-manual-payment') return handleConfirmManualPayment(req, res);
   return res.status(400).json({ error: 'invalid_action' });
 }
 
-export { handleCreate, handleMarkReceived, handleConfirmManualPayment, handleIssuePsFeeWaiver };
+export { handleCreate, handleQuote, handleMarkReceived, handleConfirmManualPayment, handleIssuePsFeeWaiver, handleNegotiationAutoApprove };

@@ -39,8 +39,13 @@ export const negotiationService = {
   async create(data: CreateNegotiationInput): Promise<Negotiation> {
     // A identidade e o estado inicial vêm da sessão e deste serviço, nunca do caller.
     const cur = auth?.currentUser;
-    if (!cur) {
+    if (!cur || cur.isAnonymous) {
       throw new Error('É preciso estar logado para enviar a negociação.');
+    }
+    // A regra do Firestore exige e-mail confirmado. Sem este aviso o cliente
+    // via só "Erro ao enviar solicitação", sem saber o motivo.
+    if (!cur.emailVerified) {
+      throw new Error('Confirme seu e-mail para pedir desconto — o link foi enviado quando você criou a conta.');
     }
 
     if (!Number.isFinite(data.requestedDiscountYen) || data.requestedDiscountYen <= 0) {
@@ -78,6 +83,34 @@ export const negotiationService = {
     };
     await setDoc(ref, neg);
     return neg;
+  },
+
+  /**
+   * Pede ao servidor a aprovação automática da taxa PS (até ¥300 por item).
+   * Quem decide é o servidor, conferindo o carrinho da negociação pelo
+   * catálogo; acima do teto ela continua pendente para a vendedora.
+   */
+  async requestAutoApproval(id: string): Promise<{ status: string; approvedDiscountYen: number | null; maxAutoYen: number }> {
+    const cur = auth?.currentUser;
+    if (!cur) throw new Error('É preciso estar logado para enviar a negociação.');
+    const token = await cur.getIdToken();
+    const response = await fetch('/api/negotiation-auto-approve', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ negotiationId: id }),
+    });
+    const payload = await response.json().catch(() => ({})) as {
+      error?: string;
+      status?: string;
+      approvedDiscountYen?: number | null;
+      maxAutoYen?: number;
+    };
+    if (!response.ok) throw new Error(payload.error || 'auto_approve_failed');
+    return {
+      status: payload.status || 'pending',
+      approvedDiscountYen: payload.approvedDiscountYen ?? null,
+      maxAutoYen: Number(payload.maxAutoYen) || 0,
+    };
   },
 
   listenById(id: string, cb: (neg: Negotiation | null) => void): () => void {

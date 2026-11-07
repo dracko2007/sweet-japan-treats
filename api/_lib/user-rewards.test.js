@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   claimBirthday,
@@ -35,9 +36,13 @@ class FakeQuery {
   }
 
   async get() {
+    return this.run(this.db.docs);
+  }
+
+  run(source) {
     const prefix = `${this.collectionName}/`;
     const docs = [];
-    for (const [path, value] of this.db.docs) {
+    for (const [path, value] of source) {
       if (!path.startsWith(prefix) || path.slice(prefix.length).includes('/')) continue;
       if (!this.filters.every((filter) => value?.[filter.field] === filter.value)) continue;
       const id = path.slice(prefix.length);
@@ -67,7 +72,7 @@ class FakeDb {
   async runTransaction(callback) {
     const working = new Map([...this.docs].map(([path, value]) => [path, clone(value)]));
     const transaction = {
-      get: async (ref) => this.snapshot(ref, working),
+      get: async (ref) => (ref instanceof FakeQuery ? ref.run(working) : this.snapshot(ref, working)),
       create: (ref, value) => {
         if (working.has(ref.path)) throw new Error('already_exists');
         working.set(ref.path, clone(value));
@@ -247,38 +252,147 @@ describe('server-defined user rewards', () => {
     expect(db.get('users/u1').points).toBe(1010);
   });
 
-  it('requires a paid product order and credits one review point once', async () => {
-    const db = new FakeDb({
-      'users/u1': { points: 50 },
-      'orders/O1': {
-        userId: 'u1',
-        customerEmail: 'buyer@example.com',
-        paymentConfirmed: true,
-        items: [{ productId: 'p1' }],
-      },
-    });
+});
 
-    const first = await claimProductReview(db, user, { action: 'product-review', productId: 'p1' });
-    const replay = await claimProductReview(db, user, { action: 'product-review', productId: 'p1' });
-
-    expect(first).toEqual({ ok: true, awarded: 1, total: 51, alreadyClaimed: false });
-    expect(replay).toEqual({ ok: true, awarded: 0, total: 51, alreadyClaimed: true });
-    expect(db.get('users/u1').points).toBe(51);
+// A avaliação é gravada pelo servidor: antes o navegador gravava a avaliação
+// e a nota do produto direto no banco, e qualquer conta logada podia pular a
+// conferência da compra e pôr a nota que quisesse.
+describe('product review (server-side)', () => {
+  const BUCKET = 'localstorage-98492.firebasestorage.app';
+  const storageUrl = (path) => `https://firebasestorage.googleapis.com/v0/b/${BUCKET}/o/${encodeURIComponent(path)}?alt=media&token=t1`;
+  const photo = (productId, name = 'a.jpg') => storageUrl(`review-photos/${productId}/${name}`);
+  const paidOrder = {
+    userId: 'u1',
+    customerEmail: 'buyer@example.com',
+    paymentConfirmed: true,
+    items: [{ productId: 'p1' }],
+  };
+  const review = (overrides = {}) => ({
+    action: 'product-review',
+    productId: 'p1',
+    rating: 4,
+    comment: 'Gostei muito do produto.',
+    ...overrides,
+  });
+  const store = (extra = {}) => new FakeDb({
+    'users/u1': { points: 50, name: 'Maria' },
+    'products/p1': { name: 'Produto' },
+    'orders/O1': paidOrder,
+    ...extra,
   });
 
-  it('does not reward a review for an unpaid order', async () => {
-    const db = new FakeDb({
-      'users/u1': { points: 50 },
-      'orders/O1': {
-        userId: 'u1',
-        status: 'pending_payment',
-        paymentConfirmed: false,
-        items: [{ productId: 'p1' }],
-      },
+  it('saves the review, recomputes the rating from saved reviews and credits one point once', async () => {
+    const db = store({
+      // Agregado adulterado pelo caminho antigo: não pode se perpetuar.
+      'products/p1': { name: 'Produto', rating: 5, reviewCount: 99 },
+      'reviews/p1_u2': { id: 'p1_u2', productId: 'p1', userId: 'u2', rating: 2 },
+      'reviews/p9_u3': { id: 'p9_u3', productId: 'p9', userId: 'u3', rating: 5 },
     });
 
-    await expect(claimProductReview(db, user, { action: 'product-review', productId: 'p1' }))
+    const first = await claimProductReview(db, user, review({ images: [photo('p1')] }));
+
+    expect(first).toEqual({ ok: true, awarded: 1, total: 51, alreadyClaimed: false, reviewId: 'p1_u1' });
+    expect(db.get('reviews/p1_u1')).toMatchObject({
+      id: 'p1_u1',
+      productId: 'p1',
+      userId: 'u1',
+      userName: 'Maria',
+      rating: 4,
+      comment: 'Gostei muito do produto.',
+      verified: true,
+      images: [photo('p1')],
+      pointsAwarded: 1,
+    });
+    expect(db.get('products/p1')).toMatchObject({ rating: 3, reviewCount: 2 });
+    expect(db.get('users/u1').points).toBe(51);
+
+    await expect(claimProductReview(db, user, review({ rating: 5 })))
+      .rejects.toMatchObject({ statusCode: 409, code: 'already_reviewed' });
+    expect(db.get('users/u1').points).toBe(51);
+    expect(db.get('products/p1')).toMatchObject({ rating: 3, reviewCount: 2 });
+  });
+
+  it('does not save a review without a paid order for the product', async () => {
+    const db = store({
+      'orders/O1': { userId: 'u1', status: 'pending_payment', paymentConfirmed: false, items: [{ productId: 'p1' }] },
+    });
+
+    await expect(claimProductReview(db, user, review()))
       .rejects.toMatchObject({ statusCode: 403, code: 'verified_purchase_required' });
+    expect(db.get('reviews/p1_u1')).toBeUndefined();
     expect(db.get('users/u1').points).toBe(50);
+  });
+
+  it('the client cannot set verification, name, owner or points', async () => {
+    const db = store();
+    for (const extra of [{ verified: true }, { userName: 'Loja Oficial' }, { userId: 'u2' }, { pointsAwarded: 500 }]) {
+      await expect(claimProductReview(db, user, review(extra))).rejects.toMatchObject({ statusCode: 400 });
+    }
+    expect(db.get('reviews/p1_u1')).toBeUndefined();
+  });
+
+  it('rejects a rating outside 1–5 and a comment that is too short or too long', async () => {
+    const db = store();
+    for (const extra of [
+      { rating: 0 },
+      { rating: 6 },
+      { rating: 4.5 },
+      { rating: '5' },
+      { comment: 'curto' },
+      { comment: 'x'.repeat(3001) },
+    ]) {
+      await expect(claimProductReview(db, user, review(extra))).rejects.toMatchObject({ statusCode: 400 });
+    }
+    expect(db.get('reviews/p1_u1')).toBeUndefined();
+  });
+
+  it("accepts only photos and videos from the store's storage, in this product's folder", async () => {
+    const db = store();
+    for (const extra of [
+      { images: ['https://evil.example.com/a.jpg'] },
+      { images: [photo('p1').replace(BUCKET, 'other-project.appspot.com')] },
+      { images: [photo('p2')] },
+      { images: [storageUrl('review-photos/p1/../p2/a.jpg')] },
+      { images: ['javascript:alert(1)'] },
+      { images: Array.from({ length: 11 }, (_, index) => photo('p1', `${index}.jpg`)) },
+      { videoUrl: 'https://vimeo.com/123456' },
+      { videoUrl: storageUrl('review-photos/p1/v.mp4') },
+    ]) {
+      await expect(claimProductReview(db, user, review(extra)))
+        .rejects.toMatchObject({ statusCode: 400, code: 'invalid_review_media' });
+    }
+    expect(db.get('reviews/p1_u1')).toBeUndefined();
+
+    await claimProductReview(db, user, review({ videoUrl: storageUrl('review-videos/p1/v.mp4') }));
+    expect(db.get('reviews/p1_u1').videoUrl).toBe(storageUrl('review-videos/p1/v.mp4'));
+  });
+
+  it('stores YouTube links in one format', async () => {
+    const db = store();
+
+    await claimProductReview(db, user, review({ videoUrl: 'https://youtu.be/dQw4w9WgXcQ?si=abc' }));
+
+    expect(db.get('reviews/p1_u1').videoUrl).toBe('https://www.youtube.com/watch?v=dQw4w9WgXcQ');
+  });
+
+  it('saves the review without a second point when the point was already claimed', async () => {
+    // Fluxo antigo: o ponto saía antes e a gravação da avaliação podia falhar depois.
+    const claimId = createHash('sha256').update('u1\0p1').digest('hex');
+    const db = store({ [`point_reward_claims/review-${claimId}`]: { type: 'product_review', userId: 'u1' } });
+
+    const outcome = await claimProductReview(db, user, review());
+
+    expect(outcome).toEqual({ ok: true, awarded: 0, total: 50, alreadyClaimed: true, reviewId: 'p1_u1' });
+    expect(db.get('reviews/p1_u1')).toMatchObject({ pointsAwarded: 0, verified: true });
+    expect(db.get('products/p1')).toMatchObject({ rating: 4, reviewCount: 1 });
+  });
+
+  it('refuses a product that no longer exists', async () => {
+    const db = store();
+    db.docs.delete('products/p1');
+
+    await expect(claimProductReview(db, user, review()))
+      .rejects.toMatchObject({ statusCode: 404, code: 'product_not_found' });
+    expect(db.get('reviews/p1_u1')).toBeUndefined();
   });
 });

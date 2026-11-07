@@ -2,6 +2,7 @@ import { requireAdmin, requireUser } from './_lib/auth.js';
 import { adminDb } from './_lib/firebase-admin.js';
 import {
   assertExactKeys,
+  getHeader,
   handleCors,
   HttpError,
   normalizeEmail,
@@ -9,6 +10,12 @@ import {
   requiredText,
   sendError,
 } from './_lib/http.js';
+import { enforceRateLimit } from './_lib/rate-limit.js';
+
+// Validar um código diz se ele existe. Sem limite dava para testar códigos em série.
+const VALIDATE_PER_USER = 30;
+const VALIDATE_PER_GUEST_IP = 60; // folgado: sem TRUSTED_PROXY, vários visitantes podem dividir o IP do proxy
+const VALIDATE_WINDOW_MS = 10 * 60 * 1000;
 
 function adminRequested(body) {
   if (body.admin === undefined) return false;
@@ -94,13 +101,50 @@ async function listPending(req, user, body) {
     .map(pendingSummary);
 }
 
+async function optionalUser(req) {
+  return String(getHeader(req, 'authorization') || '') ? requireUser(req) : null;
+}
+
+// Carrinho (inclusive visitante): confere o código e devolve só o que a tela usa.
+// E-mail, ganhos e vendas do afiliado nunca saem daqui (antes o navegador lia o doc inteiro).
+async function validateCode(req, body) {
+  assertExactKeys(body, ['action', 'code']);
+  // Códigos são criados livremente no admin: aceita qualquer id válido do Firestore (sem '/', '.' ou '..').
+  const code = requiredText(body.code, { max: 80, pattern: /^(?!\.\.?$)[^/]+$/ }).toUpperCase();
+  const user = await optionalUser(req);
+  await enforceRateLimit(req, user
+    ? { scope: 'affiliate-validate', limit: VALIDATE_PER_USER, windowMs: VALIDATE_WINDOW_MS, identity: user.uid }
+    : { scope: 'affiliate-validate:guest', limit: VALIDATE_PER_GUEST_IP, windowMs: VALIDATE_WINDOW_MS });
+
+  const snapshot = await adminDb().collection('affiliates').doc(code).get();
+  if (!snapshot.exists) return { valid: false, reason: 'not_found' };
+  const data = snapshot.data() || {};
+  if (data.active !== true) return { valid: false, reason: 'inactive' };
+  const expiresAt = String(data.expiresAt || '');
+  const expiresMs = Date.parse(expiresAt);
+  if (!Number.isFinite(expiresMs) || expiresMs <= Date.now()) return { valid: false, reason: 'expired' };
+  return {
+    valid: true,
+    affiliate: {
+      code: snapshot.id,
+      ownerName: String(data.ownerName || '').slice(0, 120),
+      discountPercent: Math.max(0, Math.min(100, numberOrZero(data.discountPercent))),
+      expiresAt,
+    },
+  };
+}
+
 export default async function handler(req, res) {
   if (!handleCors(req, res, { methods: ['POST'] })) return;
 
   try {
-    const user = await requireUser(req);
     const body = parseJsonObject(req.body);
     const action = requiredText(body.action, { max: 20 });
+    if (action === 'validate') {
+      res.status(200).json(await validateCode(req, body));
+      return;
+    }
+    const user = await requireUser(req);
 
     if (action === 'by-owner') {
       res.status(200).json({ affiliates: await listByOwner(req, user, body) });

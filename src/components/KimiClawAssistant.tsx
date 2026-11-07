@@ -31,7 +31,7 @@ interface ShippingOption {
   carrier: string;
   basePrice: number;
   ratePerKg: number;
-  currency: 'BRL' | 'JPY' | 'EUR';
+  currency: 'BRL' | 'JPY' | 'EUR' | 'USD';
   daysEstimate?: string;
 }
 
@@ -433,9 +433,11 @@ const KimiClawAssistant: React.FC = () => {
   const calculateShipping = (country: string, weightKg: number): ShippingOption[] => {
     const normalizedCountry = normalizeText(country);
 
-    // Detect country from aliases
+    // Detect country from aliases. EUA primeiro: "estados unidos" contém "es"
+    // (viraria Espanha) e "united" contém "it" (viraria Itália).
     let detectedCountry = country;
-    if (normalizedCountry.includes('brasil') || normalizedCountry.includes('brazil') || normalizedCountry.includes('br')) detectedCountry = 'Brasil';
+    if (normalizedCountry.includes('estados unidos') || normalizedCountry.includes('united states') || /\b(eua|usa|us)\b/.test(normalizedCountry)) detectedCountry = 'Estados Unidos';
+    else if (normalizedCountry.includes('brasil') || normalizedCountry.includes('brazil') || normalizedCountry.includes('br')) detectedCountry = 'Brasil';
     else if (normalizedCountry.includes('japao') || normalizedCountry.includes('japan') || normalizedCountry.includes('ja')) detectedCountry = 'Japão';
     else if (normalizedCountry.includes('portugal') || normalizedCountry.includes('pt')) detectedCountry = 'Portugal';
     else if (normalizedCountry.includes('franca') || normalizedCountry.includes('france') || normalizedCountry.includes('fr')) detectedCountry = 'França';
@@ -445,8 +447,23 @@ const KimiClawAssistant: React.FC = () => {
     if (detectedCountry === 'Japão') return [];
 
     const zone = countryToZone(detectedCountry);
-    const currency: 'BRL' | 'EUR' = ['Portugal', 'França', 'Itália', 'Espanha'].includes(detectedCountry) ? 'EUR' : 'BRL';
     const weightG = Math.max(100, Math.round(weightKg * 1000));
+
+    // EUA: desde 15/10/2026 só sai com imposto pré-pago (DDP), e o único
+    // serviço com DDP para loja é o EMS — mesma regra do checkout
+    // (`src/utils/shippingQuote.ts`). Valor em dólar.
+    if (detectedCountry === 'Estados Unidos') {
+      const usEmsYen = getEmsRate(weightG, zone);
+      return usEmsYen ? [{
+        carrier: 'Japan Post EMS (DDP — imposto pré-pago, já no total)',
+        basePrice: Math.round(fxConvert(usEmsYen, 'USD')),
+        ratePerKg: 0,
+        currency: 'USD',
+        daysEstimate: '10-12',
+      }] : [];
+    }
+
+    const currency: 'BRL' | 'EUR' = ['Portugal', 'França', 'Itália', 'Espanha'].includes(detectedCountry) ? 'EUR' : 'BRL';
     const daysByZone: Record<number, { light: string; air: string; ems: string }> = {
       1: { light: '6-10', air: '4-7', ems: '2-4' },
       2: { light: '7-12', air: '5-9', ems: '3-5' },
@@ -461,7 +478,7 @@ const KimiClawAssistant: React.FC = () => {
       const eLightYen = getELightRate(weightG, zone);
       if (eLightYen) {
         options.push({
-          carrier: 'Japan Post E-Light (国際eパケットライト)',
+          carrier: 'Japan Post Air Packet (国際エアパケット)',
           basePrice: Math.round(fxConvert(eLightYen, currency)),
           ratePerKg: 0,
           currency,

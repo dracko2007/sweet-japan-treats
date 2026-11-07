@@ -34,7 +34,8 @@ describe('authoritative checkout quote', () => {
     const result = quote({ requestedItems: [{ productId: 'p1', variantId: 'small', quantity: 2, price: 1, total: 1 }] });
     expect(result.items[0].unitYen).toBe(1000);
     expect(result.productSubtotalYen).toBe(2000);
-    expect(result.netProductsYen).toBe(1900);
+    // Sem desconto escondido no cartão: o de 5% saiu do site em 07/06/2026.
+    expect(result.netProductsYen).toBe(2000);
     expect(result.currency).toBe('BRL');
     expect(result.total).toBeGreaterThan(1);
   });
@@ -157,19 +158,94 @@ describe('authoritative checkout quote', () => {
       coupon: { code: 'GLOBAL10', discountType: 'percentage', discount: 10 },
       redeemPoints: 500,
     });
-    const { products, shipping, psFee, tax } = result.display;
+    const { subtotal, couponDiscount, pointsDiscount, products, shipping, psFee } = result.display;
 
     // Sem estas parcelas o teste passaria por vacuidade.
+    expect(couponDiscount).toBeGreaterThan(0);
+    expect(pointsDiscount).toBeGreaterThan(0);
     expect(shipping).toBeGreaterThan(0);
     expect(psFee).toBeGreaterThan(0);
-    expect(tax).toBeGreaterThan(0);
 
-    // A invariante essencial: as linhas cobradas devem somar exatamente o total,
-    // em centavos inteiros (para evitar ruído de float). O imposto é informativo
-    // (loja não cobra tributo de importação) e fica de fora do total cobrado.
-    const centavos = (valor) => Math.round(valor * 100);
-    expect(centavos(products) + centavos(shipping) + centavos(psFee))
-      .toBe(centavos(result.total));
+    // A invariante essencial: as linhas cobradas somam exatamente o total.
+    // Toda linha é inteira (R$), como a tela mostra.
+    for (const valor of [subtotal, couponDiscount, pointsDiscount, products, shipping, psFee, result.total]) {
+      expect(Number.isInteger(valor)).toBe(true);
+    }
+    expect(subtotal - couponDiscount - pointsDiscount).toBe(products);
+    expect(products + shipping + psFee).toBe(result.total);
+  });
+
+  // A tela converte CADA unidade e arredonda para inteiro; o subtotal é a soma
+  // dessas unidades. O servidor cobrava o total convertido de uma vez, com
+  // centavos, e a diferença aparecia na fatura.
+  it('cobra a soma das unidades exatamente como a tela converte', () => {
+    const wise = { BRL: 0.0347798, EUR: 0.00566316, USD: 0.00630994, source: 'wise' };
+    const result = quote({ requestedItems: [{ productId: 'p1', variantId: 'small', quantity: 3 }], rates: wise });
+    const unidade = Math.round((1000 + 5) * wise.BRL);
+    expect(result.items[0].price).toBe(unidade);
+    expect(result.display.subtotal).toBe(unidade * 3);
+    expect(result.display.psFee).toBe(Math.round(3000 * wise.BRL));
+  });
+
+  it('cartão e Wise cobram o mesmo valor: não existe desconto por forma de pagamento', () => {
+    expect(quote({ paymentMethod: 'card' }).total).toBe(quote({ paymentMethod: 'wise' }).total);
+    expect(quote({ paymentMethod: 'card' }).display.paymentDiscount).toBe(0);
+  });
+
+  // A tela do PIX sempre somou IOF 3,5% + R$32; a cobrança não somava.
+  it('PIX soma o IOF e a tarifa bancária que a tela mostra', () => {
+    const semTaxa = quote({ paymentMethod: 'wise' });
+    const pix = quote({ paymentMethod: 'pix' });
+    const iof = Math.round(semTaxa.total * 0.035);
+    expect(pix.display.pixIof).toBe(iof);
+    expect(pix.display.pixBankFee).toBe(32);
+    expect(pix.total).toBe(semTaxa.total + iof + 32);
+  });
+
+  it('EUA: só EMS, com o imposto pré-pago (DDP) no total', () => {
+    expect(() => quote({ country: 'Estados Unidos', carrier: 'eraito' })).toThrowError('shipping_unavailable');
+    const result = quote({ country: 'Estados Unidos', carrier: 'ems', state: 'CA' });
+    const { products, shipping, psFee, importDuty, tax } = result.display;
+    expect(importDuty).toBe(Math.round(products * 0.125 + 2.77));
+    expect(tax).toBe(0);
+    expect(products + shipping + psFee + importDuty).toBe(result.total);
+  });
+
+  it('Brasil não grava estimativa de imposto que a tela não mostra', () => {
+    expect(quote().tax).toBe(0);
+    expect(quote({ country: 'Portugal' }).tax).toBeGreaterThan(0);
+  });
+
+  it('cupom fixo é em ienes, nunca na moeda do cliente', () => {
+    const result = quote({ coupon: { code: 'MENOS500', discountType: 'fixed', discount: 500 } });
+    expect(result.couponDiscountYen).toBe(500);
+    expect(result.display.couponDiscount).toBe(Math.round(500 * rates.BRL * 1.04));
+  });
+
+  describe('negociação da taxa PS', () => {
+    const pendente = { type: 'ps_fee', approvedDiscountYen: 300, expiresAt: new Date(Date.now() + 3_600_000).toISOString() };
+
+    it('aprovação automática do servidor vale até ¥300 por unidade do carrinho atual', () => {
+      const negotiation = { ...pendente, status: 'auto_approved', approvedBy: 'system', approvedDiscountYen: 900 };
+      const result = quote({ requestedItems: [{ productId: 'p1', variantId: 'small', quantity: 2 }], negotiation });
+      expect(result.psFeeDiscountYen).toBe(600);
+      expect(result.psFeeYen).toBe(1400);
+    });
+
+    it('aprovação manual da vendedora vale o valor aprovado', () => {
+      const negotiation = { ...pendente, status: 'approved', approvedBy: 'loja@example.com', approvedDiscountYen: 700 };
+      expect(quote({ negotiation }).psFeeYen).toBe(300);
+    });
+
+    it('recusa a antiga aprovação gravada pelo navegador', () => {
+      const negotiation = { ...pendente, status: 'auto_approved', approvedBy: 'auto' };
+      expect(quote({ negotiation }).psFeeYen).toBe(1000);
+    });
+
+    it('negociação vencida não dá desconto', () => {
+      const negotiation = { ...pendente, status: 'approved', approvedBy: 'loja@example.com', expiresAt: new Date(Date.now() - 1000).toISOString() };
+      expect(quote({ negotiation }).psFeeYen).toBe(1000);
+    });
   });
 
   // Iene não tem centavo: a taxa efetiva é 1 e cada linha exibida é o próprio
@@ -179,14 +255,14 @@ describe('authoritative checkout quote', () => {
       country: 'Japão', prefecture: 'Tokyo', carrier: 'yuubin',
       coupon: { code: 'GLOBAL10', discountType: 'percentage', discount: 10 },
     });
-    const { subtotal, couponDiscount, pointsDiscount, paymentDiscount, products, shipping, psFee, tax } = result.display;
+    const { subtotal, couponDiscount, pointsDiscount, products, shipping, psFee, tax } = result.display;
 
     for (const valor of [subtotal, couponDiscount, products, shipping, psFee, tax, result.total]) {
       expect(Number.isInteger(valor)).toBe(true);
     }
     expect(tax).toBe(0);
     expect(result.total).toBe(result.totalYen);
-    expect(subtotal - couponDiscount - pointsDiscount - paymentDiscount).toBe(products);
-    expect(products + shipping + psFee + tax).toBe(result.total);
+    expect(subtotal - couponDiscount - pointsDiscount).toBe(products);
+    expect(products + shipping + psFee).toBe(result.total);
   });
 });

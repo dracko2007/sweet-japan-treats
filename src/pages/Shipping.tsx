@@ -10,6 +10,11 @@ import { formatPrice, getCurrencyByCountry } from '@/utils/currency';
 import { getELightRate, getAirParcelRate, getEmsRate, countryToZone, MAX_DIM_SUM_CM, MAX_WEIGHT_G, type JapanPostZone } from '@/utils/japanPostRates';
 import { convertYen as fxConvert } from '@/services/fxService';
 import { cn } from '@/lib/utils';
+import { US_COUNTRY, US_ENTRY_FEE_USD, US_IMPORT_DUTY_RATE } from '../../shared/money.js';
+
+// EUA: desde 15/10/2026 só sai com imposto pré-pago (DDP), e o único serviço
+// com DDP para loja é o EMS (`src/utils/shippingQuote.ts`).
+const US_DDP_EMS_DAYS = '10-12';
 
 const Shipping: React.FC = () => {
   const { t, selectedCountry, language } = useLanguage();
@@ -34,6 +39,8 @@ const Shipping: React.FC = () => {
       setSimValueInput('4500'); // 4500 JPY
     } else if (['Portugal', 'França', 'Itália', 'Espanha'].includes(country)) {
       setSimValueInput('25'); // 25 EUR
+    } else if (country === US_COUNTRY) {
+      setSimValueInput('50'); // 50 USD
     } else {
       setSimValueInput('150'); // 150 BRL
     }
@@ -90,9 +97,14 @@ const Shipping: React.FC = () => {
     type SimRate = { name: string; cost: number | null; time: string; consultar?: boolean; combinar?: boolean };
     type SampleRate = { name: string; logo: string; desc: string; rate60: number; rate80: number; time: string; features: string[]; consultar?: boolean; combinar?: boolean };
     const rates: SimRate[] = [];
+    if (country === US_COUNTRY) {
+      const usEmsYen = getEmsRate(billableWeightG, zone);
+      rates.push({ name: 'Japan Post EMS (DDP) ✈️', cost: usEmsYen ? fxConvert(usEmsYen, cur) : null, time: `${US_DDP_EMS_DAYS} ${du}` });
+      return rates;
+    }
     if (billableWeightG <= 2000) {
       const yen = getELightRate(billableWeightG, zone);
-      rates.push({ name: 'Japan Post E-Light ✉️', cost: yen ? fxConvert(yen, cur) : null, time: `${zd.light} ${du}` });
+      rates.push({ name: 'Japan Post Air Packet ✉️', cost: yen ? fxConvert(yen, cur) : null, time: `${zd.light} ${du}` });
     } else {
       const airYen = getAirParcelRate(billableWeightG, zone);
       rates.push({ name: 'Japan Post Kozutsumi Air 📦', cost: airYen ? fxConvert(airYen, cur) : null, time: `${zd.air} ${du}` });
@@ -111,6 +123,11 @@ const Shipping: React.FC = () => {
   const getSimulatorTax = () => {
     if (country === 'Brasil') {
       // Brazil import taxes determined by customs authorities — not reliably estimated
+      return { total: 0, label: '' };
+    }
+    if (country === US_COUNTRY) {
+      // Pré-pago pela loja (DDP) e já somado no total do checkout: não é uma
+      // estimativa "a pagar na alfândega". O quadro de impostos explica.
       return { total: 0, label: '' };
     }
     
@@ -168,6 +185,22 @@ const Shipping: React.FC = () => {
       ];
     }
 
+    if (country === US_COUNTRY) {
+      const usdEms1kg = fxConvert(getEmsRate(1000, 4) ?? 0, 'USD');
+      const usdEms3kg = fxConvert(getEmsRate(3000, 4) ?? 0, 'USD');
+      return [
+        {
+          name: 'Japan Post EMS (DDP) ✈️',
+          logo: '✈️',
+          desc: t('shippingPage.carrier.ems.desc'),
+          rate60: usdEms1kg,
+          rate80: usdEms3kg,
+          time: `${US_DDP_EMS_DAYS} business days`,
+          features: ['Import duty prepaid (DDP)', 'Nothing to pay on delivery', 'Real-time tracking'],
+        },
+      ];
+    }
+
     if (['Portugal', 'França', 'Itália', 'Espanha'].includes(country)) {
       const eurELight1kg = fxConvert(getELightRate(1000, 3) ?? 2500, 'EUR');
       const eurELight2kg = fxConvert(getELightRate(2000, 3) ?? 4300, 'EUR');
@@ -177,7 +210,7 @@ const Shipping: React.FC = () => {
       const eurAir5kg  = fxConvert(getAirParcelRate(5000, 3) ?? 12450, 'EUR');
       return [
         {
-          name: 'Japan Post E-Light ✉️',
+          name: 'Japan Post Air Packet ✉️',
           logo: '✉️',
           desc: t('shippingPage.carrier.elight.desc'),
           rate60: eurELight1kg,
@@ -228,7 +261,7 @@ const Shipping: React.FC = () => {
     const tbdTime = language === 'ja' ? '要相談' : language === 'en' ? 'TBD' : 'A definir';
     return [
       {
-        name: 'Japan Post E-Light ✉️',
+        name: 'Japan Post Air Packet ✉️',
         logo: '✉️',
         desc: t('shippingPage.carrier.elight.desc'),
         rate60: brlELight1kg,
@@ -618,6 +651,34 @@ const Shipping: React.FC = () => {
                   </div>
                 )}
 
+                {country === US_COUNTRY && (
+                  <div className="space-y-3 text-xs leading-relaxed text-muted-foreground">
+                    <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 rounded-lg p-3 text-blue-800 dark:text-blue-200 font-medium">
+                      ✓ <strong>United States — Duties Prepaid (DDP)</strong>
+                    </div>
+                    <p>
+                      Since October 15, 2026, Japan Post only ships goods to the U.S. with import duties paid in advance.
+                      We pay them before posting and show them as a separate line at checkout, already included in the total.
+                    </p>
+                    <div className="border-t border-primary/10 pt-2.5 space-y-2">
+                      <div className="flex justify-between font-bold text-foreground">
+                        <span>Import duty (in the total):</span>
+                        <span className="text-blue-600">{Math.round(US_IMPORT_DUTY_RATE * 1000) / 10}% + $ {US_ENTRY_FEE_USD.toFixed(2)}</span>
+                      </div>
+                      <p className="text-[10px] pl-2 border-l-2 border-border">
+                        {Math.round(US_IMPORT_DUTY_RATE * 1000) / 10}% of the products after discounts, plus the U.S. Customs processing fee of $ {US_ENTRY_FEE_USD.toFixed(2)} per package, rounded to whole dollars.
+                      </p>
+                      <div className="flex justify-between font-bold text-foreground">
+                        <span>On delivery:</span>
+                        <span className="text-green-600">$ 0.00</span>
+                      </div>
+                      <p className="text-[10px] pl-2 border-l-2 border-border">
+                        Shipping is by EMS only ({US_DDP_EMS_DAYS} business days), the service Japan Post offers with prepaid duties.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
                 {country === 'Japão' && (
                   <div className="space-y-3 text-xs leading-relaxed text-muted-foreground">
                     <div className="bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 rounded-lg p-3 text-emerald-800 dark:text-emerald-200 font-medium">
@@ -662,7 +723,7 @@ const Shipping: React.FC = () => {
                   {t('shippingPage.sampleNote')}
                 </p>
                 <div className="space-y-3">
-                  {sampleRates.filter((carrier) => billableWeightG <= 2000 || carrier.name !== 'Japan Post E-Light ✉️').map((carrier) => (
+                  {sampleRates.filter((carrier) => billableWeightG <= 2000 || carrier.name !== 'Japan Post Air Packet ✉️').map((carrier) => (
                     <div key={carrier.name} className="p-4 rounded-xl bg-card border border-border space-y-3 hover:border-primary/50 transition-all">
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex items-center gap-3">

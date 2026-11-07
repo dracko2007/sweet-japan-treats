@@ -90,6 +90,9 @@ export interface Affiliate {
   tierSettings?: AffiliateTierSettings;
 }
 
+/** O que o servidor devolve ao validar um código no carrinho. */
+export type AffiliateCouponInfo = Pick<Affiliate, 'code' | 'ownerName' | 'discountPercent' | 'expiresAt'>;
+
 export interface AffiliateTierSettings {
   bronzeGoalYen: number;
   bronzePercent: number;
@@ -187,17 +190,24 @@ export const affiliateService = {
     }
   },
 
-  /** Valida um código de afiliado (existe, ativo, não expirado). */
-  async validate(code: string): Promise<{ valid: boolean; affiliate?: Affiliate; error?: string }> {
-    if (!db) return { valid: false, error: 'Indisponível' };
+  /**
+   * Valida um código de afiliado (existe, ativo, não expirado) pelo servidor.
+   * Só volta o que o carrinho mostra; e-mail e ganhos do afiliado ficam no servidor.
+   */
+  async validate(code: string, signedIn = false): Promise<{ valid: boolean; affiliate?: AffiliateCouponInfo; error?: string }> {
+    const errors: Record<string, string> = { not_found: 'Código inválido.', inactive: 'Código inativo.', expired: 'Código expirado.' };
     try {
-      const ref = doc(db, COL, normalize(code));
-      const snap = await getDoc(ref);
-      if (!snap.exists()) return { valid: false, error: 'Código inválido.' };
-      const aff = snap.data() as Affiliate;
-      if (!aff.active) return { valid: false, error: 'Código inativo.' };
-      if (new Date(aff.expiresAt) <= new Date()) return { valid: false, error: 'Código expirado.' };
-      return { valid: true, affiliate: aff };
+      const request = signedIn ? authenticatedFetch : fetch;
+      const response = await request('/api/affiliates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'validate', code: normalize(code) }),
+      });
+      if (response.status === 400) return { valid: false, error: errors.not_found };
+      if (!response.ok) throw new Error(`status ${response.status}`);
+      const payload = await response.json() as { valid?: boolean; reason?: string; affiliate?: AffiliateCouponInfo };
+      if (payload.valid === true && payload.affiliate) return { valid: true, affiliate: payload.affiliate };
+      return { valid: false, error: errors[payload.reason || ''] || errors.not_found };
     } catch (e) {
       devWarn('affiliateService.validate falhou:', e);
       return { valid: false, error: 'Erro ao validar código.' };

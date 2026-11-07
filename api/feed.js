@@ -13,9 +13,16 @@
 import { detectBrand } from '../shared/brand.js';
 import { packedWeightG } from '../shared/weight.js';
 import { minEffectiveYen, variantPrices } from '../shared/pricing.js';
-import { taxDisclosure } from '../shared/tax-disclosure.js';
+import { taxDisclosure, usDutyNotice } from '../shared/tax-disclosure.js';
 import { fetchProducts, escapeXml, isVisibleInternationally } from './_lib/firestore-products.js';
-import { convertYen as convertYenFx, getFxRates } from './_lib/fx.js';
+import { yenToDisplay } from '../shared/money.js';
+import { emsRateYen } from './_lib/commerce.js';
+import { getFxRates } from './_lib/fx.js';
+
+// Mesma conversão da vitrine e do checkout (`shared/money.js`): valor inteiro
+// na moeda do destino. O feed publicava centavos (R$ 50,43) para um produto
+// que a página mostra como R$ 50.
+const convertYenFx = (yen, currency, rates) => yenToDisplay(yen, currency, rates);
 
 const SITE_URL = 'https://www.japanexpress-store.com';
 
@@ -24,7 +31,10 @@ const SITE_URL = 'https://www.japanexpress-store.com';
 const DISCLOSURE_LANG = { br: 'pt', eu: 'pt', us: 'en' };
 
 export function feedDisclosure(region) {
-  return taxDisclosure(DISCLOSURE_LANG[region] || 'pt').body;
+  const lang = DISCLOSURE_LANG[region] || 'pt';
+  const body = taxDisclosure(lang).body;
+  // O feed `us` anuncia para os EUA, onde o imposto é pré-pago e cobrado no site.
+  return region === 'us' ? `${body} ${usDutyNotice(lang)}` : body;
 }
 
 // Descrição do item = texto do produto + aviso, dentro dos 5000 caracteres do
@@ -76,8 +86,12 @@ function getAirParcelRate(weightG, zone) {
 }
 
 // Frete mais barato disponível para o peso (¥). Peso é o real do produto + overhead.
-function cheapestShippingYen(weightG, zone) {
+function cheapestShippingYen(weightG, zone, iso = '') {
   const billable = Math.max(100, weightG); // peso real já cadastrado
+  // EUA: desde 15/10/2026 mercadoria só sai com imposto pré-pago (DDP), e o
+  // checkout só oferece EMS para lá (`api/_lib/commerce.js`). O feed precisa
+  // anunciar o mesmo frete que a página cobra.
+  if (iso === 'US' || zone === 4) return emsRateYen(billable, 4);
   const opts = [];
   const eLight = getELightRate(billable, zone);
   if (eLight != null) opts.push(eLight);
@@ -242,7 +256,7 @@ function buildCatalog(products, region, rates) {
       // Frete por país de destino da região (cada país tem sua zona/preço)
       const shippingByCountry = (REGION_COUNTRIES[region] || []).map(c => ({
         iso: c.iso,
-        priceLocal: convertYenFx(cheapestShippingYen(weightG, c.zone) || 0, currency, rates),
+        priceLocal: convertYenFx(cheapestShippingYen(weightG, c.zone, c.iso) || 0, currency, rates),
       }));
 
       const classification = classifyMerchantProduct(p, region);
@@ -267,7 +281,8 @@ function buildCatalog(products, region, rates) {
         totalYen,
         priceLocal: convertYenFx(productYen, currency, rates),
         shippingLocal: convertYenFx(shipYen, currency, rates),
-        totalLocal: convertYenFx(totalYen, currency, rates),
+        // Soma das duas linhas, como a página soma (cada uma convertida e inteira).
+        totalLocal: convertYenFx(productYen, currency, rates) + convertYenFx(shipYen, currency, rates),
         shippingByCountry,
         currency,
       };

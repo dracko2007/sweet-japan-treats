@@ -16,8 +16,9 @@ import { useToast } from '@/hooks/use-toast';
 import { useLanguage } from '@/context/LanguageContext';
 import { useProducts } from '@/context/ProductsContext';
 import { formatPrice, getCurrencyByCountry } from '@/utils/currency';
-import { effectiveYen, roundYen } from '@/utils/pricing';
-import { convertYen as fxConvert, yenFromConverted } from '@/services/fxService';
+import { effectiveYen } from '@/utils/pricing';
+import { convertYen as fxConvert, getRatesId } from '@/services/fxService';
+import { cartBenefits, computeCheckoutTotals } from '@/utils/checkoutTotals';
 import { negotiationService } from '@/services/negotiationService';
 import { psFeeWaiver } from '@/utils/psFeeWaiver';
 import { productService } from '@/services/productService';
@@ -30,11 +31,19 @@ import { firebaseSyncService } from '@/services/firebaseSyncService';
 import { paymentSettingsService } from '@/services/paymentSettingsService';
 import { Wallet } from 'lucide-react';
 import { referralService } from '@/services/referralService';
-import { calcBrazilTax, calcImportTax } from '@/utils/taxRules';
+import { calcImportTax } from '@/utils/taxRules';
 import { promoCampaignService } from '@/services/promoCampaignService';
 import { thermalPrintService } from '@/services/thermalPrintService';
 import StripeCardForm from '@/components/checkout/StripeCardForm';
-import { prepareCheckout, type AuthoritativeCheckoutOrder, type CheckoutPaymentMethod } from '@/services/checkoutService';
+import {
+  CheckoutError,
+  checkoutErrorMessage,
+  prepareCheckout,
+  quoteCheckout,
+  type AuthoritativeCheckoutOrder,
+  type CheckoutPaymentMethod,
+  type CheckoutQuote,
+} from '@/services/checkoutService';
 import { getCountryConfig } from '@/data/worldCountries';
 import { db } from '@/config/firebase';
 import { doc, getDoc, setDoc, updateDoc, increment } from 'firebase/firestore';
@@ -60,8 +69,14 @@ const OrderReview: React.FC = () => {
 
   const formData = location.state?.formData;
   const shipping = location.state?.shipping;
-  const [couponDiscount, setCouponDiscount] = useState<number>(location.state?.couponDiscount || 0);
-  const [appliedCoupon, setAppliedCoupon] = useState<{ code: string; freeShipping?: boolean } | null>(
+  const [appliedCoupon, setAppliedCoupon] = useState<{
+    code: string;
+    freeShipping?: boolean;
+    discount?: number;
+    discountType?: string;
+    affiliateCode?: string;
+    minOrderValue?: number;
+  } | null>(
     (location.state?.coupon as { code: string; freeShipping?: boolean } | null | undefined) ?? null,
   );
   const psFeeYen: number = location.state?.psFeeYen || 0;
@@ -92,6 +107,9 @@ const OrderReview: React.FC = () => {
   const [orderCreating, setOrderCreating] = useState(false);
   const [pixCopied, setPixCopied] = useState(false);
 
+  // A cotação espera as formas de pagamento ativas: senão a primeira pergunta
+  // ia com a Wise pré-selecionada e voltava "em manutenção" por um instante.
+  const [paySettingsLoaded, setPaySettingsLoaded] = useState(false);
   useEffect(() => {
     paymentSettingsService.get().then((s) => {
       setPaySettings(s);
@@ -103,7 +121,8 @@ const OrderReview: React.FC = () => {
         if (enabledByMethod[current]) return current;
         return (['wise', 'pix', 'card'] as const).find((m) => enabledByMethod[m]) || current;
       });
-    });
+    }).catch(() => { /* segue com o padrão; o servidor recusa método desligado */ })
+      .finally(() => setPaySettingsLoaded(true));
   }, [formData?.country]);
 
   // Redirect if no form data or shipping
@@ -116,6 +135,105 @@ const OrderReview: React.FC = () => {
   // Hook precisa executar mesmo durante o redirecionamento sem estado.
   const recentSpendYen = useMemo(() => recentProductSpendYen(orders), [orders]);
 
+  const country: string = formData?.country || '';
+  const isJapan = country === 'Japão';
+  const currency = getCurrencyByCountry(country);
+  const isPix = paymentMethod === 'pix';
+
+  // Pontos pagam só a mercadoria que sobra depois do cupom — o servidor
+  // limita igual (`shared/money.js`).
+  const availablePoints = user?.points || 0;
+  const couponOnly = cartBenefits(items, appliedCoupon);
+  const maxRedeemable = Math.min(
+    availablePoints,
+    Math.max(0, Math.floor((couponOnly.productSubtotalYen - couponOnly.couponDiscountYen) / POINTS.yenPerPoint)),
+  );
+  const redeemPoints = Math.max(0, Math.min(pointsToUse, maxRedeemable));
+
+  // Prévia local com a MESMA função do servidor. Vale até a cotação do
+  // servidor chegar (alguns décimos de segundo); com a mesma cotação de
+  // câmbio, os números são idênticos.
+  const shippingYenBase = shipping
+    ? (currency === 'JPY' ? Number(shipping.cost) || 0 : Number(shipping.costYen) || 0)
+    : 0;
+  const local = computeCheckoutTotals({
+    items,
+    currency,
+    country,
+    paymentMethod,
+    coupon: appliedCoupon,
+    redeemPoints,
+    shippingYen: shippingYenBase,
+    shippingDiscountYen,
+    // O checkout já mandou o desconto efetivo (isenção ou negociação, com o teto).
+    negotiatedPsFee: psFeeDiscountYen > 0 ? { status: 'approved', approvedDiscountYen: psFeeDiscountYen } : null,
+  });
+
+  // Cotação do servidor: a conta que vale para a cobrança. Refeita a cada
+  // troca de forma de pagamento, cupom ou pontos.
+  const quoteInput = formData && shipping && paySettingsLoaded ? {
+    paymentMethod: paymentMethod as CheckoutPaymentMethod,
+    items: items
+      .filter((item) => !item.freeGift)
+      .map((item) => ({ productId: item.product.id, variantId: item.size, quantity: item.quantity })),
+    customer: {
+      name: formData.name,
+      email: String(formData.email || user?.email || '').trim().toLowerCase(),
+      phone: formData.phone || '',
+      cpf: formData.cpf || '',
+    },
+    shippingAddress: {
+      postalCode: formData.postalCode || '',
+      prefecture: formData.prefecture || '',
+      state: formData.state || '',
+      city: formData.city || '',
+      address: formData.address || '',
+      building: formData.building || '',
+      country: formData.country,
+    },
+    shippingCarrier: shipping.carrier,
+    couponCode: appliedCoupon?.code || '',
+    promoCode: safeStorage.getItem('promo_applied') || '',
+    pointsToRedeem: redeemPoints,
+    negotiationId: negotiationId || '',
+    psFeeWaiverToken: psFeeWaiver.token(),
+    ratesId: getRatesId(),
+  } : null;
+  const quoteInputKey = quoteInput ? JSON.stringify(quoteInput) : '';
+  const [quote, setQuote] = useState<CheckoutQuote | null>(null);
+  const [quoteKey, setQuoteKey] = useState('');
+  const [quoteLoading, setQuoteLoading] = useState(false);
+  const [quoteError, setQuoteError] = useState('');
+
+  useEffect(() => {
+    if (!quoteInputKey) return undefined;
+    let cancelled = false;
+    setQuoteLoading(true);
+    setQuoteError('');
+    // Espera o cliente parar de digitar (campo de pontos) antes de perguntar.
+    const timer = window.setTimeout(() => {
+      quoteCheckout(JSON.parse(quoteInputKey))
+        .then((next) => {
+          if (cancelled) return;
+          setQuote(next);
+          setQuoteKey(quoteInputKey);
+        })
+        .catch((error) => {
+          if (cancelled) return;
+          setQuote(null);
+          setQuoteKey('');
+          setQuoteError(error instanceof CheckoutError ? error.code : 'checkout_failed');
+        })
+        .finally(() => {
+          if (!cancelled) setQuoteLoading(false);
+        });
+    }, 350);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [quoteInputKey]);
+
   if (!formData || !shipping) {
     return null;
   }
@@ -124,91 +242,42 @@ const OrderReview: React.FC = () => {
     window.print();
   };
 
-  const isJapan = formData.country === 'Japão';
-  const isEurope = ['Portugal', 'França', 'Itália', 'Espanha'].includes(formData.country);
-  const isUsa = formData.country === 'Estados Unidos';
-  const currency = getCurrencyByCountry(formData.country);
-
-  const convertYen = (yen: number) => fxConvert(yen, currency);
-  const convertYenExact = (yen: number) => fxConvert(yen, currency, true);
-
-  // Subtotal dos produtos em ¥ (já com desconto promocional, sem frete) — base dos pontos
-  const productSubtotalYen = items.reduce(
-    (sum, item) => item.freeGift ? sum : sum + effectiveYen(item.product, item.size) * item.quantity, 0
+  // A cotação só vale para os dados com que foi pedida.
+  const serverQuote = quote && quoteKey === quoteInputKey ? quote : null;
+  const view = serverQuote ? serverQuote.display : { ...local.shown, tax: 0 };
+  // O que será cobrado: a soma exata das linhas abaixo.
+  const finalGrandTotal = serverQuote ? serverQuote.total : local.shown.total;
+  const pixIofFee = view.pixIof;
+  const pixBankFee = view.pixBankFee;
+  // Total sem as taxas do PIX (é o total da Wise e do cartão).
+  const grandTotal = finalGrandTotal - view.paymentFee;
+  const grandTotalYen = (serverQuote ? serverQuote.display.wiseYen : undefined) ?? local.shown.wiseYen;
+  const couponDiscount = view.couponDiscount;
+  const pointsDiscount = view.pointsDiscount;
+  const finalShippingCost = view.shipping;
+  const psFeeDisplay = view.psFee;
+  const psFeeFinalYen = serverQuote ? serverQuote.psFeeYen : local.psFeeFinalYen;
+  const psFeeGrossYen = serverQuote ? serverQuote.psFeeYen + serverQuote.psFeeDiscountYen : local.psFeeYen;
+  const effectivePsFeeDiscountYen = serverQuote ? serverQuote.psFeeDiscountYen : local.psFeeDiscountYen;
+  const pointsCoverAllProducts = local.benefits.pointsCoverAllProducts;
+  const pointsMultiplier = serverQuote ? serverQuote.pointsMultiplier : pointsMultiplierForSpend(recentSpendYen);
+  // Mesma função que `api/_lib/commerce.js` usa para creditar.
+  const earnedPoints = serverQuote
+    ? serverQuote.earnedPoints
+    : earnedPointsForOrder(local.benefits.productSubtotalYen, local.benefits.pointsDiscountYen, pointsMultiplier);
+  const serverUnitPrice = new Map(
+    (serverQuote?.items || []).filter((item) => !item.freeGift)
+      .map((item) => [`${item.requestedId || item.productId}:${item.variantId}`, item.price]),
   );
+  const unitPriceFor = (item: (typeof items)[number]) => {
+    if (item.freeGift) return 0;
+    return serverUnitPrice.get(`${item.product.id}:${item.size}`) ?? fxConvert(effectiveYen(item.product, item.size), currency);
+  };
 
-  // Base Total Price (subtotal before discounts/taxes) in target currency — excludes free gifts
-  const baseTotalPrice = items.reduce(
-    (sum, item) => item.freeGift ? sum : sum + convertYen(effectiveYen(item.product, item.size)) * item.quantity, 0
-  );
-
-  // Gasto dos últimos 3 meses-calendário, para o multiplicador de pontos.
-  // A conta mora em `utils/loyaltySpend` porque o perfil mostra o MESMO nível.
-
-  const pointsMultiplier = pointsMultiplierForSpend(recentSpendYen);
-
-  // Pontos pagam só mercadoria. Resgate parcial convive com desconto na taxa;
-  // apenas quando os pontos zeram toda a mercadoria a taxa PS volta ao valor
-  // cheio, exatamente como a cotação autoritativa do servidor.
-  const availablePoints = user?.points || 0;
-  const couponDiscountYen = couponDiscount > 0 ? Math.floor(yenFromConverted(couponDiscount, currency)) : 0;
-  const maxRedeemable = Math.min(
-    availablePoints,
-    Math.max(0, Math.floor((productSubtotalYen - couponDiscountYen) / POINTS.yenPerPoint)),
-  );
-  const redeemPoints = Math.max(0, Math.min(pointsToUse, maxRedeemable));
-  const netProductsAfterCouponAndPoints = productSubtotalYen - couponDiscountYen - redeemPoints;
-  const pointsCoverAllProducts = productSubtotalYen > 0 && redeemPoints > 0 && netProductsAfterCouponAndPoints <= 0;
-  const pointsDiscount = convertYen(redeemPoints * POINTS.yenPerPoint); // desconto na moeda exibida
-  // Mesma função que `api/_lib/commerce.js` usa para creditar — o número que
-  // aparece aqui é exatamente o que vai cair na conta do cliente, incluindo
-  // o multiplicador de pontos pelo nível do cliente.
-  const earnedPoints = earnedPointsForOrder(productSubtotalYen, redeemPoints * POINTS.yenPerPoint, pointsMultiplier);
-
-  const isPix = paymentMethod === 'pix';
-  const subtotalWithCoupon = Math.max(0, baseTotalPrice - couponDiscount - pointsDiscount);
-  // Sem desconto por método de pagamento.
-  const pixDiscount = 0;
-  const priceAfterPix = subtotalWithCoupon;
-  
-  // Taxes (Estimated only, NOT added to grand total)
-  let federalTax = 0;
-  let icmsTax = 0;
-  let estimatedTax = 0;
-  let taxLabel = '';
-
-  if (formData.country === 'Brasil') {
-    const br = calcBrazilTax(priceAfterPix);
-    federalTax = br.federal;
-    icmsTax = br.icms;
-    estimatedTax = br.total;
-    taxLabel = 'Impostos Estimados (Brasil)';
-  } else {
-    const r = calcImportTax(priceAfterPix, formData.country, formData.prefecture);
-    estimatedTax = r.tax;
-    taxLabel = r.label;
-  }
-  
-  const taxAmount = estimatedTax; // Saved in mockOrder for administrative visibility
-  
-  const rawShippingCost = appliedCoupon?.freeShipping ? 0 : shipping.cost;
-  const shippingDiscountDisplay = convertYen(shippingDiscountYen);
-  const finalShippingCost = Math.max(0, rawShippingCost - shippingDiscountDisplay);
-  const effectivePsFeeDiscountYen = pointsCoverAllProducts ? 0 : psFeeDiscountYen;
-  const psFeeFinalYen = Math.max(0, psFeeYen - effectivePsFeeDiscountYen);
-  const psFeeDisplay = convertYenExact(psFeeFinalYen);
-  // Grand Total only includes products + shipping + PS fee (NO TAXES ADDED!)
-  const grandTotal = priceAfterPix + finalShippingCost + psFeeDisplay;
-
-  // PIX: IOF 3,5% sobre o total + taxa bancária de remessa fixa R$32
-  const PIX_BANK_FEE = 32; // taxa fixa do banco para remessa internacional em BRL
-  const pixIofFee = isPix ? Math.round(grandTotal * 0.035) : 0;
-  const pixBankFee = isPix ? PIX_BANK_FEE : 0;
-  const pixTotalFees = pixIofFee + pixBankFee;
-  const finalGrandTotal = grandTotal + pixTotalFees;
-
-  // Total em ¥ para exibir no badge da Wise (sem taxas PIX)
-  const grandTotalYen = currency === 'JPY' ? grandTotal : roundYen(yenFromConverted(grandTotal, currency));
+  // Imposto do destino só informativo (não entra no total). EUA: pré-pago e
+  // somado como linha própria (`view.importDuty`).
+  const { tax: estimatedTax, label: taxLabel } = calcImportTax(view.products, country, formData.prefecture);
+  const quoteErrorMessage = quoteError ? checkoutErrorMessage(quoteError) : '';
 
   const handleApplyCoupon = async () => {
     const code = couponInput.trim().toUpperCase();
@@ -216,22 +285,16 @@ const OrderReview: React.FC = () => {
     setCouponError('');
     setCouponLoading(true);
     try {
+      // O desconto sai da conta única (prévia e cotação do servidor) a partir
+      // do próprio cupom. Cupom fixo é em ienes: antes ele era descontado
+      // como se fosse R$/€/$.
       // 1. Profile coupon
       if (user?.coupons) {
         const found = user.coupons.find((coupon) => coupon.code?.toUpperCase() === code && !coupon.isUsed);
         if (found) {
-          const isPromoItem = (item: (typeof items)[number]) => item.product.id.endsWith('_promo');
-          const regularSubtotalYen = items.filter(i => !i.freeGift && !isPromoItem(i))
-            .reduce((s, i) => s + effectiveYen(i.product, i.size) * i.quantity, 0);
-          const regularSubtotal = items.filter(i => !i.freeGift && !isPromoItem(i))
-            .reduce((s, i) => s + fxConvert(effectiveYen(i.product, i.size), currency) * i.quantity, 0);
-          let disc = 0;
-          if (found.discountType === 'percentage') disc = Math.round(regularSubtotal * (found.discount / 100) * 100) / 100;
-          else disc = Math.min(found.discount, regularSubtotal);
-          setCouponDiscount(disc);
           setAppliedCoupon(found);
           setCouponInput('');
-          toast({ title: `Cupom ${code} aplicado!`, description: `-${formatPrice(disc, currency)}` });
+          toast({ title: `Cupom ${code} aplicado!`, description: 'O desconto já aparece no resumo.' });
           return;
         }
       }
@@ -242,11 +305,6 @@ const OrderReview: React.FC = () => {
       const globalResult = await globalCouponService.validateCouponAsync(code, user?.email || undefined, regularSubtotalYen);
       if (globalResult.valid && globalResult.coupon) {
         const gc = globalResult.coupon;
-        const regularSubtotal = items.filter(i => !i.freeGift && !isPromoItem(i))
-          .reduce((s, i) => s + fxConvert(effectiveYen(i.product, i.size), currency) * i.quantity, 0);
-        let disc = 0;
-        if (gc.type === 'percent') disc = Math.round(regularSubtotal * ((gc.discountPercent || gc.discount || 0) / 100) * 100) / 100;
-        else disc = Math.min(gc.discount || 0, regularSubtotal);
         const couponObj = {
           id: `global-${gc.code}-${Date.now()}`,
           code: gc.code,
@@ -257,10 +315,9 @@ const OrderReview: React.FC = () => {
           isUsed: false,
           freeShipping: gc.freeShipping,
         };
-        setCouponDiscount(disc);
         setAppliedCoupon(couponObj);
         setCouponInput('');
-        toast({ title: `Cupom ${code} aplicado!`, description: `-${formatPrice(disc, currency)}` });
+        toast({ title: `Cupom ${code} aplicado!`, description: 'O desconto já aparece no resumo.' });
         return;
       }
       setCouponError('Cupom inválido ou expirado.');
@@ -271,8 +328,10 @@ const OrderReview: React.FC = () => {
     }
   };
 
-  // Passo 1: monta os dados do pedido e abre o modal de pagamento (sem salvar nada ainda)
+  // Passo 1: cria o pedido no servidor com o total que está na tela e abre o
+  // modal de pagamento.
   const handleProceedToPayment = async () => {
+    if (!quoteInput) return;
     const iso = getCountryConfig(formData.country)?.iso.toUpperCase() || 'XX';
     const orderId = formData.country === 'Japão'
       ? `SC-JP-${Math.floor(100000 + Math.random() * 900000)}`
@@ -281,50 +340,35 @@ const OrderReview: React.FC = () => {
     setOrderCreating(true);
     try {
       const result = await prepareCheckout({
+        ...quoteInput,
         orderId,
-        paymentMethod: paymentMethod as CheckoutPaymentMethod,
-        items: items
-          .filter((item) => !item.freeGift)
-          .map((item) => ({
-            productId: item.product.id,
-            variantId: item.size,
-            quantity: item.quantity,
-          })),
-        customer: {
-          name: formData.name,
-          email: String(formData.email || user?.email || '').trim().toLowerCase(),
-          phone: formData.phone || '',
-          cpf: formData.cpf || '',
-        },
-        shippingAddress: {
-          postalCode: formData.postalCode || '',
-          prefecture: formData.prefecture || '',
-          state: formData.state || '',
-          city: formData.city || '',
-          address: formData.address || '',
-          building: formData.building || '',
-          country: formData.country,
-        },
-        shippingCarrier: shipping.carrier,
-        couponCode: appliedCoupon?.code || '',
-        promoCode: safeStorage.getItem('promo_applied') || '',
-        pointsToRedeem: redeemPoints,
-        negotiationId: negotiationId || '',
-        psFeeWaiverToken: psFeeWaiver.token(),
+        // O servidor recusa (sem cobrar nada) se a conta dele der outro número.
+        expectedTotal: finalGrandTotal,
+        ratesId: serverQuote?.ratesId || quoteInput.ratesId,
       });
       if (result.order.psFeeWaiverApplied === true) psFeeWaiver.clear();
       setPendingOrder(result.order);
       setStripeClientSecret(result.clientSecret || '');
       setPaymentModal(true);
     } catch (error) {
-      const codigo = error instanceof Error ? error.message : '';
+      const codigo = error instanceof CheckoutError ? error.code : '';
+      if (codigo === 'price_changed' && error instanceof CheckoutError && error.quote) {
+        // Nada foi criado nem cobrado. A tela passa a mostrar a conta nova e
+        // o cliente confirma de novo, vendo o valor que vai pagar.
+        setQuote(error.quote);
+        setQuoteKey(quoteInputKey);
+        toast({
+          title: 'O valor foi atualizado',
+          description: `${checkoutErrorMessage(codigo)} Novo total: ${formatPrice(error.quote.total, error.quote.currency, true)}.`,
+          variant: 'destructive',
+        });
+        return;
+      }
       const waiverInvalid = codigo === 'invalid_ps_fee_waiver' || codigo === 'ps_fee_waiver_already_used';
       if (waiverInvalid) psFeeWaiver.clear();
       toast({
         title: 'Não foi possível criar o pedido',
-        description: waiverInvalid
-          ? 'A isenção da taxa expirou ou já foi usada. O total foi atualizado; tente novamente.'
-          : codigo || 'Revise os itens e tente novamente.',
+        description: checkoutErrorMessage(codigo),
         variant: 'destructive',
       });
     } finally {
@@ -414,7 +458,7 @@ const OrderReview: React.FC = () => {
 
               <div className="space-y-4">
                 {items.map((item) => {
-                  const displayUnitPrice = item.freeGift ? 0 : convertYen(effectiveYen(item.product, item.size));
+                  const displayUnitPrice = unitPriceFor(item);
                   const displayItemPrice = displayUnitPrice * item.quantity;
                   const productName = productEnglishName(item.product);
                   return (
@@ -455,7 +499,7 @@ const OrderReview: React.FC = () => {
                 <div className="pt-4 space-y-2.5 text-sm border-t border-border">
                   <div className="flex justify-between text-muted-foreground">
                     <span>Subtotal</span>
-                    <span>{formatPrice(baseTotalPrice, currency)}</span>
+                    <span>{formatPrice(view.subtotal, currency)}</span>
                   </div>
 
                   {/* Coupon input */}
@@ -486,7 +530,7 @@ const OrderReview: React.FC = () => {
                     <div className="flex justify-between text-green-600 font-bold bg-green-50/50 p-2 rounded border border-dashed border-green-200">
                       <span className="flex items-center gap-2">
                         Desconto do Cupom {appliedCoupon ? `(${appliedCoupon.code})` : ''}
-                        <button type="button" onClick={() => { setCouponDiscount(0); setAppliedCoupon(null); }} className="text-[10px] text-red-400 hover:text-red-600 underline font-normal print:hidden">remover</button>
+                        <button type="button" onClick={() => setAppliedCoupon(null)} className="text-[10px] text-red-400 hover:text-red-600 underline font-normal print:hidden">remover</button>
                       </span>
                       <span>-{formatPrice(couponDiscount, currency)}</span>
                     </div>
@@ -537,13 +581,6 @@ const OrderReview: React.FC = () => {
                     </div>
                   )}
 
-                  {pixDiscount > 0 && (
-                    <div className="flex justify-between text-pink-600 font-bold bg-pink-50 p-2 rounded border border-dashed border-pink-200">
-                      <span>Desconto Extra de 5% (Pagamento via PIX)</span>
-                      <span>-{formatPrice(pixDiscount, 'BRL')}</span>
-                    </div>
-                  )}
-
                   {user && earnedPoints > 0 && (
                     <div className="flex justify-between text-green-700 text-xs bg-green-50/60 p-2 rounded">
                       <span className="flex items-center gap-1"><Sparkles className="w-3.5 h-3.5" /> Você ganhará nesta compra</span>
@@ -573,19 +610,32 @@ const OrderReview: React.FC = () => {
                     {isJapan ? 'Envio doméstico seguro de Hiroshima Prefecture.' : `Envio internacional de Hiroshima para ${formData.country}.`} Entrega estimada: {shipping.estimatedDays} dias úteis
                   </div>
 
-                  {psFeeYen > 0 && (
+                  {psFeeGrossYen > 0 && (
                     <div className="flex justify-between text-muted-foreground">
                       <span>Taxa Personal Shopper</span>
                       <div className="text-right">
                         {effectivePsFeeDiscountYen > 0 && (
                           <span className="text-xs line-through text-muted-foreground mr-1">
-                            {currency === 'JPY' ? `¥ ${psFeeYen.toLocaleString()}` : `${formatPrice(convertYenExact(psFeeYen), currency, true)} (¥ ${psFeeYen.toLocaleString()})`}
+                            {currency === 'JPY' ? `¥ ${psFeeGrossYen.toLocaleString()}` : `${formatPrice(fxConvert(psFeeGrossYen, currency, true), currency, true)} (¥ ${psFeeGrossYen.toLocaleString()})`}
                           </span>
                         )}
                         <span className={effectivePsFeeDiscountYen > 0 ? 'text-green-600 font-semibold' : ''}>
                           {currency === 'JPY' ? `¥ ${psFeeFinalYen.toLocaleString()}` : `${formatPrice(psFeeDisplay, currency, true)} (¥ ${psFeeFinalYen.toLocaleString()})`}
                         </span>
                       </div>
+                    </div>
+                  )}
+
+                  {/* EUA: imposto pré-pago pela loja (DDP), dentro do total. */}
+                  {view.importDuty > 0 && (
+                    <div>
+                      <div className="flex justify-between text-muted-foreground">
+                        <span>Imposto de importação EUA (pré-pago, DDP)</span>
+                        <span>{formatPrice(view.importDuty, currency)}</span>
+                      </div>
+                      <p className="text-[10px] text-gray-400 text-right">
+                        A loja paga o imposto antes de postar. Nada é cobrado na entrega.
+                      </p>
                     </div>
                   )}
 
@@ -604,7 +654,7 @@ const OrderReview: React.FC = () => {
                       </div>
                       <div className="flex justify-between text-xs text-pink-700">
                         <span>+ Taxa bancária de remessa (fixa)</span>
-                        <span>+ R$ 32</span>
+                        <span>+ {formatPrice(pixBankFee, currency)}</span>
                       </div>
                       <div className="flex justify-between text-xs font-bold text-orange-900 bg-pink-100 rounded px-1.5 py-1 mt-0.5">
                         <span>= Total com taxas PIX</span>
@@ -619,6 +669,12 @@ const OrderReview: React.FC = () => {
                       {formatPrice(finalGrandTotal, currency)}
                     </span>
                   </div>
+                  {quoteErrorMessage && (
+                    <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2 print:hidden">
+                      <AlertCircle className="w-3.5 h-3.5 inline mr-1 -mt-0.5" />
+                      {quoteErrorMessage}
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
@@ -640,7 +696,7 @@ const OrderReview: React.FC = () => {
                   <p className="font-bold text-gray-800 text-base">{formData.name}</p>
                 </div>
 
-                 {!isJapan && (
+                 {formData.country === 'Brasil' && (
                    <div>
                      <Label className="text-muted-foreground font-semibold">CPF (Desembaraço Aduaneiro)</Label>
                      <p className="font-bold text-pink-600 text-base">{formData.cpf}</p>
@@ -672,7 +728,9 @@ const OrderReview: React.FC = () => {
                       formData.country === 'Portugal' ? 'Portugal 🇵🇹' :
                       formData.country === 'França' ? 'França 🇫🇷' :
                       formData.country === 'Itália' ? 'Itália 🇮🇹' :
-                      'Espanha 🇪🇸'
+                      formData.country === 'Espanha' ? 'Espanha 🇪🇸' :
+                      formData.country === 'Estados Unidos' ? 'Estados Unidos 🇺🇸' :
+                      formData.country
                     })
                   </h2>
               </div>
@@ -912,7 +970,7 @@ const OrderReview: React.FC = () => {
                       {/* Itens */}
                       <div className="flex justify-between text-muted-foreground">
                         <span>Itens ({items.filter(i => !i.freeGift).length}x)</span>
-                        <span>{formatPrice(baseTotalPrice, currency)}</span>
+                        <span>{formatPrice(view.subtotal, currency)}</span>
                       </div>
 
                       {couponDiscount > 0 && (
@@ -934,12 +992,19 @@ const OrderReview: React.FC = () => {
                         <span>{finalShippingCost === 0 ? 'Grátis' : formatPrice(finalShippingCost, currency)}</span>
                       </div>
 
-                      {psFeeYen > 0 && (
+                      {psFeeGrossYen > 0 && (
                         <div className="flex justify-between text-muted-foreground">
                           <span>Taxa PS</span>
                           <span className={effectivePsFeeDiscountYen > 0 ? 'text-green-600 font-semibold' : ''}>
                             {currency === 'JPY' ? `¥ ${psFeeFinalYen.toLocaleString()}` : formatPrice(psFeeDisplay, currency, true)}
                           </span>
+                        </div>
+                      )}
+
+                      {view.importDuty > 0 && (
+                        <div className="flex justify-between text-muted-foreground">
+                          <span>Imposto EUA (pré-pago)</span>
+                          <span>{formatPrice(view.importDuty, currency)}</span>
                         </div>
                       )}
 
@@ -965,7 +1030,7 @@ const OrderReview: React.FC = () => {
                           </div>
                           <div className="flex justify-between text-xs text-pink-700">
                             <span>+ Taxa bancária</span>
-                            <span>+ R$ 32</span>
+                            <span>+ {formatPrice(pixBankFee, currency)}</span>
                           </div>
                           <div className="flex justify-between text-xs font-bold text-orange-900 border-t border-pink-200 pt-1 mt-1">
                             <span>Total PIX</span>
@@ -1008,13 +1073,20 @@ const OrderReview: React.FC = () => {
                         </div>
                       )}
 
+                      {quoteErrorMessage && (
+                        <p className="text-[11px] text-red-600 bg-red-50 border border-red-200 rounded-lg px-2 py-1.5 mb-3 leading-snug">
+                          {quoteErrorMessage}
+                        </p>
+                      )}
+
+                      {/* Espera a conta do servidor: o clique cobra o número que está na tela. */}
                       <Button
                         onClick={handleProceedToPayment}
-                        disabled={orderCreating}
+                        disabled={orderCreating || quoteLoading}
                         className="w-full btn-primary rounded-xl py-5 text-base font-bold"
                       >
                         <CheckCircle className="w-5 h-5 mr-2" />
-                        {orderCreating ? 'Criando pedido seguro...' : 'Confirmar e Pagar'}
+                        {orderCreating ? 'Criando pedido seguro...' : quoteLoading ? 'Atualizando valores...' : 'Confirmar e Pagar'}
                         <ArrowRight className="w-5 h-5 ml-2" />
                       </Button>
 
@@ -1166,6 +1238,13 @@ const OrderReview: React.FC = () => {
                       <WalletIcon className="w-5 h-5" /> PAGAMENTO VIA WISE
                     </div>
                     <p className="text-sm text-muted-foreground">Pague <strong>{formatPrice(pendingOrder.total, pendingOrder.currency)}</strong> pelo Wise com câmbio justo.</p>
+                    {(pendingOrder.priceBreakdown?.wiseYen ?? 0) > 0 && (
+                      <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 max-w-xs mx-auto">
+                        <p className="text-[11px] text-emerald-700 mb-0.5">No campo <strong>Valor</strong> da Wise, insira:</p>
+                        <p className="text-2xl font-black text-emerald-900">¥ {Number(pendingOrder.priceBreakdown?.wiseYen).toLocaleString()}</p>
+                        <p className="text-[10px] text-emerald-600">A Wise converte automaticamente</p>
+                      </div>
+                    )}
                     {paySettings.wiseLink && (
                       <a href={paySettings.wiseLink.startsWith('http') ? paySettings.wiseLink : `https://wise.com/pay/${paySettings.wiseLink.replace(/^@/, '')}`}
                         target="_blank" rel="noopener noreferrer"

@@ -1,8 +1,15 @@
 import { earnedPointsForOrder, pointsMultiplierForSpend } from '../../shared/points.js';
 import { packedWeightG } from '../../shared/weight.js';
 import { roundYen } from '../../shared/pricing.js';
+import {
+  autoApprovablePsDiscountYen,
+  displayTotals,
+  productBenefits,
+  psFeeDiscountYen,
+  US_COUNTRY,
+} from '../../shared/money.js';
 import { HttpError } from './http.js';
-import { convertYen, currencyForCountry } from './fx.js';
+import { currencyForCountry } from './fx.js';
 
 const E_LIGHT = {
   1: [720,820,920,1020,1120,1220,1320,1420,1520,1620,1720,1820,1920,2020,2120,2220,2320,2420,2520,2620],
@@ -83,7 +90,6 @@ const COUNTRY_CONFIG = new Map([
   ['Angola', { currency: 'USD', zone: 5, vat: .14 }],
   ['Moçambique', { currency: 'USD', zone: 5, vat: .16 }],
 ]);
-const US_TAX = { AL:.0924,AK:.0176,AZ:.0838,AR:.0947,CA:.0882,CO:.0777,CT:.0635,DE:0,FL:.0702,GA:.0735,HI:.0444,ID:.0603,IL:.0888,IN:.07,IA:.0694,KS:.0869,KY:.06,LA:.0955,ME:.055,MD:.06,MA:.0625,MI:.06,MN:.0749,MS:.07,MO:.0825,MT:0,NE:.0694,NV:.0823,NH:0,NJ:.066,NM:.0762,NY:.0852,NC:.0698,ND:.0697,OH:.0723,OK:.0899,OR:0,PA:.0634,RI:.07,SC:.0744,SD:.064,TN:.0955,TX:.082,UT:.0719,VT:.0624,VA:.0573,WA:.0938,WV:.0656,WI:.0543,WY:.0536,DC:.06 };
 
 export { roundYen };
 
@@ -167,6 +173,12 @@ function shippingShape(items) {
   return { totalWeightG, boxes60, boxes80, maxSum };
 }
 
+/** Tarifa EMS (¥) para o peso já embalado. `null` acima de 30 kg. */
+export function emsRateYen(weightG, zone) {
+  const index = EMS_BRACKETS.findIndex((bracket) => weightG <= bracket);
+  return index >= 0 ? (EMS[zone]?.[index] ?? null) : null;
+}
+
 function internationalZone(country) {
   const config = COUNTRY_CONFIG.get(country);
   if (!config) throw new HttpError(400, 'unsupported_country');
@@ -186,31 +198,30 @@ function shippingYen(items, country, prefecture, carrier, productSubtotalYen, fr
     return { amount, weightG: shape.totalWeightG };
   }
   const zone = internationalZone(country);
+  // EUA: mercadoria só sai com imposto pré-pago (DDP), e o único serviço com
+  // DDP confirmado para lojas é o EMS. Air Packet e Kozutsumi ficam de fora.
+  if (country === US_COUNTRY && carrier !== 'ems') throw new HttpError(409, 'shipping_unavailable');
   let amount = null;
   if (carrier === 'eraito' && shape.totalWeightG <= 2000) amount = E_LIGHT[zone][Math.ceil(shape.totalWeightG / 100) - 1];
   if (carrier === 'kozutsumi-air' && shape.totalWeightG > 2000) amount = AIR_PARCEL[zone][Math.ceil(shape.totalWeightG / 1000) - 1];
-  if (carrier === 'ems') {
-    const index = EMS_BRACKETS.findIndex((bracket) => shape.totalWeightG <= bracket);
-    amount = index >= 0 ? EMS[zone][index] : null;
-  }
+  if (carrier === 'ems') amount = emsRateYen(shape.totalWeightG, zone);
   if (!(amount > 0)) throw new HttpError(400, 'invalid_shipping');
   return { amount, weightG: shape.totalWeightG };
 }
 
-function displayTax(amount, country, state) {
-  if (country === 'Brasil') {
-    const federal = amount < 250 ? amount * 0.20 : Math.max(0, amount * 0.60 - 62.50);
-    return federal + (amount + federal) * 0.17;
-  }
-  if (country === 'Estados Unidos') return amount * (US_TAX[String(state || '').toUpperCase()] ?? 0.0699);
+// Estimativa de tributo do destino, só informativa (não entra no total).
+// Brasil: a tela não mostra estimativa (`src/utils/taxRules.ts`), porque a
+// regra depende do regime da Receita; o pedido gravava uma mesmo assim, e a
+// confirmação exibia um número que o checkout nunca mostrou.
+// EUA: o imposto agora é pré-pago (DDP) e cobrado como linha própria
+// (`display.importDuty`), então não existe estimativa a mostrar.
+function informativeTax(amount, country) {
+  if (country === 'Japão' || country === 'Brasil' || country === US_COUNTRY) return 0;
   const config = COUNTRY_CONFIG.get(country);
   if (!config) throw new HttpError(400, 'unsupported_country');
-  return amount * config.vat;
+  return Math.round(amount * config.vat * 100) / 100;
 }
 
-function normalizeMoney(value, currency) {
-  return currency === 'JPY' ? Math.round(value) : Math.round(value * 100) / 100;
-}
 
 export function buildQuote({ requestedItems, products, country, prefecture, state, carrier, paymentMethod, coupon, redeemPoints, negotiation, campaign, homePromotion, rates, recentSpendYen = 0, psFeeWaived = false }) {
   const now = Date.now();
@@ -257,96 +268,84 @@ export function buildQuote({ requestedItems, products, country, prefecture, stat
     }
   }
 
-  const productSubtotalYen = lineItems.reduce((sum, item) => sum + item.unitYen * item.quantity, 0);
-  // Affiliate codes never stack with an existing product/site discount. In a
-  // mixed cart, calculate the affiliate discount only over eligible lines.
-  const affiliateCoupon = Boolean(coupon?.affiliateCode);
-  const regularItems = lineItems.filter((item) => !item.homePromo && !item.freeGift);
-  const regularSubtotalYen = regularItems.reduce((sum, item) => {
-    if (affiliateCoupon && Number(item.product.discountPercent || 0) > 0) return sum;
-    return sum + item.unitYen * item.quantity;
-  }, 0);
-  let couponDiscountYen = 0;
-  if (coupon) {
-    if (coupon.minOrderValue && productSubtotalYen < Number(coupon.minOrderValue)) throw new HttpError(409, 'coupon_minimum_not_met');
-    if (!coupon.freeShipping) {
-      const percentage = coupon.discountPercent != null ? Number(coupon.discountPercent) : Number(coupon.discount || 0);
-      couponDiscountYen = coupon.discountType === 'fixed' || coupon.type === 'fixed'
-        ? Math.min(regularSubtotalYen, Number(coupon.discount || 0))
-        : Math.min(regularSubtotalYen, Math.round(regularSubtotalYen * percentage / 100));
-    }
+  // A conta em ¥ e a conta na moeda do cliente vêm de `shared/money.js`, a
+  // MESMA função que a tela usa. O total cobrado é a soma das linhas que o
+  // cliente vê — sem desconto escondido por forma de pagamento (o de 5% no
+  // cartão/PIX saiu do site em 07/06/2026 e só o servidor continuava dando).
+  const lines = lineItems.map((item) => ({
+    unitYen: item.unitYen,
+    quantity: item.quantity,
+    freeGift: item.freeGift,
+    homePromo: item.homePromo,
+    productDiscounted: Number(item.product.discountPercent || 0) > 0,
+    noPsFee: Boolean(item.product.noPsFee),
+  }));
+  const benefits = productBenefits({ lines, coupon, redeemPoints });
+  if (benefits.terms?.minOrderYen && benefits.productSubtotalYen < benefits.terms.minOrderYen) {
+    throw new HttpError(409, 'coupon_minimum_not_met');
   }
-  // Ponto paga mercadoria, e só. O teto é o subtotal dos produtos já sem o
-  // cupom — frete e taxa do personal shopper ficam de fora por construção:
-  // entram no total depois, sem passar por aqui. Resgatar ¥99.999 num pedido
-  // de ¥10.000 zera os produtos e não tira um iene do frete.
-  const points = Math.max(0, Math.floor(Number(redeemPoints || 0)));
-  const pointsDiscountYen = Math.min(points, Math.max(0, productSubtotalYen - couponDiscountYen));
-  const afterBenefitsYen = Math.max(0, productSubtotalYen - couponDiscountYen - pointsDiscountYen);
-  const paymentDiscountYen = paymentMethod === 'card' || paymentMethod === 'pix'
-    ? Math.floor(afterBenefitsYen * 0.05)
-    : 0;
-  const netProductsYen = Math.max(0, afterBenefitsYen - paymentDiscountYen);
 
-  const psFeeYen = lineItems.filter((item) => !item.freeGift && !item.product.noPsFee).reduce((sum, item) => sum + item.quantity * 1000, 0);
-  const approved = negotiation?.status === 'approved'
+  // Negociação. Manual: a vendedora aprovou (`approvedBy` = e-mail dela).
+  // Automática: até ¥300 por unidade, aprovada pelo servidor
+  // (`api/orders.js`, ação `negotiation-auto-approve`, `approvedBy: 'system'`).
+  // O antigo `approvedBy: 'auto'` era gravado pelo navegador e segue recusado.
+  // O teto automático é recalculado sobre o carrinho ATUAL, então negociar com
+  // 50 itens e tirar 49 não leva o desconto de 50.
+  const negotiationActive = !negotiation?.expiresAt || new Date(negotiation.expiresAt).getTime() > now;
+  const manualApproved = Boolean(negotiation?.status === 'approved'
     && negotiation.approvedBy
     && negotiation.approvedBy !== 'auto'
-    && (!negotiation.expiresAt || new Date(negotiation.expiresAt).getTime() > now);
-  const negotiatedPsDiscountYen = approved && negotiation.type === 'ps_fee'
-    ? Math.min(psFeeYen, Number(negotiation.approvedDiscountYen || 0))
+    && negotiation.approvedBy !== 'system'
+    && negotiationActive);
+  const autoApproved = Boolean(negotiation?.status === 'auto_approved'
+    && negotiation.approvedBy === 'system'
+    && negotiationActive);
+  const psFeeUnits = lines.reduce((sum, line) => (line.freeGift || line.noPsFee ? sum : sum + line.quantity), 0);
+  let negotiatedPsYen = 0;
+  if (negotiation?.type === 'ps_fee') {
+    const approvedYen = Math.max(0, Number(negotiation.approvedDiscountYen || 0));
+    if (manualApproved) negotiatedPsYen = approvedYen;
+    else if (autoApproved) negotiatedPsYen = Math.min(approvedYen, autoApprovablePsDiscountYen(psFeeUnits));
+  }
+  const psFeeWaiverApplied = Boolean(psFeeWaived && benefits.psFeeYen > 0 && !benefits.pointsCoverAllProducts);
+  const psDiscountYen = psFeeDiscountYen({
+    psFeeYen: benefits.psFeeYen,
+    pointsCoverAllProducts: benefits.pointsCoverAllProducts,
+    psFeeWaived,
+    negotiatedDiscountYen: negotiatedPsYen,
+  });
+  const psFeeFinalYen = benefits.psFeeYen - psDiscountYen;
+
+  const shipping = shippingYen(
+    lineItems,
+    country,
+    prefecture,
+    carrier,
+    benefits.productSubtotalYen - benefits.couponDiscountYen,
+    benefits.terms?.freeShipping === true,
+  );
+  const shippingDiscountYen = manualApproved && negotiation.type === 'shipping'
+    ? Math.min(shipping.amount, Math.max(0, Number(negotiation.approvedDiscountYen || 0)))
     : 0;
-  // Só o caso extremo bloqueia o desconto da taxa: pontos cobriram toda a
-  // mercadoria após o cupom. Com resgate parcial, negociação e oferta de saída
-  // continuam válidas. Quando cobriu tudo, a taxa cheia preserva o custo mínimo
-  // de separar e despachar o pedido.
-  const pointsCoverAllProducts = productSubtotalYen > 0
-    && pointsDiscountYen > 0
-    && afterBenefitsYen === 0;
-  const psFeeWaiverApplied = Boolean(psFeeWaived && psFeeYen > 0 && !pointsCoverAllProducts);
-  const psDiscountYen = pointsCoverAllProducts
-    ? 0
-    : psFeeWaiverApplied ? psFeeYen : negotiatedPsDiscountYen;
-  const shipping = shippingYen(lineItems, country, prefecture, carrier, productSubtotalYen - couponDiscountYen, coupon?.freeShipping === true);
-  const shippingDiscountYen = approved && negotiation.type === 'shipping' ? Math.min(shipping.amount, Number(negotiation.approvedDiscountYen || 0)) : 0;
   const finalShippingYen = Math.max(0, shipping.amount - shippingDiscountYen);
   const currency = currencyForCountry(country);
 
-  // O total e as parcelas que o compõem ficam EXATAMENTE como eram: este achado
-  // é de conta que não fecha na tela, não de preço. Passar tudo pelo cushion de
-  // uma vez "arrumaria" a soma, mas subiria ~0,9% o valor cobrado de todo
-  // pedido (medido: R$416,11 → R$419,94), o que é decisão de preço, não de bug.
-  const productsDisplay = normalizeMoney(convertYen(netProductsYen, currency, rates), currency);
-  const shippingDisplay = normalizeMoney(convertYen(finalShippingYen, currency, rates), currency);
-  const psFeeDisplay = normalizeMoney(convertYen(psFeeYen - psDiscountYen, currency, rates, { exact: true }), currency);
-  // O imposto é só informativo (ver shared/tax-disclosure.js): a loja nunca
-  // cobra tributo de importação do cliente, quem cobra é a alfândega do país
-  // de destino na entrega. `taxDisplay`/`tax`/`display.tax` seguem calculados
-  // e expostos para o aviso na tela, mas ficam de fora de `total`/`totalYen`
-  // — que é o valor que vira `order.totalPrice` e é o que de fato é cobrado
-  // no Stripe/PIX/Wise (ver `stripeIntent` em `api/orders.js`).
-  const taxDisplay = country === 'Japão' ? 0 : normalizeMoney(displayTax(productsDisplay, country, state || prefecture), currency);
-  const total = normalizeMoney(productsDisplay + shippingDisplay + psFeeDisplay, currency);
-  if (!(total > 0)) throw new HttpError(400, 'invalid_total');
-
-  // O defeito era só nas linhas de cima da conta: subtotal saía com cushion e
-  // os descontos com a taxa exata, então "subtotal − descontos" não dava o valor
-  // de produtos que entrou no total — sobravam ~4% do desconto (uns R$2 num
-  // cupom de ¥1.500). Agora os descontos usam a MESMA taxa efetiva que produziu
-  // `productsDisplay`, e o subtotal é derivado de volta a partir dele.
-  const taxaEfetiva = netProductsYen > 0 ? productsDisplay / netProductsYen : 0;
-  const linha = (valorYen) => normalizeMoney(valorYen * taxaEfetiva, currency);
-  const couponDiscountDisplay = linha(couponDiscountYen);
-  const pointsDiscountDisplay = linha(pointsDiscountYen);
-  const paymentDiscountDisplay = linha(paymentDiscountYen);
-  // O subtotal absorve o arredondamento porque é a única linha da conta que não
-  // é uma promessa: mexer num desconto faria a tela anunciar um abatimento
-  // diferente do que foi de fato aplicado, e mexer em produtos quebraria a soma
-  // com o total.
-  const subtotalDisplay = normalizeMoney(
-    productsDisplay + couponDiscountDisplay + pointsDiscountDisplay + paymentDiscountDisplay,
+  const shown = displayTotals({
     currency,
-  );
+    rates,
+    country,
+    paymentMethod,
+    lines,
+    benefits,
+    finalShippingYen,
+    psFeeFinalYen,
+  });
+  // O imposto é só informativo (ver shared/tax-disclosure.js) e fica fora do
+  // total. O imposto dos EUA é outra coisa: pré-pago pela loja (DDP), entra
+  // no total como `importDuty`.
+  const taxDisplay = informativeTax(shown.products, country);
+  const total = shown.total;
+  if (!(total > 0)) throw new HttpError(400, 'invalid_total');
 
   // Pontos da campanha "Compre e Ganhe pontos". Até 04/08/2026 o
   // `fulfillment.js` somava `order.promoPoints` no saldo, mas ninguém gravava
@@ -366,40 +365,46 @@ export function buildQuote({ requestedItems, products, country, prefecture, stat
   return {
     currency,
     total,
-    totalYen: netProductsYen + finalShippingYen + (psFeeYen - psDiscountYen),
-    productSubtotalYen,
-    netProductsYen,
+    totalYen: benefits.netProductsYen + finalShippingYen + psFeeFinalYen,
+    productSubtotalYen: benefits.productSubtotalYen,
+    netProductsYen: benefits.netProductsYen,
     productCostYen: lineItems.reduce((sum, item) => sum + Math.max(0, Number(item.product.cost || 0)) * item.quantity, 0),
-    couponDiscountYen,
-    pointsDiscountYen,
-    redeemPoints: pointsDiscountYen,
-    earnedPoints: earnedPointsForOrder(productSubtotalYen, pointsDiscountYen, pointsMultiplier),
+    couponDiscountYen: benefits.couponDiscountYen,
+    pointsDiscountYen: benefits.pointsDiscountYen,
+    redeemPoints: benefits.pointsDiscountYen,
+    earnedPoints: earnedPointsForOrder(benefits.productSubtotalYen, benefits.pointsDiscountYen, pointsMultiplier),
     pointsMultiplier,
     promoPoints,
     shippingYen: finalShippingYen,
+    shippingDiscountYen,
     shippingWeightG: shipping.weightG,
-    psFeeYen: psFeeYen - psDiscountYen,
+    psFeeYen: psFeeFinalYen,
+    psFeeDiscountYen: psDiscountYen,
     psFeeWaiverApplied,
-    tax: normalizeMoney(taxDisplay, currency),
-    // A conta decomposta, com as linhas já coerentes entre si:
-    // `subtotal - couponDiscount - pointsDiscount - paymentDiscount == products`
-    // e `products + shipping + psFee == total` (tax é só informativo, ver
-    // comentário acima). Vai gravada no pedido (`orders.js`, campo
-    // `priceBreakdown`) para congelar o que o cliente viu no momento da
-    // compra — sem isso, uma variação de câmbio depois torna impossível
-    // reconstruir a conta numa contestação.
+    tax: taxDisplay,
+    // A conta como o cliente viu, congelada no pedido (`orders.js`,
+    // `priceBreakdown`): `subtotal − couponDiscount − pointsDiscount = products`
+    // e `products + shipping + psFee + importDuty + paymentFee = total`.
+    // `tax` é só informativo. `paymentDiscount` fica em 0 para quem lê pedidos
+    // antigos, que ainda têm o desconto de 5%.
     display: {
-      subtotal: subtotalDisplay,
-      couponDiscount: couponDiscountDisplay,
-      pointsDiscount: pointsDiscountDisplay,
-      paymentDiscount: paymentDiscountDisplay,
-      products: productsDisplay,
-      shipping: shippingDisplay,
-      psFee: psFeeDisplay,
+      subtotal: shown.subtotal,
+      couponDiscount: shown.couponDiscount,
+      pointsDiscount: shown.pointsDiscount,
+      paymentDiscount: 0,
+      products: shown.products,
+      shipping: shown.shipping,
+      psFee: shown.psFee,
+      importDuty: shown.importDuty,
+      paymentFee: shown.paymentFee,
+      pixIof: shown.pixIof,
+      pixBankFee: shown.pixBankFee,
+      // Ienes para digitar na Wise (a tela de revisão e o pedido mostram este).
+      wiseYen: shown.wiseYen,
       tax: taxDisplay,
     },
     homePromoQuantity,
-    items: lineItems.map((item) => ({
+    items: lineItems.map((item, index) => ({
       productId: item.productId,
       requestedId: item.requestedId,
       productName: String(item.product.name || ''),
@@ -408,6 +413,8 @@ export function buildQuote({ requestedItems, products, country, prefecture, stat
       size: item.variantId,
       quantity: item.quantity,
       unitYen: item.unitYen,
+      // Preço unitário na moeda do pedido, exatamente o da tela.
+      price: shown.units[index],
       cost: Math.max(0, Number(item.product.cost || 0)),
       productDiscountPercent: Math.max(0, Number(item.product.discountPercent || 0)),
       freeGift: item.freeGift,

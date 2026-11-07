@@ -72,6 +72,28 @@ const OrderConfirmation: React.FC = () => {
 
   if (!order) return null;
 
+  // O pedido chega do servidor (`publicOrder`, api/orders.js): nome e
+  // endereço ficam em `customerName`/`shippingAddress` e a conta em
+  // `priceBreakdown`. Esta tela lia um formato antigo (`order.name`,
+  // `order.subtotal`…) e o recibo saía com "R$ NaN" e sem nome nem endereço.
+  const shippingAddress = order.shippingAddress || {};
+  const receipt = {
+    name: order.customerName || order.name || '',
+    email: order.customerEmail || order.email || '',
+    phone: shippingAddress.phone || order.phone || '',
+    postalCode: shippingAddress.postalCode || order.postalCode || '',
+    prefecture: shippingAddress.prefecture || order.prefecture || '',
+    city: shippingAddress.city || order.city || '',
+    address: shippingAddress.address || order.address || '',
+    building: shippingAddress.building || order.building || '',
+    country: shippingAddress.country || order.country || '',
+    date: order.date || (order.orderDate ? new Date(order.orderDate).toLocaleDateString('pt-BR') : ''),
+  };
+  const receiptCurrency = order.currency || 'BRL';
+  // Linhas da conta exatamente como o cliente viu na revisão (inteiras, na
+  // moeda do pedido; a soma é o total cobrado).
+  const breakdown = order.priceBreakdown || null;
+
   // PIX Copia e Cola real, gerado a partir da chave configurada pelo admin.
   // Se a chave ainda não foi cadastrada, fica vazio e a tela mostra um aviso.
   const pixPayload = pixSettings.pixKey
@@ -397,6 +419,13 @@ const OrderConfirmation: React.FC = () => {
                 <p className="text-sm text-muted-foreground max-w-md mx-auto">
                   Pague <strong>{formatPrice(order.total, order.currency || 'BRL')}</strong> pelo Wise com câmbio justo. Após pagar, nos envie o comprovante pelo contato informado.
                 </p>
+                {Number(breakdown?.wiseYen) > 0 && (
+                  <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 max-w-xs mx-auto">
+                    <p className="text-[11px] text-emerald-700 mb-0.5">No campo <strong>Valor</strong> da Wise, insira:</p>
+                    <p className="text-2xl font-black text-emerald-900">¥ {Number(breakdown.wiseYen).toLocaleString()}</p>
+                    <p className="text-[10px] text-emerald-600">A Wise converte automaticamente</p>
+                  </div>
+                )}
                 {wiseLink ? (
                   <a
                     href={wiseLink.startsWith('http') ? wiseLink : `https://wise.com/pay/${wiseLink.replace(/^@/, '')}`}
@@ -424,7 +453,7 @@ const OrderConfirmation: React.FC = () => {
                   {order.currency === 'JPY' ? t('order.receipt.domestic') : t('order.receipt.intl')}
                 </p>
                 <p className="font-mono text-sm">{t('order.id')}: {order.orderNumber || order.id}</p>
-                <p className="text-sm text-muted-foreground">{order.date}</p>
+                <p className="text-sm text-muted-foreground">{receipt.date}</p>
               </div>
 
               <div className="space-y-6">
@@ -447,7 +476,7 @@ const OrderConfirmation: React.FC = () => {
                     <span className="text-muted-foreground block">
                       {order.currency === 'JPY'
                         ? t('order.tracking.domestic')
-                        : order.country === 'Brasil'
+                        : receipt.country === 'Brasil'
                           ? t('order.tracking.air.br')
                           : t('order.tracking.air.intl')}
                     </span>
@@ -474,29 +503,30 @@ const OrderConfirmation: React.FC = () => {
                 <div className="grid md:grid-cols-2 gap-4 text-xs md:text-sm border-b pb-4">
                   <div>
                     <h4 className="font-semibold text-gray-500 uppercase tracking-wider mb-1">{t('order.recipient')}</h4>
-                    <p className="font-bold text-gray-800">{order.name}</p>
+                    <p className="font-bold text-gray-800">{receipt.name}</p>
                     {order.currency !== 'JPY' && order.cpf && (
                       <p className="text-muted-foreground font-mono mt-0.5">CPF: {order.cpf}</p>
                     )}
-                    <p className="text-muted-foreground">Tel: {order.phone}</p>
-                    <p className="text-muted-foreground">{order.email}</p>
+                    <p className="text-muted-foreground">Tel: {receipt.phone}</p>
+                    <p className="text-muted-foreground">{receipt.email}</p>
                   </div>
                   <div>
                     <h4 className="font-semibold text-gray-500 uppercase tracking-wider mb-1">{t('order.deliveryAddress')}</h4>
-                    <p className="text-gray-800">〒 {order.postalCode}</p>
+                    <p className="text-gray-800">〒 {receipt.postalCode}</p>
                     <p className="text-gray-800">
-                      {order.prefecture}, {order.city}
+                      {[receipt.prefecture, receipt.city].filter(Boolean).join(', ')}
                     </p>
-                    <p className="text-gray-800">{order.address}</p>
-                    {order.building && <p className="text-gray-500 text-xs">{t('order.complement')} {order.building}</p>}
+                    <p className="text-gray-800">{receipt.address}</p>
+                    {receipt.building && <p className="text-gray-500 text-xs">{t('order.complement')} {receipt.building}</p>}
                     <p className="font-bold text-gray-800 mt-1">
-                      {order.country || 'Brasil'} {
-                        order.country === 'Japão' ? '🇯🇵' :
-                        order.country === 'Brasil' ? '🇧🇷' :
-                        order.country === 'Portugal' ? '🇵🇹' :
-                        order.country === 'França' ? '🇫🇷' :
-                        order.country === 'Itália' ? '🇮🇹' :
-                        order.country === 'Espanha' ? '🇪🇸' : '🇧🇷'
+                      {receipt.country || 'Brasil'} {
+                        receipt.country === 'Japão' ? '🇯🇵' :
+                        receipt.country === 'Brasil' ? '🇧🇷' :
+                        receipt.country === 'Portugal' ? '🇵🇹' :
+                        receipt.country === 'França' ? '🇫🇷' :
+                        receipt.country === 'Itália' ? '🇮🇹' :
+                        receipt.country === 'Espanha' ? '🇪🇸' :
+                        receipt.country === 'Estados Unidos' ? '🇺🇸' : ''
                       }
                     </p>
                   </div>
@@ -515,12 +545,12 @@ const OrderConfirmation: React.FC = () => {
                             <img src={item.image} alt={item.name} className="w-8 h-8 rounded object-cover border border-gray-100" />
                           )}
                           <div className="truncate">
-                            <p className="font-bold text-gray-800 truncate">{item.name}</p>
+                            <p className="font-bold text-gray-800 truncate">{item.productName || item.name}</p>
                             <p className="text-muted-foreground text-[10px]">{item.size} × {item.quantity}</p>
                           </div>
                         </div>
                         <p className="font-bold text-gray-800 shrink-0">
-                          {formatPrice(item.price * item.quantity, order.currency || 'BRL')}
+                          {item.freeGift ? 'GRÁTIS' : formatPrice(item.price * item.quantity, receiptCurrency, true)}
                         </p>
                       </div>
                     ))}
@@ -529,24 +559,26 @@ const OrderConfirmation: React.FC = () => {
 
                 {/* Invoice Totals */}
                 <div className="border-t pt-4 space-y-2 text-xs md:text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">{t('order.subtotal')}</span>
-                    <span className="font-semibold text-gray-800">
-                      {formatPrice(order.subtotal, order.currency || 'BRL')}
-                    </span>
-                  </div>
-
-                  {order.couponDiscount > 0 && (
-                    <div className="flex justify-between text-green-600 font-bold">
-                      <span>{t('order.couponDiscount')} ({order.couponCode})</span>
-                      <span>-{formatPrice(order.couponDiscount, order.currency || 'BRL')}</span>
+                  {breakdown && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">{t('order.subtotal')}</span>
+                      <span className="font-semibold text-gray-800">
+                        {formatPrice(breakdown.subtotal, receiptCurrency, true)}
+                      </span>
                     </div>
                   )}
 
-                  {order.currency !== 'JPY' && order.pixDiscount > 0 && (
-                    <div className="flex justify-between text-pink-600 font-bold">
-                      <span>{t('order.pixDiscount')}</span>
-                      <span>-{formatPrice(order.pixDiscount, 'BRL')}</span>
+                  {breakdown && breakdown.couponDiscount > 0 && (
+                    <div className="flex justify-between text-green-600 font-bold">
+                      <span>{t('order.couponDiscount')} ({order.couponCode})</span>
+                      <span>-{formatPrice(breakdown.couponDiscount, receiptCurrency, true)}</span>
+                    </div>
+                  )}
+
+                  {breakdown && breakdown.pointsDiscount > 0 && (
+                    <div className="flex justify-between text-purple-700 font-bold">
+                      <span>Desconto em pontos</span>
+                      <span>-{formatPrice(breakdown.pointsDiscount, receiptCurrency, true)}</span>
                     </div>
                   )}
 
@@ -567,17 +599,39 @@ const OrderConfirmation: React.FC = () => {
                       {order.currency === 'JPY' ? t('order.shipping.local') : t('order.shipping.intl')}
                     </span>
                     <span className="font-semibold text-gray-800">
-                      {order.shippingCostYen === 0 ? t('order.shipping.free') : formatPrice(order.shippingCostYen, 'JPY')}
+                      {(breakdown ? breakdown.shipping : order.shippingCostYen) === 0
+                        ? t('order.shipping.free')
+                        : breakdown ? formatPrice(breakdown.shipping, receiptCurrency, true) : formatPrice(order.shippingCostYen, 'JPY')}
                     </span>
                   </div>
 
-                  {order.psFeeYen > 0 && (
+                  {(breakdown ? breakdown.psFee > 0 : order.psFeeYen > 0) && (
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Taxa Personal Shopper</span>
                       <span className="font-semibold text-gray-800">
-                        {formatPrice(order.psFeeYen, 'JPY')}
+                        {breakdown ? formatPrice(breakdown.psFee, receiptCurrency, true) : formatPrice(order.psFeeYen, 'JPY')}
                       </span>
                     </div>
+                  )}
+
+                  {breakdown && breakdown.importDuty > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Imposto de importação EUA (pré-pago, DDP)</span>
+                      <span className="font-semibold text-gray-800">{formatPrice(breakdown.importDuty, receiptCurrency, true)}</span>
+                    </div>
+                  )}
+
+                  {breakdown && breakdown.paymentFee > 0 && (
+                    <>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">IOF do PIX (3,5%)</span>
+                        <span className="font-semibold text-gray-800">{formatPrice(breakdown.pixIof, receiptCurrency, true)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Taxa bancária de remessa</span>
+                        <span className="font-semibold text-gray-800">{formatPrice(breakdown.pixBankFee, receiptCurrency, true)}</span>
+                      </div>
+                    </>
                   )}
 
                   <div className="flex justify-between pt-3 border-t font-black text-base md:text-lg">

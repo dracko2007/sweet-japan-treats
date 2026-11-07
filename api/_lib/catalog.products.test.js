@@ -15,7 +15,7 @@ vi.mock('../_handlers/product-enrich.js', () => ({ default: vi.fn() }));
 vi.mock('../_handlers/sitemap.js', () => ({ default: vi.fn() }));
 vi.mock('../_handlers/wise-rate.js', () => ({ default: vi.fn() }));
 
-import catalog from '../catalog.js';
+import catalog, { resetCatalogCache } from '../catalog.js';
 
 function response() {
   return {
@@ -44,6 +44,8 @@ function fakeCollection(docs) {
 describe('GET /api/catalog?action=products', () => {
   beforeEach(() => {
     mocks.adminDb.mockReset();
+    resetCatalogCache();
+    vi.useRealTimers();
   });
 
   it('adiciona produto recém-ocultado ao array `deleted`, não só o remove de `items`', async () => {
@@ -90,5 +92,57 @@ describe('GET /api/catalog?action=products', () => {
 
     expect(res.body.deleted).toEqual([]);
     expect(res.body.items).toEqual([{ id: 'produto-visivel', name: 'Y', image: 'https://x/y.jpg' }]);
+  });
+
+  // Primeira visita relê o catálogo inteiro. Numa onda de visitas, cada pedido
+  // relia tudo e a cota diária do Firestore acabava.
+  it('leitura completa: pedidos dentro de um minuto dividem uma leitura só', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-11-08T00:00:00.000Z'));
+    const reads = vi.fn(async () => fakeSnapshot([['p1', { name: 'A', updatedAt: { toMillis: () => 1000 } }]]));
+    mocks.adminDb.mockReturnValue({ collection: () => ({ where: vi.fn(), get: reads }) });
+
+    const first = response();
+    const second = response();
+    await Promise.all([
+      catalog({ query: { action: 'products' } }, first),
+      catalog({ query: { action: 'products' } }, second),
+    ]);
+    await catalog({ query: { action: 'products' } }, response());
+    expect(reads).toHaveBeenCalledTimes(1);
+    expect(second.body).toEqual(first.body);
+
+    vi.setSystemTime(new Date('2026-11-08T00:01:01.000Z'));
+    await catalog({ query: { action: 'products' } }, response());
+    expect(reads).toHaveBeenCalledTimes(2);
+  });
+
+  it('o delta (`since`) sempre lê o banco', async () => {
+    const reads = vi.fn(async () => fakeSnapshot([]));
+    const collection = { where: () => collection, get: reads };
+    mocks.adminDb.mockReturnValue({ collection: () => collection });
+
+    await catalog({ query: { action: 'products' } }, response());
+    await catalog({ query: { action: 'products', since: '500' } }, response());
+    await catalog({ query: { action: 'products', since: '500' } }, response());
+
+    expect(reads).toHaveBeenCalledTimes(3);
+  });
+
+  it('erro na leitura não fica guardado', async () => {
+    const reads = vi.fn()
+      .mockRejectedValueOnce(new Error('quota'))
+      .mockResolvedValueOnce(fakeSnapshot([['p1', { name: 'A' }]]));
+    mocks.adminDb.mockReturnValue({ collection: () => ({ where: vi.fn(), get: reads }) });
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const failed = response();
+    await catalog({ query: { action: 'products' } }, failed);
+    const retried = response();
+    await catalog({ query: { action: 'products' } }, retried);
+
+    expect(failed.statusCode).toBe(500);
+    expect(retried.statusCode).toBe(200);
+    expect(retried.body.items).toEqual([{ id: 'p1', name: 'A' }]);
   });
 });

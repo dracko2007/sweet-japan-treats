@@ -4,50 +4,23 @@
 // Z.ai/GLM (ZAI_API_KEY) como reserva, nessa ordem.
 // As chaves ficam SÓ no servidor e nunca vão pro navegador.
 // Sem nenhuma chave configurada, retorna 503 e o assistente responde pelas regras (fallback).
-import { cert, getApps, initializeApp } from 'firebase-admin/app';
-import { getAuth } from 'firebase-admin/auth';
-import { superAdminEmail } from './_lib/auth.js';
+import { adminAuth, adminDb } from './_lib/firebase-admin.js';
+import { HttpError } from './_lib/http.js';
+import { enforceRateLimit } from './_lib/rate-limit.js';
 import { buildProviders, chatWithFallback } from './_lib/ai-providers.js';
 import { containsUngroundedMoney, ungroundedMoney } from './_lib/money-grounding.js';
 import { ADMIN_AGENT_PROMPT, ADMIN_AGENT_TOOLS, AGENT_TOOLS, LANGUAGE_NAMES, agentGroundingText, buildAgentPrompt, detectLanguage, sanitizeAgentMessages } from './_lib/assistant-agent.js';
 
 // Tempo máximo da função: vercel.json → functions (a IA tem orçamento de 25s dentro disso).
 
-function firebaseAdminAuth() {
-  if (!getApps().length) {
-    const sa = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
-    if (!sa) throw new Error('Firebase Admin not configured');
-    initializeApp({ credential: cert(JSON.parse(sa)) });
-  }
-  return getAuth();
-}
-
-// ---------- Rate limiting simples em memória (por IP, reseta ao cold start) ----------
-// Suficiente para barrar bots no tier gratuito; em produção de alta escala usar Upstash/Redis.
+// ---------- Limite de uso ----------
+// O mesmo limitador do resto da API (Firestore, `_lib/rate-limit.js`): vale
+// para todas as instâncias da função. O contador em memória que havia aqui
+// zerava a cada instância nova e não segurava quem disparasse em paralelo —
+// e cada chamada gasta a cota dos provedores de IA.
 const RATE_WINDOW_MS = 60_000; // 1 minuto
 // Uma pergunta no modo agente gasta 2–4 chamadas (ferramentas + resposta final).
 const RATE_MAX = 40;           // máximo de requisições por IP por janela
-const ipMap = new Map();       // ip → { count, resetAt }
-
-function checkRateLimit(ip) {
-  const now = Date.now();
-  const entry = ipMap.get(ip);
-  if (!entry || now > entry.resetAt) {
-    ipMap.set(ip, { count: 1, resetAt: now + RATE_WINDOW_MS });
-    return true;
-  }
-  if (entry.count >= RATE_MAX) return false;
-  entry.count++;
-  return true;
-}
-
-// Limpa entradas expiradas periodicamente para não vazar memória
-setInterval(() => {
-  const now = Date.now();
-  for (const [ip, entry] of ipMap) {
-    if (now > entry.resetAt) ipMap.delete(ip);
-  }
-}, RATE_WINDOW_MS * 2);
 
 // Rede de segurança anti-alucinação numérica: ver _lib/money-grounding.js.
 
@@ -122,16 +95,17 @@ calculadora de frete do site — nunca tente calcular de cabeça, mesmo que pare
 
 Responda de forma direta, técnica e completa. Pode usar mais de 4 frases quando a pergunta for complexa.`;
 
-// O cliente envia o token no header x-firebase-token; o servidor verifica e confere
-// se o email pertence ao admin. Sem token válido = não-admin, sem exceção.
+// O cliente envia o token no header x-firebase-token; o servidor verifica o
+// token e confere o registro ativo em admins/{uid} — a mesma régua das regras
+// do Firestore e do `requireAdmin` da API. Antes comparava o e-mail do token
+// com ADMIN_EMAIL: deixava de fora os outros admins e não respeitava a
+// revogação (apagar admins/{uid}). Sem token válido = não-admin, sem exceção.
 async function verifyAdmin(idToken) {
-  if (!idToken) return false;
+  if (typeof idToken !== 'string' || !idToken.trim()) return false;
   try {
-    // `superAdminEmail()` lança quando ADMIN_EMAIL não está configurado: sem
-    // configuração ninguém é admin, mesmo desfecho de um token inválido.
-    const adminEmail = superAdminEmail();
-    const decoded = await firebaseAdminAuth().verifyIdToken(idToken);
-    return decoded.email?.toLowerCase() === adminEmail.toLowerCase();
+    const decoded = await adminAuth().verifyIdToken(idToken.trim());
+    const record = await adminDb().collection('admins').doc(decoded.uid).get();
+    return record.exists && record.data()?.active === true;
   } catch {
     return false;
   }
@@ -244,11 +218,18 @@ export default async function handler(req, res) {
     return;
   }
 
-  // Never trust caller-controlled forwarding headers for quota identity.
-  const ip = req.socket?.remoteAddress || 'unknown';
-
-  if (!checkRateLimit(ip)) {
-    res.status(429).json({ error: 'Muitas requisições. Aguarde um momento.' });
+  // Identidade = IP, pela regra do limitador compartilhado (cabeçalho de proxy
+  // só conta com TRUSTED_PROXY configurado).
+  try {
+    await enforceRateLimit(req, { scope: 'kimiclaw', limit: RATE_MAX, windowMs: RATE_WINDOW_MS });
+  } catch (error) {
+    if (error instanceof HttpError && error.statusCode === 429) {
+      res.status(429).json({ error: 'Muitas requisições. Aguarde um momento.' });
+      return;
+    }
+    // Sem como contar, não chama a IA: o assistente do site responde pelas
+    // regras locais quando a API falha.
+    res.status(503).json({ error: 'rate_limit_unavailable' });
     return;
   }
 
@@ -364,3 +345,5 @@ export default async function handler(req, res) {
     res.status(500).json({ error: String(e?.message || e) });
   }
 }
+
+export { verifyAdmin };
