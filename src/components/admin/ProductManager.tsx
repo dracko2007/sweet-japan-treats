@@ -551,8 +551,10 @@ const ProductManager: React.FC = () => {
       const large = roundYen(priceVals.length ? Math.max(...priceVals) : Number(editing.prices?.large) || small);
       const packageDimensionsCm = sanitizePackageDimensions(editing.packageDimensionsCm);
 
-      // SKU único por categoria — gerado automaticamente na criação (ou se faltar ao editar)
-      const sku = editing.sku?.trim() || generateUniqueSku(editing.category, products);
+      // SKU único por categoria — gerado automaticamente na criação (ou se faltar ao editar).
+      // Lê todos os produtos do banco, inclusive ocultos e apagados: a lista da tela não
+      // tem os apagados, e gerar só a partir dela repetia o SKU de produto antigo.
+      const sku = editing.sku?.trim() || generateUniqueSku(editing.category, await productService.listAllSkus());
 
       const product: Product = {
         ...editing,

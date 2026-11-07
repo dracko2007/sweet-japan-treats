@@ -262,6 +262,24 @@ export const productService = {
     return result.length > 0 ? result : memoria.items.length > 0 ? memoria.items : defaultProducts;
   },
 
+  /**
+   * SKU de TODOS os produtos, inclusive ocultos e apagados (admin). Base para
+   * gerar o próximo SKU sem repetir número de produto que não está na tela.
+   */
+  async listAllSkus(): Promise<Array<{ id: string; category: string; sku?: string }>> {
+    if (!db) throw new Error('Firebase indisponível');
+    await ensureAdminAuth();
+    const snap = await getDocs(collection(db, COL));
+    return snap.docs.map((d) => {
+      const data = d.data() as { category?: unknown; sku?: unknown };
+      return {
+        id: d.id,
+        category: typeof data.category === 'string' ? data.category : '',
+        sku: typeof data.sku === 'string' ? data.sku : undefined,
+      };
+    });
+  },
+
   /** Cria ou atualiza um produto. Invalida o cache local automaticamente. */
   async save(product: Product): Promise<void> {
     if (!db) throw new Error('Firebase indisponível');

@@ -265,8 +265,10 @@ const ShippingCalculator: React.FC<ShippingCalculatorProps> = ({
           {shippingOptions.map((option, index) => {
             const isConsultar = option.isConsultar;
             const isCombinar = option.isCombinar;
-            // 'A Combinar' é selecionável (tem radio), apesar de não ter preço fixo
-            const selectable = !isConsultar || isCombinar;
+            // Sem preço fixo (marítimo, "A Combinar") não dá para escolher no checkout:
+            // o servidor só cobra frete com tabela e recusava o pedido (invalid_shipping).
+            // Encomenda fora do site é cotada pelo WhatsApp e registrada pelo admin.
+            const selectable = !isConsultar;
             return (
               <div
                 key={option.carrier}
@@ -309,7 +311,7 @@ const ShippingCalculator: React.FC<ShippingCalculatorProps> = ({
                       </p>
                       {isCombinar && (
                         <p className="text-xs text-amber-600 dark:text-amber-400 mt-0.5 leading-tight">
-                          ⚖️ O valor será informado após a pesagem e cobrado separadamente.
+                          ⚖️ Só para encomendas fora do site: combine o frete pelo WhatsApp.
                         </p>
                       )}
                     </div>

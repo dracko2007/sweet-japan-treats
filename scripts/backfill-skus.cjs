@@ -33,31 +33,21 @@ function categoryCode(category) {
 }
 function skuPrefix(category) { return `JE-${categoryCode(category)}`; }
 function isValidSku(sku) { return !!sku && /^JE-[A-Z]{2,4}-\d{4}$/.test(sku); }
+// Continua depois do maior número de cada prefixo, olhando TODOS os produtos
+// (inclusive apagados e de outra categoria): nunca reaproveita número.
 function assignSkus(items) {
   const assignments = {};
-  const byCategory = new Map();
+  const highest = new Map();
   for (const it of items) {
-    const arr = byCategory.get(it.category) || [];
-    arr.push(it);
-    byCategory.set(it.category, arr);
+    const m = (it.sku || '').trim().match(/^(JE-[A-Z]{2,4})-(\d{4})$/);
+    if (m) highest.set(m[1], Math.max(highest.get(m[1]) || 0, Number(m[2])));
   }
-  for (const [category, list] of byCategory) {
-    const prefix = skuPrefix(category);
-    const re = new RegExp(`^${prefix}-(\\d{4})$`);
-    const used = new Set();
-    for (const it of list) {
-      const m = (it.sku || '').match(re);
-      if (m) used.add(Number(m[1]));
-    }
-    let n = 1;
-    const sorted = [...list].sort((a, b) => a.id.localeCompare(b.id));
-    for (const it of sorted) {
-      if (isValidSku(it.sku)) continue;
-      while (used.has(n)) n++;
-      assignments[it.id] = `${prefix}-${String(n).padStart(4, '0')}`;
-      used.add(n);
-      n++;
-    }
+  const pending = items.filter((it) => !it.deleted && !isValidSku(it.sku)).sort((a, b) => a.id.localeCompare(b.id));
+  for (const it of pending) {
+    const prefix = skuPrefix(it.category);
+    const next = (highest.get(prefix) || 0) + 1;
+    highest.set(prefix, next);
+    assignments[it.id] = `${prefix}-${String(next).padStart(4, '0')}`;
   }
   return assignments;
 }
@@ -70,8 +60,8 @@ function assignSkus(items) {
   const items = [];
   snap.forEach((d) => {
     const data = d.data();
-    if (data.__deleted) return; // soft-deleted
-    items.push({ id: d.id, category: data.category || '', sku: data.sku || undefined, name: data.name || '' });
+    // Apagados entram na conta dos números usados, mas não recebem SKU novo.
+    items.push({ id: d.id, category: data.category || '', sku: data.sku || undefined, name: data.name || '', deleted: data.__deleted === true });
   });
 
   const assignments = assignSkus(items);

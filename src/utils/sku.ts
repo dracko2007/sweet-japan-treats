@@ -1,7 +1,7 @@
 /**
  * Geração de SKU (código de produto) da Japan Express.
  * Padrão: JE-<CAT>-<NNNN>  (ex.: JE-COS-0001, JE-DOC-0012)
- * - Único por categoria (números sequenciais dentro de cada categoria).
+ * - Único por categoria (números sequenciais dentro de cada categoria, nunca reaproveitados).
  * - Determinístico e estável em re-rodadas: produtos que já têm SKU válido são preservados.
  * - Módulo puro (sem dependências de alias "@/") para poder ser importado tanto pela
  *   app (via "@/utils/sku") quanto por scripts Node/Bun usando caminho relativo.
@@ -48,58 +48,57 @@ export function isValidSku(sku: string | undefined | null): boolean {
 }
 
 /**
- * Gera o próximo SKU único para a categoria informada, pulando os números já
- * em uso (lidos dos SKUs existentes passados em `existing`).
+ * Maiores números já usados por prefixo, considerando TODOS os itens, de qualquer
+ * categoria (um produto pode ter mudado de categoria depois de ganhar o SKU).
  */
-export function generateUniqueSku(category: string, existing: SkuItem[] = []): string {
-  const prefix = skuPrefix(category);
-  const re = new RegExp(`^${prefix}-(\\d{4})$`);
-  const used = new Set<number>();
-  for (const item of existing) {
-    const m = item.sku?.trim().match(re);
-    if (m) used.add(Number(m[1]));
+function highestByPrefix(items: Array<{ sku?: string }>): Map<string, number> {
+  const highest = new Map<string, number>();
+  for (const item of items) {
+    const m = item.sku?.trim().match(/^(JE-[A-Z]{2,4})-(\d{4})$/);
+    if (m) highest.set(m[1], Math.max(highest.get(m[1]) ?? 0, Number(m[2])));
   }
-  let n = 1;
-  while (used.has(n)) n++;
-  return `${prefix}-${String(n).padStart(4, '0')}`;
+  return highest;
 }
 
 /**
- * Atribui SKUs (id -> sku) APENAS aos itens que ainda não possuem um SKU válido.
- * Respeita SKUs já existentes (não duplica números). Determinístico (ordena por id
- * dentro de cada categoria). Usado pelo script de backfill (Firestore) e pode ser
- * reaproveitado em operações em massa pelo painel admin.
+ * Gera o próximo SKU da categoria: o maior número já usado no prefixo + 1.
+ * Nunca reaproveita número (nem de produto apagado), porque o SKU antigo pode
+ * continuar em pedidos, planilhas e marketplaces. `existing` deve trazer TODOS os
+ * produtos, inclusive os apagados (`productService.listAllSkus()`): foi gerar a
+ * partir só dos produtos visíveis que criou os SKUs duplicados.
+ */
+export function generateUniqueSku(category: string, existing: SkuItem[] = []): string {
+  const prefix = skuPrefix(category);
+  const next = (highestByPrefix(existing).get(prefix) ?? 0) + 1;
+  return `${prefix}-${String(next).padStart(4, '0')}`;
+}
+
+/** SKUs usados por mais de um produto (sku -> ids). */
+export function findDuplicateSkus<T extends { id: string; sku?: string }>(items: T[]): Record<string, string[]> {
+  const byKey = new Map<string, string[]>();
+  for (const item of items) {
+    const sku = item.sku?.trim();
+    if (!sku) continue;
+    byKey.set(sku, [...(byKey.get(sku) ?? []), item.id]);
+  }
+  return Object.fromEntries([...byKey].filter(([, ids]) => ids.length > 1));
+}
+
+/**
+ * Atribui SKUs (id -> sku) APENAS aos itens que ainda não possuem um SKU válido,
+ * continuando depois do maior número já usado em cada prefixo (sem reaproveitar).
+ * Determinístico (ordena por id dentro de cada categoria). Usado pelo script de
+ * backfill (Firestore); `items` deve incluir os produtos apagados.
  */
 export function assignSkus<T extends SkuItem & { id: string }>(items: T[]): Record<string, string> {
   const assignments: Record<string, string> = {};
-
-  const byCategory = new Map<string, T[]>();
-  for (const item of items) {
-    const list = byCategory.get(item.category) ?? [];
-    list.push(item);
-    byCategory.set(item.category, list);
+  const highest = highestByPrefix(items);
+  const pending = items.filter((item) => !isValidSku(item.sku)).sort((a, b) => a.id.localeCompare(b.id));
+  for (const item of pending) {
+    const prefix = skuPrefix(item.category);
+    const next = (highest.get(prefix) ?? 0) + 1;
+    highest.set(prefix, next);
+    assignments[item.id] = `${prefix}-${String(next).padStart(4, '0')}`;
   }
-
-  for (const [category, list] of byCategory) {
-    const prefix = skuPrefix(category);
-    const re = new RegExp(`^${prefix}-(\\d{4})$`);
-    const used = new Set<number>();
-    for (const item of list) {
-      const m = item.sku?.trim().match(re);
-      if (m) used.add(Number(m[1]));
-    }
-
-    let n = 1;
-    const sorted = [...list].sort((a, b) => a.id.localeCompare(b.id));
-    for (const item of sorted) {
-      if (isValidSku(item.sku)) continue; // já tem SKU válido — preserva
-      while (used.has(n)) n++;
-      const sku = `${prefix}-${String(n).padStart(4, '0')}`;
-      assignments[item.id] = sku;
-      used.add(n);
-      n++;
-    }
-  }
-
   return assignments;
 }
