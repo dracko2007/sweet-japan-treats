@@ -6,11 +6,13 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { emailServiceSimple } from '@/services/emailServiceSimple';
 import { useToast } from '@/hooks/use-toast';
+import { trackingCarrierOption } from '@/utils/trackingUrl';
+import type { Order } from '@/types';
 
 
 
 interface TrackingModalProps {
-  order: any;
+  order: Order;
   isOpen: boolean;
   onClose: () => void;
   onSuccess: (trackingNumber: string, carrier: string) => void | Promise<void>;
@@ -23,7 +25,8 @@ const TrackingModal: React.FC<TrackingModalProps> = ({
   onSuccess,
 }) => {
   const [trackingNumber, setTrackingNumber] = useState('');
-  const [selectedCarrier, setSelectedCarrier] = useState(order?.shipping?.carrier || '');
+  // O pedido guarda o código do checkout (`ems`…); o select precisa do nome da lista.
+  const [selectedCarrier, setSelectedCarrier] = useState(trackingCarrierOption(order?.shipping?.carrier || order?.shippingCarrier));
   const [isSending, setIsSending] = useState(false);
   const { toast } = useToast();
 

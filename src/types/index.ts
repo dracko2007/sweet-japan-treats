@@ -133,6 +133,20 @@ export interface Order {
   shippingAddress?: OrderShippingAddress;
   trackingNumber?: string;
   trackingUrl?: string;
+  /** Campos que pedidos antigos ou de outros fluxos também trazem. */
+  total?: number;
+  carrier?: string;
+  grandTotalYen?: number;
+  federalTax?: number;   // II (pedidos antigos do Brasil)
+  icmsTax?: number;      // ICMS (pedidos antigos do Brasil)
+  /** Endereço "solto" de pedidos antigos (os atuais usam `shippingAddress`). */
+  name?: string;
+  phone?: string;
+  postalCode?: string;
+  prefecture?: string;
+  city?: string;
+  address?: string;
+  building?: string;
 }
 
 export interface OrderStatistics {

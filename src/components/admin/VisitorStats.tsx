@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import { Users, Globe, MapPin, TrendingUp, ExternalLink, RefreshCw, FileText, ShoppingBag } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { visitorService } from '@/services/visitorService';
@@ -30,20 +30,29 @@ export default function VisitorStats() {
   const [topPages, setTopPages] = useState<Array<{ slug: string; label: string; views: number }>>([]);
   const [topProducts, setTopProducts] = useState<Array<{ productId: string; productName: string; views: number }>>([]);
 
-  async function load() {
-    setLoading(true);
-    const [s, pages, products] = await Promise.all([
-      visitorService.getSummary(period),
-      visitorService.getTopPages(15),
-      visitorService.getTopProducts(15),
-    ]);
-    setSummary(s);
-    setTopPages(pages);
-    setTopProducts(products);
-    setLoading(false);
-  }
+  const [error, setError] = useState('');
 
-  useEffect(() => { load(); }, [period]);
+  // Uma consulta que falhava deixava a aba carregando para sempre, sem aviso.
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const [s, pages, products] = await Promise.all([
+        visitorService.getSummary(period),
+        visitorService.getTopPages(15),
+        visitorService.getTopProducts(15),
+      ]);
+      setSummary(s);
+      setTopPages(pages);
+      setTopProducts(products);
+    } catch {
+      setError('Não foi possível carregar as visitas. Tente atualizar.');
+    } finally {
+      setLoading(false);
+    }
+  }, [period]);
+
+  useEffect(() => { void load(); }, [load]);
 
   // Gráfico de barras simples (últimos 14 dias)
   const chartDays = summary?.dailyData.slice(-14) ?? [];
@@ -68,12 +77,16 @@ export default function VisitorStats() {
                 period === d ? 'bg-pink-500 text-white' : 'bg-secondary text-muted-foreground hover:bg-secondary/80'
               }`}>{d} dias</button>
           ))}
-          <Button variant="outline" size="sm" onClick={load} disabled={loading} className="gap-1.5">
+          <Button variant="outline" size="sm" onClick={() => void load()} disabled={loading} className="gap-1.5">
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
             Atualizar
           </Button>
         </div>
       </div>
+
+      {error && (
+        <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>
+      )}
 
       {/* Tabs */}
       <div className="flex gap-1 bg-secondary/50 rounded-xl p-1 w-fit">

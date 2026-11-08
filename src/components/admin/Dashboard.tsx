@@ -1,9 +1,5 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { Suspense, lazy, useEffect, useState, useCallback } from 'react';
 import { TrendingUp, TrendingDown, Package, DollarSign, ShoppingBag, CheckCircle, XCircle, AlertTriangle, ChevronDown, ChevronUp, RefreshCw, ChevronRight, Handshake, Megaphone, Sparkles } from 'lucide-react';
-import {
-  BarChart, Bar, PieChart, Pie, Cell,
-  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-} from 'recharts';
 import { z } from 'zod';
 import { affiliateService } from '@/services/affiliateService';
 import type { Affiliate, PendingCommission } from '@/services/affiliateService';
@@ -16,6 +12,10 @@ import type { OrderStatistics } from '@/types';
 import MaintenanceToggle from '@/components/admin/MaintenanceToggle';
 import DangerZone from '@/components/admin/DangerZone';
 import WisePaymentSettings from '@/components/admin/WisePaymentSettings';
+
+const MonthlyFinanceChart = lazy(() => import('./DashboardCharts').then((m) => ({ default: m.MonthlyFinanceChart })));
+const OrderStatusPie = lazy(() => import('./DashboardCharts').then((m) => ({ default: m.OrderStatusPie })));
+const chartFallback = (height: number) => <div className="animate-pulse rounded-lg bg-secondary/50" style={{ height }} aria-hidden />;
 
 // Cotação fixa usada para converter despesas em R$ (marketing, salários) para ¥.
 const YEN_PER_BRL = 28;
@@ -567,35 +567,18 @@ const Dashboard: React.FC<DashboardProps> = ({ pending, onNavigate }) => {
           <div className="bg-card rounded-xl border border-border p-6">
             <h3 className="font-semibold text-lg mb-1">Financeiro Mensal (¥)</h3>
             <p className="text-xs text-muted-foreground mb-6">Comparação receita com/sem frete, custo e lucro.</p>
-            <ResponsiveContainer width="100%" height={280}>
-              <BarChart data={monthlyData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="month" />
-                <YAxis tickFormatter={(v) => `¥${(v / 1000).toFixed(0)}k`} />
-                <Tooltip formatter={(value) => (typeof value === 'number' ? `¥${value.toLocaleString()}` : value)} />
-                <Legend />
-                <Bar dataKey="receitaComFrete" name="Receita c/ frete" fill="#fbcfe8" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="receitaSemFrete" name="Receita s/ frete" fill="#ec4899" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="custo" name="Custo" fill="#9ca3af" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="lucro" name="Lucro" fill="#22c55e" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            <Suspense fallback={chartFallback(280)}>
+              <MonthlyFinanceChart data={monthlyData} />
+            </Suspense>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <div className="bg-card rounded-xl border border-border p-6">
               <h3 className="font-semibold text-lg mb-6">Status dos Pedidos</h3>
               {statusData.length > 0 ? (
-                <ResponsiveContainer width="100%" height={200}>
-                  <PieChart>
-                    <Pie data={statusData} dataKey="value" nameKey="name" innerRadius={45} outerRadius={75} label>
-                      {statusData.map((entry: any, idx: number) => (
-                        <Cell key={`cell-${idx}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                  </PieChart>
-                </ResponsiveContainer>
+                <Suspense fallback={chartFallback(200)}>
+                  <OrderStatusPie data={statusData} />
+                </Suspense>
               ) : (
                 <p className="text-muted-foreground text-center py-8">Nenhum pedido</p>
               )}

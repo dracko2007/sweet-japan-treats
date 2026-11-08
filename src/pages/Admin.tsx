@@ -1,6 +1,6 @@
 import { safeStorage } from '@/utils/storage';
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { Suspense, lazy, useCallback, useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Package, Printer, ShoppingBag, User, MapPin, Phone, Mail, Calendar, TestTube, Tag, Truck, CheckCircle, XCircle, Trash2, BarChart3, Users, PackagePlus, Video, Megaphone, Clapperboard, Building2, Sparkles, ShieldCheck, Calculator, CloudUpload, FileText, Handshake, Flag, TrendingDown, MessageCircle, Trophy, Landmark } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
@@ -10,40 +10,10 @@ import { emailServiceSimple } from '@/services/emailServiceSimple';
 import { whatsappServiceSimple } from '@/services/whatsappServiceSimple';
 import { waServer } from '@/services/waServerService';
 import { useToast } from '@/hooks/use-toast';
-import CouponManager from '@/components/admin/CouponManager';
-import AffiliateManager from '@/components/admin/AffiliateManager';
-import Dashboard from '@/components/admin/Dashboard';
-import CustomerList from '@/components/admin/CustomerList';
-import ProductManager from '@/components/admin/ProductManager';
-import HomeContentManager from '@/components/admin/HomeContentManager';
-import VlogManager from '@/components/admin/VlogManager';
-import CustomRequestManager from '@/components/admin/CustomRequestManager';
-import B2BRequestManager from '@/components/admin/B2BRequestManager';
-import AdminAccessManager from '@/components/admin/AdminAccessManager';
-import CN23Modal from '@/components/admin/CN23Modal';
-import ImageMigration from '@/components/admin/ImageMigration';
-import PromotionManager from '@/components/admin/PromotionManager';
-import NegotiationManager from '@/components/admin/NegotiationManager';
-import TrackingModal from '@/components/admin/TrackingModal';
-import AdminCalculator from '@/components/admin/AdminCalculator';
-import MarketingManager from '@/components/admin/MarketingManager';
-import EmployeeManager from '@/components/admin/EmployeeManager';
-import CouponUsageReport from '@/components/admin/CouponUsageReport';
-import FraudDashboard from '@/components/admin/FraudDashboard';
-import ThermalPrinterSettings from '@/components/admin/ThermalPrinterSettings';
-import WhatsAppSettings from '@/components/admin/WhatsAppSettings';
-import VisitorStats from '@/components/admin/VisitorStats';
-import ReviewModeration from '@/components/admin/ReviewModeration';
-import MarginAudit from '@/components/admin/MarginAudit';
-import FinanceDetailManager from '@/components/admin/FinanceDetailManager';
-import CheckoutSandbox from '@/components/admin/CheckoutSandbox';
-import PromoNotificationModal from '@/components/admin/PromoNotificationModal';
-import VideoReviewManager from '@/components/admin/VideoReviewManager';
 import { useSiteSettings } from '@/hooks/useSiteSettings';
 import { orderService } from '@/services/orderService';
 import type { OrderPageCursor } from '@/services/firebaseSyncService';
 import { customRequestService } from '@/services/customRequestService';
-import SorteioManager from '@/components/admin/SorteioManager';
 import { customerService } from '@/services/customerService';
 import { useConfirm } from '@/components/ConfirmDialog';
 import { negotiationService } from '@/services/negotiationService';
@@ -51,6 +21,41 @@ import { COMPANY_PROFILE } from '@/config/companyProfile';
 import { ADMIN_EMAIL } from '@/config/admin';
 import { auth } from '@/config/firebase';
 import { affiliateService } from '@/services/affiliateService';
+import { trackingUrlFor } from '@/utils/trackingUrl';
+import type { Order, OrderItem } from '@/types';
+
+// Cada aba (e os modais dos pedidos) só baixa quando é aberta: antes as ~30
+// telas vinham juntas num pacote de ~940 KB, pesado para abrir no celular.
+const CouponManager = lazy(() => import('@/components/admin/CouponManager'));
+const AffiliateManager = lazy(() => import('@/components/admin/AffiliateManager'));
+const Dashboard = lazy(() => import('@/components/admin/Dashboard'));
+const CustomerList = lazy(() => import('@/components/admin/CustomerList'));
+const ProductManager = lazy(() => import('@/components/admin/ProductManager'));
+const HomeContentManager = lazy(() => import('@/components/admin/HomeContentManager'));
+const VlogManager = lazy(() => import('@/components/admin/VlogManager'));
+const CustomRequestManager = lazy(() => import('@/components/admin/CustomRequestManager'));
+const B2BRequestManager = lazy(() => import('@/components/admin/B2BRequestManager'));
+const AdminAccessManager = lazy(() => import('@/components/admin/AdminAccessManager'));
+const CN23Modal = lazy(() => import('@/components/admin/CN23Modal'));
+const ImageMigration = lazy(() => import('@/components/admin/ImageMigration'));
+const PromotionManager = lazy(() => import('@/components/admin/PromotionManager'));
+const NegotiationManager = lazy(() => import('@/components/admin/NegotiationManager'));
+const TrackingModal = lazy(() => import('@/components/admin/TrackingModal'));
+const AdminCalculator = lazy(() => import('@/components/admin/AdminCalculator'));
+const MarketingManager = lazy(() => import('@/components/admin/MarketingManager'));
+const EmployeeManager = lazy(() => import('@/components/admin/EmployeeManager'));
+const CouponUsageReport = lazy(() => import('@/components/admin/CouponUsageReport'));
+const FraudDashboard = lazy(() => import('@/components/admin/FraudDashboard'));
+const ThermalPrinterSettings = lazy(() => import('@/components/admin/ThermalPrinterSettings'));
+const WhatsAppSettings = lazy(() => import('@/components/admin/WhatsAppSettings'));
+const VisitorStats = lazy(() => import('@/components/admin/VisitorStats'));
+const ReviewModeration = lazy(() => import('@/components/admin/ReviewModeration'));
+const MarginAudit = lazy(() => import('@/components/admin/MarginAudit'));
+const FinanceDetailManager = lazy(() => import('@/components/admin/FinanceDetailManager'));
+const CheckoutSandbox = lazy(() => import('@/components/admin/CheckoutSandbox'));
+const PromoNotificationModal = lazy(() => import('@/components/admin/PromoNotificationModal'));
+const VideoReviewManager = lazy(() => import('@/components/admin/VideoReviewManager'));
+const SorteioManager = lazy(() => import('@/components/admin/SorteioManager'));
 
 const isDev = import.meta.env.DEV;
 const devLog = isDev ? console.log.bind(console) : () => {};
@@ -67,11 +72,22 @@ function escapeHtml(value: unknown): string {
 }
 
 
-type AdminTab =
-  | 'orders' | 'coupons' | 'dashboard' | 'customers' | 'products'
-  | 'calculator' | 'migration' | 'promotion' | 'negotiations' | 'marketing' | 'employees' | 'coupon-usage' | 'fraud'
-  | 'thermal-printer' | 'whatsapp' | 'review-moderation' | 'margin-audit' | 'visitors' | 'finance-detail' | 'sandbox'
-  | 'affiliates' | 'requests' | 'b2b' | 'videos' | 'home' | 'vlog' | 'sorteio' | 'admins';
+const ADMIN_TABS = [
+  'orders', 'coupons', 'dashboard', 'customers', 'products',
+  'calculator', 'migration', 'promotion', 'negotiations', 'marketing', 'employees', 'coupon-usage', 'fraud',
+  'thermal-printer', 'whatsapp', 'review-moderation', 'margin-audit', 'visitors', 'finance-detail', 'sandbox',
+  'affiliates', 'requests', 'b2b', 'videos', 'home', 'vlog', 'sorteio', 'admins',
+] as const;
+type AdminTab = (typeof ADMIN_TABS)[number];
+const isAdminTab = (value: string | null): value is AdminTab => ADMIN_TABS.includes(value as AdminTab);
+
+/** Enquanto o código da aba baixa (só na primeira abertura dela). */
+const TabLoading: React.FC = () => (
+  <div className="flex items-center justify-center py-16 text-sm text-muted-foreground" role="status">
+    <span className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" aria-hidden />
+    Carregando…
+  </div>
+);
 
 interface AdminTabItem {
   id: AdminTab;
@@ -85,7 +101,7 @@ const Admin: React.FC = () => {
   const { user, permissions, authReady } = useUser();
   const { toast } = useToast();
   const confirm = useConfirm();
-  const [allOrders, setAllOrders] = useState<any[]>([]);
+  const [allOrders, setAllOrders] = useState<Order[]>([]);
   const [ordersLoading, setOrdersLoading] = useState(true);
   const [ordersCursor, setOrdersCursor] = useState<OrderPageCursor | null>(null);
   const [ordersHasMore, setOrdersHasMore] = useState(false);
@@ -96,10 +112,23 @@ const Admin: React.FC = () => {
   const [newRequests, setNewRequests] = useState(0);
   const [pendingAffiliateRequestsCount, setPendingAffiliateRequestsCount] = useState(0);
   const [isTesting, setIsTesting] = useState(false);
-  const [activeTab, setActiveTab] = useState<AdminTab>('dashboard');
+  // A aba fica no endereço (?aba=pedidos…): recarregar a página ou voltar
+  // no navegador mantém o lugar, e dá para mandar o link de uma aba.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabParam = searchParams.get('aba');
+  const requestedTab: AdminTab = isAdminTab(tabParam) ? tabParam : 'dashboard';
+  const activeTab: AdminTab = requestedTab === 'admins' && !permissions.canManageAdmins ? 'dashboard' : requestedTab;
+  const setActiveTab = useCallback((tab: AdminTab) => {
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+      if (tab === 'dashboard') next.delete('aba');
+      else next.set('aba', tab);
+      return next;
+    });
+  }, [setSearchParams]);
   const [trackingModalOpen, setTrackingModalOpen] = useState(false);
-  const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
-  const [cn23Order, setCn23Order] = useState<any | null>(null);
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [cn23Order, setCn23Order] = useState<Order | null>(null);
   const [promoModalOpen, setPromoModalOpen] = useState(false);
   const [pendingNegotiationsCount, setPendingNegotiationsCount] = useState(0);
   // Sem sessão no Firebase (expirada, ou nunca aberta neste navegador): nenhuma
@@ -138,6 +167,8 @@ const Admin: React.FC = () => {
     const refresh = () => {
       const now = Date.now();
       if (now - lastRefresh < MIN_INTERVAL_MS) return; // throttle
+      // Sem isto a trava nunca valia: cada foco/volta à aba relia tudo.
+      lastRefresh = now;
       loadOrders();
       loadCustomers();
       affiliateService.getPendingCommissions()
@@ -190,7 +221,8 @@ const Admin: React.FC = () => {
   const loadOrders = async (append = false) => {
     if (append && (!ordersHasMore || ordersLoadingMore)) return;
 
-    append ? setOrdersLoadingMore(true) : setOrdersLoading(true);
+    if (append) setOrdersLoadingMore(true);
+    else setOrdersLoading(true);
     try {
       const page = await orderService.getOrdersPage(20, append ? ordersCursor : null);
       setAllOrders((current) => {
@@ -215,7 +247,8 @@ const Admin: React.FC = () => {
         variant: 'destructive',
       });
     } finally {
-      append ? setOrdersLoadingMore(false) : setOrdersLoading(false);
+      if (append) setOrdersLoadingMore(false);
+      else setOrdersLoading(false);
     }
   };
 
@@ -328,7 +361,7 @@ const Admin: React.FC = () => {
 
   // Envia notificação WhatsApp ao cliente (silencioso; mostra toast com o resultado).
   const notifyWhatsApp = async (
-    order: any,
+    order: Order,
     type: 'paymentConfirmed' | 'preparing' | 'shipped',
     extra?: { trackingNumber: string; trackingUrl: string; carrier: string }
   ) => {
@@ -490,7 +523,7 @@ _This is an automated test message_
     }
   };
 
-  const printOrder = (order: any) => {
+  const printOrder = (order: Order) => {
     const printWindow = window.open('', '_blank', 'noopener,noreferrer');
     if (!printWindow) return;
 
@@ -512,13 +545,13 @@ _This is an automated test message_
       yucho: '🏦 Banco Yucho',
     };
 
-    const itemsSubtotal = order.items.reduce((s: number, i: any) => s + i.price * i.quantity, 0);
+    const itemsSubtotal = order.items.reduce((s: number, i: OrderItem) => s + i.price * i.quantity, 0);
     const discount = order.couponDiscount || (itemsSubtotal > order.totalPrice ? itemsSubtotal - order.totalPrice : 0);
     const shippingCost = order.shipping?.cost ?? null;
     const grandTotal = order.totalPrice ?? order.total ?? 0;
     const grandTotalYen = order.grandTotalYen;
 
-    const itemsHtml = order.items.map((item: any) => `
+    const itemsHtml = order.items.map((item: OrderItem) => `
       <tr>
         <td style="padding:6px 8px;border-bottom:1px solid #eee;">${escapeHtml(item.productName || item.name)}${item.size ? ` <span style="color:#888;font-size:12px;">(${escapeHtml(item.size)})</span>` : ''}</td>
         <td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:center;">${Number(item.quantity) || 0}</td>
@@ -643,7 +676,7 @@ _This is an automated test message_
     printWindow.document.close();
   };
 
-  const printShippingLabel = (order: any) => {
+  const printShippingLabel = (order: Order) => {
     const printWindow = window.open('', '_blank', 'noopener,noreferrer');
     if (!printWindow) return;
 
@@ -685,7 +718,7 @@ _This is an automated test message_
 
           <div class="section">
             <h3>📦 PRODUTOS</h3>
-            ${order.items.map((item: any) => `
+            ${order.items.map((item: OrderItem) => `
               <p>• ${escapeHtml(item.productName || item.name)} (${escapeHtml(item.size || '')}) x${Number(item.quantity) || 0} - R$${(Number(item.price) * Number(item.quantity)).toLocaleString()}</p>
             `).join('')}
             <p class="strong" style="margin-top: 10px;">Total: R$${Number(order.totalPrice ?? order.totalAmount ?? 0).toLocaleString()}</p>
@@ -708,7 +741,7 @@ _This is an automated test message_
               <p>${escapeHtml(`${order.shippingAddress?.prefecture || order.prefecture || ''} - ${order.shippingAddress?.city || order.city || ''}`)}</p>
               <p>${escapeHtml(order.shippingAddress?.address || order.address || '')}</p>
               ${(order.shippingAddress?.building || order.building) ? `<p>Complemento: ${escapeHtml(order.shippingAddress?.building || order.building)}</p>` : ''}
-              <p>📞 ${escapeHtml(order.phone || 'N/A')}</p>
+              <p>📞 ${escapeHtml(order.shippingAddress?.phone || order.phone || 'N/A')}</p>
             </div>
           </div>
 
@@ -890,6 +923,7 @@ _This is an automated test message_
               <h2 className="hidden lg:block font-display text-2xl font-bold text-foreground mb-5">{activeLabel}</h2>
 
             {/* Content */}
+            <Suspense fallback={<TabLoading />}>
             {activeTab === 'orders' ? (
               <>
             
@@ -1060,14 +1094,14 @@ _This is an automated test message_
                           Produtos
                         </h4>
                         <div className="space-y-2">
-                          {order.items.map((item: any, i: number) => (
+                          {order.items.map((item: OrderItem, i: number) => (
                             <div key={i} className="flex justify-between text-sm">
                                <span>{item.productName || item.name} ({item.size}) x{item.quantity}</span>
                                <span className="font-semibold font-mono">R$ {(item.price * item.quantity).toFixed(2)}</span>
                             </div>
                           ))}
                           {(() => {
-                            const itemsSubtotal = order.items.reduce((sum: number, item: any) => sum + item.price * item.quantity, 0);
+                            const itemsSubtotal = order.items.reduce((sum: number, item: OrderItem) => sum + item.price * item.quantity, 0);
                             // Detect coupon discount: saved field OR inferred from items sum vs totalPrice
                             const discount = order.couponDiscount || (itemsSubtotal > order.totalPrice ? itemsSubtotal - order.totalPrice : 0);
                             const shippingCost = order.shipping?.cost ?? null;
@@ -1124,8 +1158,8 @@ _This is an automated test message_
                                 <div className="flex justify-between font-bold pt-1 border-t border-border text-base">
                                   <span>Total Geral</span>
                                   <span className="text-primary font-mono">
-                                    {order.currency !== 'JPY' && (order as any).grandTotalYen
-                                      ? `R$ ${(order.totalPrice ?? order.total ?? 0).toFixed(2)} (¥ ${((order as any).grandTotalYen as number).toLocaleString()})`
+                                    {order.currency !== 'JPY' && order.grandTotalYen
+                                      ? `R$ ${(order.totalPrice ?? order.total ?? 0).toFixed(2)} (¥ ${(order.grandTotalYen as number).toLocaleString()})`
                                       : `R$ ${(order.totalPrice ?? order.total ?? 0).toFixed(2)}`}
                                   </span>
                                 </div>
@@ -1295,11 +1329,13 @@ _This is an automated test message_
             ) : (
               <CustomerList />
             )}
+            </Suspense>
             </div>
           </div>
         </div>
       </section>
 
+      <Suspense fallback={null}>
       {/* Promo Notification Modal */}
       {promoModalOpen && (
         <PromoNotificationModal onClose={() => setPromoModalOpen(false)} />
@@ -1322,15 +1358,7 @@ _This is an automated test message_
           onSuccess={async (trackingNumber, carrierFromModal) => {
             // Get carrier info from modal (which reads from order.shipping.carrier) or fallback
             const carrier = carrierFromModal || selectedOrder.shipping?.carrier || selectedOrder.carrier || '';
-            const getTrackingUrl = (c: string, tn: string) => {
-              const lc = c.toLowerCase();
-              if (lc.includes('yamato') || lc.includes('クロネコ')) return `https://toi.kuronekoyamato.co.jp/cgi-bin/tneko?number00=1&number01=${tn}`;
-              if (lc.includes('sagawa') || lc.includes('佐川')) return `https://k2k.sagawa-exp.co.jp/p/web/okurijosearch.do?okurijoNo=${tn}`;
-              if (lc.includes('japan post') || lc.includes('ゆうパック') || lc.includes('post')) return `https://trackings.post.japanpost.jp/services/srv/search/direct?reqCodeNo1=${tn}&locale=ja`;
-              if (lc.includes('fukutsu') || lc.includes('福通')) return `https://corp.fukutsu.co.jp/situation/tracking_no_hunt.html?tracking_no=${tn}`;
-              return '';
-            };
-            const trackingUrl = getTrackingUrl(carrier, trackingNumber);
+            const trackingUrl = trackingUrlFor(carrier, trackingNumber);
 
             // Save tracking info to order (Firestore + safeStorage)
             await orderService.updateOrderTracking(selectedOrder.orderNumber, trackingNumber, trackingUrl, carrier);
@@ -1347,6 +1375,7 @@ _This is an automated test message_
           }}
         />
       )}
+      </Suspense>
     </Layout>
   );
 };
