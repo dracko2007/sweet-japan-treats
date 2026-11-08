@@ -1,5 +1,5 @@
 import { earnedPointsForOrder, pointsMultiplierForSpend } from '../../shared/points.js';
-import { packedWeightG, productPackedWeightG } from '../../shared/weight.js';
+import { packedWeightG, parcelWeightG, productPackedWeightG } from '../../shared/weight.js';
 import { yupackRateYen } from '../../shared/yupack.js';
 import { roundYen } from '../../shared/pricing.js';
 import {
@@ -163,7 +163,8 @@ function shippingShape(items) {
     maxSum = Math.max(maxSum, padded.reduce((sum, value) => sum + value, 0));
     volume += padded.reduce((product, value) => product * value, 1) * item.quantity;
   }
-  totalWeightG = Math.max(100, Math.round(totalWeightG));
+  // Mais a caixa com plástico-bolha, uma vez por pacote (igual ao carrinho).
+  totalWeightG = Math.max(100, parcelWeightG(totalWeightG));
   let boxes60 = 0;
   let boxes80 = 0;
   if (knownQuantity === 0) {

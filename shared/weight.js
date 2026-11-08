@@ -52,6 +52,24 @@ export function packedWeightG(weightGrams, verified = false) {
   return peso + PACKING_PADDING_G;
 }
 
+/**
+ * Caixa de papelão + plástico-bolha que a loja usa, pesada pelo dono: ~100 g.
+ *
+ * Vai UMA vez por pacote, não por unidade: 3 produtos seguem na mesma caixa.
+ * Por isso fica fora de `packedWeightG` (que é por unidade) e entra só no total.
+ */
+export const PACKAGE_BOX_G = 100;
+
+/**
+ * Peso do pacote pronto para o correio: soma das unidades (já com a margem de
+ * quem não tem peso conferido) mais uma caixa. Total vazio ou inválido devolve 0.
+ */
+export function parcelWeightG(itemsWeightG) {
+  const peso = Number(itemsWeightG);
+  if (!Number.isFinite(peso) || peso <= 0) return 0;
+  return Math.round(peso) + PACKAGE_BOX_G;
+}
+
 /** Peso de envio de uma unidade do produto (0 se não tem peso cadastrado). */
 export function productPackedWeightG(product) {
   return packedWeightG(product?.weightGrams, product?.weightVerified === true);

@@ -288,14 +288,15 @@ describe('frete: tabelas conferidas no Japan Post (2026-11-08)', () => {
     expect(emsRateYen(30000, 4)).toBe(75100);
   });
 
-  it('peso conferido não leva margem: 3 finos de 303 g pesam 909 g', () => {
+  it('peso conferido não leva margem: 3 finos de 303 g = 909 g + 100 g da caixa', () => {
     const fino = { ...product, weightGrams: 303, weightVerified: true };
     const result = quote({
       carrier: 'eraito',
       products: new Map([['p1', fino]]),
       requestedItems: [{ productId: 'p1', variantId: 'small', quantity: 3 }],
     });
-    expect(result.shippingWeightG).toBe(909);
+    // Sem margem por unidade; só a caixa com plástico-bolha, uma vez por pacote.
+    expect(result.shippingWeightG).toBe(1009);
   });
 });
 

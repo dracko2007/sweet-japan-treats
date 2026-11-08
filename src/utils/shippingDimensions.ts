@@ -1,4 +1,4 @@
-import { packedWeightG, productPackedWeightG } from '../../shared/weight.js';
+import { packedWeightG, parcelWeightG, productPackedWeightG } from '../../shared/weight.js';
 import type { CartItem, ProductPackageDimensionsCm } from '@/types';
 
 export const PACKAGE_SAFETY_MARGIN_CM = 5;
@@ -112,7 +112,8 @@ export const calculateCartShippingBoxes = (
       totalWeightG += packedWeightG(estimatedWeight) * item.quantity;
     }
   }
-  totalWeightG = Math.max(100, Math.round(totalWeightG));
+  // Mais a caixa com plástico-bolha, uma vez por pacote.
+  totalWeightG = Math.max(100, parcelWeightG(totalWeightG));
 
   let knownQuantity = 0;
   let missingQuantity = 0;

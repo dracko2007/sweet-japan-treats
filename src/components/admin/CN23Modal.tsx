@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { getRates } from '@/services/fxService';
 import { COMPANY_PROFILE } from '@/config/companyProfile';
 import type { Order, OrderItem } from '@/types';
+import { PACKAGE_BOX_G } from '../../../shared/weight.js';
 
 interface CN23Item {
   description: string;
@@ -104,7 +105,8 @@ const CN23Modal: React.FC<CN23ModalProps> = ({ order, onClose }) => {
   }, [order]);
 
   const totalValueJpy = items.reduce((s, i) => s + i.unitValueJpy * i.quantity, 0);
-  const totalWeightG = items.reduce((s, i) => s + i.weightG * i.quantity, 0) + 200;
+  // Itens + a caixa com plástico-bolha (uma por pacote).
+  const totalWeightG = items.reduce((s, i) => s + i.weightG * i.quantity, 0) + PACKAGE_BOX_G;
   const formType = totalValueJpy <= 10000 ? 'CN22' : 'CN23';
 
   const updateItem = (idx: number, field: keyof CN23Item, value: string | number) => {

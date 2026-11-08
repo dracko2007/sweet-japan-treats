@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { packedWeightG, productPackedWeightG } from '../../shared/weight.js';
+import { packedWeightG, parcelWeightG, productPackedWeightG } from '../../shared/weight.js';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { Send, X, Bot, Sparkles, Loader2, MessageSquare, Trash, CornerDownLeft, Command, HelpCircle, Smartphone, ShoppingCart, ChevronRight } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
@@ -1070,7 +1070,7 @@ const KimiClawAssistant: React.FC = () => {
       if (productMatch.length > 0) {
         const prod = productMatch[0];
         const sizeHint = query.includes('grande') || query.includes('large') ? 'large' : 'small';
-        const weightG = getProductWeight(prod, sizeHint);
+        const weightG = parcelWeightG(getProductWeight(prod, sizeHint)); // uma unidade + a caixa
         const weightKg = weightG / 1000;
 
         let detectedCountry = '';
