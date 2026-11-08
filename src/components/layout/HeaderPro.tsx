@@ -291,15 +291,7 @@ const HeaderPro: React.FC = () => {
                 <LanguageSwitcher />
               </div>
 
-              <button
-                type="button"
-                onClick={() => setSearchOpen(true)}
-                className="rounded-full p-2.5 transition-colors hover:bg-pink-50 md:hidden"
-                aria-label={t('navPro.search')}
-              >
-                <Search className="h-5 w-5 text-slate-700" />
-              </button>
-
+              {/* Celular: busca e carrinho ficam só na barra de baixo (MobileBottomNav). */}
               {isAdmin && (
                 <Link
                   to="/admin"
@@ -333,7 +325,7 @@ const HeaderPro: React.FC = () => {
                 type="button"
                 data-cart-target="header"
                 onClick={() => setCartOpen(true)}
-                className="relative rounded-full p-2.5 transition-colors hover:bg-pink-50"
+                className="relative hidden rounded-full p-2.5 transition-colors hover:bg-pink-50 md:block"
                 aria-label={`${t('nav.cart')}${totalItems > 0 ? ` — ${totalItems}` : ''}`}
                 aria-haspopup="dialog"
               >
