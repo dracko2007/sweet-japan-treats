@@ -159,8 +159,8 @@ const Shipping: React.FC = () => {
           name: 'Japan Post Local (ゆうパック) ✉️',
           logo: '📮',
           desc: t('shippingPage.carrier.jp.desc'),
-          rate60: 870,
-          rate80: 1100,
+          rate60: 840,
+          rate80: 1150,
           time: language === 'ja' ? '1-2営業日' : '1-2 business days',
           features: ['Rastreamento completo', 'Entrega aos sábados/domingos', 'Seguro básico']
         },

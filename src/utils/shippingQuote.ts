@@ -1,5 +1,6 @@
 import type { CartItem } from '@/types';
 import { japanPrefectures, japanShippingRates } from '@/data/japanPrefectures';
+import { yupackRateYen } from '../../shared/yupack.js';
 import { convertYen as fxConvert } from '@/services/fxService';
 import { getCurrencyByCountry } from '@/utils/currency';
 import { calculateCartShippingBoxes, type CartShippingBoxes } from '@/utils/shippingDimensions';
@@ -102,10 +103,13 @@ export function quoteShipping(items: CartItem[], destinationCountry: string, { p
     if (!pref) return { ...base, options: [], needsPrefecture: true };
     const zone = pref.zone as 1 | 2 | 3 | 4;
     const options = (Object.keys(JAPAN_CARRIERS) as Array<keyof typeof JAPAN_CARRIERS>).map((carrier) => {
+      // Yu-Pack: tabela oficial por província (shared/yupack.js), igual ao servidor.
+      const rate = (size: '60' | '80'): number =>
+        (carrier === 'yuubin' ? yupackRateYen(pref.name, size) : null) ?? japanShippingRates[carrier][size][zone];
       let totalCost = 0;
-      if (boxes.boxes60 > 0) totalCost += japanShippingRates[carrier]['60'][zone] * boxes.boxes60;
-      if (boxes.boxes80 > 0) totalCost += japanShippingRates[carrier]['80'][zone] * boxes.boxes80;
-      if (totalCost === 0) totalCost = japanShippingRates[carrier]['60'][zone];
+      if (boxes.boxes60 > 0) totalCost += rate('60') * boxes.boxes60;
+      if (boxes.boxes80 > 0) totalCost += rate('80') * boxes.boxes80;
+      if (totalCost === 0) totalCost = rate('60');
       return {
         carrier,
         ...JAPAN_CARRIERS[carrier],

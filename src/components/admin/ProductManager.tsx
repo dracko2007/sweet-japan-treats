@@ -380,6 +380,7 @@ const ProductManager: React.FC = () => {
 
       if (enrichFields.weight && data.weightGrams != null && Number(data.weightGrams) > 0) {
         updatedEditing.weightGrams = Number(data.weightGrams);
+        updatedEditing.weightVerified = false; // peso da IA é estimativa: mantém a margem
       }
 
       if (canPrice && enrichFields.price) {
@@ -1416,8 +1417,19 @@ const ProductManager: React.FC = () => {
                     placeholder="ex: 500"
                     className="w-full px-3 py-2 rounded-lg border border-orange-200 bg-background text-sm mt-1"
                   />
+                  <label className="flex items-center gap-2 mt-2 text-xs font-medium cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={editing.weightVerified === true}
+                      onChange={(e) => setEditing({ ...editing, weightVerified: e.target.checked })}
+                      className="w-4 h-4"
+                    />
+                    Peso conferido (pesei na balança / fonte confiável)
+                  </label>
                   <p className="text-[11px] text-orange-700 dark:text-orange-300 mt-1">
-                    Peso do produto (sem embalagem). O sistema soma 200 g de embalagem no cálculo do frete para produtos abaixo de 2 kg.
+                    Peso do produto com o frasco/caixa dele. {editing.weightVerified
+                      ? 'Conferido: o frete usa o peso exato, sem margem.'
+                      : 'Não conferido: o frete soma 200 g de margem por unidade (produtos abaixo de 2 kg).'}
                   </p>
                 </div>
               </div>

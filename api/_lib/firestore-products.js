@@ -5,7 +5,7 @@ import { adminDb } from './firebase-admin.js';
 const PUBLIC_FIELDS = [
   'sku', 'gtin', 'name', 'description', 'category', 'prices', 'variants',
   'image', 'thumbnail', 'gallery', 'video', 'videoCover', 'flavor',
-  'deliveryRestrict', 'origin', 'discountPercent', 'i18n', 'weightGrams',
+  'deliveryRestrict', 'origin', 'discountPercent', 'i18n', 'weightGrams', 'weightVerified',
   'tags', 'featured', 'featuredAt', 'heroCarousel', 'heroCarouselAt',
   'isNew', 'salesCount', 'rating', 'stock', 'promoGift',
 ];

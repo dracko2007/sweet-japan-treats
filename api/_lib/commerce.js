@@ -1,5 +1,6 @@
 import { earnedPointsForOrder, pointsMultiplierForSpend } from '../../shared/points.js';
-import { packedWeightG } from '../../shared/weight.js';
+import { packedWeightG, productPackedWeightG } from '../../shared/weight.js';
+import { yupackRateYen } from '../../shared/yupack.js';
 import { roundYen } from '../../shared/pricing.js';
 import {
   autoApprovablePsDiscountYen,
@@ -30,7 +31,7 @@ const EMS = {
   1: [1450,1600,1750,1900,2050,2200,2500,2800,3100,3400,3900,4400,4900,5400,5900,6400,6900,7400,8200,9000,9800,10600,11400,12200,13000,13800,14600,15400,16200,17000,17800,18600,19400,20200,21000,21800,22600,23400,24200,25000,25800,26600],
   2: [1900,2150,2400,2650,2900,3150,3500,3850,4200,4550,5150,5750,6350,6950,7550,8150,8750,9350,10350,11350,12350,13350,14350,15350,16350,17350,18350,19350,20350,21350,22350,23350,24350,25350,26350,27350,28350,29350,30350,31350,32350,33350],
   3: [3150,3400,3650,3900,4150,4400,5000,5550,6150,6700,7750,8800,9850,10900,11950,13000,14050,15100,17200,19300,21400,23500,25600,27700,29800,31900,34000,36100,38200,40300,42400,44500,46600,48700,50800,52900,55000,57100,59200,61300,63400,65500],
-  4: [3900,4180,4460,4740,5020,5300,5990,6600,7290,7900,9100,10300,11500,12700,13900,15100,16300,17500,19900,22300,24700,27100,39100,39100,39100,39100,39100,51100,51100,51100,51100,51100,63100,63100,63100,63100,63100,75100,75100,75100,75100,75100,75100,75100],
+  4: [3900,4180,4460,4740,5020,5300,5990,6600,7290,7900,9100,10300,11500,12700,13900,15100,16300,17500,19900,22300,24700,27100,29500,31900,34300,36700,39100,41500,43900,46300,48700,51100,53500,55900,58300,60700,63100,65500,67900,70300,72700,75100],
   5: [3600,3900,4200,4500,4800,5100,5850,6600,7350,8100,9600,11100,12600,14100,15600,17100,18600,20100,22500,24900,27300,29700,32100,34500,36900,39300,41700,44100,46500,48900,51300,53700,56100,58500,60900,63300,65700,68100,70500,72900,75300,77700],
 };
 const DOMESTIC_RATES = {
@@ -145,7 +146,7 @@ function shippingShape(items) {
   let maxSum = 0;
   for (const item of items) {
     const dims = dimensions(item.product);
-    const weight = packedWeightG(item.product.weightGrams);
+    const weight = productPackedWeightG(item.product);
     if (weight > 0) totalWeightG += weight * item.quantity;
     else {
       const estimatedWeight = dims
@@ -205,7 +206,8 @@ function shippingYen(items, country, prefecture, carrier, productSubtotalYen, fr
     const zone = DOMESTIC_ZONE.get(prefecture);
     const rates = DOMESTIC_RATES[carrier];
     if (!zone || !rates) throw new HttpError(400, 'invalid_shipping');
-    const amount = (rates[60][zone] * shape.boxes60) + (rates[80][zone] * shape.boxes80) || rates[60][zone];
+    const rate = (size) => (carrier === 'yuubin' ? yupackRateYen(prefecture, size) : rates[size][zone]);
+    const amount = (rate(60) * shape.boxes60) + (rate(80) * shape.boxes80) || rate(60);
     return { amount, weightG: shape.totalWeightG };
   }
   const zone = internationalZone(country);

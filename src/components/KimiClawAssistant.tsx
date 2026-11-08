@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { packedWeightG } from '../../shared/weight.js';
+import { packedWeightG, productPackedWeightG } from '../../shared/weight.js';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { Send, X, Bot, Sparkles, Loader2, MessageSquare, Trash, CornerDownLeft, Command, HelpCircle, Smartphone, ShoppingCart, ChevronRight } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
@@ -568,7 +568,7 @@ const KimiClawAssistant: React.FC = () => {
       .filter((p) => !p.hidden)
       .map((p) => {
         const rawFallback = (WEIGHT_BY_CATEGORY[p.category] || DEFAULT_WEIGHT).small;
-        const wt = packedWeightG(p.weightGrams) || packedWeightG(rawFallback);
+        const wt = productPackedWeightG(p) || packedWeightG(rawFallback);
         return { id: p.id, name: productEnglishName(p), category: p.category, priceYen: p.prices?.small || 0, discount: p.discountPercent || 0, approxWeightGrams: wt };
       });
 
@@ -585,7 +585,7 @@ const KimiClawAssistant: React.FC = () => {
           discount: p.discountPercent || 0,
           costYen: p.cost,
           weightGrams: p.weightGrams
-            ? { small: packedWeightG(p.weightGrams), large: packedWeightG(p.weightGrams) }
+            ? { small: productPackedWeightG(p), large: productPackedWeightG(p) }
             : wt,
           hidden: p.hidden,
         };
@@ -598,7 +598,7 @@ const KimiClawAssistant: React.FC = () => {
 
   // Calcula o peso total de um produto para uma variante/tamanho específico
   const getProductWeight = (product: Product, size: string): number => {
-    if (product.weightGrams) return packedWeightG(product.weightGrams);
+    if (product.weightGrams) return productPackedWeightG(product);
     const rawWeight = WEIGHT_BY_CATEGORY[product.category] || DEFAULT_WEIGHT;
     return packedWeightG(size === 'large' ? rawWeight.large : rawWeight.small);
   };

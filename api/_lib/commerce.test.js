@@ -274,3 +274,28 @@ describe('authoritative checkout quote', () => {
     expect(products + shipping + psFee).toBe(result.total);
   });
 });
+
+describe('frete: tabelas conferidas no Japan Post (2026-11-08)', () => {
+  it('Yu-Pack usa a tabela oficial de Hiroshima', () => {
+    expect(quote({ country: 'Japão', prefecture: 'Tokyo', carrier: 'yuubin' }).shippingYen).toBe(1270);
+    expect(quote({ country: 'Japão', prefecture: 'Hiroshima', carrier: 'yuubin' }).shippingYen).toBe(840);
+  });
+
+  it('EMS para os EUA acima de 10 kg segue a tabela oficial (11 kg = ¥29.500)', async () => {
+    const { emsRateYen } = await import('./commerce.js');
+    expect(emsRateYen(11000, 4)).toBe(29500);
+    expect(emsRateYen(16000, 4)).toBe(41500);
+    expect(emsRateYen(30000, 4)).toBe(75100);
+  });
+
+  it('peso conferido não leva margem: 3 finos de 303 g pesam 909 g', () => {
+    const fino = { ...product, weightGrams: 303, weightVerified: true };
+    const result = quote({
+      carrier: 'eraito',
+      products: new Map([['p1', fino]]),
+      requestedItems: [{ productId: 'p1', variantId: 'small', quantity: 3 }],
+    });
+    expect(result.shippingWeightG).toBe(909);
+  });
+});
+

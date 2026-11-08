@@ -74,6 +74,8 @@ export const japanPrefectures: Prefecture[] = [
 ];
 
 // Shipping rates by carrier, box size, and zone (in JPY)
+// Yu-Pack (yuubin) usa a tabela oficial por província em shared/yupack.js;
+// os números abaixo ficam só como reserva.
 export const japanShippingRates = {
   yuubin: {
     '60': { 1: 870, 2: 970, 3: 1100, 4: 1350 },

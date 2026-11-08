@@ -1,4 +1,4 @@
-import { packedWeightG } from '../../shared/weight.js';
+import { packedWeightG, productPackedWeightG } from '../../shared/weight.js';
 // Frete estimado por peso para o catálogo/SEO (Schema.org e feed).
 // Usa o serviço mais barato disponível (e-Packet Light ou Air Parcel) pelo peso real.
 
@@ -7,7 +7,7 @@ import type { Product } from '@/types';
 
 /** Peso usado para frete: weightGrams + embalagem real, ou 500g base. */
 export function catalogWeightG(product: Product): number {
-  if (product.weightGrams && product.weightGrams > 0) return packedWeightG(product.weightGrams);
+  if (product.weightGrams && product.weightGrams > 0) return productPackedWeightG(product);
   return packedWeightG(500);
 }
 
