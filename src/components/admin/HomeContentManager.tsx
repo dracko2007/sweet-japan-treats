@@ -3,6 +3,7 @@ import { Plus, Trash2, Save, Loader2, Video, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { siteContentService, HomeContent, HomeVideo } from '@/services/siteContentService';
 import { useToast } from '@/hooks/use-toast';
+import { errorMessage } from '@/utils/errorMessage';
 
 function getYouTubeEmbed(url: string): string | null {
   const m = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([\w-]{11})/);
@@ -40,8 +41,8 @@ const HomeContentManager: React.FC = () => {
       await siteContentService.saveHome(clean);
       setContent(clean);
       toast({ title: '✅ Home atualizada!', description: 'Os vídeos já estão no ar.' });
-    } catch (e: any) {
-      toast({ title: 'Erro ao salvar', description: e?.message, variant: 'destructive' });
+    } catch (e) {
+      toast({ title: 'Erro ao salvar', description: errorMessage(e), variant: 'destructive' });
     } finally {
       setSaving(false);
     }

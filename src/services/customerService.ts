@@ -18,6 +18,31 @@ const devWarn = isDev ? console.warn.bind(console) : () => {};
 const devError = isDev ? console.error.bind(console) : () => {};
 
 
+// Pedido como fica guardado no perfil do cliente (users/{uid}.orders e localStorage).
+interface StoredOrder {
+  orderNumber?: string;
+  date?: string;
+  orderDate?: string;
+  status?: string;
+  currency?: string;
+  totalPrice?: number;
+  totalAmount?: number;
+  items?: Array<{ name?: string; productName?: string; quantity: number; price?: number }>;
+}
+
+type OrderHistoryEntry = CustomerStats['orderHistory'][number];
+
+export interface CustomerOverview {
+  totalCustomers: number;
+  activeCustomers: number;
+  inactiveCustomers: number;
+  totalRevenue: number;
+  totalOrders: number;
+  averageOrdersPerCustomer: number;
+  averageRevenuePerCustomer: number;
+  topCustomers: CustomerStats[];
+}
+
 export interface CustomerStats {
   /** Id do doc em `users` (= uid no Firebase Auth); ausente em clientes só-locais. */
   id?: string;
@@ -83,25 +108,26 @@ export const customerService = {
       const productMap: Record<string, { quantity: number; total: number }> = {};
       const orderHistory: Array<{ orderNumber: string; date: string; total: number; status: string }> = [];
 
-      orders.forEach((order: any) => {
+      (orders as StoredOrder[]).forEach((order) => {
         // Normaliza tudo para ¥ (pedidos podem estar em R$/€) para o painel admin.
         const oc = order.currency;
         totalSpent += toYen(order.totalPrice || 0, oc);
 
         orderHistory.push({
-          orderNumber: order.orderNumber,
-          date: order.date,
+          orderNumber: order.orderNumber || '',
+          date: order.date || '',
           total: toYen(order.totalPrice || 0, oc),
           status: order.status || 'pending',
         });
 
         // Conta produtos
-        order.items.forEach((item: any) => {
-          if (!productMap[item.name]) {
-            productMap[item.name] = { quantity: 0, total: 0 };
+        (order.items || []).forEach((item) => {
+          const name = item.name || item.productName || '';
+          if (!productMap[name]) {
+            productMap[name] = { quantity: 0, total: 0 };
           }
-          productMap[item.name].quantity += item.quantity;
-          productMap[item.name].total += toYen(item.price * item.quantity, oc);
+          productMap[name].quantity += item.quantity;
+          productMap[name].total += toYen((item.price || 0) * item.quantity, oc);
         });
       });
 
@@ -218,7 +244,7 @@ export const customerService = {
       
       const usersSnapshot = await getDocs(collection(db, 'users'));
       const localCustomers = this.getAllCustomers();
-      const customerMap = new Map<string, any>();
+      const customerMap = new Map<string, CustomerStats>();
 
       // Add Firestore users
       usersSnapshot.forEach((doc) => {
@@ -227,21 +253,21 @@ export const customerService = {
         const orders = data.orders || [];
 
         let totalSpent = 0;
-        const orderHistory: any[] = [];
+        const orderHistory: OrderHistoryEntry[] = [];
         const productMap: Record<string, { quantity: number; total: number }> = {};
 
-        orders.forEach((order: any) => {
+        (orders as StoredOrder[]).forEach((order) => {
           const oc = order.currency;
           totalSpent += toYen(order.totalPrice || order.totalAmount || 0, oc);
           orderHistory.push({
-            orderNumber: order.orderNumber,
-            date: order.date || order.orderDate,
+            orderNumber: order.orderNumber || '',
+            date: order.date || order.orderDate || '',
             total: toYen(order.totalPrice || order.totalAmount || 0, oc),
             status: order.status || 'pending',
           });
           if (order.items) {
-            order.items.forEach((item: any) => {
-              const name = item.name || item.productName;
+            order.items.forEach((item) => {
+              const name = item.name || item.productName || '';
               if (!productMap[name]) productMap[name] = { quantity: 0, total: 0 };
               productMap[name].quantity += item.quantity;
               productMap[name].total += toYen((item.price || 0) * item.quantity, oc);
@@ -277,9 +303,9 @@ export const customerService = {
         ordersSnapshot.forEach((doc) => {
           const order = doc.data();
           const email = order.customerEmail;
-          if (email && customerMap.has(email)) {
-            const customer = customerMap.get(email);
-            const existingOrder = customer.orderHistory.find((o: any) => o.orderNumber === order.orderNumber);
+          const customer = email ? customerMap.get(email) : undefined;
+          if (customer) {
+            const existingOrder = customer.orderHistory.find((o) => o.orderNumber === order.orderNumber);
             if (!existingOrder) {
               customer.totalOrders += 1;
               customer.totalSpent += toYen(order.totalPrice || order.totalAmount || 0, order.currency);
@@ -290,7 +316,7 @@ export const customerService = {
                 status: order.status || 'pending',
               });
               customer.averageOrderValue = customer.totalOrders > 0 ? customer.totalSpent / customer.totalOrders : 0;
-              customer.orderHistory.sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
+              customer.orderHistory.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
               customer.lastOrderDate = customer.orderHistory[0]?.date || null;
             }
           }
@@ -314,7 +340,7 @@ export const customerService = {
   },
 
   // Async customer overview
-  async getCustomerOverviewAsync(): Promise<any> {
+  async getCustomerOverviewAsync(): Promise<CustomerOverview> {
     const customers = await this.getAllCustomersAsync();
 
     const totalCustomers = customers.length;

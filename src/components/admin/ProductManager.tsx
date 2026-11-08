@@ -26,6 +26,7 @@ import { formatPrice } from '@/utils/currency';
 import { categoryService, DEFAULT_CATEGORIES, type ProductCategory } from '@/services/categoryService';
 import { useConfirm } from '@/components/ConfirmDialog';
 import { authenticatedFetch } from '@/services/authenticatedFetch';
+import { errorMessage } from '@/utils/errorMessage';
 
 const slugify = (s: string) =>
   s
@@ -358,7 +359,7 @@ const ProductManager: React.FC = () => {
           ])
         ) as Product['i18n'];
         const incomingI18n = Object.fromEntries(
-          Object.entries(data.i18n).map(([lang, value]: [string, any]) => [
+          Object.entries(data.i18n as Record<string, { description?: string } | null>).map(([lang, value]) => [
             lang,
             { description: value?.description || '' },
           ])
@@ -417,8 +418,8 @@ const ProductManager: React.FC = () => {
           ? `${data.images.length} foto(s) · ${descSourceLabel} · custo ¥${data.costYen?.toLocaleString() || '–'} · venda ¥${data.sellingPriceYen?.toLocaleString() || '–'}`
           : `${descSourceLabel} · custo ¥${data.costYen?.toLocaleString() || '–'} · venda ¥${data.sellingPriceYen?.toLocaleString() || '–'}`,
       });
-    } catch (e: any) {
-      toast({ title: 'Erro ao enriquecer produto', description: e?.message, variant: 'destructive' });
+    } catch (e) {
+      toast({ title: 'Erro ao enriquecer produto', description: errorMessage(e), variant: 'destructive' });
     } finally {
       setEnriching(false);
     }
@@ -484,8 +485,8 @@ const ProductManager: React.FC = () => {
       const url = await cloudinaryService.uploadVideoFile(file, folder);
       setEditing((prev) => (prev ? { ...prev, video: url } : prev));
       toast({ title: '✅ Vídeo enviado' });
-    } catch (e: any) {
-      toast({ title: 'Erro ao enviar vídeo', description: e?.message, variant: 'destructive' });
+    } catch (e) {
+      toast({ title: 'Erro ao enviar vídeo', description: errorMessage(e), variant: 'destructive' });
     } finally {
       setUploadingVideo(false);
       if (videoRef.current) videoRef.current.value = '';
@@ -586,8 +587,8 @@ const ProductManager: React.FC = () => {
         description: `${product.name} · ${product.gallery?.length ?? 0} foto(s) salva(s) no Firestore`,
       });
       close();
-    } catch (e: any) {
-      toast({ title: 'Erro ao salvar', description: e?.message, variant: 'destructive' });
+    } catch (e) {
+      toast({ title: 'Erro ao salvar', description: errorMessage(e), variant: 'destructive' });
     } finally {
       setSaving(false);
     }
@@ -1072,7 +1073,7 @@ const ProductManager: React.FC = () => {
                   <label className="text-sm font-semibold block">Restrição de venda por destino</label>
                   <select
                     value={editing.deliveryRestrict || ''}
-                    onChange={e => setEditing({ ...editing, deliveryRestrict: (e.target.value as any) || undefined })}
+                    onChange={e => setEditing({ ...editing, deliveryRestrict: (e.target.value as Product['deliveryRestrict']) || undefined })}
                     className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm"
                   >
                     <option value="">Sem restrição (vende em qualquer destino)</option>

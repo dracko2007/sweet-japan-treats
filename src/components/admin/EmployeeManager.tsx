@@ -7,6 +7,7 @@ import { Trash2, Plus, User, Briefcase } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useConfirm } from '@/components/ConfirmDialog';
+import { errorMessage } from '@/utils/errorMessage';
 
 export interface Employee {
   id?: string;
@@ -98,8 +99,8 @@ const EmployeeManager: React.FC = () => {
       toast({ title: 'Funcionário cadastrado!' });
       setEmpForm(emptyEmp());
       load();
-    } catch (e: any) {
-      toast({ title: 'Erro ao salvar', description: e?.message, variant: 'destructive' });
+    } catch (e) {
+      toast({ title: 'Erro ao salvar', description: errorMessage(e), variant: 'destructive' });
     }
     setSaving(false);
   };
@@ -144,8 +145,8 @@ const EmployeeManager: React.FC = () => {
       toast({ title: 'Pagamento registrado!' });
       setPayForm(f => ({ ...f, amount: 0, description: '' }));
       load();
-    } catch (e: any) {
-      toast({ title: 'Erro ao salvar', description: e?.message, variant: 'destructive' });
+    } catch (e) {
+      toast({ title: 'Erro ao salvar', description: errorMessage(e), variant: 'destructive' });
     }
     setSaving(false);
   };

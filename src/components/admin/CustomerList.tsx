@@ -4,6 +4,7 @@ import { affiliateService, AffiliateRequest } from '@/services/affiliateService'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { customerService, CustomerStats, CustomerVerification } from '@/services/customerService';
+import type { CustomerOverview } from '@/services/customerService';
 import { useToast } from '@/hooks/use-toast';
 import { usePagination } from '@/hooks/usePagination';
 import Pagination from '@/components/Pagination';
@@ -20,7 +21,7 @@ import { resendVerificationAsAdmin } from '@/services/mailService';
 
 const CustomerList: React.FC = () => {
   const [customers, setCustomers] = useState<CustomerStats[]>([]);
-  const [overview, setOverview] = useState<any>(null);
+  const [overview, setOverview] = useState<CustomerOverview | null>(null);
   const [verification, setVerification] = useState<Map<string, CustomerVerification>>(new Map());
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerStats | null>(null);
   const { toast } = useToast();

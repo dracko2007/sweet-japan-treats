@@ -10,6 +10,10 @@ import { useConfirm } from '@/components/ConfirmDialog';
 import { firebaseSyncService } from '@/services/firebaseSyncService';
 import { ensureAdminAuth } from '@/utils/adminAuth';
 import { useUser } from '@/context/UserContext';
+import type { Coupon as ProfileCoupon } from '@/context/UserContext';
+import { errorMessage } from '@/utils/errorMessage';
+
+type CouponTarget = NonNullable<Coupon['targetType']>;
 
 const CouponManager: React.FC = () => {
   const [coupons, setCoupons] = useState<Coupon[]>([]);
@@ -27,7 +31,7 @@ const CouponManager: React.FC = () => {
     usageLimit: 0,
     minOrderValue: 0,
     description: '',
-    targetType: 'all' as 'all' | 'specific' | 'birthday' | 'loyalty',
+    targetType: 'all' as CouponTarget,
     targetEmails: '',
     minOrders: 0,
     freeShipping: false,
@@ -208,23 +212,23 @@ const CouponManager: React.FC = () => {
             onClick={async () => {
               try {
                 await ensureAdminAuth();
-                const profileCoupon = {
+                const profileCoupon: ProfileCoupon = {
                   id: `teste20-${Date.now()}`,
                   code: 'TESTE20',
                   description: 'Cupom de teste — 20% de desconto',
                   discount: 20,
-                  discountType: 'percentage' as const,
+                  discountType: 'percentage',
                   expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
                   isUsed: false,
                 };
                 couponService.create({ code: 'TESTE20', type: 'percent', discount: 0, discountPercent: 20, description: 'Cupom de teste', isActive: true, targetType: 'all', expiryDate: profileCoupon.expiresAt });
                 // Adiciona imediatamente ao perfil do admin logado (sem precisar de reload)
-                addCoupon(profileCoupon as any);
+                addCoupon(profileCoupon);
                 const res = await firebaseSyncService.grantCouponToAllUsers(profileCoupon);
                 toast({ title: '🎟️ TESTE20 criado', description: `Concedido a ${res.granted ?? 0} cliente(s). Código: TESTE20 — 20% OFF` });
                 loadCoupons();
-              } catch (e: any) {
-                toast({ title: 'Erro', description: e?.message, variant: 'destructive' });
+              } catch (e) {
+                toast({ title: 'Erro', description: errorMessage(e), variant: 'destructive' });
               }
             }}>
             <Star className="w-3.5 h-3.5" /> TESTE20
@@ -369,16 +373,16 @@ const CouponManager: React.FC = () => {
                 <Label>Quem pode usar este cupom?</Label>
                 <div className="flex flex-wrap gap-2">
                   {[
-                    { value: 'all', label: 'Todos', icon: <Users className="w-4 h-4 mr-1" /> },
-                    { value: 'specific', label: 'Clientes Específicos', icon: <Tag className="w-4 h-4 mr-1" /> },
-                    { value: 'birthday', label: 'Aniversariantes do Mês', icon: <Gift className="w-4 h-4 mr-1" /> },
-                    { value: 'loyalty', label: 'Fidelidade (Qtd Pedidos)', icon: <Star className="w-4 h-4 mr-1" /> },
+                    { value: 'all' as CouponTarget, label: 'Todos', icon: <Users className="w-4 h-4 mr-1" /> },
+                    { value: 'specific' as CouponTarget, label: 'Clientes Específicos', icon: <Tag className="w-4 h-4 mr-1" /> },
+                    { value: 'birthday' as CouponTarget, label: 'Aniversariantes do Mês', icon: <Gift className="w-4 h-4 mr-1" /> },
+                    { value: 'loyalty' as CouponTarget, label: 'Fidelidade (Qtd Pedidos)', icon: <Star className="w-4 h-4 mr-1" /> },
                   ].map(opt => (
                     <Button
                       key={opt.value}
                       type="button"
                       variant={formData.targetType === opt.value ? 'default' : 'outline'}
-                      onClick={() => setFormData(prev => ({ ...prev, targetType: opt.value as any }))}
+                      onClick={() => setFormData(prev => ({ ...prev, targetType: opt.value }))}
                       className="flex items-center"
                       size="sm"
                     >

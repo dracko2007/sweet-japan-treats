@@ -9,6 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useConfirm } from '@/components/ConfirmDialog';
 import { convertYen } from '@/services/fxService';
 import { PROMO_TYPES, ActivePromo, ScheduledNextPromo } from '@/types/promotion';
+import { errorMessage } from '@/utils/errorMessage';
 export type { ActivePromo, ScheduledNextPromo };
 export { PROMO_TYPES };
 
@@ -212,8 +213,8 @@ const PromotionManager: React.FC = () => {
         setActive(null);
         toast({ title: '✅ Simulação concluída', description: 'Nenhuma próxima promoção configurada — promoção removida.' });
       }
-    } catch (e: any) {
-      toast({ title: 'Erro na simulação', description: e?.message, variant: 'destructive' });
+    } catch (e) {
+      toast({ title: 'Erro na simulação', description: errorMessage(e), variant: 'destructive' });
     } finally { setSaving(false); }
   };
 
@@ -308,8 +309,8 @@ const PromotionManager: React.FC = () => {
       setNextForm(emptyForm());
       setShowNext(false);
       toast({ title: 'Promoção ativada!', description: `${form.productName} — ¥${form.promoPriceYen}` });
-    } catch (e: any) {
-      toast({ title: 'Erro', description: e?.message, variant: 'destructive' });
+    } catch (e) {
+      toast({ title: 'Erro', description: errorMessage(e), variant: 'destructive' });
     } finally { setSaving(false); }
   };
 

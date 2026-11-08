@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { siteContentService, VlogContent, VlogVideo, DEFAULT_VLOG_CONTENT } from '@/services/siteContentService';
 import { useToast } from '@/hooks/use-toast';
 import { getYouTubeEmbed } from '@/utils/youtube';
+import { errorMessage } from '@/utils/errorMessage';
 
 // Editor de UM vídeo (usado no principal e em cada secundário)
 const VideoFields: React.FC<{
@@ -126,8 +127,8 @@ const VlogManager: React.FC = () => {
       setContent(clean);
       setUsingDefaults(false);
       toast({ title: '✅ Vlog atualizado!', description: 'Os vídeos já estão no ar na página /vlog.' });
-    } catch (e: any) {
-      toast({ title: 'Erro ao salvar', description: e?.message, variant: 'destructive' });
+    } catch (e) {
+      toast({ title: 'Erro ao salvar', description: errorMessage(e), variant: 'destructive' });
     } finally {
       setSaving(false);
     }

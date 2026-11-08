@@ -6,6 +6,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useConfirm } from '@/components/ConfirmDialog';
 import { ShieldCheck, AlertTriangle, CheckCircle } from 'lucide-react';
 import { normalizeCPF } from '@/utils/validation';
+import { errorMessage } from '@/utils/errorMessage';
 
 interface MigrationResult {
   total: number;
@@ -68,8 +69,8 @@ const CpfMigration: React.FC = () => {
         if (!index[cpf]) index[cpf] = { productIds: new Set(), affiliateCodes: new Set() };
 
         // Produtos com limite de estoque
-        const orderItems: any[] = order.items || [];
-        orderItems.forEach((it: any) => {
+        const orderItems: Array<{ productId?: string; id?: string }> = order.items || [];
+        orderItems.forEach((it) => {
           const pid = it.productId || it.id || '';
           if (pid) index[cpf].productIds.add(pid);
         });
@@ -107,8 +108,8 @@ const CpfMigration: React.FC = () => {
 
       setResult({ total, processed, skipped, cpfsFound, errors, log });
       toast({ title: 'Migração concluída!', description: `${cpfsFound} CPFs indexados.` });
-    } catch (e: any) {
-      log.push(`❌ Erro fatal: ${e?.message}`);
+    } catch (e) {
+      log.push(`❌ Erro fatal: ${errorMessage(e)}`);
       setResult({ total, processed, skipped, cpfsFound: 0, errors: errors + 1, log });
       toast({ title: 'Erro na migração', variant: 'destructive' });
     }

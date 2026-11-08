@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { paymentSettingsService, PaymentSettings } from '@/services/paymentSettingsService';
 import { useToast } from '@/hooks/use-toast';
 import { useUser } from '@/context/UserContext';
+import { errorMessage } from '@/utils/errorMessage';
 
 const WisePaymentSettings: React.FC = () => {
   const { toast } = useToast();
@@ -38,8 +39,8 @@ const WisePaymentSettings: React.FC = () => {
       await paymentSettingsService.save(clean);
       setSettings(clean);
       toast({ title: '✅ Pagamento salvo', description: clean.pixKey ? 'Chave PIX configurada — o QR Code do checkout usa ela.' : 'Configurações salvas.' });
-    } catch (e: any) {
-      toast({ title: 'Erro ao salvar', description: e?.message, variant: 'destructive' });
+    } catch (e) {
+      toast({ title: 'Erro ao salvar', description: errorMessage(e), variant: 'destructive' });
     } finally {
       setSaving(false);
     }

@@ -3,6 +3,7 @@ import { X, Printer, FileText, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { getRates } from '@/services/fxService';
 import { COMPANY_PROFILE } from '@/config/companyProfile';
+import type { Order, OrderItem } from '@/types';
 
 interface CN23Item {
   description: string;
@@ -13,8 +14,13 @@ interface CN23Item {
   hsCode: string;
 }
 
+// Pedidos antigos podiam trazer o preço em ¥ por item.
+type CN23SourceItem = OrderItem & { priceJpy?: number };
+
+type CN23Category = 'gift' | 'commercial' | 'sample' | 'documents' | 'returned' | 'other';
+
 interface CN23ModalProps {
-  order: any;
+  order: Order;
   onClose: () => void;
 }
 
@@ -63,7 +69,7 @@ const CN23Modal: React.FC<CN23ModalProps> = ({ order, onClose }) => {
     cpf: order.cpf || '',
   });
   const [items, setItems] = useState<CN23Item[]>([]);
-  const [category, setCategory] = useState<'gift' | 'commercial' | 'sample' | 'documents' | 'returned' | 'other'>('commercial');
+  const [category, setCategory] = useState<CN23Category>('commercial');
   const [comments, setComments] = useState('Remessa Conforme');
   const [activeTab, setActiveTab] = useState<'edit' | 'preview'>('edit');
 
@@ -78,7 +84,7 @@ const CN23Modal: React.FC<CN23ModalProps> = ({ order, onClose }) => {
       return Math.round(price / (rates.BRL || 0.036));
     };
 
-    const mapped: CN23Item[] = (order.items || []).map((it: any) => {
+    const mapped: CN23Item[] = ((order.items || []) as CN23SourceItem[]).map((it) => {
       const name = it.productName || it.name || '';
       // Try priceJpy first, then convert from order currency
       const unitPriceInCurrency = (it.price || 0) / (it.quantity || 1);
@@ -439,7 +445,7 @@ const CN23Modal: React.FC<CN23ModalProps> = ({ order, onClose }) => {
                     <h3 className="font-bold text-sm mb-2">Categoria</h3>
                     <select
                       value={category}
-                      onChange={e => setCategory(e.target.value as any)}
+                      onChange={e => setCategory(e.target.value as CN23Category)}
                       className="w-full p-2.5 rounded-lg border border-border bg-background text-sm"
                     >
                       <option value="commercial">Comercial (Commercial sample)</option>

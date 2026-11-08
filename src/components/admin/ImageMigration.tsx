@@ -6,6 +6,7 @@ import { productService } from '@/services/productService';
 import { cloudinaryService, cdnOriginal } from '@/services/cloudinaryService';
 import { Product } from '@/types';
 import { authenticatedFetch } from '@/services/authenticatedFetch';
+import { errorMessage } from '@/utils/errorMessage';
 
 const CONCURRENCY = 3;
 async function runWithConcurrency<T>(
@@ -199,8 +200,8 @@ const ImageMigration: React.FC = () => {
       try {
         const migrated = await remigrateProductHD(p);
         await productService.save(migrated);
-      } catch (e: any) {
-        errors.push(`${p.name}: ${e?.message || 'erro'}`);
+      } catch (e) {
+        errors.push(`${p.name}: ${errorMessage(e, 'erro')}`);
       }
       setHdState((s) => ({ ...s, done: s.done + 1, errors: [...errors] }));
     });
