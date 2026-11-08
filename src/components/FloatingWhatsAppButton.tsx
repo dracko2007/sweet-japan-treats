@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import {
   MessageCircle,
@@ -10,6 +10,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { COMPANY_PROFILE } from '@/config/companyProfile';
+import { onOpenRequest, setMinimized, useMinimized } from '@/utils/floatingWidgets';
 
 interface FloatingWhatsAppButtonProps {
   productName?: string;
@@ -22,11 +23,16 @@ interface FloatingWhatsAppButtonProps {
 const FloatingWhatsAppButton: React.FC<FloatingWhatsAppButtonProps> = () => {
   const location = useLocation();
   const [isOpen, setIsOpen] = useState(false);
+  const minimized = useMinimized('whatsapp');
+  // Ícone do WhatsApp no topo (balão minimizado): volta e já abre o atendimento.
+  useEffect(() => onOpenRequest('whatsapp', () => setIsOpen(true)), []);
 
   // Não renderiza dentro do painel administrativo
   if (location.pathname.startsWith('/admin')) {
     return null;
   }
+  // Minimizado: o balão sai do canto; fica só o ícone no topo (HeaderPro).
+  if (minimized && !isOpen) return null;
 
   const isProductPage = location.pathname.startsWith('/produto/');
   const isCartOrCheckout = location.pathname === '/carrinho' || location.pathname === '/checkout';
@@ -161,6 +167,7 @@ const FloatingWhatsAppButton: React.FC<FloatingWhatsAppButtonProps> = () => {
       )}
 
       {/* Botão de Gatilho (Pill) */}
+      <div className="relative">
       <button
         onClick={() => setIsOpen(!isOpen)}
         aria-label="Abrir atendimento no WhatsApp"
@@ -173,6 +180,18 @@ const FloatingWhatsAppButton: React.FC<FloatingWhatsAppButtonProps> = () => {
           WhatsApp Japão
         </span>
       </button>
+      {!isOpen && (
+        <button
+          type="button"
+          onClick={() => setMinimized('whatsapp', true)}
+          aria-label="Ocultar botão do WhatsApp (fica no topo da página)"
+          title="Ocultar (fica no topo da página)"
+          className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full border border-white bg-slate-800 text-white shadow-md transition-transform hover:scale-110 active:scale-95"
+        >
+          <X className="h-3.5 w-3.5" />
+        </button>
+      )}
+      </div>
     </div>
   );
 };

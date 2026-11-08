@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { AnimatePresence, motion, useReducedMotion, useScroll, useSpring } from 'framer-motion';
-import { ChevronDown, Heart, Lock, Package, Plane, Search, ShieldCheck, ShoppingBag, UserCircle } from 'lucide-react';
+import { Bot, ChevronDown, Heart, Lock, MessageCircle, Package, Plane, Search, ShieldCheck, ShoppingBag, UserCircle } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
 import { useUser } from '@/context/UserContext';
 import { useLanguage } from '@/context/LanguageContext';
@@ -14,6 +14,7 @@ import CountrySwitcher from '@/components/CountrySwitcher';
 import JapanExpressLogo from '@/components/JapanExpressLogo';
 import { cn } from '@/lib/utils';
 import { scrollPageToTop } from '@/lib/smoothScroll';
+import { restoreAndOpen, useMinimized } from '@/utils/floatingWidgets';
 import MegaMenu from './pro/MegaMenu';
 import SearchPalette from './pro/SearchPalette';
 import MiniCartDrawer from './pro/MiniCartDrawer';
@@ -36,6 +37,8 @@ const HeaderPro: React.FC = () => {
   const { products } = useProducts();
   const { settings } = useSiteSettings();
   const { pathname } = useLocation();
+  const assistantMinimized = useMinimized('assistant');
+  const whatsappMinimized = useMinimized('whatsapp');
   const reduce = useReducedMotion();
 
   const [allCategories, setAllCategories] = useState<ProductCategory[]>(DEFAULT_CATEGORIES);
@@ -292,6 +295,30 @@ const HeaderPro: React.FC = () => {
               </div>
 
               {/* Celular: busca e carrinho ficam só na barra de baixo (MobileBottomNav). */}
+
+              {/* Balões minimizados (WhatsApp / assistente): tocar volta e abre. */}
+              {whatsappMinimized && (
+                <button
+                  type="button"
+                  onClick={() => restoreAndOpen('whatsapp')}
+                  className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-500 text-white shadow-md transition-transform hover:scale-105 active:scale-95"
+                  aria-label="Abrir atendimento no WhatsApp"
+                  title="WhatsApp"
+                >
+                  <MessageCircle className="h-4 w-4 fill-white" />
+                </button>
+              )}
+              {assistantMinimized && (
+                <button
+                  type="button"
+                  onClick={() => restoreAndOpen('assistant')}
+                  className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-tr from-primary via-accent to-primary text-white shadow-md transition-transform hover:scale-105 active:scale-95"
+                  aria-label={t('kimiclaw.title')}
+                  title={t('kimiclaw.title')}
+                >
+                  <Bot className="h-5 w-5" />
+                </button>
+              )}
               {isAdmin && (
                 <Link
                   to="/admin"

@@ -21,6 +21,7 @@ import { convertYen as fxConvert } from '@/services/fxService';
 import { authenticatedFetch } from '@/services/authenticatedFetch';
 import { toast } from 'sonner';
 import { COMPANY_PROFILE } from '@/config/companyProfile';
+import { onOpenRequest, setMinimized, useMinimized } from '@/utils/floatingWidgets';
 
 // Formato internacional em toda mensagem: o cliente que lê isto está no Brasil
 // e disca de lá. O link `wa.me` usa os dígitos puros, sem `+` nem separador.
@@ -99,6 +100,9 @@ const KimiClawAssistant: React.FC = () => {
   const location = useLocation();
 
   const [isOpen, setIsOpen] = useState(false);
+  const minimized = useMinimized('assistant');
+  // Ícone do assistente no topo (balão minimizado): volta e já abre o chat.
+  useEffect(() => onOpenRequest('assistant', () => setIsOpen(true)), []);
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -1444,6 +1448,10 @@ const KimiClawAssistant: React.FC = () => {
     ]);
   };
 
+  // Minimizado: o balão sai do canto; fica só o ícone no topo (HeaderPro).
+  // O chat ainda abre sozinho quando precisa (ex.: confirmação de pedido).
+  if (minimized && !isOpen) return null;
+
   return (
     <div className="fixed bottom-[calc(1.5rem+var(--bottom-nav-h))] right-6 z-[9999] font-sans">
       {/* ATTENTION BADGE */}
@@ -1471,6 +1479,17 @@ const KimiClawAssistant: React.FC = () => {
           <Bot className="w-7 h-7 text-white transform group-hover:rotate-12 transition-transform duration-300" />
           <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-green-500 rounded-full border border-white animate-ping" />
           <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-green-500 rounded-full border border-white" />
+        </button>
+      )}
+      {!isOpen && (
+        <button
+          type="button"
+          onClick={() => setMinimized('assistant', true)}
+          aria-label="Ocultar assistente (fica no topo da página)"
+          title="Ocultar (fica no topo da página)"
+          className="absolute -left-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full border border-white bg-slate-800 text-white shadow-md transition-transform hover:scale-110 active:scale-95"
+        >
+          <X className="h-3.5 w-3.5" />
         </button>
       )}
 
