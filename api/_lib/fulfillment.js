@@ -205,7 +205,9 @@ export async function fulfillOrder(orderId, { provider, reference, confirmedBy }
     for (const ref of productRefs) {
       const product = byPath.get(ref.path).data();
       const quantity = quantities.get(ref.id);
-      const update = { salesCount: Number(product.salesCount || 0) + quantity };
+      // updatedAt: o catálogo dos clientes (PWA) sincroniza por delta desse campo;
+      // sem ele a baixa de estoque nunca chegava a quem já tinha o catálogo em cache.
+      const update = { salesCount: Number(product.salesCount || 0) + quantity, updatedAt: FieldValue.serverTimestamp() };
       if (product.stock?.unlimited === false) update['stock.quantity'] = Number(product.stock.quantity || 0) - quantity;
       transaction.update(ref, update);
     }

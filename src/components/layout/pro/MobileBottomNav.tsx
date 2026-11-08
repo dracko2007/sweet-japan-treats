@@ -6,6 +6,7 @@ import { useLanguage } from '@/context/LanguageContext';
 import { useUser } from '@/context/UserContext';
 import { cn } from '@/lib/utils';
 import { CART_KICK } from './flyToCart';
+import { scrollPageToTop } from '@/lib/smoothScroll';
 
 interface Props {
   cartCount: number;
@@ -80,7 +81,15 @@ const MobileBottomNav: React.FC<Props> = ({ cartCount, cartKick, onOpenMenu, onO
           return (
             <li key={key}>
               {to ? (
-                <Link to={to} className={cls} aria-current={active ? 'page' : undefined}>{body}</Link>
+                <Link
+                  to={to}
+                  // Tocar em "Início" já estando nele volta ao topo.
+                  onClick={() => { if (to === pathname) scrollPageToTop(); }}
+                  className={cls}
+                  aria-current={active ? 'page' : undefined}
+                >
+                  {body}
+                </Link>
               ) : (
                 <button type="button" onClick={onClick} className={cls} data-cart-target={key === 'cart' ? 'bottom' : undefined}>{body}</button>
               )}

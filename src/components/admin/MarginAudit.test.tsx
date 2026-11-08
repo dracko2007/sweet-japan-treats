@@ -1,6 +1,7 @@
 import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import type { Product } from '@/types';
 
 const product = (id: string, name: string, cost: number | undefined, extra: Partial<Product> = {}) =>
@@ -17,7 +18,12 @@ vi.mock('@/context/ProductsContext', () => ({
   }),
 }));
 
-const { default: MarginAudit } = await import('./MarginAudit');
+const { default: MarginAuditComponent } = await import('./MarginAudit');
+const MarginAudit = () => (
+  <MemoryRouter>
+    <MarginAuditComponent />
+  </MemoryRouter>
+);
 
 describe('MarginAudit', () => {
   it('abre nos produtos abaixo de 50%', () => {
@@ -40,5 +46,11 @@ describe('MarginAudit', () => {
     fireEvent.click(screen.getByText('Sem custo cadastrado'));
     expect(screen.getByText('Zeta Sem Custo')).toBeTruthy();
     expect(screen.queryByText('Margem Boa')).toBeNull();
+  });
+
+  it('cada produto é um link para a edição dele', () => {
+    render(<MarginAudit />);
+    const link = screen.getByText('Margem Baixa').closest('a');
+    expect(link?.getAttribute('href')).toBe('/admin?aba=products&editar=a');
   });
 });

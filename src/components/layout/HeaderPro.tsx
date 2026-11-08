@@ -13,6 +13,7 @@ import LanguageSwitcher from '@/components/LanguageSwitcher';
 import CountrySwitcher from '@/components/CountrySwitcher';
 import JapanExpressLogo from '@/components/JapanExpressLogo';
 import { cn } from '@/lib/utils';
+import { scrollPageToTop } from '@/lib/smoothScroll';
 import MegaMenu from './pro/MegaMenu';
 import SearchPalette from './pro/SearchPalette';
 import MiniCartDrawer from './pro/MiniCartDrawer';
@@ -249,7 +250,13 @@ const HeaderPro: React.FC = () => {
 
         <div className="container mx-auto px-4">
           <div className={cn('flex items-center justify-between gap-3 transition-[height] duration-300', compact ? 'h-16' : 'h-20')}>
-            <Link to="/" className="group flex shrink-0 items-center gap-1.5 sm:gap-2.5" aria-label="Japan Express — início">
+            <Link
+              to="/"
+              // Já na página inicial o link não muda nada: volta ao topo.
+              onClick={() => { if (pathname === '/') scrollPageToTop(); }}
+              className="group flex shrink-0 items-center gap-1.5 sm:gap-2.5"
+              aria-label="Japan Express — início"
+            >
               <JapanExpressLogo
                 size={56}
                 className={cn(

@@ -11,6 +11,7 @@ import { checkoutPointsCoverage, psFeeWaiver } from '@/utils/psFeeWaiver';
 import { safeStorage } from '@/utils/storage';
 import { effectiveYen } from '@/utils/pricing';
 import type { CartItem } from '@/types';
+import { overlayHistory } from '@/lib/overlayHistory';
 
 const MARKETING_KEY = 'exit_popup_shown';      // oferta/guia/retenção simples — 1× por sessão
 const WARN_KEY = 'exit_waiver_warn_shown';     // aviso de perda da isenção — 1× por sessão
@@ -183,6 +184,8 @@ const ExitIntentPopup: React.FC = () => {
     let ancoraArmada = false;
     const onPopState = () => {
       if (!ancoraArmada) return;
+      // Voltar que só fechou a foto ampliada: não é o cliente saindo.
+      if (overlayHistory.owns()) return;
       ancoraArmada = false;
       trigger();
     };

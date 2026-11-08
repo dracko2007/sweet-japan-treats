@@ -20,6 +20,13 @@ let activeLenis: Lenis | null = null;
  */
 export const getLenis = () => activeLenis;
 
+/** Volta ao topo da página com scroll suave (respeita o Lenis quando ativo). */
+export function scrollPageToTop() {
+  const lenis = activeLenis;
+  if (lenis) lenis.scrollTo(0);
+  else window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
 /**
  * SmoothScroll
  *

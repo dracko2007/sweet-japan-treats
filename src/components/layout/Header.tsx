@@ -7,6 +7,7 @@ import { useLanguage } from '@/context/LanguageContext';
 import { useProducts } from '@/context/ProductsContext';
 import { categoryService, DEFAULT_CATEGORIES, type ProductCategory } from '@/services/categoryService';
 import { cn } from '@/lib/utils';
+import { scrollPageToTop } from '@/lib/smoothScroll';
 import { Button } from '@/components/ui/button';
 import LanguageSwitcher from '@/components/LanguageSwitcher';
 import CountrySwitcher from '@/components/CountrySwitcher';
@@ -133,7 +134,12 @@ const Header: React.FC = () => {
         {/* Top Bar: Logo + Search + User Menu */}
         <div className="flex h-20 items-center justify-between gap-4">
           {/* Logo */}
-          <Link to="/" className="group flex shrink-0 items-center gap-1.5 sm:gap-2.5" aria-label="Japan Express — início">
+          <Link
+            to="/"
+            onClick={() => { if (location.pathname === '/') scrollPageToTop(); }}
+            className="group flex shrink-0 items-center gap-1.5 sm:gap-2.5"
+            aria-label="Japan Express — início"
+          >
             <JapanExpressLogo size={56} className="h-11 w-11 shrink-0 drop-shadow-lg transition-transform duration-300 group-hover:-rotate-3 group-hover:scale-105 sm:h-14 sm:w-14" />
             <div className="flex items-baseline gap-1">
               <span className="font-brand text-xl font-black tracking-tight text-foreground sm:text-2xl lg:text-3xl">Japan</span>

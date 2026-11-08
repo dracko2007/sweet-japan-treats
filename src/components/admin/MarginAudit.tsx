@@ -1,7 +1,8 @@
 import React, { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useProducts } from '@/context/ProductsContext';
 import { minEffectiveYen } from '@/utils/pricing';
-import { TrendingDown, AlertTriangle, CheckCircle, Search, CircleDollarSign, List } from 'lucide-react';
+import { TrendingDown, AlertTriangle, CheckCircle, Search, CircleDollarSign, List, Pencil } from 'lucide-react';
 import type { Product } from '@/types';
 
 // Margem alvo: lucro deve ser >= 50% do PREÇO DE VENDA (markup 100% = custo×2).
@@ -125,9 +126,11 @@ const MarginAudit: React.FC = () => {
       ) : (
         <div className="space-y-2">
           {filtered.map(r => (
-            <div
+            <Link
               key={r.product.id}
-              className={`flex items-center gap-3 rounded-xl border p-3 ${
+              to={`/admin?aba=products&editar=${encodeURIComponent(r.product.id)}`}
+              title="Abrir a edição do produto"
+              className={`group flex items-center gap-3 rounded-xl border p-3 transition-shadow hover:shadow-md hover:border-primary/50 ${
                 r.belowTarget ? 'border-red-200 dark:border-red-900 bg-red-50/50 dark:bg-red-950/10'
                 : !r.hasCost ? 'border-border bg-secondary/20'
                 : 'border-border'
@@ -163,7 +166,8 @@ const MarginAudit: React.FC = () => {
                   </p>
                 )}
               </div>
-            </div>
+              <Pencil className="w-4 h-4 shrink-0 text-muted-foreground group-hover:text-primary" aria-hidden />
+            </Link>
           ))}
         </div>
       )}

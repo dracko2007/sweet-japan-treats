@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Plus, Pencil, Trash2, X, Image as ImageIcon, Loader2, PackageOpen, Sparkles, GripVertical, Save, Gift, Infinity as InfinityIcon, Search, Star } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useSearchParams } from 'react-router-dom';
 import { FEATURES } from '@/config/features';
 import { Button } from '@/components/ui/button';
 import { Product, ProductVariant } from '@/types';
@@ -273,6 +274,24 @@ const ProductManager: React.FC = () => {
     setTagInput('');
   };
 
+  // Link direto para a edição (?aba=products&editar=<id>), usado pela Auditoria
+  // de Margem. Abre o produto assim que a lista carrega e limpa o parâmetro.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const editParam = searchParams.get('editar');
+  useEffect(() => {
+    if (!editParam) return;
+    const target = products.find((p) => p.id === editParam);
+    if (!target) return;
+    openEdit(target);
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+      next.delete('editar');
+      return next;
+    }, { replace: true });
+    // openEdit é recriado a cada render; só importa quando o id ou a lista mudam.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editParam, products, setSearchParams]);
+
   // Helpers das variantes de preço
   const variants = (): ProductVariant[] => editing?.variants || [];
   const setVariants = (vs: ProductVariant[]) => editing && setEditing({ ...editing, variants: vs });
@@ -530,6 +549,11 @@ const ProductManager: React.FC = () => {
       // Thumbnail HD 1200px a partir do data URL original
       let thumbnailUrl = editing.thumbnail || '';
       const needNewThumb = rawCover && !cloudinaryService.isCloudinaryUrl(rawCover) && !cloudinaryService.isFirebaseUrl(rawCover);
+      // Capa trocada por uma foto que já estava hospedada (galeria reordenada,
+      // outra foto escolhida como capa): a miniatura antiga era de outra foto e
+      // o card mostrava uma imagem e a página do produto outra. Usa a nova capa.
+      const savedCover = isNew ? '' : products.find((p) => p.id === editing.id)?.image || '';
+      if (!needNewThumb && coverUrl && coverUrl !== savedCover) thumbnailUrl = coverUrl;
       if (needNewThumb) {
         const thumbData = await urlToCompressedDataURL(
           cloudinaryService.isDataUrl(rawCover) ? rawCover : coverUrl,

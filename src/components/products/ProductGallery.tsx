@@ -1,7 +1,9 @@
 import React, { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { AnimatePresence, motion, type PanInfo } from 'framer-motion';
 import { Box, ChevronLeft, ChevronRight, Play, X, ZoomIn } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { overlayHistory } from '@/lib/overlayHistory';
 import { useFinePointer } from '@/hooks/useTilt';
 import type { Product3DModel } from '@/types';
 
@@ -229,6 +231,28 @@ const GalleryModal: React.FC<GalleryModalProps> = ({ media, startSrc, productNam
   const next = useCallback(() => { setZoomed(false); setIndex((i) => (i + 1) % count); }, [count]);
   const prev = useCallback(() => { setZoomed(false); setIndex((i) => (i - 1 + count) % count); }, [count]);
 
+  // O "voltar" do celular fecha a foto em vez de sair da página do produto:
+  // a tela cheia ganha uma entrada própria no histórico (mesma URL).
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+  useEffect(() => {
+    let closedByBack = false;
+    overlayHistory.open();
+    window.history.pushState({ ...(window.history.state || {}), galleryOpen: true }, '');
+    const onPop = () => {
+      closedByBack = true;
+      onCloseRef.current();
+    };
+    window.addEventListener('popstate', onPop);
+    return () => {
+      window.removeEventListener('popstate', onPop);
+      overlayHistory.close();
+      // Fechou pelo X/Esc/fundo: tira a entrada extra para o voltar seguinte
+      // não "ficar parado" na mesma página.
+      if (!closedByBack && window.history.state?.galleryOpen) window.history.back();
+    };
+  }, []);
+
   useEffect(() => {
     const prevFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     dialogRef.current?.focus();
@@ -257,7 +281,9 @@ const GalleryModal: React.FC<GalleryModalProps> = ({ media, startSrc, productNam
     lastTap.current = now;
   };
 
-  return (
+  // Portal no <body>: dentro da página, a tela cheia ficava atrás do cabeçalho
+  // fixo e da barra de baixo, que escondiam o botão de fechar no celular.
+  return createPortal(
     <div
       ref={dialogRef}
       role="dialog"
@@ -265,13 +291,13 @@ const GalleryModal: React.FC<GalleryModalProps> = ({ media, startSrc, productNam
       aria-label={productName}
       tabIndex={-1}
       data-lenis-prevent
-      className="fixed inset-0 z-[200] flex items-center justify-center bg-black/95 p-4 outline-none"
+      className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/95 p-4 pt-[max(1rem,env(safe-area-inset-top))] outline-none"
       onClick={onClose}
     >
       <button
         type="button"
         onClick={onClose}
-        className="absolute right-4 top-4 z-10 flex h-12 w-12 items-center justify-center rounded-full bg-white/10 transition-colors hover:bg-white/20"
+        className="absolute right-4 top-[max(1rem,env(safe-area-inset-top))] z-10 flex h-12 w-12 items-center justify-center rounded-full bg-white/10 transition-colors hover:bg-white/20"
         aria-label="Fechar"
       >
         <X className="h-6 w-6 text-white" />
@@ -332,7 +358,8 @@ const GalleryModal: React.FC<GalleryModalProps> = ({ media, startSrc, productNam
               : `${index + 1} / ${count} · ${fine ? 'clique' : 'toque duplo'} para zoom`}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 };
 
