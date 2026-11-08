@@ -8,7 +8,7 @@ export const SOCIAL_POINTS = 500;
 
 export const SOCIAL_CONFIG: Record<SocialNetwork, { label: string; url: string; color: string }> = {
   instagram: { label: 'Instagram', url: 'https://www.instagram.com/japan_express_official/', color: 'bg-pink-500' },
-  facebook:  { label: 'Facebook',  url: 'https://www.facebook.com/japanexpressoficial',   color: 'bg-blue-600' },
+  facebook:  { label: 'Facebook',  url: 'https://www.facebook.com/profile.php?id=1206331712566979',   color: 'bg-blue-600' },
   tiktok:    { label: 'TikTok',    url: 'https://www.tiktok.com/@japanexpressoficial',    color: 'bg-gray-900' },
   x:         { label: 'X (Twitter)', url: 'https://x.com/japanexpress_of',                color: 'bg-black' },
 };

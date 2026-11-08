@@ -19,7 +19,7 @@ const OrganizationJsonLd: React.FC = () => {
       logo: `${SITE_URL}/icons/icon-512x512.png`,
       sameAs: [
         'https://www.instagram.com/japan_express_official/',
-        'https://www.facebook.com/japanexpressoficial',
+        'https://www.facebook.com/profile.php?id=1206331712566979',
         'https://www.tiktok.com/@japanexpressoficial',
         'https://x.com/japanexpress_of',
       ],

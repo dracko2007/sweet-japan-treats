@@ -6,7 +6,7 @@ import { COMPANY_PROFILE } from '@/config/companyProfile';
 
 const WHATSAPP_NUMBER = COMPANY_PROFILE.whatsapp.digits;
 const INSTAGRAM_URL = 'https://www.instagram.com/japan_express_official/';
-const FACEBOOK_URL = 'https://www.facebook.com/japanexpressoficial';
+const FACEBOOK_URL = 'https://www.facebook.com/profile.php?id=1206331712566979';
 const TIKTOK_URL = 'https://www.tiktok.com/@japanexpressoficial';
 const X_URL = 'https://x.com/japanexpress_of';
 const WHATSAPP_LINK = `https://wa.me/${WHATSAPP_NUMBER}`;
@@ -63,7 +63,7 @@ const Footer: React.FC = () => {
                 href={FACEBOOK_URL}
                 target="_blank"
                 rel="noopener noreferrer"
-                aria-label="Facebook japanexpressoficial"
+                aria-label="Facebook Japan Express Store"
                 className="p-2 rounded-full bg-primary/20 hover:bg-primary/30 transition-colors"
               >
                 <Facebook className="w-5 h-5" />
