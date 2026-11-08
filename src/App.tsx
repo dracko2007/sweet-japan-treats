@@ -16,6 +16,7 @@ import { useCookieConsent } from "@/hooks/useCookieConsent";
 import { useMaintenanceMode } from "@/hooks/useMaintenanceMode";
 import { ADMIN_EMAIL, ADMIN_USER_ID } from "@/config/admin";
 import ScrollToTop from "./components/ScrollToTop";
+import AppUpdater from "./components/AppUpdater";
 import { referralService } from "@/services/referralService";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { useSeo } from "@/hooks/useSeo";
@@ -168,6 +169,7 @@ const FullApp: React.FC = () => (
           <Toaster />
           <Sonner />
           <ScrollToTop />
+          <AppUpdater />
           <SmoothScroll>
           <ErrorBoundary>
             <Suspense fallback={<RouteLoader />}>

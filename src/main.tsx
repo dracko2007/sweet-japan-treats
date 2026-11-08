@@ -1,36 +1,26 @@
 import { createRoot } from "react-dom/client";
 import { registerSW } from "virtual:pwa-register";
-import { toast } from "sonner";
 import App from "./App.tsx";
 import "./index.css";
 import { migrateLocalStorage } from "./utils/migrate";
 import { isChunkLoadError, recoverFromChunkError } from "./utils/recoverFromChunkError";
+import { marcarAtualizacaoPronta } from "./utils/appUpdate";
 
 migrateLocalStorage();
 
-// Registra o Service Worker. Novo build não recarrega sozinho — pede
-// confirmação por toque.
+// Registra o Service Worker. Atualização como numa loja de apps: o build novo
+// é baixado em segundo plano e entra na próxima troca de página
+// (`components/AppUpdater`), sem reinstalar o app.
 //
-// Antes, `onNeedRefresh` chamava `updateSW(true)` direto, que recarrega a
-// página via JS sem gesto nenhum do usuário. Isso rodava até em segundo
-// plano: a checagem de atualização abaixo roda a cada 60s enquanto o app
-// está aberto, então o reload podia disparar no meio da navegação. No PWA
-// standalone do iOS, um `location.reload()` fora de um toque do usuário é
-// o gatilho clássico do bug do WebKit "pinta a tela em branco até rolar" —
-// era exatamente esse sintoma no iPhone. Pedir confirmação resolve as duas
-// coisas: o reload não pega o cliente no meio de nada, e quando acontece é
-// dentro do gesto de toque no botão, que o WebKit repinta direito.
-let avisoMostrado = false;
-const updateSW = registerSW({
+// Com `registerType: "autoUpdate"` o plugin ignora `onNeedRefresh` e, sem
+// `onNeedReload`, chama `location.reload()` sozinho assim que o SW novo
+// ativa — no meio da navegação, sem toque nenhum. No PWA do iOS esse reload
+// fora de um gesto é o gatilho do bug do WebKit "tela em branco até rolar".
+// `onNeedReload` só marca a versão como pronta; quem recarrega é o toque.
+registerSW({
   immediate: true,
-  onNeedRefresh() {
-    if (avisoMostrado) return;
-    avisoMostrado = true;
-    toast('Nova versão disponível', {
-      description: 'Toque para atualizar e ver as últimas novidades.',
-      duration: Infinity,
-      action: { label: 'Atualizar', onClick: () => updateSW(true) },
-    });
+  onNeedReload() {
+    marcarAtualizacaoPronta();
   },
   onRegisteredSW(_swUrl, registration) {
     // Verifica atualização a cada 60s enquanto o app está aberto

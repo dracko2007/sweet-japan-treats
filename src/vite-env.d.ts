@@ -5,6 +5,8 @@
 declare module "virtual:pwa-register" {
   export interface RegisterSWOptions {
     immediate?: boolean;
+    /** Modo autoUpdate: chamado quando o SW novo assumiu, no lugar do reload automático. */
+    onNeedReload?: () => void;
     onNeedRefresh?: () => void;
     onOfflineReady?: () => void;
     onRegistered?: (registration: ServiceWorkerRegistration | undefined) => void;

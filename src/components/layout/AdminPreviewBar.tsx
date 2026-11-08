@@ -14,8 +14,10 @@ const AdminPreviewBar: React.FC = () => {
   if (!isAdminAccount || onAdminPage) return null;
 
   return (
-    <div className="fixed bottom-0 inset-x-0 z-40 bg-gray-900 text-white shadow-[0_-2px_10px_rgba(0,0,0,0.3)]">
-      <div className="container mx-auto px-4 py-2.5 flex items-center justify-between gap-3">
+    // No celular fica logo acima da barra de navegação de baixo (Início, Buscar…);
+    // antes as duas ficavam em bottom-0 e esta cobria a outra.
+    <div className="fixed bottom-[var(--bottom-nav-h)] inset-x-0 z-40 bg-gray-900 text-white shadow-[0_-2px_10px_rgba(0,0,0,0.3)] print:hidden">
+      <div className="container mx-auto px-4 py-1.5 md:py-2.5 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2 text-sm font-medium">
           <span className="flex items-center gap-1.5 bg-amber-400 text-gray-900 px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wide">
             <Eye className="w-3.5 h-3.5" /> Modo Admin
