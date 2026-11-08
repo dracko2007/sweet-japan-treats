@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Megaphone, Plus, Trash2, Link2, TrendingUp, DollarSign, Package, X, CheckCircle, Clock, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,6 +9,24 @@ import { affiliateService, Affiliate, PendingCommission, TIER_CONFIG, AffiliateT
 
 const SITE_URL = 'https://japanexpress-store.com';
 
+const EMPTY_FORM = {
+  code: '',
+  ownerName: '',
+  ownerEmail: '',
+  discountPercent: 10,
+  commissionPercent: 10,
+  validityDays: 90,
+  active: true,
+  bronzeGoalYen: 100000,
+  bronzePercent: 10,
+  silverGoalYen: 200000,
+  silverPercent: 15,
+  goldGoalYen: 201000,
+  goldPercent: 20,
+};
+
+type AffiliateForm = typeof EMPTY_FORM;
+
 const AffiliateManager: React.FC = () => {
   const { toast } = useToast();
   const confirm = useConfirm();
@@ -18,21 +36,33 @@ const AffiliateManager: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [creating, setCreating] = useState(false);
   const [editingCode, setEditingCode] = useState<string | null>(null);
-  const [form, setForm] = useState({
-    code: '',
-    ownerName: '',
-    ownerEmail: '',
-    discountPercent: 10,
-    commissionPercent: 10,
-    validityDays: 90,
-    active: true,
-    bronzeGoalYen: 100000,
-    bronzePercent: 10,
-    silverGoalYen: 200000,
-    silverPercent: 15,
-    goldGoalYen: 201000,
-    goldPercent: 20,
-  });
+  const [form, setForm] = useState<AffiliateForm>(EMPTY_FORM);
+  // Dono do código extra (só para o título do formulário).
+  const [extraCodeFor, setExtraCodeFor] = useState<string | null>(null);
+  // O formulário fica no topo e os botões Editar/+ Código ficam na lista, lá embaixo:
+  // ao abrir, rola até ele (senão parece que o clique não fez nada).
+  const formRef = useRef<HTMLDivElement>(null);
+  const codeInputRef = useRef<HTMLInputElement>(null);
+  const [formOpenKey, setFormOpenKey] = useState(0);
+  useEffect(() => {
+    if (!formOpenKey) return;
+    formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (!editingCode) codeInputRef.current?.focus({ preventScroll: true });
+  }, [formOpenKey, editingCode]);
+
+  const openForm = (next: AffiliateForm, code: string | null, extraFor: string | null) => {
+    setForm(next);
+    setEditingCode(code);
+    setExtraCodeFor(extraFor);
+    setCreating(true);
+    setFormOpenKey((k) => k + 1);
+  };
+  const closeForm = () => {
+    setCreating(false);
+    setEditingCode(null);
+    setExtraCodeFor(null);
+    setForm(EMPTY_FORM);
+  };
 
   const load = async () => {
     setLoading(true);
@@ -130,6 +160,11 @@ const AffiliateManager: React.FC = () => {
       toast({ title: 'Informe o código e o e-mail do influencer', variant: 'destructive' });
       return;
     }
+    const newCode = form.code.trim().toUpperCase();
+    if (!editingCode && affiliates.some((a) => a.code.toUpperCase() === newCode)) {
+      toast({ title: `O código ${newCode} já existe`, description: 'Escolha outro código ou use Editar na lista.', variant: 'destructive' });
+      return;
+    }
     setSaving(true);
     const ok = await affiliateService.save({
       code: form.code.toUpperCase(),
@@ -147,9 +182,8 @@ const AffiliateManager: React.FC = () => {
     });
     setSaving(false);
     if (ok) {
-      setEditingCode(null);
-      setCreating(false);
-      setForm({ code: '', ownerName: '', ownerEmail: '', discountPercent: 10, commissionPercent: 10, validityDays: 90, active: true, bronzeGoalYen: 100000, bronzePercent: 10, silverGoalYen: 200000, silverPercent: 15, goldGoalYen: 201000, goldPercent: 20 });
+      toast({ title: editingCode ? '✅ Afiliado atualizado' : '✅ Código criado', description: newCode });
+      closeForm();
       load();
     } else {
       toast({ title: 'Erro ao salvar afiliado', variant: 'destructive' });
@@ -172,14 +206,13 @@ const AffiliateManager: React.FC = () => {
   };
   const startEdit = (affiliate: Affiliate) => {
     const settings = affiliate.tierSettings;
-    setEditingCode(affiliate.code);
-    setForm({
+    openForm({
       code: affiliate.code,
       ownerName: affiliate.ownerName,
       ownerEmail: affiliate.ownerEmail,
       discountPercent: affiliate.discountPercent,
       commissionPercent: affiliate.commissionPercent,
-      validityDays: Math.max(1, Math.ceil((new Date(affiliate.expiresAt).getTime() - Date.now()) / 86400000)),
+      validityDays: Math.max(1, Math.ceil((new Date(affiliate.expiresAt).getTime() - Date.now()) / 86400000) || 1),
       active: affiliate.active,
       bronzeGoalYen: settings?.bronzeGoalYen || 100000,
       bronzePercent: settings?.bronzePercent || 10,
@@ -187,13 +220,11 @@ const AffiliateManager: React.FC = () => {
       silverPercent: settings?.silverPercent || 15,
       goldGoalYen: settings?.goldGoalYen || 201000,
       goldPercent: settings?.goldPercent || 20,
-    });
-    setCreating(true);
+    }, affiliate.code, null);
   };
   const startAdditionalCode = (affiliate: Affiliate) => {
     const settings = affiliate.tierSettings;
-    setEditingCode(null);
-    setForm({
+    openForm({
       code: '',
       ownerName: affiliate.ownerName,
       ownerEmail: affiliate.ownerEmail,
@@ -207,8 +238,7 @@ const AffiliateManager: React.FC = () => {
       silverPercent: settings?.silverPercent || 15,
       goldGoalYen: settings?.goldGoalYen || 201000,
       goldPercent: settings?.goldPercent || 20,
-    });
-    setCreating(true);
+    }, null, affiliate.ownerName || affiliate.code);
   };
 
   const copyLink = (code: string) => {
@@ -233,7 +263,7 @@ const AffiliateManager: React.FC = () => {
             </p>
           </div>
         </div>
-        <Button onClick={() => setCreating(!creating)} className="btn-primary">
+        <Button onClick={() => (creating ? closeForm() : openForm(EMPTY_FORM, null, null))} className="btn-primary">
           <Plus className="w-4 h-4 mr-2" /> Novo Afiliado
         </Button>
       </div>
@@ -276,8 +306,10 @@ const AffiliateManager: React.FC = () => {
       </div>
 
       {creating && (
-        <div className="bg-card rounded-xl border border-border p-6">
-          <h3 className="font-semibold mb-4">Cadastrar Influencer</h3>
+        <div ref={formRef} className="bg-card rounded-xl border-2 border-primary/40 p-6 scroll-mt-40">
+          <h3 className="font-semibold mb-4">
+            {editingCode ? `Editar afiliado ${editingCode}` : extraCodeFor ? `Novo código para ${extraCodeFor}` : 'Cadastrar Influencer'}
+          </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-1">
               <div className="flex items-center justify-between">
@@ -286,7 +318,7 @@ const AffiliateManager: React.FC = () => {
                   <Plus className="w-3 h-3 mr-1" /> Outro código
                 </Button>
               </div>
-              <Input value={form.code} disabled={Boolean(editingCode)} onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })} placeholder="Ex: JUNIOR10" className="uppercase font-bold" />
+              <Input ref={codeInputRef} value={form.code} disabled={Boolean(editingCode)} onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })} placeholder="Ex: JUNIOR10" className="uppercase font-bold" />
               <p className="text-[11px] text-muted-foreground">Cada código é independente e pode ter sua própria validade e desconto.</p>
             </div>
             <div className="space-y-1">
@@ -331,7 +363,7 @@ const AffiliateManager: React.FC = () => {
             </div>
           </div>
           <div className="flex justify-end gap-2 mt-4">
-            <Button variant="outline" onClick={() => setCreating(false)}>Cancelar</Button>
+            <Button variant="outline" onClick={closeForm}>Cancelar</Button>
             <Button onClick={handleSave} disabled={saving} className="btn-primary">{saving ? 'Salvando...' : 'Salvar'}</Button>
           </div>
         </div>
