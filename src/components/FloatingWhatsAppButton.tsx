@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { COMPANY_PROFILE } from '@/config/companyProfile';
 import { onOpenRequest, setMinimized, useMinimized } from '@/utils/floatingWidgets';
+import { useDraggableBubble } from '@/hooks/useDraggableBubble';
 
 interface FloatingWhatsAppButtonProps {
   productName?: string;
@@ -24,6 +25,8 @@ const FloatingWhatsAppButton: React.FC<FloatingWhatsAppButtonProps> = () => {
   const location = useLocation();
   const [isOpen, setIsOpen] = useState(false);
   const minimized = useMinimized('whatsapp');
+  // Segurar e arrastar move o balão; com o atendimento aberto ele volta ao canto.
+  const { containerRef, offset, onClickCapture, handleProps } = useDraggableBubble('whatsapp', !isOpen);
   // Ícone do WhatsApp no topo (balão minimizado): volta e já abre o atendimento.
   useEffect(() => onOpenRequest('whatsapp', () => setIsOpen(true)), []);
 
@@ -86,7 +89,12 @@ const FloatingWhatsAppButton: React.FC<FloatingWhatsAppButtonProps> = () => {
   ];
 
   return (
-    <div className="fixed bottom-[calc(1.5rem+var(--bottom-nav-h))] left-6 z-50 flex flex-col items-start font-sans select-none print:hidden">
+    <div
+      ref={containerRef}
+      onClickCapture={onClickCapture}
+      style={isOpen ? undefined : { transform: `translate(${offset.x}px, ${offset.y}px)` }}
+      className="fixed bottom-[calc(1.5rem+var(--bottom-nav-h))] left-6 z-50 flex flex-col items-start font-sans select-none print:hidden"
+    >
       {/* Modal / Card Interativo de Atendimento */}
       {isOpen && (
         <div className="mb-3 w-[340px] sm:w-[380px] max-w-[calc(100vw-2rem)] bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200/80 dark:border-slate-800 overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-300">
@@ -169,6 +177,7 @@ const FloatingWhatsAppButton: React.FC<FloatingWhatsAppButtonProps> = () => {
       {/* Botão de Gatilho (Pill) */}
       <div className="relative">
       <button
+        {...(isOpen ? {} : handleProps)}
         onClick={() => setIsOpen(!isOpen)}
         aria-label="Abrir atendimento no WhatsApp"
         className="group flex items-center gap-2.5 bg-emerald-500 hover:bg-emerald-600 text-white pl-3.5 pr-4 py-2.5 rounded-full shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 hover:scale-105 transition-all duration-300 active:scale-95 border border-emerald-400/30 cursor-pointer"

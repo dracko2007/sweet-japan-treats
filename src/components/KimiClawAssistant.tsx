@@ -22,6 +22,7 @@ import { authenticatedFetch } from '@/services/authenticatedFetch';
 import { toast } from 'sonner';
 import { COMPANY_PROFILE } from '@/config/companyProfile';
 import { onOpenRequest, setMinimized, useMinimized } from '@/utils/floatingWidgets';
+import { useDraggableBubble } from '@/hooks/useDraggableBubble';
 
 // Formato internacional em toda mensagem: o cliente que lê isto está no Brasil
 // e disca de lá. O link `wa.me` usa os dígitos puros, sem `+` nem separador.
@@ -101,6 +102,8 @@ const KimiClawAssistant: React.FC = () => {
 
   const [isOpen, setIsOpen] = useState(false);
   const minimized = useMinimized('assistant');
+  // Segurar e arrastar move o balão; com o chat aberto ele volta ao canto.
+  const { containerRef, offset, onClickCapture, handleProps } = useDraggableBubble('assistant', !isOpen);
   // Ícone do assistente no topo (balão minimizado): volta e já abre o chat.
   useEffect(() => onOpenRequest('assistant', () => setIsOpen(true)), []);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -1453,7 +1456,12 @@ const KimiClawAssistant: React.FC = () => {
   if (minimized && !isOpen) return null;
 
   return (
-    <div className="fixed bottom-[calc(1.5rem+var(--bottom-nav-h))] right-6 z-[9999] font-sans">
+    <div
+      ref={containerRef}
+      onClickCapture={onClickCapture}
+      style={isOpen ? undefined : { transform: `translate(${offset.x}px, ${offset.y}px)` }}
+      className="fixed bottom-[calc(1.5rem+var(--bottom-nav-h))] right-6 z-[9999] font-sans"
+    >
       {/* ATTENTION BADGE */}
       {showAttentionBadge && !isOpen && (
         <div className="absolute bottom-16 right-2 bg-gradient-to-r from-primary to-accent text-white text-xs px-3 py-1.5 rounded-full shadow-elevated whitespace-nowrap animate-float border border-white/20 select-none">
@@ -1469,6 +1477,7 @@ const KimiClawAssistant: React.FC = () => {
       {!isOpen && (
         <button
           ref={fabButtonRef}
+          {...handleProps}
           onClick={() => setIsOpen(true)}
           aria-label={t('kimiclaw.title')}
           aria-haspopup="dialog"
