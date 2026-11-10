@@ -258,6 +258,17 @@
 }
 
 @layer utilities {
+  /* Direção "vidro e luz": fundo claro com manchas suaves de cor da marca.
+     Só gradientes estáticos (sem blur nem animação): não pesa no celular, e dá
+     aos cards translúcidos algo para deixar transparecer. */
+  .aurora-light {
+    background-color: hsl(330 100% 99%);
+    background-image:
+      radial-gradient(60rem 28rem at 8% 0%, hsl(330 95% 90% / 0.75), transparent 60%),
+      radial-gradient(48rem 26rem at 96% 18%, hsl(285 90% 92% / 0.7), transparent 62%),
+      radial-gradient(52rem 30rem at 50% 100%, hsl(20 100% 93% / 0.55), transparent 60%);
+  }
+
   .animate-float {
     animation: float 6s ease-in-out infinite;
   }

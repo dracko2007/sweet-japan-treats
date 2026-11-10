@@ -212,7 +212,7 @@ const Products: React.FC = () => {
         </div>
       </div>
 
-      <section className="pt-3 pb-8 md:py-8 bg-background">
+      <section className="aurora-light pt-3 pb-8 md:py-8">
         <div className="container mx-auto px-4">
           {/* Banner da categoria atual (compacto) */}
           {catMeta && (

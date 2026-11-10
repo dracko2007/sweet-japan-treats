@@ -107,10 +107,10 @@ const CompactProductCard: React.FC<CompactProductCardProps> = ({ product }) => {
       role="link"
       tabIndex={0}
       aria-label={`${name} — ${formatPrice(price, currency)}`}
-      className="group relative flex cursor-pointer flex-col overflow-hidden rounded-2xl border border-pink-100/60 bg-white shadow-sm transition-[box-shadow,border-color] duration-300 will-change-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-500 focus-visible:ring-offset-2 hover:z-10 hover:border-pink-300 hover:shadow-2xl hover:shadow-pink-300/50"
+      className="group relative flex cursor-pointer flex-col overflow-hidden rounded-2xl border border-white/80 bg-white/70 shadow-[0_10px_30px_-18px_rgba(219,39,119,0.45)] ring-1 ring-pink-100/60 transition-[box-shadow,border-color] duration-300 md:backdrop-blur-md will-change-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-500 focus-visible:ring-offset-2 hover:z-10 hover:border-pink-300 hover:shadow-2xl hover:shadow-pink-300/50"
     >
       <div
-        className="relative aspect-square overflow-hidden bg-gradient-to-br from-white via-pink-50/35 to-fuchsia-50/50 transition-colors duration-500 group-hover:from-pink-50 group-hover:via-fuchsia-50 group-hover:to-pink-100/80"
+        className="relative aspect-square overflow-hidden bg-gradient-to-br from-white/90 via-white/50 to-fuchsia-50/40 transition-colors duration-500 group-hover:from-pink-50 group-hover:via-fuchsia-50 group-hover:to-pink-100/80"
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
       >

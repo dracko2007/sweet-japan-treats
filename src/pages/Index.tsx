@@ -11,6 +11,7 @@ import ScrollReveal from '@/components/ScrollReveal';
 import WelcomeCouponBanner from '@/components/WelcomeCouponBanner';
 import CinematicHeroShelfTransition from '@/components/home/CinematicHeroShelfTransition';
 import CinematicPosterShelf from '@/components/home/CinematicPosterShelf';
+import ScrollCinema from '@/components/home/ScrollCinema';
 
 const Index: React.FC = () => (
   <Layout>
@@ -20,6 +21,9 @@ const Index: React.FC = () => (
     <ScrollReveal><CategoryQuickNav /></ScrollReveal>
     {/* Mais vistos / ofertas logo depois da vitrine: a grade de produtos não pode ficar no fim da rolagem */}
     <ScrollReveal><FeaturedProducts /></ScrollReveal>
+
+    {/* Cena de rolagem: o scroll anda pelo vídeo da loja (sem ScrollReveal: transform quebraria o sticky) */}
+    <ScrollCinema />
 
     <CinematicPosterShelf
       i18nKey="posterShelf.shampoo"
