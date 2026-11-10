@@ -1,20 +1,22 @@
 // Balões flutuantes (assistente e WhatsApp) que o cliente pode minimizar.
 // Minimizado, o balão sai do canto da tela e vira um ícone pequeno no topo.
-// A escolha fica salva no aparelho (conveniência de quem está vendo).
+// Começam MINIMIZADOS: não cobrem produto nem preço, e quem quiser atendimento
+// toca no ícone do topo. A escolha fica salva no aparelho.
+// (Chave v2: quem tinha a preferência antiga também passa a começar minimizado.)
 import { useSyncExternalStore } from 'react';
 import { safeStorage } from '@/utils/storage';
 
 export type FloatingWidget = 'assistant' | 'whatsapp';
 
-const KEY = 'je_floating_minimized';
+const KEY = 'je_floating_minimized_v2';
 const OPEN_EVENT = 'je:floating-open';
 
 function ler(): Record<FloatingWidget, boolean> {
   try {
     const raw = JSON.parse(safeStorage.getItem(KEY) || '{}') as Partial<Record<FloatingWidget, unknown>>;
-    return { assistant: raw.assistant === true, whatsapp: raw.whatsapp === true };
+    return { assistant: raw.assistant !== false, whatsapp: raw.whatsapp !== false };
   } catch {
-    return { assistant: false, whatsapp: false };
+    return { assistant: true, whatsapp: true };
   }
 }
 
@@ -57,5 +59,5 @@ function assinar(ouvir: () => void): () => void {
 }
 
 export function useMinimized(widget: FloatingWidget): boolean {
-  return useSyncExternalStore(assinar, () => estado[widget], () => false);
+  return useSyncExternalStore(assinar, () => estado[widget], () => true);
 }
