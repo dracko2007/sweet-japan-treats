@@ -111,6 +111,7 @@ const Admin: React.FC = () => {
   const [newCustomers, setNewCustomers] = useState(0);
   const [newRequests, setNewRequests] = useState(0);
   const [pendingAffiliateRequestsCount, setPendingAffiliateRequestsCount] = useState(0);
+  const [pendingReviewsCount, setPendingReviewsCount] = useState(0); // vídeos de review aguardando aprovação
   const [isTesting, setIsTesting] = useState(false);
   // A aba fica no endereço (?aba=pedidos…): recarregar a página ou voltar
   // no navegador mantém o lugar, e dá para mandar o link de uma aba.
@@ -177,6 +178,9 @@ const Admin: React.FC = () => {
       affiliateService.getRequests('pending')
         .then((items) => setPendingAffiliateRequestsCount(items.length))
         .catch(() => setPendingAffiliateRequestsCount(0));
+      affiliateService.getAllReviews()
+        .then((items) => setPendingReviewsCount(items.filter((item) => item.status === 'pending').length))
+        .catch(() => setPendingReviewsCount(0));
     };
 
     const debouncedRefresh = () => {
@@ -770,7 +774,7 @@ _This is an automated test message_
     { title: 'Visão geral', items: [{ id: 'dashboard', label: 'Dashboard', icon: BarChart3 }] },
     { title: 'Vendas', items: [
       { id: 'orders', label: 'Pedidos', icon: Package, badge: ordersHasMore ? undefined : pendingOrdersCount },
-      { id: 'affiliates', label: 'Afiliados', icon: Megaphone, badge: Math.max(affiliatePendingCount, pendingAffiliateRequestsCount) },
+      { id: 'affiliates', label: 'Afiliados', icon: Megaphone, badge: Math.max(affiliatePendingCount, pendingAffiliateRequestsCount, pendingReviewsCount) },
       { id: 'sandbox', label: 'Sandbox', icon: TestTube },
       { id: 'negotiations', label: 'Negociações', icon: Handshake, badge: pendingNegotiationsCount || 0 },
       { id: 'customers', label: 'Clientes', icon: Users, badge: Math.max(newCustomers, pendingAffiliateRequestsCount) },
@@ -1273,7 +1277,7 @@ _This is an automated test message_
               <Dashboard
                 pending={{
                   negotiations: pendingNegotiationsCount,
-                  affiliates: Math.max(affiliatePendingCount, pendingAffiliateRequestsCount),
+                  affiliates: Math.max(affiliatePendingCount, pendingAffiliateRequestsCount, pendingReviewsCount),
                   requests: newRequests,
                 }}
                 onNavigate={setActiveTab}

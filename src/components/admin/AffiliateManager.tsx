@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { useConfirm } from '@/components/ConfirmDialog';
-import { affiliateService, affiliateLink, isPromoter, Affiliate, AffiliateKind, AffiliateReview, PendingCommission, TIER_CONFIG, AffiliateTier } from '@/services/affiliateService';
+import { affiliateService, affiliateLink, isPromoter, Affiliate, AffiliateKind, AffiliateReview, PendingCommission, PromoterOrders, TIER_CONFIG, AffiliateTier } from '@/services/affiliateService';
 import { useProducts } from '@/context/ProductsContext';
 
 const EMPTY_FORM = {
@@ -35,6 +35,8 @@ const AffiliateManager: React.FC = () => {
   const [affiliates, setAffiliates] = useState<Affiliate[]>([]);
   const [pending, setPending] = useState<PendingCommission[]>([]);
   const [reviews, setReviews] = useState<AffiliateReview[]>([]);
+  // Compras por código de divulgador, contadas nos pedidos pagos e não cancelados.
+  const [purchases, setPurchases] = useState<Record<string, PromoterOrders>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -69,12 +71,14 @@ const AffiliateManager: React.FC = () => {
 
   const load = async () => {
     setLoading(true);
-    const [list, pend, revs] = await Promise.all([
+    const [list, pend, revs, bought] = await Promise.all([
       affiliateService.getAll(),
       affiliateService.getPendingCommissions(),
       affiliateService.getAllReviews(),
+      affiliateService.getPromoterOrders(true),
     ]);
     setReviews(revs);
+    setPurchases(bought);
     setAffiliates(list.sort((a, b) => b.totalEarnings - a.totalEarnings));
     setPending(pend.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
     setLoading(false);
@@ -82,6 +86,22 @@ const AffiliateManager: React.FC = () => {
 
   useEffect(() => {
     load();
+    // Uma vez por dia, ao abrir a aba: confere se os vídeos aprovados ainda existem nas redes.
+    const key = 'reviews_checked_at';
+    let last = 0;
+    try { last = Number(localStorage.getItem(key) || 0); } catch { /* sem storage: confere */ }
+    if (Date.now() - last > 24 * 60 * 60 * 1000) {
+      try { localStorage.setItem(key, String(Date.now())); } catch { /* noop */ }
+      affiliateService.checkReviews().then((result) => {
+        if (!result || result.hidden + result.restored === 0) return;
+        toast({
+          title: 'Vídeos de review conferidos',
+          description: `${result.hidden} saíram do ar e foram escondidos do site · ${result.restored} voltaram`,
+        });
+        affiliateService.getAllReviews().then(setReviews);
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const [evaluating, setEvaluating] = useState(false);
@@ -518,9 +538,9 @@ const AffiliateManager: React.FC = () => {
                 </div>
                 <div className="flex items-center gap-2">
                   <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
-                    review.status === 'approved' ? 'bg-green-100 text-green-700' : review.status === 'rejected' ? 'bg-gray-100 text-gray-600' : 'bg-amber-100 text-amber-800'
+                    review.status === 'approved' ? 'bg-green-100 text-green-700' : review.status === 'rejected' ? 'bg-gray-100 text-gray-600' : review.status === 'unavailable' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-800'
                   }`}>
-                    {review.status === 'approved' ? 'Publicado' : review.status === 'rejected' ? 'Recusado' : 'Aguardando'}
+                    {review.status === 'approved' ? 'Publicado' : review.status === 'rejected' ? 'Recusado' : review.status === 'unavailable' ? 'Fora do ar (escondido)' : 'Aguardando'}
                   </span>
                   {review.status !== 'approved' && (
                     <Button size="sm" className="btn-primary text-xs" onClick={() => handleReview(review, 'approved')}>
@@ -575,7 +595,9 @@ const AffiliateManager: React.FC = () => {
               if (isPromoter(aff)) {
                 const link = affiliateLink(aff.code, aff.productId);
                 const visits = aff.visitCount || 0;
-                const buyers = aff.totalOrders || 0;
+                const bought = purchases[aff.code];
+                const buyers = bought ? bought.count : (aff.totalOrders || 0);
+                const revenue = bought ? bought.revenueYen : aff.totalRevenue;
                 return (
                   <div key={aff.code} className={`bg-card rounded-xl border p-6 ${!aff.active || expired ? 'border-border opacity-70' : 'border-sky-300/60'}`}>
                     <div className="flex items-start justify-between gap-4">
@@ -610,13 +632,28 @@ const AffiliateManager: React.FC = () => {
                           </div>
                           <div>
                             <p className="text-muted-foreground text-xs flex items-center gap-1"><TrendingUp className="w-3 h-3" /> Vendas geradas</p>
-                            <p className="font-semibold text-lg">{yen(aff.totalRevenue)}</p>
+                            <p className="font-semibold text-lg">{yen(revenue)}</p>
                           </div>
                           <div>
                             <p className="text-muted-foreground text-xs">Desconto</p>
                             <p className="font-semibold text-lg">{aff.discountPercent}%</p>
                           </div>
                         </div>
+                        {bought && bought.orders.length > 0 && (
+                          <details className="mt-4 rounded-lg border border-border px-3 py-2">
+                            <summary className="cursor-pointer text-sm font-semibold">Quem comprou ({bought.count})</summary>
+                            <ul className="mt-2 space-y-1">
+                              {bought.orders.map((order) => (
+                                <li key={order.orderId || order.date} className="flex flex-wrap justify-between gap-2 text-xs">
+                                  <span className="text-muted-foreground">
+                                    {order.date ? new Date(order.date).toLocaleDateString('pt-BR') : '—'} · {order.customerName || 'cliente'} · Pedido {order.orderId}
+                                  </span>
+                                  <span className="font-semibold">{yen(order.netYen)}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </details>
+                        )}
                         <div className="flex gap-2 mt-4">
                           <Button variant="outline" size="sm" onClick={() => startEdit(aff)} title="Editar divulgador">
                             Editar

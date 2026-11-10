@@ -24,6 +24,7 @@ import { effectiveYen, baseYen, hasDiscount, getVariants } from '@/utils/pricing
 import { convertYen as fxConvert } from '@/services/fxService';
 import { productEnglishName } from '@/utils/productName';
 import ProductJsonLd from '@/components/ProductJsonLd';
+import ProductVideoReviews from '@/components/products/ProductVideoReviews';
 import { useSeo } from '@/hooks/useSeo';
 import DeliveryEstimateBadge from '@/components/products/DeliveryEstimate';
 import StockUrgency from '@/components/products/StockUrgency';
@@ -514,6 +515,8 @@ const ProductDetail: React.FC = () => {
 
               </div>
             </div>
+
+            <ProductVideoReviews productId={product.id} />
 
             <div className="mt-16">
               <ProductReviews productId={product.id} productName={translatedName} />

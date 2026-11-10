@@ -103,7 +103,7 @@ const CATEGORY_LABEL: Record<string, string> = {
   papelaria: 'Papelaria', eletronicos: 'Eletrônicos', masculino: 'Masculino',
   vestuario: 'Vestuário', higiene: 'Higiene & Saúde', pet: 'Pet',
 };
-const HERO_MAX_PRODUCTS = 4; // produtos sorteados por visita (além da promo)
+const HERO_MAX_PRODUCTS = 3; // produtos sorteados por visita (além da promo); 4 alongava demais a rolagem até a grade
 
 const heroStyleFor = (category?: string) =>
   (category && HERO_CATEGORY_STYLE[category]) || DEFAULT_HERO_STYLE;

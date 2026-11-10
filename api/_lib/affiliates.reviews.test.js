@@ -120,3 +120,55 @@ describe('reviews dos divulgadores', () => {
     expect((await call({ action: 'review-mine' })).body.reviews).toHaveLength(0);
   });
 });
+
+describe('reviews: produto, vídeo fora do ar e compras por código', () => {
+  const aprovar = async (url) => {
+    const { review } = (await call({ action: 'review-submit', code: 'DIVULGADOR1FINO', url })).body;
+    mocks.admin = true;
+    await call({ action: 'review-moderate', id: review.id, status: 'approved' });
+    mocks.admin = false;
+    return review;
+  };
+
+  it('a página do produto recebe só os reviews daquele produto', async () => {
+    await aprovar(LINK);
+    expect((await call({ action: 'review-list', productId: 'fino' })).body.reviews).toHaveLength(1);
+    expect((await call({ action: 'review-list', productId: 'outro' })).body.reviews).toHaveLength(0);
+  });
+
+  it('esconde o vídeo apagado na rede e devolve quando ele volta', async () => {
+    const review = await aprovar(LINK);
+    mocks.admin = true;
+    fetch.mockResolvedValue({ ok: false, status: 404 });
+    expect((await call({ action: 'review-check' })).body).toEqual({ checked: 1, hidden: 1, restored: 0 });
+    expect((await call({ action: 'review-list' })).body.reviews).toHaveLength(0);
+
+    fetch.mockRejectedValue(new Error('timeout')); // sem resposta não muda nada
+    expect((await call({ action: 'review-check' })).body).toMatchObject({ hidden: 0, restored: 0 });
+
+    fetch.mockResolvedValue({ ok: true, status: 200, json: async () => ({}) });
+    expect((await call({ action: 'review-check' })).body).toMatchObject({ restored: 1 });
+    expect((await call({ action: 'review-list' })).body.reviews[0].id).toBe(review.id);
+
+    mocks.admin = false;
+    expect((await call({ action: 'review-check' })).statusCode).toBe(403);
+  });
+
+  it('conta compras pelos pedidos pagos e ignora cancelados', async () => {
+    Object.assign(mocks.docs, {
+      'orders/O1': { id: 'O1', affiliateCode: 'DIVULGADOR1FINO', paymentConfirmed: true, status: 'confirmed', netProductsYen: 3000, customerName: 'Maria', paymentConfirmedAt: '2026-11-02' },
+      'orders/O2': { id: 'O2', affiliateCode: 'DIVULGADOR1FINO', paymentConfirmed: true, status: 'cancelled', netProductsYen: 9000 },
+      'orders/O3': { id: 'O3', affiliateCode: 'DIVULGADOR1FINO', paymentConfirmed: false, status: 'pending_payment', netProductsYen: 5000 },
+      'orders/O4': { id: 'O4', affiliateCode: 'OUTRO', paymentConfirmed: true, status: 'confirmed', netProductsYen: 1000 },
+    });
+    const dono = (await call({ action: 'promoter-orders' })).body.orders;
+    expect(Object.keys(dono)).toEqual(['DIVULGADOR1FINO']);
+    expect(dono.DIVULGADOR1FINO).toEqual({ count: 1, revenueYen: 3000, orders: [{ date: '2026-11-02', netYen: 3000 }] });
+
+    expect((await call({ action: 'promoter-orders', admin: true })).statusCode).toBe(403);
+    mocks.admin = true;
+    const loja = (await call({ action: 'promoter-orders', admin: true })).body.orders;
+    expect(Object.keys(loja).sort()).toEqual(['DIVULGADOR1FINO', 'OUTRO']);
+    expect(loja.DIVULGADOR1FINO.orders[0]).toMatchObject({ orderId: 'O1', customerName: 'Maria' });
+  });
+});

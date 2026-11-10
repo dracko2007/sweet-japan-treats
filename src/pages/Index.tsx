@@ -18,14 +18,14 @@ const Index: React.FC = () => (
 
     <WelcomeCouponBanner />
     <ScrollReveal><CategoryQuickNav /></ScrollReveal>
+    {/* Mais vistos / ofertas logo depois da vitrine: a grade de produtos não pode ficar no fim da rolagem */}
+    <ScrollReveal><FeaturedProducts /></ScrollReveal>
+
     <CinematicPosterShelf
       i18nKey="posterShelf.shampoo"
       keywords={['shampoo', 'condicionador', 'tratamento capilar', 'hair']}
       wordmark="Shampoo"
     />
-
-    {/* Most Viewed / Featured Products */}
-    <ScrollReveal><FeaturedProducts /></ScrollReveal>
 
     {/* Recently Viewed */}
     <RecentlyViewed />

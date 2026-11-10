@@ -7,12 +7,13 @@ import { useUser } from '@/context/UserContext';
 import { useProducts } from '@/context/ProductsContext';
 import { useToast } from '@/hooks/use-toast';
 import { affiliateService, affiliateLink, isPromoter, SITE_URL, TIER_CONFIG } from '@/services/affiliateService';
-import type { AffiliateDashboard, AffiliateReview, AffiliateTier } from '@/services/affiliateService';
+import type { AffiliateDashboard, AffiliateReview, AffiliateTier, PromoterOrders } from '@/services/affiliateService';
 
 const REVIEW_STATUS: Record<AffiliateReview['status'], { label: string; className: string }> = {
   pending: { label: 'Em análise', className: 'bg-amber-100 text-amber-800' },
   approved: { label: 'Publicado no vlog', className: 'bg-green-100 text-green-700' },
   rejected: { label: 'Não aprovado', className: 'bg-gray-100 text-gray-600' },
+  unavailable: { label: 'Vídeo fora do ar', className: 'bg-red-100 text-red-700' },
 };
 const PLATFORM_LABEL: Record<AffiliateReview['platform'], string> = { youtube: 'YouTube', tiktok: 'TikTok', instagram: 'Instagram' };
 import { convertYen as fxConvert, loadFxRates } from '@/services/fxService';
@@ -29,6 +30,8 @@ const AffiliatePage: React.FC = () => {
   const { toast } = useToast();
   // Reviews (vídeos) que o divulgador enviou, e o link em digitação por código.
   const [reviews, setReviews] = useState<AffiliateReview[]>([]);
+  // Compras por código, contadas nos pedidos pagos (cancelado sai da conta).
+  const [purchases, setPurchases] = useState<Record<string, PromoterOrders>>({});
   const [reviewUrl, setReviewUrl] = useState<Record<string, string>>({});
   const [sendingReview, setSendingReview] = useState<string | null>(null);
 
@@ -57,7 +60,10 @@ const AffiliatePage: React.FC = () => {
     }
     affiliateService.getByOwnerEmail(user.email).then(async (list) => {
       setAffiliates(list);
-      if (list.some(isPromoter)) affiliateService.getMyReviews().then(setReviews);
+      if (list.some(isPromoter)) {
+        affiliateService.getMyReviews().then(setReviews);
+        affiliateService.getPromoterOrders().then(setPurchases);
+      }
       const map: Record<string, { commissionYen: number; netYen: number; orders: number }> = {};
       await Promise.all(
         list.filter((aff) => !isPromoter(aff)).map(async (aff) => {
@@ -139,7 +145,8 @@ const AffiliatePage: React.FC = () => {
                     const link = affiliateLink(aff.code, aff.productId);
                     const expired = new Date(aff.expiresAt) < new Date();
                     const visits = aff.visitCount || 0;
-                    const buyers = aff.totalOrders || 0;
+                    const bought = purchases[aff.code];
+                    const buyers = bought ? bought.count : (aff.totalOrders || 0);
                     return (
                       <div key={aff.code} className={`bg-card rounded-2xl border border-border p-6 lg:p-8 space-y-5 ${!aff.active || expired ? 'opacity-70' : ''}`}>
                         <div className="flex flex-wrap items-start justify-between gap-3">
@@ -166,6 +173,20 @@ const AffiliatePage: React.FC = () => {
                             <p className="text-[10px] text-muted-foreground">pedidos pagos com seu link ou código</p>
                           </div>
                         </div>
+
+                        {bought && bought.orders.length > 0 && (
+                          <details className="rounded-xl border border-border px-4 py-3">
+                            <summary className="cursor-pointer text-sm font-semibold">Ver compras ({bought.count})</summary>
+                            <ul className="mt-3 space-y-1.5">
+                              {bought.orders.map((order, index) => (
+                                <li key={`${order.date}-${index}`} className="flex justify-between text-sm">
+                                  <span className="text-muted-foreground">{order.date ? new Date(order.date).toLocaleDateString('pt-BR') : '—'}</span>
+                                  <span className="font-semibold">{yen(order.netYen)}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </details>
+                        )}
 
                         <div>
                           <p className="text-xs uppercase font-bold text-muted-foreground mb-2">Seu código</p>

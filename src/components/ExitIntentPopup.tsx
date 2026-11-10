@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useNoticeSlot } from '@/lib/noticeQueue';
+import { noticeQueue, useNoticeSlot } from '@/lib/noticeQueue';
 import { X, Download, Mail, CheckCircle2, Loader2, ShoppingBag, Gift } from 'lucide-react';
 import { useUser } from '@/context/UserContext';
 import { useCart } from '@/context/CartContext';
@@ -143,6 +143,9 @@ const ExitIntentPopup: React.FC = () => {
 
   const trigger = useCallback(() => {
     if (openRef.current) return;                 // já há um popup aberto
+    // Enquanto o aviso de cookies espera resposta, a oferta não entra por cima dele;
+    // fica para o próximo sinal de saída (não gasta a vez da sessão).
+    if (noticeQueue.isActive('cookie')) return;
     let v = resolveVariant();
     if (!v) return;
     // No checkout com isenção ativa, o lembrete vira AVISO de perda da isenção.

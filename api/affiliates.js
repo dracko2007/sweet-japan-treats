@@ -185,7 +185,8 @@ async function trackVisit(req, body) {
 
 /* ---------- Reviews (vídeos) dos divulgadores ---------- */
 
-const REVIEW_STATUSES = ['pending', 'approved', 'rejected'];
+// 'unavailable': aprovado, mas o vídeo saiu do ar na rede (apagado ou privado) — some do site sozinho.
+const REVIEW_STATUSES = ['pending', 'approved', 'rejected', 'unavailable'];
 const REVIEWS_PER_USER = 10;
 const REVIEWS_WINDOW_MS = 60 * 60 * 1000;
 
@@ -262,7 +263,28 @@ async function submitReview(req, user, body) {
     status: 'pending',
     createdAt: new Date().toISOString(),
   });
+  await notifyAdminOfReview({ code, ownerName: String(affiliate.ownerName || email), productName: String(affiliate.productName || ''), url: review.url });
   return reviewSummary(await ref.get());
+}
+
+// Avisa a loja por e-mail que chegou vídeo para aprovar. É cortesia: nunca derruba o envio.
+async function notifyAdminOfReview({ code, ownerName, productName, url }) {
+  try {
+    const [{ superAdminEmail }, { sendMail, wrapEmail, siteOrigin }, { escapeHtml }] = await Promise.all([
+      import('./_lib/auth.js'), import('./_lib/mailer.js'), import('./_lib/http.js'),
+    ]);
+    await sendMail({
+      to: superAdminEmail(),
+      subject: `Novo vídeo de review para aprovar — ${code}`,
+      html: wrapEmail(`
+        <h2>Novo vídeo de review</h2>
+        <p><strong>${escapeHtml(ownerName)}</strong> enviou um vídeo pelo código <strong>${escapeHtml(code)}</strong>${productName ? ` (${escapeHtml(productName)})` : ''}.</p>
+        <p><a href="${escapeHtml(url)}">${escapeHtml(url)}</a></p>
+        <p>Para publicar no site, aprove em <a href="${siteOrigin()}/admin?aba=affiliates">Admin → Afiliados</a>.</p>`),
+    });
+  } catch (error) {
+    console.error('review_notification_failed', error?.message || error);
+  }
 }
 
 async function myReviews(user, body) {
@@ -273,9 +295,87 @@ async function myReviews(user, body) {
 
 // Vlog público: só os aprovados, sem e-mail de ninguém.
 async function publicReviews(body) {
-  assertExactKeys(body, ['action']);
+  assertExactKeys(body, ['action', 'productId']);
+  // Página de produto pede só os reviews daquele produto.
+  const productId = optionalText(body.productId, { max: 120 });
   const snapshot = await adminDb().collection('affiliate_reviews').where('status', '==', 'approved').get();
-  return snapshot.docs.map((document) => reviewSummary(document)).sort(newestFirst).slice(0, 60);
+  return snapshot.docs
+    .map((document) => reviewSummary(document))
+    .filter((review) => !productId || review.productId === productId)
+    .sort(newestFirst)
+    .slice(0, 60);
+}
+
+// O divulgador pode apagar o vídeo ou deixá-lo privado. Confere no oEmbed (YouTube/TikTok)
+// e tira do site o que saiu do ar; se voltar, volta a aparecer. Instagram não tem como conferir.
+async function checkReviews(req, body) {
+  assertExactKeys(body, ['action']);
+  await requireAdmin(req);
+  const collection = adminDb().collection('affiliate_reviews');
+  const snapshot = await collection.get();
+  const candidates = snapshot.docs
+    .map((document) => ({ id: document.id, ...reviewSummary(document) }))
+    .filter((review) => ['approved', 'unavailable'].includes(review.status) && oembedEndpoint(review))
+    .slice(0, 40);
+  let hidden = 0;
+  let restored = 0;
+  await Promise.all(candidates.map(async (review) => {
+    let gone;
+    try {
+      const response = await fetch(oembedEndpoint(review), { signal: AbortSignal.timeout(4000), headers: { accept: 'application/json' } });
+      if (response.ok) gone = false;
+      else if ([400, 401, 403, 404].includes(response.status)) gone = true;
+    } catch {
+      // Sem resposta não prova nada: mantém como está.
+    }
+    if (gone === undefined || gone === (review.status === 'unavailable')) return;
+    await collection.doc(review.id).update({ status: gone ? 'unavailable' : 'approved', checkedAt: new Date().toISOString() });
+    if (gone) hidden += 1; else restored += 1;
+  }));
+  return { checked: candidates.length, hidden, restored };
+}
+
+/* ---------- Compras por código de divulgador ---------- */
+
+// Conta direto nos pedidos (pagos e não cancelados), e não num contador:
+// pedido cancelado ou excluído depois sai da conta sozinho.
+function countsAsPurchase(order) {
+  return order.paymentConfirmed === true && !['cancelled', 'cancelado'].includes(String(order.status || ''));
+}
+
+async function promoterOrders(req, user, body) {
+  assertExactKeys(body, ['action', 'admin']);
+  const asAdmin = adminRequested(body);
+  if (asAdmin) await requireAdmin(req);
+  const db = adminDb();
+  const affiliatesQuery = asAdmin
+    ? db.collection('affiliates').where('kind', '==', 'promoter')
+    : db.collection('affiliates').where('ownerEmail', '==', tokenEmail(user));
+  const codes = (await affiliatesQuery.get()).docs
+    .filter((document) => affiliateKind(document.data()) === 'promoter')
+    .map((document) => document.id)
+    .slice(0, 200);
+
+  const byCode = {};
+  await Promise.all(codes.map(async (code) => {
+    const snapshot = await db.collection('orders').where('affiliateCode', '==', code).get();
+    const orders = snapshot.docs
+      .map((document) => document.data() || {})
+      .filter(countsAsPurchase)
+      .map((order) => ({
+        date: String(order.paymentConfirmedAt || order.orderDate || ''),
+        netYen: numberOrZero(order.netProductsYen),
+        // Quem comprou só interessa à loja; o divulgador vê data e valor.
+        ...(asAdmin ? { orderId: String(order.id || order.orderNumber || ''), customerName: String(order.customerName || '') } : {}),
+      }))
+      .sort((a, b) => (a.date < b.date ? 1 : -1));
+    byCode[code] = {
+      count: orders.length,
+      revenueYen: orders.reduce((sum, order) => sum + order.netYen, 0),
+      orders: orders.slice(0, 50),
+    };
+  }));
+  return byCode;
 }
 
 async function adminReviews(req, body) {
@@ -331,6 +431,14 @@ export default async function handler(req, res) {
     }
     if (action === 'review-admin-list') {
       res.status(200).json({ reviews: await adminReviews(req, body) });
+      return;
+    }
+    if (action === 'review-check') {
+      res.status(200).json(await checkReviews(req, body));
+      return;
+    }
+    if (action === 'promoter-orders') {
+      res.status(200).json({ orders: await promoterOrders(req, user, body) });
       return;
     }
     if (action === 'review-moderate') {

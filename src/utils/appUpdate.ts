@@ -6,10 +6,18 @@
 // de página o cliente acabou de tocar num link, e a recarga entra nesse gesto.
 
 let pronta = false;
+const ouvintes = new Set<() => void>();
 
 /** O service worker novo assumiu: há versão nova esperando para entrar. */
 export function marcarAtualizacaoPronta(): void {
   pronta = true;
+  ouvintes.forEach((avisar) => avisar());
+}
+
+/** Para a tela mostrar o aviso "nova versão" assim que ela chega. */
+export function aoFicarPronta(avisar: () => void): () => void {
+  ouvintes.add(avisar);
+  return () => { ouvintes.delete(avisar); };
 }
 
 export function atualizacaoPronta(): boolean {

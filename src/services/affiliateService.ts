@@ -149,7 +149,7 @@ export type PendingCommissionSummary = Pick<
 
 /** Vídeo de review enviado por um divulgador (YouTube, TikTok ou Instagram). */
 export type ReviewPlatform = 'youtube' | 'tiktok' | 'instagram';
-export type ReviewStatus = 'pending' | 'approved' | 'rejected';
+export type ReviewStatus = 'pending' | 'approved' | 'rejected' | 'unavailable';
 export interface AffiliateReview {
   id: string;
   code: string;
@@ -164,6 +164,19 @@ export interface AffiliateReview {
   status: ReviewStatus;
   createdAt: string;
   ownerEmail?: string; // só na lista do admin
+}
+
+/** Compras pagas (e não canceladas) de um código de divulgador. */
+export interface PromoterOrder {
+  date: string;
+  netYen: number;
+  orderId?: string;      // só para o admin
+  customerName?: string; // só para o admin
+}
+export interface PromoterOrders {
+  count: number;
+  revenueYen: number;
+  orders: PromoterOrder[];
 }
 
 const REVIEW_ERRORS: Record<string, string> = {
@@ -333,10 +346,11 @@ export const affiliateService = {
     }
   },
 
-  /** Reviews aprovados, para o vlog (público). */
-  async getApprovedReviews(): Promise<AffiliateReview[]> {
+  /** Reviews aprovados (público): todos para o vlog, ou só os de um produto. */
+  async getApprovedReviews(productId?: string): Promise<AffiliateReview[]> {
     try {
-      return (await reviewsCall<{ reviews: AffiliateReview[] }>({ action: 'review-list' }, false)).reviews || [];
+      const body = { action: 'review-list', ...(productId ? { productId } : {}) };
+      return (await reviewsCall<{ reviews: AffiliateReview[] }>(body, false)).reviews || [];
     } catch (e) {
       devWarn('affiliateService.getApprovedReviews falhou:', e);
       return [];
@@ -353,8 +367,29 @@ export const affiliateService = {
     }
   },
 
+  /** Confere se os vídeos aprovados ainda existem nas redes; os que saíram do ar somem do site. */
+  async checkReviews(): Promise<{ checked: number; hidden: number; restored: number } | null> {
+    try {
+      return await reviewsCall<{ checked: number; hidden: number; restored: number }>({ action: 'review-check' });
+    } catch (e) {
+      devWarn('affiliateService.checkReviews falhou:', e);
+      return null;
+    }
+  },
+
+  /** Compras por código de divulgador, contadas nos pedidos (cancelado não conta). */
+  async getPromoterOrders(admin = false): Promise<Record<string, PromoterOrders>> {
+    try {
+      const body = { action: 'promoter-orders', ...(admin ? { admin: true } : {}) };
+      return (await reviewsCall<{ orders: Record<string, PromoterOrders> }>(body)).orders || {};
+    } catch (e) {
+      devWarn('affiliateService.getPromoterOrders falhou:', e);
+      return {};
+    }
+  },
+
   /** Admin aprova, recusa ou exclui um review. */
-  async moderateReview(id: string, status: ReviewStatus | 'deleted'): Promise<boolean> {
+  async moderateReview(id: string, status: 'approved' | 'rejected' | 'deleted'): Promise<boolean> {
     try {
       await reviewsCall<{ ok: boolean }>({ action: 'review-moderate', id, status });
       return true;
