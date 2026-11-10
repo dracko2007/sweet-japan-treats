@@ -83,3 +83,22 @@ export async function limparCatalogo(): Promise<void> {
     // nada a fazer — o cache já está inacessível
   }
 }
+
+/** Retrato do catálogo que vai junto com o site (/catalog/snapshot.json, gerado por
+ *  scripts/sync-local-catalog.mjs). Na primeira visita ele mostra a vitrine sem
+ *  esperar o Firestore; o delta logo em seguida traz preço e estoque atuais. */
+export async function lerRetratoLocal(): Promise<CatalogSnapshot | null> {
+  try {
+    const response = await fetch('/catalog/snapshot.json');
+    if (!response.ok) return null;
+    const data = await response.json() as Partial<CatalogSnapshot>;
+    if (!Array.isArray(data.items) || !data.items.length) return null;
+    return {
+      items: data.items,
+      deleted: Array.isArray(data.deleted) ? data.deleted : [],
+      syncedAtMs: Number(data.syncedAtMs) || 0,
+    };
+  } catch {
+    return null;
+  }
+}

@@ -10,6 +10,7 @@ import { formatPrice, getCurrencyByCountry } from '@/utils/currency';
 import { effectiveYen, baseYen, hasDiscount } from '@/utils/pricing';
 import { convertYen as fxConvert } from '@/services/fxService';
 import { productEnglishName } from '@/utils/productName';
+import { localImage } from '@/utils/localImage';
 
 interface CartItemProps {
   item: CartItemType;
@@ -46,7 +47,7 @@ const CartItemComponent: React.FC<CartItemProps> = ({ item, couponDiscount = 0 }
       <div className="flex gap-4 p-4 bg-purple-50 dark:bg-purple-950/20 rounded-xl border border-purple-200 dark:border-purple-800">
         <div className="w-24 h-24 rounded-lg overflow-hidden bg-secondary/50 flex-shrink-0 relative">
           {item.product.image ? (
-            <img src={item.product.image} alt={productName} loading="lazy" className="w-full h-full object-cover" />
+            <img src={localImage(item.product.image, 'thumb')} alt={productName} loading="lazy" className="w-full h-full object-cover" />
           ) : (
             <span className="text-4xl">🎁</span>
           )}
@@ -81,7 +82,7 @@ const CartItemComponent: React.FC<CartItemProps> = ({ item, couponDiscount = 0 }
       {/* Image — clicável para ir à página do produto */}
       <Link to={productUrl} className="w-24 h-24 rounded-lg overflow-hidden bg-secondary/50 flex-shrink-0 hover:opacity-90 transition-opacity">
         {item.product.image ? (
-          <img src={item.product.image} alt={productName} loading="lazy" className="w-full h-full object-cover" />
+          <img src={localImage(item.product.image, 'thumb')} alt={productName} loading="lazy" className="w-full h-full object-cover" />
         ) : (
           <span className="text-4xl">🌸</span>
         )}

@@ -16,6 +16,7 @@ import { categoryService, DEFAULT_CATEGORIES, type ProductCategory } from '@/ser
 import ItemListJsonLd from '@/components/ItemListJsonLd';
 import { formatPrice, getCurrencyByCountry } from '@/utils/currency';
 import { convertYen as fxConvert } from '@/services/fxService';
+import { productThumb } from '@/utils/localImage';
 const normalize = (s: string) =>
   (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 
@@ -440,7 +441,7 @@ const Products: React.FC = () => {
                     <p className="py-6 text-center text-xs text-muted-foreground">Seu carrinho está vazio.</p>
                   ) : cartItems.map((item) => (
                     <div key={`${item.product.id}-${item.size}`} className="flex items-center gap-2 border-b border-slate-100 pb-2">
-                      <img src={item.product.thumbnail || item.product.image} alt="" className="h-11 w-11 rounded-lg bg-slate-50 object-contain" />
+                      <img src={productThumb(item.product)} alt="" className="h-11 w-11 rounded-lg bg-slate-50 object-contain" />
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-xs font-bold text-slate-700">{item.product.name}</p>
                         <p className="text-[11px] text-slate-500">Qtd. {item.quantity}</p>

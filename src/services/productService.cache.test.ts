@@ -33,6 +33,7 @@ vi.mock('firebase/firestore', () => ({
 
 vi.mock('@/services/catalogCache', () => ({
   lerCatalogo: async () => cacheMocks.snapshot,
+  lerRetratoLocal: async () => null, // sem retrato: estes testes cobrem a ida ao Firestore
   gravarCatalogo: async (s: unknown) => { cacheMocks.snapshot = s; },
   limparCatalogo: async () => { cacheMocks.snapshot = null; },
 }));

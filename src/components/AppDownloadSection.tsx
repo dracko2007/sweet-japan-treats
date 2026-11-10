@@ -273,7 +273,7 @@ const AppDownloadSection: React.FC = () => {
                   {/* Mesma vinheta cinematográfica usada pelo hero transition */}
                   <div className="absolute inset-0 bg-pink-500">
                     <video
-                      src="/videos/hero-store-transition.mp4"
+                      src="/videos/hero-store-transition-mobile.mp4"
                       poster="/videos/hero-intro-poster.jpg"
                       autoPlay
                       muted

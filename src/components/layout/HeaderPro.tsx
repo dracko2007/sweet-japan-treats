@@ -15,6 +15,7 @@ import JapanExpressLogo from '@/components/JapanExpressLogo';
 import { cn } from '@/lib/utils';
 import { scrollPageToTop } from '@/lib/smoothScroll';
 import { restoreAndOpen, useMinimized } from '@/utils/floatingWidgets';
+import { localImage, productThumb } from '@/utils/localImage';
 import MegaMenu from './pro/MegaMenu';
 import SearchPalette from './pro/SearchPalette';
 import MiniCartDrawer from './pro/MiniCartDrawer';
@@ -167,7 +168,7 @@ const HeaderPro: React.FC = () => {
     const added = items.find((i) => !i.freeGift && (paidQty.get(i.product.id) || 0) > (prev.get(i.product.id) || 0));
     if (!added || pathname === '/carrinho' || pathname === '/checkout') return;
 
-    const img = reduce ? null : findSourceImage([added.product.thumbnail || '', added.product.image || '']);
+    const img = reduce ? null : findSourceImage([productThumb(added.product), localImage(added.product.image), added.product.thumbnail || '', added.product.image || '']);
     const target = img && findCartTarget();
     if (!img || !target) {
       setCartKick((k) => k + 1);

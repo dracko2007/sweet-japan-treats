@@ -18,6 +18,7 @@ import { wishlistService } from '@/services/wishlistService';
 import { useWishlist } from '@/hooks/useWishlist';
 import { useTilt } from '@/hooks/useTilt';
 import { ToastAction } from '@/components/ui/toast';
+import { productThumb } from '@/utils/localImage';
 
 interface CompactProductCardProps {
   product: Product;
@@ -122,7 +123,7 @@ const CompactProductCard: React.FC<CompactProductCardProps> = ({ product }) => {
             <video
               key={product.video}
               src={cdnVideo(product.video, 480)}
-              poster={product.thumbnail || product.image}
+              poster={productThumb(product)}
               preload="none"
               autoPlay
               loop
@@ -135,7 +136,7 @@ const CompactProductCard: React.FC<CompactProductCardProps> = ({ product }) => {
             <>
               {/* Poster sempre visível — vídeo só carrega/toca no hover para não travar a página */}
               <img
-                src={product.thumbnail || product.image}
+                src={productThumb(product)}
                 alt={name}
                 loading="lazy"
                 className={`absolute inset-0 h-full w-full object-contain p-5 transition-all duration-500 group-hover:scale-[1.04] ${isHovered ? 'opacity-0' : 'opacity-100'}`}
@@ -155,7 +156,7 @@ const CompactProductCard: React.FC<CompactProductCardProps> = ({ product }) => {
             </>
           ) : (
             <img
-              src={product.thumbnail || product.image}
+              src={productThumb(product)}
               alt={name}
               loading="lazy"
               className="absolute inset-0 h-full w-full object-contain p-5 drop-shadow-[0_10px_12px_rgba(157,23,77,0.10)] transition-transform duration-500 group-hover:scale-[1.08]"

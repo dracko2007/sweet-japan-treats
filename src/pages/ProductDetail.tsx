@@ -24,6 +24,7 @@ import { effectiveYen, baseYen, hasDiscount, getVariants } from '@/utils/pricing
 import { convertYen as fxConvert } from '@/services/fxService';
 import { productEnglishName } from '@/utils/productName';
 import ProductJsonLd from '@/components/ProductJsonLd';
+import { localImage } from '@/utils/localImage';
 import ProductVideoReviews from '@/components/products/ProductVideoReviews';
 import { useSeo } from '@/hooks/useSeo';
 import DeliveryEstimateBadge from '@/components/products/DeliveryEstimate';
@@ -302,7 +303,7 @@ const ProductDetail: React.FC = () => {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 animate-fade-in motion-reduce:animate-none">
               <div>
                 <ProductGallery
-                  images={images}
+                  images={images.map((src) => localImage(src))}
                   productName={translatedName}
                   video={product.video}
                   videoCover={product.videoCover}

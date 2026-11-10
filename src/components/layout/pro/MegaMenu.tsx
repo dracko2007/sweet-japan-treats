@@ -8,6 +8,7 @@ import type { Product } from '@/types';
 import { minEffectiveYen } from '@/utils/pricing';
 import { productEnglishName } from '@/utils/productName';
 import { usePrice } from './usePrice';
+import { productThumb } from '@/utils/localImage';
 
 interface Props {
   id: string;
@@ -110,7 +111,7 @@ const MegaMenu: React.FC<Props> = ({ id, categories, counts, tags, highlights, o
                   <Link to={`/produto/${p.id}`} onClick={onNavigate} className="group block">
                     <span className="block aspect-[3/4] overflow-hidden rounded-2xl bg-pink-50 shadow-sm">
                       <img
-                        src={p.thumbnail || p.image}
+                        src={productThumb(p)}
                         alt=""
                         loading="lazy"
                         className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"

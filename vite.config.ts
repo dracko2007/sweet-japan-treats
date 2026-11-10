@@ -76,7 +76,8 @@ export default defineConfig(({ mode }) => ({
             handler: "CacheFirst",
             options: {
               cacheName: "site-media-v1",
-              expiration: { maxEntries: 200, maxAgeSeconds: 60 * 60 * 24 * 30 },
+              // 700: cabem as fotos de produto locais (/catalog), além das mídias do site.
+              expiration: { maxEntries: 700, maxAgeSeconds: 60 * 60 * 24 * 30 },
               cacheableResponse: { statuses: [0, 200] },
             },
           },

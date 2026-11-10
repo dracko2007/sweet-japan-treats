@@ -14,6 +14,7 @@ import { SESSION_END_EVENT } from '@/utils/localData';
 import { cn } from '@/lib/utils';
 import { useEscape, useScrollLock } from './useScrollLock';
 import { usePrice } from './usePrice';
+import { productThumb } from '@/utils/localImage';
 
 const RECENT_KEY = 'sandbox_recent_searches';
 const MAX_RECENT = 5;
@@ -296,7 +297,7 @@ const SearchPalette: React.FC<Props> = ({ open, onClose, categories }) => {
                       >
                         <span className="block aspect-square overflow-hidden rounded-xl bg-pink-50/50">
                           <img
-                            src={p.thumbnail || p.image}
+                            src={productThumb(p)}
                             alt=""
                             loading="lazy"
                             className="h-full w-full object-contain p-1.5 transition-transform duration-500 group-hover:scale-110"
@@ -344,7 +345,7 @@ const SearchPalette: React.FC<Props> = ({ open, onClose, categories }) => {
                       <motion.span layoutId="search-active" className="absolute inset-0 rounded-2xl bg-pink-50" transition={pill} aria-hidden />
                     )}
                     <img
-                      src={p.thumbnail || p.image}
+                      src={productThumb(p)}
                       alt=""
                       loading="lazy"
                       className="relative h-14 w-14 shrink-0 rounded-xl border border-pink-100 bg-white object-cover"

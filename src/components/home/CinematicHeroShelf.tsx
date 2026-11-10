@@ -15,6 +15,7 @@ import type { Product } from '@/types';
 import type { ActivePromo } from '@/types/promotion';
 import { db } from '@/config/firebase';
 import { doc, getDoc } from 'firebase/firestore';
+import { localImage } from '@/utils/localImage';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -168,6 +169,8 @@ interface CinematicHeroShelfProps {
 
 interface IntroVideoConfig {
   src: string;
+  /** Versão menor do mesmo vídeo para o celular. */
+  mobileSrc?: string;
   poster: string;
   overlayExitAtSeconds: number;
   restartHoldMs: number;
@@ -191,6 +194,7 @@ const INTRO_VIDEOS: Record<CinematicIntroVariant, IntroVideoConfig> = {
   },
   transition: {
     src: '/videos/hero-store-transition.mp4',
+    mobileSrc: '/videos/hero-store-transition-mobile.mp4',
     poster: '/videos/hero-intro-poster.jpg',
     overlayExitAtSeconds: 5.6,
     restartHoldMs: 2600,
@@ -517,7 +521,8 @@ const CinematicHeroShelf: React.FC<CinematicHeroShelfProps> = ({
       <video
         ref={introVideoRef}
         className="pointer-events-none absolute inset-0 h-full w-full object-cover"
-        src={introVideo.src}
+        // Celular: versão 360p (≈0,4 MB) do mesmo vídeo; o painel ali é pequeno.
+        src={isMobile && introVideo.mobileSrc ? introVideo.mobileSrc : introVideo.src}
         poster={introVideo.poster}
         autoPlay
         muted
@@ -653,7 +658,7 @@ const CinematicHeroShelf: React.FC<CinematicHeroShelfProps> = ({
           {/* Produto "pega" o mouse e inclina em 3D, como se estivesse na mão do cliente. */}
           <Tilt max={14} lift={1.04} glare={false}>
             <img
-              src={p.image}
+              src={localImage(p.image)}
               alt={`${p.brand} ${name}`}
               loading="lazy"
               className="cinematic-product-img h-[18vh] max-h-[165px] w-auto object-contain md:h-[58vh] md:max-h-[440px]"

@@ -19,6 +19,7 @@ import { useUser } from '@/context/UserContext';
 import { useWishlist } from '@/hooks/useWishlist';
 import { wishlistService } from '@/services/wishlistService';
 import { ToastAction } from '@/components/ui/toast';
+import { localImage, productThumb } from '@/utils/localImage';
 
 interface PosterCardProps {
   product: Product;
@@ -48,7 +49,7 @@ const PosterCard: React.FC<PosterCardProps> = ({ product, name, priceLabel, onOp
       >
         <motion.img
           layoutId={`poster-img-${product.id}`}
-          src={product.thumbnail || product.image}
+          src={productThumb(product)}
           alt={name}
           loading="lazy"
           className={cn(
@@ -261,7 +262,7 @@ const CinematicPosterShelf: React.FC<CinematicPosterShelfProps> = ({
 
               <motion.img
                 layoutId={`poster-img-${selected.id}`}
-                src={selected.image}
+                src={localImage(selected.image)}
                 alt={productEnglishName(selected)}
                 className="hidden w-2/5 shrink-0 bg-white object-contain p-4 md:block"
               />

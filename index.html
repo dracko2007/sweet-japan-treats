@@ -10,9 +10,10 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700;800&display=swap" />
-    <!-- Hero transition padrão: preload evita atraso entre o loader e a
-         experiência cinematográfica da home/PWA. -->
-    <link rel="preload" as="video" href="/videos/hero-store-transition.mp4" type="video/mp4" fetchpriority="high" />
+    <!-- Retrato do catálogo: baixa junto com o código, para a vitrine aparecer sem esperar o servidor. -->
+    <link rel="preload" as="fetch" href="/catalog/snapshot.json" crossorigin="anonymous" />
+    <!-- Sem preload do vídeo do hero: ele era pedido em TODAS as páginas (e no
+         celular baixava a versão grande além da pequena). O poster cobre a espera. -->
     <script src="/init.js"></script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <link rel="icon" type="image/png" sizes="192x192" href="/favicon.png?v=2" />

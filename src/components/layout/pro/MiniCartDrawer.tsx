@@ -10,6 +10,7 @@ import { formatPrice, getCurrencyByCountry } from '@/utils/currency';
 import { convertYen } from '@/services/fxService';
 import { productEnglishName } from '@/utils/productName';
 import { useEscape, useScrollLock } from './useScrollLock';
+import { productThumb } from '@/utils/localImage';
 
 interface Props {
   open: boolean;
@@ -128,7 +129,7 @@ const MiniCartDrawer: React.FC<Props> = ({ open, onClose }) => {
                         >
                           <Link to={`/produto/${item.product.id}`} onClick={onClose} className="shrink-0">
                             <img
-                              src={item.product.thumbnail || item.product.image}
+                              src={productThumb(item.product)}
                               alt=""
                               className="h-20 w-20 rounded-xl bg-pink-50 object-cover"
                             />

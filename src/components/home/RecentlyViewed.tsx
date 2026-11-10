@@ -8,6 +8,7 @@ import { effectiveYen } from '@/utils/pricing';
 import { convertYen as fxConvert } from '@/services/fxService';
 import { useLanguage } from '@/context/LanguageContext';
 import { productEnglishName } from '@/utils/productName';
+import { productThumb } from '@/utils/localImage';
 
 /** Carrossel "Visto Recentemente" — baseado no histórico local do navegador (sem login necessário). */
 const RecentlyViewed: React.FC = () => {
@@ -44,7 +45,7 @@ const RecentlyViewed: React.FC = () => {
               >
                 <div className="aspect-square bg-white overflow-hidden">
                   <img
-                    src={product.thumbnail || product.image}
+                    src={productThumb(product)}
                     alt={productEnglishName(product)}
                     loading="lazy"
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"

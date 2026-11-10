@@ -21,7 +21,7 @@ import {
   writeBatch,
 } from 'firebase/firestore';
 import type { CatalogSnapshot } from '@/services/catalogCache';
-import { gravarCatalogo, lerCatalogo, limparCatalogo } from '@/services/catalogCache';
+import { gravarCatalogo, lerCatalogo, lerRetratoLocal, limparCatalogo } from '@/services/catalogCache';
 import { Product } from '@/types';
 import { cdnImage } from '@/services/cloudinaryService';
 import { products as defaultProducts } from '@/data/products';
@@ -78,6 +78,19 @@ function instanteMs(valor: unknown): number {
   return 0;
 }
 // ──────────────────────────────────────────────────────────────────────────
+
+/** Lista final a partir do cache: Firestore é a fonte; os defaults só cobrem IDs ausentes. */
+function mesclar(snapshot: CatalogSnapshot): Product[] {
+  const map = new Map<string, Product>();
+  // Defaults entram sem imagem própria — só como esqueleto de fallback.
+  for (const p of defaultProducts) {
+    map.set(p.id, { ...p, image: '', gallery: [], thumbnail: undefined });
+  }
+  for (const p of snapshot.items) map.set(p.id, p);
+  for (const id of snapshot.deleted) map.delete(id);
+  const result = Array.from(map.values()).filter((p) => p.image);
+  return result.length > 0 ? result : snapshot.items.length > 0 ? snapshot.items : defaultProducts;
+}
 
 const stripUndefined = (value: unknown): unknown => {
   if (value === undefined) return undefined;
@@ -197,6 +210,8 @@ export const productService = {
    *  Primeira visita: leitura completa. Depois: só o delta. */
   async sync(): Promise<CatalogSnapshot | null> {
     if (!memoria) memoria = await lerCatalogo();
+    // Primeira visita: parte do retrato local e pede só o que mudou depois dele.
+    if (!memoria) memoria = await lerRetratoLocal();
 
     const base = memoria;
     const { items, deleted, maxMs } = await this.getOverrides(base ? base.syncedAtMs : null);
@@ -229,6 +244,14 @@ export const productService = {
     return memoria;
   },
 
+  /** O que já está no aparelho (ou o retrato que vem com o site), SEM ir à rede
+   *  do Firestore. Serve para mostrar a vitrine na hora; `getMerged` atualiza depois. */
+  async getLocal(): Promise<Product[] | null> {
+    if (!memoria) memoria = await lerCatalogo();
+    if (!memoria) memoria = await lerRetratoLocal();
+    return memoria ? mesclar(memoria) : null;
+  },
+
   /** Lista final: Firestore é fonte de verdade. defaultProducts entram só para
    *  IDs que o Firestore não tem (evita tela vazia em erros parciais).
    *
@@ -250,16 +273,7 @@ export const productService = {
     }
 
     if (!memoria) return defaultProducts;
-
-    const map = new Map<string, Product>();
-    // Defaults entram sem imagem própria — só como esqueleto de fallback.
-    for (const p of defaultProducts) {
-      map.set(p.id, { ...p, image: '', gallery: [], thumbnail: undefined });
-    }
-    for (const p of memoria.items) map.set(p.id, p);
-    for (const id of memoria.deleted) map.delete(id);
-    const result = Array.from(map.values()).filter((p) => p.image);
-    return result.length > 0 ? result : memoria.items.length > 0 ? memoria.items : defaultProducts;
+    return mesclar(memoria);
   },
 
   /**

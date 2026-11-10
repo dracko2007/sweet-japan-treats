@@ -84,7 +84,18 @@ export const ProductsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     let cancelled = false;
 
     const load = async (attempt = 0) => {
-      if (attempt === 0) setLoading(true);
+      if (attempt === 0) {
+        setLoading(true);
+        // Mostra na hora o que já está no aparelho (ou o retrato que vem com o
+        // site) e atualiza preço/estoque logo abaixo. Antes a vitrine esperava a
+        // resposta do servidor em TODA abertura de página, mesmo com cache.
+        const local = await productService.getLocal().catch(() => null);
+        if (cancelled) return;
+        if (local?.length) {
+          setProducts(local);
+          setLoading(false);
+        }
+      }
       try {
         const merged = await productService.getMerged(attempt > 0);
         if (cancelled) return;
