@@ -32,23 +32,6 @@ const Vlog: React.FC = () => {
     affiliateService.getApprovedReviews().then(setReviews);
   }, []);
 
-  // Vídeos padrão (fallback quando o admin ainda não cadastrou nada)
-  const defaultVideos = [
-    { id: 1, titleKey: 'vlog.video1.title', descKey: 'vlog.video1.desc', thumbnail: '', videoUrl: 'tYcA1j-fcKg', duration: '14:02', date: '2026-05-15', views: '' },
-    { id: 2, titleKey: 'vlog.video2.title', descKey: 'vlog.video2.desc', thumbnail: '', videoUrl: '1xN5_p-lU0Y', duration: '12:45', date: '2026-05-08', views: '' },
-    { id: 3, titleKey: 'vlog.video3.title', descKey: 'vlog.video3.desc', thumbnail: '', videoUrl: 'S7R97sV1w8k', duration: '13:28', date: '2026-05-01', views: '' },
-  ];
-
-  const normDefault = (v: typeof defaultVideos[number]): DisplayVideo => ({
-    id: String(v.id),
-    title: t(v.titleKey),
-    description: t(v.descKey),
-    ytId: getYouTubeId(v.videoUrl),
-    thumbnail: v.thumbnail || undefined,
-    duration: v.duration,
-    date: v.date,
-    views: v.views || undefined,
-  });
   const normAdmin = (v: VlogVideo): DisplayVideo => ({
     id: v.id,
     title: v.title,
@@ -73,10 +56,6 @@ const Vlog: React.FC = () => {
       featured = adminVids[0];
       grid = adminVids.slice(1);
     }
-  } else {
-    const defs = defaultVideos.map(normDefault);
-    featured = defs[0];
-    grid = defs.slice(1);
   }
 
   const getThumb = (v: DisplayVideo) =>
@@ -86,8 +65,11 @@ const Vlog: React.FC = () => {
         ? `https://img.youtube.com/vi/${v.ytId}/hqdefault.jpg`
         : '/placeholder.svg';
 
-  const youtubeUrl = import.meta.env.VITE_YOUTUBE_URL || 'https://www.youtube.com';
-  const instagramUrl = import.meta.env.VITE_INSTAGRAM_URL || 'https://www.instagram.com';
+  // Sempre os perfis da loja (os mesmos do rodapé), nunca a página inicial da plataforma.
+  // YouTube só aparece quando o canal estiver configurado (VITE_YOUTUBE_URL).
+  const youtubeUrl = import.meta.env.VITE_YOUTUBE_URL || '';
+  const instagramUrl = import.meta.env.VITE_INSTAGRAM_URL || 'https://www.instagram.com/japan_express_official/';
+  const tiktokUrl = 'https://www.tiktok.com/@japanexpressoficial';
   const dateLocale = language === 'pt' ? 'pt-BR' : language === 'ja' ? 'ja-JP' : 'en-US';
 
   const pageTitle = vlog?.title || t('vlog.title');
@@ -154,6 +136,10 @@ const Vlog: React.FC = () => {
                 </div>
               </div>
             </div>
+          )}
+
+          {!featured && grid.length === 0 && reviews.length === 0 && (
+            <p className="text-center text-muted-foreground py-8">Em breve, novos vídeos por aqui.</p>
           )}
 
           {/* Video Grid */}
@@ -281,9 +267,14 @@ const Vlog: React.FC = () => {
             <span className="text-4xl mb-4 block">📺</span>
             <h3 className="font-display text-2xl font-bold text-foreground mb-2">{t('vlog.subscribe')}</h3>
             <p className="text-muted-foreground mb-6 max-w-md mx-auto">{t('vlog.subscribeDesc')}</p>
-            <div className="flex justify-center gap-4">
-              <a href={youtubeUrl} target="_blank" rel="noopener noreferrer" className="px-6 py-2.5 rounded-full bg-destructive text-destructive-foreground font-medium hover:bg-destructive/90 transition-colors text-sm">
-                YouTube
+            <div className="flex flex-wrap justify-center gap-3">
+              {youtubeUrl && (
+                <a href={youtubeUrl} target="_blank" rel="noopener noreferrer" className="px-6 py-2.5 rounded-full bg-destructive text-destructive-foreground font-medium hover:bg-destructive/90 transition-colors text-sm">
+                  YouTube
+                </a>
+              )}
+              <a href={tiktokUrl} target="_blank" rel="noopener noreferrer" className="px-6 py-2.5 rounded-full bg-foreground text-background font-medium hover:opacity-90 transition-opacity text-sm">
+                TikTok
               </a>
               <a href={instagramUrl} target="_blank" rel="noopener noreferrer" className="px-6 py-2.5 rounded-full gradient-caramel text-primary-foreground font-medium hover:opacity-90 transition-opacity text-sm">
                 Instagram
