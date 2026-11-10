@@ -1,11 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Megaphone, Plus, Trash2, Link2, TrendingUp, DollarSign, Package, X, CheckCircle, Clock, RefreshCw, Users, ShoppingBag } from 'lucide-react';
+import { Megaphone, Plus, Trash2, Link2, TrendingUp, DollarSign, Package, X, CheckCircle, Clock, RefreshCw, Users, ShoppingBag, Video } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { useConfirm } from '@/components/ConfirmDialog';
-import { affiliateService, affiliateLink, isPromoter, Affiliate, AffiliateKind, PendingCommission, TIER_CONFIG, AffiliateTier } from '@/services/affiliateService';
+import { affiliateService, affiliateLink, isPromoter, Affiliate, AffiliateKind, AffiliateReview, PendingCommission, TIER_CONFIG, AffiliateTier } from '@/services/affiliateService';
 import { useProducts } from '@/context/ProductsContext';
 
 const EMPTY_FORM = {
@@ -34,6 +34,7 @@ const AffiliateManager: React.FC = () => {
   const { products } = useProducts();
   const [affiliates, setAffiliates] = useState<Affiliate[]>([]);
   const [pending, setPending] = useState<PendingCommission[]>([]);
+  const [reviews, setReviews] = useState<AffiliateReview[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -68,10 +69,12 @@ const AffiliateManager: React.FC = () => {
 
   const load = async () => {
     setLoading(true);
-    const [list, pend] = await Promise.all([
+    const [list, pend, revs] = await Promise.all([
       affiliateService.getAll(),
       affiliateService.getPendingCommissions(),
+      affiliateService.getAllReviews(),
     ]);
+    setReviews(revs);
     setAffiliates(list.sort((a, b) => b.totalEarnings - a.totalEarnings));
     setPending(pend.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
     setLoading(false);
@@ -155,6 +158,17 @@ const AffiliateManager: React.FC = () => {
         load();
       },
     });
+  };
+
+  const handleReview = async (review: AffiliateReview, status: 'approved' | 'rejected' | 'deleted') => {
+    if (!(await affiliateService.moderateReview(review.id, status))) {
+      toast({ title: 'Não foi possível atualizar o vídeo', variant: 'destructive' });
+      return;
+    }
+    toast({ title: status === 'approved' ? '✅ Vídeo publicado no vlog' : status === 'rejected' ? 'Vídeo recusado' : 'Vídeo removido' });
+    setReviews((current) => status === 'deleted'
+      ? current.filter((item) => item.id !== review.id)
+      : current.map((item) => (item.id === review.id ? { ...item, status } : item)));
   };
 
   const handleSave = async () => {
@@ -471,6 +485,55 @@ const AffiliateManager: React.FC = () => {
                   </Button>
                   <Button size="sm" variant="outline" className="text-xs text-destructive" onClick={() => handleCancelPending(pc)}>
                     <X className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Vídeos de review enviados pelos divulgadores — aprovar publica no vlog */}
+      {reviews.length > 0 && (
+        <div className="bg-card border border-border rounded-xl p-5">
+          <h3 className="font-semibold flex items-center gap-2 mb-1">
+            <Video className="w-5 h-5 text-primary" /> Vídeos de review ({reviews.filter((r) => r.status === 'pending').length} aguardando)
+          </h3>
+          <p className="text-xs text-muted-foreground mb-4">
+            O divulgador cola o link no painel dele. Ao aprovar, o vídeo aparece no vlog com o link do produto.
+          </p>
+          <div className="space-y-2">
+            {reviews.map((review) => (
+              <div key={review.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border p-3">
+                <div className="min-w-0 text-sm">
+                  <a href={review.url} target="_blank" rel="noopener noreferrer" className="font-semibold text-foreground hover:text-primary break-all">
+                    {review.title || review.url}
+                  </a>
+                  <div className="text-xs text-muted-foreground">
+                    <span className="font-mono font-bold text-primary">{review.code}</span>
+                    {' · '}{review.ownerName || review.ownerEmail}
+                    {review.productName ? ` · ${review.productName}` : ''}
+                    {' · '}{review.platform}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
+                    review.status === 'approved' ? 'bg-green-100 text-green-700' : review.status === 'rejected' ? 'bg-gray-100 text-gray-600' : 'bg-amber-100 text-amber-800'
+                  }`}>
+                    {review.status === 'approved' ? 'Publicado' : review.status === 'rejected' ? 'Recusado' : 'Aguardando'}
+                  </span>
+                  {review.status !== 'approved' && (
+                    <Button size="sm" className="btn-primary text-xs" onClick={() => handleReview(review, 'approved')}>
+                      <CheckCircle className="w-4 h-4 mr-1" /> Aprovar
+                    </Button>
+                  )}
+                  {review.status !== 'rejected' && (
+                    <Button size="sm" variant="outline" className="text-xs" onClick={() => handleReview(review, 'rejected')}>
+                      Recusar
+                    </Button>
+                  )}
+                  <Button size="sm" variant="outline" className="text-xs text-destructive" onClick={() => handleReview(review, 'deleted')} title="Excluir vídeo">
+                    <Trash2 className="w-4 h-4" />
                   </Button>
                 </div>
               </div>

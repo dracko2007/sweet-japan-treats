@@ -4,6 +4,10 @@ import Layout from '@/components/layout/Layout';
 import { useLanguage } from '@/context/LanguageContext';
 import { siteContentService, VlogContent, VlogVideo } from '@/services/siteContentService';
 import { getYouTubeId } from '@/utils/youtube';
+import { Link } from 'react-router-dom';
+import { affiliateService, type AffiliateReview, type ReviewPlatform } from '@/services/affiliateService';
+
+const PLATFORM_LABEL: Record<ReviewPlatform, string> = { youtube: 'YouTube', tiktok: 'TikTok', instagram: 'Instagram' };
 
 interface DisplayVideo {
   id: string;
@@ -21,18 +25,18 @@ const Vlog: React.FC = () => {
   const [playingVideo, setPlayingVideo] = useState<string | null>(null);
   const [vlog, setVlog] = useState<VlogContent | null>(null);
 
+  const [reviews, setReviews] = useState<AffiliateReview[]>([]);
+
   useEffect(() => {
     siteContentService.getVlog().then(setVlog);
+    affiliateService.getApprovedReviews().then(setReviews);
   }, []);
 
   // Vídeos padrão (fallback quando o admin ainda não cadastrou nada)
   const defaultVideos = [
-    { id: 1, titleKey: 'vlog.video1.title', descKey: 'vlog.video1.desc', thumbnail: '', videoUrl: 'tYcA1j-fcKg', duration: '14:02', date: '2026-05-15', views: '12.5K' },
-    { id: 2, titleKey: 'vlog.video2.title', descKey: 'vlog.video2.desc', thumbnail: '', videoUrl: '1xN5_p-lU0Y', duration: '12:45', date: '2026-05-08', views: '8.2K' },
-    { id: 3, titleKey: 'vlog.video3.title', descKey: 'vlog.video3.desc', thumbnail: '', videoUrl: 'S7R97sV1w8k', duration: '13:28', date: '2026-05-01', views: '9.8K' },
-    { id: 4, titleKey: 'vlog.video4.title', descKey: 'vlog.video4.desc', thumbnail: '', videoUrl: '1xN5_p-lU0Y', duration: '12:45', date: '2026-04-20', views: '14.1K' },
-    { id: 5, titleKey: 'vlog.video5.title', descKey: 'vlog.video5.desc', thumbnail: '', videoUrl: 'tYcA1j-fcKg', duration: '14:02', date: '2026-04-10', views: '4.9K' },
-    { id: 6, titleKey: 'vlog.video6.title', descKey: 'vlog.video6.desc', thumbnail: '', videoUrl: 'S7R97sV1w8k', duration: '13:28', date: '2026-04-01', views: '3.5K' },
+    { id: 1, titleKey: 'vlog.video1.title', descKey: 'vlog.video1.desc', thumbnail: '', videoUrl: 'tYcA1j-fcKg', duration: '14:02', date: '2026-05-15', views: '' },
+    { id: 2, titleKey: 'vlog.video2.title', descKey: 'vlog.video2.desc', thumbnail: '', videoUrl: '1xN5_p-lU0Y', duration: '12:45', date: '2026-05-08', views: '' },
+    { id: 3, titleKey: 'vlog.video3.title', descKey: 'vlog.video3.desc', thumbnail: '', videoUrl: 'S7R97sV1w8k', duration: '13:28', date: '2026-05-01', views: '' },
   ];
 
   const normDefault = (v: typeof defaultVideos[number]): DisplayVideo => ({
@@ -43,7 +47,7 @@ const Vlog: React.FC = () => {
     thumbnail: v.thumbnail || undefined,
     duration: v.duration,
     date: v.date,
-    views: v.views,
+    views: v.views || undefined,
   });
   const normAdmin = (v: VlogVideo): DisplayVideo => ({
     id: v.id,
@@ -91,16 +95,16 @@ const Vlog: React.FC = () => {
 
   return (
     <Layout>
-      <div className="gradient-hero py-16">
+      <div className="gradient-hero py-6 md:py-16">
         <div className="container mx-auto px-4">
           <div className="text-center max-w-2xl mx-auto">
-            <h1 className="font-display text-4xl lg:text-5xl font-bold text-foreground mb-4">{pageTitle}</h1>
-            <p className="text-muted-foreground text-lg">{pageSubtitle}</p>
+            <h1 className="font-display text-2xl md:text-4xl lg:text-5xl font-bold text-foreground mb-2 md:mb-4">{pageTitle}</h1>
+            <p className="text-muted-foreground text-sm md:text-lg">{pageSubtitle}</p>
           </div>
         </div>
       </div>
 
-      <section className="py-16 bg-background">
+      <section className="py-6 md:py-16 bg-background">
         <div className="container mx-auto px-4">
           {/* Featured Video */}
           {featured && (
@@ -214,6 +218,63 @@ const Vlog: React.FC = () => {
               </div>
             ))}
           </div>
+
+          {/* Reviews enviados pelos divulgadores (aprovados no admin) */}
+          {reviews.length > 0 && (
+            <div className="mt-12 md:mt-16">
+              <h2 className="font-display text-xl md:text-2xl font-bold text-foreground mb-1">Reviews de quem testou</h2>
+              <p className="text-sm text-muted-foreground mb-5">Vídeos de criadores que receberam e testaram os produtos.</p>
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-5">
+                {reviews.map((review) => {
+                  const thumb = review.platform === 'youtube' && review.videoId
+                    ? `https://img.youtube.com/vi/${review.videoId}/hqdefault.jpg`
+                    : review.thumbnail;
+                  const title = review.title || review.productName || 'Review';
+                  const open = () => {
+                    if (review.platform === 'youtube' && review.videoId) setPlayingVideo(review.videoId);
+                    else window.open(review.url, '_blank', 'noopener,noreferrer');
+                  };
+                  return (
+                    <div key={review.id} className="bg-card rounded-2xl overflow-hidden border border-border shadow-sm flex flex-col">
+                      <button type="button" onClick={open} className="group relative block aspect-video w-full overflow-hidden bg-gradient-to-br from-pink-100 to-fuchsia-100" aria-label={`Assistir: ${title}`}>
+                        {thumb && (
+                          <img
+                            src={thumb}
+                            alt=""
+                            loading="lazy"
+                            referrerPolicy="no-referrer"
+                            className="absolute inset-0 h-full w-full object-cover"
+                            // Miniaturas do TikTok expiram: sem imagem, fica o fundo da marca.
+                            onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                          />
+                        )}
+                        <span className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/35 transition-colors">
+                          <span className="w-11 h-11 rounded-full bg-white/95 flex items-center justify-center shadow-lg">
+                            <Play className="w-5 h-5 text-primary fill-primary ml-0.5" />
+                          </span>
+                        </span>
+                        <span className="absolute left-2 top-2 rounded-full bg-black/70 px-2 py-0.5 text-[10px] font-bold text-white">
+                          {PLATFORM_LABEL[review.platform]}
+                        </span>
+                      </button>
+                      <div className="p-3 flex-1 flex flex-col gap-1.5">
+                        <h3 className="text-sm font-bold text-foreground line-clamp-2">{title}</h3>
+                        {review.ownerName && <p className="text-xs text-muted-foreground">por {review.ownerName}</p>}
+                        {review.productId && (
+                          <Link
+                            to={`/produto/${review.productId}?ref=${encodeURIComponent(review.code)}`}
+                            className="mt-auto pt-1 text-xs font-semibold text-primary hover:underline line-clamp-1"
+                          >
+                            Ver produto{review.productName ? `: ${review.productName}` : ''} →
+                          </Link>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Subscribe CTA */}
           <div className="mt-16 text-center p-8 rounded-3xl bg-card border border-border">

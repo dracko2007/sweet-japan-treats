@@ -1,13 +1,20 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Megaphone, Link2, Copy, Check, DollarSign, Package, TrendingUp, Percent, Clock, X, Trophy, Users, ShoppingBag } from 'lucide-react';
+import { Megaphone, Link2, Copy, Check, DollarSign, Package, TrendingUp, Percent, Clock, X, Trophy, Users, ShoppingBag, Video } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { useUser } from '@/context/UserContext';
 import { useProducts } from '@/context/ProductsContext';
 import { useToast } from '@/hooks/use-toast';
 import { affiliateService, affiliateLink, isPromoter, SITE_URL, TIER_CONFIG } from '@/services/affiliateService';
-import type { AffiliateDashboard, AffiliateTier } from '@/services/affiliateService';
+import type { AffiliateDashboard, AffiliateReview, AffiliateTier } from '@/services/affiliateService';
+
+const REVIEW_STATUS: Record<AffiliateReview['status'], { label: string; className: string }> = {
+  pending: { label: 'Em análise', className: 'bg-amber-100 text-amber-800' },
+  approved: { label: 'Publicado no vlog', className: 'bg-green-100 text-green-700' },
+  rejected: { label: 'Não aprovado', className: 'bg-gray-100 text-gray-600' },
+};
+const PLATFORM_LABEL: Record<AffiliateReview['platform'], string> = { youtube: 'YouTube', tiktok: 'TikTok', instagram: 'Instagram' };
 import { convertYen as fxConvert, loadFxRates } from '@/services/fxService';
 
 const AffiliatePage: React.FC = () => {
@@ -19,6 +26,26 @@ const AffiliatePage: React.FC = () => {
   const [copied, setCopied] = useState<string | null>(null);
   const [selectedProductId, setSelectedProductId] = useState('');
   const [showTierModal, setShowTierModal] = useState(false);
+  const { toast } = useToast();
+  // Reviews (vídeos) que o divulgador enviou, e o link em digitação por código.
+  const [reviews, setReviews] = useState<AffiliateReview[]>([]);
+  const [reviewUrl, setReviewUrl] = useState<Record<string, string>>({});
+  const [sendingReview, setSendingReview] = useState<string | null>(null);
+
+  const sendReview = async (code: string) => {
+    const url = (reviewUrl[code] || '').trim();
+    if (!url) return;
+    setSendingReview(code);
+    const result = await affiliateService.submitReview(code, url);
+    setSendingReview(null);
+    if (result.ok === false) {
+      toast({ title: 'Não foi possível enviar o vídeo', description: result.error, variant: 'destructive' });
+      return;
+    }
+    setReviews((current) => [result.review, ...current]);
+    setReviewUrl((current) => ({ ...current, [code]: '' }));
+    toast({ title: 'Vídeo enviado', description: 'Assim que a loja aprovar, ele aparece no vlog do site.' });
+  };
   useEffect(() => {
     loadFxRates().catch(() => {});
   }, []);
@@ -30,6 +57,7 @@ const AffiliatePage: React.FC = () => {
     }
     affiliateService.getByOwnerEmail(user.email).then(async (list) => {
       setAffiliates(list);
+      if (list.some(isPromoter)) affiliateService.getMyReviews().then(setReviews);
       const map: Record<string, { commissionYen: number; netYen: number; orders: number }> = {};
       await Promise.all(
         list.filter((aff) => !isPromoter(aff)).map(async (aff) => {
@@ -174,6 +202,46 @@ const AffiliatePage: React.FC = () => {
                             {aff.discountPercent > 0 ? ` Quem usar ganha ${aff.discountPercent}% de desconto.` : ''}
                             {' '}Cada cliente pode usar este código uma única vez.
                           </p>
+                        </div>
+
+                        {/* Vídeo de review: o divulgador cola o link e ele vai para o vlog do site */}
+                        <div className="border-t border-border pt-5">
+                          <p className="text-xs uppercase font-bold text-muted-foreground mb-2 flex items-center gap-1"><Video className="w-3.5 h-3.5" /> Seu vídeo de review</p>
+                          <form
+                            className="flex gap-2"
+                            onSubmit={(e) => { e.preventDefault(); void sendReview(aff.code); }}
+                          >
+                            <input
+                              type="url"
+                              inputMode="url"
+                              aria-label={`Link do vídeo de review do código ${aff.code}`}
+                              value={reviewUrl[aff.code] || ''}
+                              onChange={(e) => setReviewUrl((current) => ({ ...current, [aff.code]: e.target.value }))}
+                              placeholder="Cole o link do YouTube, TikTok ou Instagram"
+                              className="flex-1 min-w-0 px-3 py-2 text-sm rounded-lg border border-border bg-background"
+                            />
+                            <Button type="submit" className="btn-primary shrink-0" disabled={sendingReview === aff.code || !(reviewUrl[aff.code] || '').trim()}>
+                              {sendingReview === aff.code ? 'Enviando...' : 'Enviar'}
+                            </Button>
+                          </form>
+                          <p className="text-[11px] text-muted-foreground mt-2">
+                            Depois de aprovado pela loja, o vídeo aparece no vlog do site com o link deste produto.
+                          </p>
+                          {reviews.filter((review) => review.code === aff.code).length > 0 && (
+                            <ul className="mt-3 space-y-2">
+                              {reviews.filter((review) => review.code === aff.code).map((review) => (
+                                <li key={review.id} className="flex items-center justify-between gap-3 rounded-lg bg-secondary/30 px-3 py-2">
+                                  <a href={review.url} target="_blank" rel="noopener noreferrer" className="min-w-0 text-sm font-medium text-foreground hover:text-primary">
+                                    <span className="block truncate">{review.title || review.url}</span>
+                                    <span className="text-[11px] text-muted-foreground">{PLATFORM_LABEL[review.platform]}</span>
+                                  </a>
+                                  <span className={`shrink-0 px-2 py-0.5 rounded-full text-[11px] font-semibold ${REVIEW_STATUS[review.status].className}`}>
+                                    {REVIEW_STATUS[review.status].label}
+                                  </span>
+                                </li>
+                              ))}
+                            </ul>
+                          )}
                         </div>
                       </div>
                     );

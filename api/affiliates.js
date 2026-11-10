@@ -3,6 +3,7 @@ import { adminDb } from './_lib/firebase-admin.js';
 import {
   assertExactKeys,
   getHeader,
+  optionalText,
   handleCors,
   HttpError,
   normalizeEmail,
@@ -11,6 +12,8 @@ import {
   sendError,
 } from './_lib/http.js';
 import { enforceRateLimit } from './_lib/rate-limit.js';
+import { createHash } from 'node:crypto';
+import { oembedEndpoint, parseReviewUrl } from './_lib/review-links.js';
 
 // Validar um código diz se ele existe. Sem limite dava para testar códigos em série.
 const VALIDATE_PER_USER = 30;
@@ -180,6 +183,124 @@ async function trackVisit(req, body) {
   });
 }
 
+/* ---------- Reviews (vídeos) dos divulgadores ---------- */
+
+const REVIEW_STATUSES = ['pending', 'approved', 'rejected'];
+const REVIEWS_PER_USER = 10;
+const REVIEWS_WINDOW_MS = 60 * 60 * 1000;
+
+function reviewSummary(document, { admin = false } = {}) {
+  const data = document.data() || {};
+  return {
+    id: document.id,
+    code: String(data.code || ''),
+    productId: String(data.productId || ''),
+    productName: String(data.productName || ''),
+    ownerName: String(data.ownerName || ''),
+    platform: String(data.platform || ''),
+    videoId: String(data.videoId || ''),
+    url: String(data.url || ''),
+    title: String(data.title || ''),
+    thumbnail: String(data.thumbnail || ''),
+    status: REVIEW_STATUSES.includes(data.status) ? data.status : 'pending',
+    createdAt: String(data.createdAt || ''),
+    ...(admin ? { ownerEmail: String(data.ownerEmail || '') } : {}),
+  };
+}
+
+const newestFirst = (a, b) => (a.createdAt < b.createdAt ? 1 : -1);
+
+// Título e miniatura vêm do oEmbed público (YouTube/TikTok). É enfeite: se falhar, o review entra do mesmo jeito.
+async function reviewMetadata(review) {
+  const endpoint = oembedEndpoint(review);
+  if (!endpoint) return {};
+  try {
+    const response = await fetch(endpoint, { signal: AbortSignal.timeout(4000), headers: { accept: 'application/json' } });
+    if (!response.ok) return {};
+    const data = await response.json();
+    const thumbnail = String(data.thumbnail_url || '');
+    return {
+      title: String(data.title || '').slice(0, 160),
+      thumbnail: /^https:\/\//.test(thumbnail) ? thumbnail.slice(0, 600) : '',
+    };
+  } catch {
+    return {};
+  }
+}
+
+// O divulgador cola o link do vídeo no painel, ligado a um código dele. Entra como pendente.
+async function submitReview(req, user, body) {
+  assertExactKeys(body, ['action', 'code', 'url', 'title']);
+  const code = requiredText(body.code, { max: 80, pattern: /^(?!\.\.?$)[^/]+$/ }).toUpperCase();
+  const review = parseReviewUrl(requiredText(body.url, { max: 500 }));
+  if (!review) throw new HttpError(400, 'invalid_review_url');
+  const typedTitle = optionalText(body.title, { max: 160 });
+  const email = tokenEmail(user);
+  await enforceRateLimit(req, { scope: 'affiliate-review', limit: REVIEWS_PER_USER, windowMs: REVIEWS_WINDOW_MS, identity: user.uid });
+
+  const db = adminDb();
+  const affiliateSnap = await db.collection('affiliates').doc(code).get();
+  const affiliate = affiliateSnap.exists ? affiliateSnap.data() || {} : null;
+  if (!affiliate || String(affiliate.ownerEmail || '').trim().toLowerCase() !== email) throw new HttpError(403, 'forbidden');
+
+  const id = createHash('sha256').update(`${code}|${review.url}`).digest('hex').slice(0, 32);
+  const ref = db.collection('affiliate_reviews').doc(id);
+  if ((await ref.get()).exists) throw new HttpError(409, 'review_already_sent');
+
+  const metadata = await reviewMetadata(review);
+  await ref.set({
+    code,
+    ownerEmail: email,
+    ownerName: String(affiliate.ownerName || '').slice(0, 120),
+    productId: String(affiliate.productId || ''),
+    productName: String(affiliate.productName || ''),
+    platform: review.platform,
+    videoId: review.videoId,
+    url: review.url,
+    title: typedTitle || metadata.title || '',
+    thumbnail: metadata.thumbnail || '',
+    status: 'pending',
+    createdAt: new Date().toISOString(),
+  });
+  return reviewSummary(await ref.get());
+}
+
+async function myReviews(user, body) {
+  assertExactKeys(body, ['action']);
+  const snapshot = await adminDb().collection('affiliate_reviews').where('ownerEmail', '==', tokenEmail(user)).get();
+  return snapshot.docs.map((document) => reviewSummary(document)).sort(newestFirst);
+}
+
+// Vlog público: só os aprovados, sem e-mail de ninguém.
+async function publicReviews(body) {
+  assertExactKeys(body, ['action']);
+  const snapshot = await adminDb().collection('affiliate_reviews').where('status', '==', 'approved').get();
+  return snapshot.docs.map((document) => reviewSummary(document)).sort(newestFirst).slice(0, 60);
+}
+
+async function adminReviews(req, body) {
+  assertExactKeys(body, ['action']);
+  await requireAdmin(req);
+  const snapshot = await adminDb().collection('affiliate_reviews').get();
+  return snapshot.docs.map((document) => reviewSummary(document, { admin: true })).sort(newestFirst);
+}
+
+async function moderateReview(req, body) {
+  assertExactKeys(body, ['action', 'id', 'status']);
+  await requireAdmin(req);
+  const id = requiredText(body.id, { max: 64, pattern: /^[a-f0-9]{32}$/ });
+  const status = requiredText(body.status, { max: 10 });
+  const ref = adminDb().collection('affiliate_reviews').doc(id);
+  if (status === 'deleted') {
+    await ref.delete();
+    return { ok: true };
+  }
+  if (!REVIEW_STATUSES.includes(status)) throw new HttpError(400, 'invalid_request');
+  if (!(await ref.get()).exists) throw new HttpError(404, 'not_found');
+  await ref.update({ status, moderatedAt: new Date().toISOString() });
+  return { ok: true };
+}
+
 export default async function handler(req, res) {
   if (!handleCors(req, res, { methods: ['POST'] })) return;
 
@@ -194,7 +315,28 @@ export default async function handler(req, res) {
       res.status(200).json(await trackVisit(req, body));
       return;
     }
+    if (action === 'review-list') {
+      res.status(200).json({ reviews: await publicReviews(body) });
+      return;
+    }
     const user = await requireUser(req);
+
+    if (action === 'review-submit') {
+      res.status(200).json({ review: await submitReview(req, user, body) });
+      return;
+    }
+    if (action === 'review-mine') {
+      res.status(200).json({ reviews: await myReviews(user, body) });
+      return;
+    }
+    if (action === 'review-admin-list') {
+      res.status(200).json({ reviews: await adminReviews(req, body) });
+      return;
+    }
+    if (action === 'review-moderate') {
+      res.status(200).json(await moderateReview(req, body));
+      return;
+    }
 
     if (action === 'by-owner') {
       res.status(200).json({ affiliates: await listByOwner(req, user, body) });

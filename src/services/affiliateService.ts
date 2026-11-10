@@ -147,6 +147,40 @@ export type PendingCommissionSummary = Pick<
   'id' | 'affiliateCode' | 'netYen' | 'commissionYen'
 >;
 
+/** Vídeo de review enviado por um divulgador (YouTube, TikTok ou Instagram). */
+export type ReviewPlatform = 'youtube' | 'tiktok' | 'instagram';
+export type ReviewStatus = 'pending' | 'approved' | 'rejected';
+export interface AffiliateReview {
+  id: string;
+  code: string;
+  productId: string;
+  productName: string;
+  ownerName: string;
+  platform: ReviewPlatform;
+  videoId: string;
+  url: string;
+  title: string;
+  thumbnail: string;
+  status: ReviewStatus;
+  createdAt: string;
+  ownerEmail?: string; // só na lista do admin
+}
+
+const REVIEW_ERRORS: Record<string, string> = {
+  invalid_review_url: 'Link não reconhecido. Use o link do vídeo no YouTube, TikTok ou Instagram.',
+  review_already_sent: 'Este vídeo já foi enviado para este código.',
+  forbidden: 'Este código não pertence à sua conta.',
+  rate_limited: 'Muitos envios seguidos. Tente de novo mais tarde.',
+};
+
+async function reviewsCall<T>(body: Record<string, unknown>, signedIn = true): Promise<T> {
+  const init: RequestInit = { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) };
+  const response = await (signedIn ? authenticatedFetch('/api/affiliates', init) : fetch('/api/affiliates', init));
+  const payload = await response.json().catch(() => ({})) as T & { error?: string };
+  if (!response.ok) throw new Error(REVIEW_ERRORS[payload.error || ''] || 'Não foi possível concluir. Tente de novo.');
+  return payload;
+}
+
 const normalize = (code: string) => code.trim().toUpperCase();
 
 export const isPromoter = (affiliate: { kind?: AffiliateKind }) => affiliate.kind === 'promoter';
@@ -277,6 +311,59 @@ export const affiliateService = {
     }
   },
 
+  /* ---------- Reviews (vídeos) dos divulgadores ---------- */
+
+  /** Divulgador envia o link do vídeo de um código dele; entra como pendente de aprovação. */
+  async submitReview(code: string, url: string): Promise<{ ok: true; review: AffiliateReview } | { ok: false; error: string }> {
+    try {
+      const { review } = await reviewsCall<{ review: AffiliateReview }>({ action: 'review-submit', code: normalize(code), url: url.trim() });
+      return { ok: true, review };
+    } catch (e) {
+      return { ok: false, error: e instanceof Error ? e.message : 'Não foi possível enviar.' };
+    }
+  },
+
+  /** Reviews enviados pela conta logada. */
+  async getMyReviews(): Promise<AffiliateReview[]> {
+    try {
+      return (await reviewsCall<{ reviews: AffiliateReview[] }>({ action: 'review-mine' })).reviews || [];
+    } catch (e) {
+      devWarn('affiliateService.getMyReviews falhou:', e);
+      return [];
+    }
+  },
+
+  /** Reviews aprovados, para o vlog (público). */
+  async getApprovedReviews(): Promise<AffiliateReview[]> {
+    try {
+      return (await reviewsCall<{ reviews: AffiliateReview[] }>({ action: 'review-list' }, false)).reviews || [];
+    } catch (e) {
+      devWarn('affiliateService.getApprovedReviews falhou:', e);
+      return [];
+    }
+  },
+
+  /** Todos os reviews (admin). */
+  async getAllReviews(): Promise<AffiliateReview[]> {
+    try {
+      return (await reviewsCall<{ reviews: AffiliateReview[] }>({ action: 'review-admin-list' })).reviews || [];
+    } catch (e) {
+      devWarn('affiliateService.getAllReviews falhou:', e);
+      return [];
+    }
+  },
+
+  /** Admin aprova, recusa ou exclui um review. */
+  async moderateReview(id: string, status: ReviewStatus | 'deleted'): Promise<boolean> {
+    try {
+      await reviewsCall<{ ok: boolean }>({ action: 'review-moderate', id, status });
+      return true;
+    } catch (e) {
+      devWarn('affiliateService.moderateReview falhou:', e);
+      return false;
+    }
+  },
+
   /* ---------- Solicitações para virar afiliado ---------- */
 
   /** Cliente solicita virar afiliado (1 por e-mail). */
@@ -343,8 +430,8 @@ export const affiliateService = {
       });
       await updateDoc(doc(db, REQ_COL, req.email.trim().toLowerCase()), { status: 'approved', code });
       return { ok: true };
-    } catch (e: any) {
-      return { ok: false, error: e?.message };
+    } catch (e) {
+      return { ok: false, error: e instanceof Error ? e.message : String(e) };
     }
   },
 
@@ -427,9 +514,9 @@ export const affiliateService = {
         }
       }
       return { ok: true };
-    } catch (e: any) {
+    } catch (e) {
       devError('affiliateService.remove falhou:', e);
-      return { ok: false, error: e?.message || String(e) };
+      return { ok: false, error: e instanceof Error ? e.message : String(e) };
     }
   },
 
