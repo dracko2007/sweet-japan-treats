@@ -11,7 +11,8 @@ const LANGUAGES: { code: Language; flagCode: string; label: string }[] = [
   { code: 'ja', flagCode: 'jp', label: '日本語' },
 ];
 
-const LanguageSwitcher: React.FC = () => {
+/** `compact`: só a bandeira, para o cabeçalho do celular/PWA. */
+const LanguageSwitcher: React.FC<{ compact?: boolean }> = ({ compact = false }) => {
   const { language, setLanguage, t } = useLanguage();
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -50,11 +51,17 @@ const LanguageSwitcher: React.FC = () => {
         aria-expanded={isOpen}
         aria-controls="language-switcher-menu"
         aria-label={`${t('a11y.selectLanguage')}: ${current.label}`}
-        className="flex items-center gap-1.5 px-2 sm:px-3 py-1.5 bg-secondary/80 border border-border rounded-full hover:bg-secondary transition-all text-xs font-semibold text-foreground shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+        className={cn(
+          "flex items-center bg-secondary/80 border border-border rounded-full hover:bg-secondary transition-all text-xs font-semibold text-foreground shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary",
+          compact ? "h-9 w-9 justify-center" : "gap-1.5 px-2 sm:px-3 py-1.5",
+        )}
       >
-        <FlagIcon code={current.flagCode} alt="" size={20} />
-        <span className="hidden sm:inline">{current.label}</span>
-        <ChevronDown className={cn("w-3 h-3 sm:w-3.5 sm:h-3.5 text-muted-foreground transition-transform duration-200", isOpen && "rotate-180")} aria-hidden="true" />
+        {/* Compacto: sigla do idioma (PT/EN/JA); a bandeira ao lado é a do país e ficaria igual. */}
+        {compact
+          ? <span className="text-[11px] font-extrabold tracking-wide">{current.code.toUpperCase()}</span>
+          : <FlagIcon code={current.flagCode} alt="" size={20} />}
+        {!compact && <span className="hidden sm:inline">{current.label}</span>}
+        {!compact && <ChevronDown className={cn("w-3 h-3 sm:w-3.5 sm:h-3.5 text-muted-foreground transition-transform duration-200", isOpen && "rotate-180")} aria-hidden="true" />}
       </button>
 
       {isOpen && (

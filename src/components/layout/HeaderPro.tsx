@@ -319,6 +319,11 @@ const HeaderPro: React.FC = () => {
                   <Bot className="h-5 w-5" />
                 </button>
               )}
+              {/* Celular/PWA: idioma e país só com a bandeira (no desktop ficam na coluna ao lado). */}
+              <div className="flex items-center gap-1 md:hidden">
+                <LanguageSwitcher compact />
+                <CountrySwitcher compact />
+              </div>
               {isAdmin && (
                 <Link
                   to="/admin"

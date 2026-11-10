@@ -7,7 +7,8 @@ import { ChevronDown } from 'lucide-react';
 import FlagIcon from '@/components/FlagIcon';
 import { WORLD_COUNTRIES } from '@/data/worldCountries';
 
-const CountrySwitcher: React.FC = () => {
+/** `compact`: só a bandeira, para o cabeçalho do celular/PWA. */
+const CountrySwitcher: React.FC<{ compact?: boolean }> = ({ compact = false }) => {
   const { selectedCountry, setSelectedCountry, t } = useLanguage();
   const { items } = useCart();
   const { toast } = useToast();
@@ -71,11 +72,14 @@ const CountrySwitcher: React.FC = () => {
         aria-expanded={isOpen}
         aria-controls="country-switcher-menu"
         aria-label={`${t('a11y.selectCountry')}: ${currentCountry.label}`}
-        className="flex items-center gap-2 px-3 py-1.5 bg-secondary/80 border border-border rounded-full hover:bg-secondary transition-all text-xs font-semibold text-foreground shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+        className={cn(
+          "flex items-center bg-secondary/80 border border-border rounded-full hover:bg-secondary transition-all text-xs font-semibold text-foreground shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary",
+          compact ? "h-9 w-9 justify-center" : "gap-2 px-3 py-1.5",
+        )}
       >
         <FlagIcon code={currentCountry.flagCode} alt="" size={20} />
-        <span>{currentCountry.label}</span>
-        <ChevronDown className={cn("w-3.5 h-3.5 text-muted-foreground transition-transform duration-200", isOpen && "rotate-180")} aria-hidden="true" />
+        {!compact && <span>{currentCountry.label}</span>}
+        {!compact && <ChevronDown className={cn("w-3.5 h-3.5 text-muted-foreground transition-transform duration-200", isOpen && "rotate-180")} aria-hidden="true" />}
       </button>
 
       {/* Dropdown Menu */}
