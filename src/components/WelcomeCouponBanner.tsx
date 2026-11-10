@@ -34,7 +34,7 @@ const WelcomeCouponBanner: React.FC<{ context?: 'home' | 'cart' }> = ({ context 
   };
 
   return (
-    <div className="relative overflow-hidden bg-gradient-to-r from-pink-600 via-pink-500 to-amber-500 text-white">
+    <div className="relative overflow-hidden bg-gradient-to-r from-pink-600 via-pink-500 to-fuchsia-600 text-white">
       <div className="container mx-auto px-4 py-2 pr-10 sm:pr-4 flex items-center justify-center gap-2 sm:gap-3 text-center">
         <Gift className="w-5 h-5 shrink-0 hidden sm:block" />
         <p className="text-xs sm:text-base font-semibold leading-tight">

@@ -197,20 +197,21 @@ const Products: React.FC = () => {
 
   return (
     <Layout>
-      <div className="gradient-hero py-10">
+      {/* Celular: só o título, compacto — os produtos precisam aparecer na primeira tela. */}
+      <div className="gradient-hero py-3 md:py-10">
         <div className="container mx-auto px-4">
           <div className="text-center max-w-2xl mx-auto">
-            <h1 className="font-display text-3xl lg:text-4xl font-bold text-foreground mb-2">
+            <h1 className="font-display text-xl md:text-3xl lg:text-4xl font-bold text-foreground md:mb-2">
               {t('productsPage.title')}
             </h1>
-            <p className="text-muted-foreground">
+            <p className="hidden md:block text-muted-foreground">
               {t('productsPage.description')}
             </p>
           </div>
         </div>
       </div>
 
-      <section className="py-8 bg-background">
+      <section className="pt-3 pb-8 md:py-8 bg-background">
         <div className="container mx-auto px-4">
           {/* Banner da categoria atual (compacto) */}
           {catMeta && (
@@ -267,31 +268,6 @@ const Products: React.FC = () => {
               />
             </div>
 
-            {/* Botão Mobile para abrir filtros */}
-            <div className="lg:hidden mb-4">
-              <button
-                onClick={() => setShowFiltersPanel(!showFiltersPanel)}
-                className="w-full flex items-center gap-2 px-4 py-3 rounded-lg border border-border bg-card hover:bg-secondary/50 transition-colors font-semibold"
-              >
-                <Menu className="w-5 h-5" />
-                {t('productsPage.filters') || 'Filtros'}
-              </button>
-
-              {/* Filtro em Modal/Panel Mobile */}
-              {showFiltersPanel && (
-                <div className="mt-4 p-4 rounded-lg border border-border bg-card">
-                  <SidebarFilters
-                    categories={availableCats.map(id => allCategories.find(c => c.id === id)!).filter(Boolean)}
-                    types={availableTypes}
-                    selectedCategory={catFilter}
-                    selectedType={typeFilter}
-                    onCategoryChange={(id) => { setCatFilter(id); setPage(1); setShowFiltersPanel(false); }}
-                    onTypeChange={(type) => { setTypeFilter(type); setPage(1); setShowFiltersPanel(false); }}
-                  />
-                </div>
-              )}
-            </div>
-
             {/* Grid de Produtos (80% width) */}
             <div className="lg:col-span-4">
               {/* Barra de busca. Perdida no redesign do catálogo (cbfdc66): o
@@ -299,7 +275,7 @@ const Products: React.FC = () => {
                   continuaram no código, só o input sumiu. Fica em largura total
                   no topo da coluna para aparecer também no mobile/PWA, onde os
                   filtros ficam atrás de um botão. */}
-              <div className="relative mb-4">
+              <div className="relative mb-3 md:mb-4">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
                 <input
                   type="search"
@@ -322,9 +298,20 @@ const Products: React.FC = () => {
                 )}
               </div>
 
-              {/* Toolbar: Sort */}
-              <div className="mb-6 flex items-center justify-between">
-                <p className="text-sm text-muted-foreground">
+              {/* Toolbar: filtros (celular) + contagem + ordenação, numa linha só */}
+              <div className="mb-3 md:mb-6 flex items-center justify-between gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowFiltersPanel(!showFiltersPanel)}
+                  aria-expanded={showFiltersPanel}
+                  className={`lg:hidden shrink-0 inline-flex items-center gap-1.5 px-3 py-2 text-sm font-semibold rounded-lg border transition-colors ${
+                    showFiltersPanel || catFilter || typeFilter ? 'border-primary bg-primary/10 text-primary' : 'border-border bg-card text-foreground'
+                  }`}
+                >
+                  <Menu className="w-4 h-4" />
+                  {t('productsPage.filters') || 'Filtros'}
+                </button>
+                <p className="min-w-0 truncate text-xs md:text-sm text-muted-foreground">
                   {loading ? (
                     <span className="inline-block h-4 w-24 rounded bg-secondary animate-pulse align-middle" />
                   ) : (
@@ -332,7 +319,7 @@ const Products: React.FC = () => {
                   )}
                 </p>
                 <div className="flex items-center gap-2">
-                  <label htmlFor="sort" className="text-sm font-semibold text-muted-foreground">
+                  <label htmlFor="sort" className="sr-only md:not-sr-only text-sm font-semibold text-muted-foreground">
                     {t('productsPage.sort')}:
                   </label>
                   <select
@@ -348,6 +335,20 @@ const Products: React.FC = () => {
                   </select>
                 </div>
               </div>
+
+              {/* Painel de filtros no celular */}
+              {showFiltersPanel && (
+                <div className="lg:hidden mb-4 p-4 rounded-lg border border-border bg-card">
+                  <SidebarFilters
+                    categories={availableCats.map(id => allCategories.find(c => c.id === id)!).filter(Boolean)}
+                    types={availableTypes}
+                    selectedCategory={catFilter}
+                    selectedType={typeFilter}
+                    onCategoryChange={(id) => { setCatFilter(id); setPage(1); setShowFiltersPanel(false); }}
+                    onTypeChange={(type) => { setTypeFilter(type); setPage(1); setShowFiltersPanel(false); }}
+                  />
+                </div>
+              )}
 
               {loading ? (
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 md:gap-4">
@@ -423,8 +424,8 @@ const Products: React.FC = () => {
             </div>
 
             <aside className="hidden lg:block lg:col-span-1">
-              <div className="sticky top-36 overflow-hidden rounded-2xl border border-sky-200 bg-white shadow-lg">
-                <div className="bg-gradient-to-br from-sky-400 to-cyan-500 p-4 text-white">
+              <div className="sticky top-36 overflow-hidden rounded-2xl border border-pink-100 bg-white shadow-lg">
+                <div className="bg-gradient-to-br from-primary to-accent p-4 text-white">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2 font-black">
                       <ShoppingCart className="h-5 w-5" />
@@ -444,7 +445,7 @@ const Products: React.FC = () => {
                         <p className="truncate text-xs font-bold text-slate-700">{item.product.name}</p>
                         <p className="text-[11px] text-slate-500">Qtd. {item.quantity}</p>
                       </div>
-                      <span className="text-[11px] font-black text-sky-600">{formatPrice(convertYen(item.product.prices.small * item.quantity), currency)}</span>
+                      <span className="text-[11px] font-black text-primary">{formatPrice(convertYen(item.product.prices.small * item.quantity), currency)}</span>
                     </div>
                   ))}
                 </div>
@@ -453,7 +454,7 @@ const Products: React.FC = () => {
                     <span>Subtotal</span>
                     <span>{formatPrice(convertYen(totalPrice), currency)}</span>
                   </div>
-                  <Link to="/carrinho" className="flex items-center justify-center gap-2 rounded-xl bg-orange-500 px-3 py-2.5 text-xs font-black text-white shadow-md transition hover:bg-orange-600">
+                  <Link to="/carrinho" className="flex items-center justify-center gap-2 rounded-xl bg-primary px-3 py-2.5 text-xs font-black text-primary-foreground shadow-md transition hover:bg-primary/90">
                     Ir para o carrinho <ArrowRight className="h-4 w-4" />
                   </Link>
                 </div>

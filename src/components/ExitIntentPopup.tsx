@@ -273,7 +273,7 @@ const ExitIntentPopup: React.FC = () => {
   if (variant === 'retention') {
     return (
       <Shell label="Finalize seu pedido" onClose={close}>
-        <div className="bg-gradient-to-br from-pink-600 to-amber-500 p-6 text-center text-white">
+        <div className="bg-gradient-to-br from-pink-600 to-fuchsia-600 p-6 text-center text-white">
           <ShoppingBag className="w-10 h-10 mx-auto mb-2" />
           <h2 className="text-xl font-black leading-tight">Seu pedido está quase pronto!</h2>
           <p className="text-sm text-white/90 mt-1">
@@ -283,7 +283,7 @@ const ExitIntentPopup: React.FC = () => {
         <div className="p-6 space-y-3">
           <button
             onClick={close}
-            className="w-full bg-gradient-to-r from-pink-600 to-amber-500 text-white font-bold py-3 rounded-xl hover:opacity-90 transition-opacity"
+            className="w-full bg-gradient-to-r from-pink-600 to-fuchsia-600 text-white font-bold py-3 rounded-xl hover:opacity-90 transition-opacity"
           >
             Voltar ao pedido
           </button>
@@ -297,7 +297,7 @@ const ExitIntentPopup: React.FC = () => {
   if (variant === 'waiver_warning') {
     return (
       <Shell label="Isenção válida só para finalização imediata" onClose={close}>
-        <div className="bg-gradient-to-br from-pink-600 to-amber-500 p-6 text-center text-white">
+        <div className="bg-gradient-to-br from-pink-600 to-fuchsia-600 p-6 text-center text-white">
           <Gift className="w-10 h-10 mx-auto mb-2" />
           <h2 className="text-xl font-black leading-tight">Sua isenção vale só agora!</h2>
           <p className="text-sm text-white/90 mt-1">
@@ -309,7 +309,7 @@ const ExitIntentPopup: React.FC = () => {
         <div className="p-6 space-y-3">
           <button
             onClick={close}
-            className="w-full bg-gradient-to-r from-pink-600 to-amber-500 text-white font-bold py-3 rounded-xl hover:opacity-90 transition-opacity"
+            className="w-full bg-gradient-to-r from-pink-600 to-fuchsia-600 text-white font-bold py-3 rounded-xl hover:opacity-90 transition-opacity"
           >
             Voltar e finalizar agora
           </button>
@@ -323,7 +323,7 @@ const ExitIntentPopup: React.FC = () => {
   if (variant === 'ps_offer') {
     return (
       <Shell label="Oferta: taxa de Personal Shopper grátis" onClose={close}>
-        <div className="bg-gradient-to-br from-pink-600 to-amber-500 p-6 text-center text-white">
+        <div className="bg-gradient-to-br from-pink-600 to-fuchsia-600 p-6 text-center text-white">
           <Gift className="w-10 h-10 mx-auto mb-2" />
           <h2 className="text-xl font-black leading-tight">Finalize agora e a taxa sai de graça!</h2>
           <p className="text-sm text-white/90 mt-1">
@@ -335,7 +335,7 @@ const ExitIntentPopup: React.FC = () => {
           <button
             onClick={acceptPsOffer}
             disabled={waiverLoading}
-            className="w-full bg-gradient-to-r from-pink-600 to-amber-500 text-white font-bold py-3 rounded-xl hover:opacity-90 transition-opacity flex items-center justify-center gap-2 disabled:opacity-60"
+            className="w-full bg-gradient-to-r from-pink-600 to-fuchsia-600 text-white font-bold py-3 rounded-xl hover:opacity-90 transition-opacity flex items-center justify-center gap-2 disabled:opacity-60"
           >
             {waiverLoading
               ? <><Loader2 className="w-4 h-4 animate-spin" /> Liberando...</>
@@ -365,7 +365,7 @@ const ExitIntentPopup: React.FC = () => {
 
   return (
     <Shell label="Cadastre-se e ganhe recompensas" onClose={close}>
-      <div className="bg-gradient-to-br from-pink-600 to-amber-500 p-6 text-center text-white">
+      <div className="bg-gradient-to-br from-pink-600 to-fuchsia-600 p-6 text-center text-white">
         <Gift className="w-10 h-10 mx-auto mb-2" />
         <h2 className="text-xl font-black leading-tight">
           Cadastre e ganhe pontos e cupons de desconto
@@ -377,7 +377,7 @@ const ExitIntentPopup: React.FC = () => {
       <div className="p-6 space-y-3">
         <button
           onClick={handleCadastro}
-          className="w-full bg-gradient-to-r from-pink-600 to-amber-500 text-white font-bold py-3 rounded-xl hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
+          className="w-full bg-gradient-to-r from-pink-600 to-fuchsia-600 text-white font-bold py-3 rounded-xl hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
         >
           Cadastrar agora
         </button>

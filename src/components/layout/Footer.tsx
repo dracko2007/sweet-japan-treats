@@ -43,10 +43,10 @@ const Footer: React.FC = () => {
                 <span className="font-display font-extrabold text-sm bg-white/15 border border-white/30 px-1.5 py-0.5 rounded-lg">Express</span>
               </div>
             </div>
-            <p className="text-accent-foreground/80 text-sm leading-relaxed max-w-md">
+            <p className="text-accent-foreground/90 text-sm leading-relaxed max-w-md">
               {t('footer.description')}
             </p>
-            <p className="text-accent-foreground/70 text-xs leading-relaxed max-w-md mt-3">
+            <p className="text-accent-foreground/90 text-xs leading-relaxed max-w-md mt-3">
               {operatorDisclosure}
             </p>
             <div className="flex items-center gap-4 mt-6">
@@ -55,7 +55,7 @@ const Footer: React.FC = () => {
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label="Instagram @japan_express_official"
-                className="p-2 rounded-full bg-primary/20 hover:bg-primary/30 transition-colors"
+                className="p-2 rounded-full bg-white/15 hover:bg-white/25 transition-colors"
               >
                 <Instagram className="w-5 h-5" />
               </a>
@@ -64,7 +64,7 @@ const Footer: React.FC = () => {
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label="Facebook Japan Express Store"
-                className="p-2 rounded-full bg-primary/20 hover:bg-primary/30 transition-colors"
+                className="p-2 rounded-full bg-white/15 hover:bg-white/25 transition-colors"
               >
                 <Facebook className="w-5 h-5" />
               </a>
@@ -73,7 +73,7 @@ const Footer: React.FC = () => {
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label="TikTok @japanexpressoficial"
-                className="p-2 rounded-full bg-primary/20 hover:bg-primary/30 transition-colors"
+                className="p-2 rounded-full bg-white/15 hover:bg-white/25 transition-colors"
               >
                 <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
                   <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.5 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.28 0 .54.04.79.1V9.01a6.33 6.33 0 0 0-.79-.05 6.34 6.34 0 0 0-6.34 6.34 6.34 6.34 0 0 0 6.34 6.34 6.34 6.34 0 0 0 6.33-6.34V8.69a8.18 8.18 0 0 0 4.78 1.52V6.77a4.85 4.85 0 0 1-1.01-.08z"/>
@@ -84,7 +84,7 @@ const Footer: React.FC = () => {
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label="X (Twitter) @japanexpress_of"
-                className="p-2 rounded-full bg-primary/20 hover:bg-primary/30 transition-colors"
+                className="p-2 rounded-full bg-white/15 hover:bg-white/25 transition-colors"
               >
                 <Twitter className="w-5 h-5" />
               </a>
@@ -99,7 +99,7 @@ const Footer: React.FC = () => {
               </a>
               <a
                 href={`mailto:${CONTACT_EMAIL}`}
-                className="p-2 rounded-full bg-primary/20 hover:bg-primary/30 transition-colors"
+                className="p-2 rounded-full bg-white/15 hover:bg-white/25 transition-colors"
               >
                 <Mail className="w-5 h-5" />
               </a>
@@ -111,27 +111,27 @@ const Footer: React.FC = () => {
             <h4 className="font-display font-semibold mb-4">{t('footer.links')}</h4>
             <ul className="space-y-2">
               <li>
-                <Link to="/produtos" className="text-sm text-accent-foreground/80 hover:text-accent-foreground transition-colors">
+                <Link to="/produtos" className="text-sm text-accent-foreground/90 hover:text-accent-foreground transition-colors">
                   {t('nav.products')}
                 </Link>
               </li>
               <li>
-                <Link to="/vlog" className="text-sm text-accent-foreground/80 hover:text-accent-foreground transition-colors">
+                <Link to="/vlog" className="text-sm text-accent-foreground/90 hover:text-accent-foreground transition-colors">
                   {t('nav.vlog')}
                 </Link>
               </li>
               <li>
-                <Link to="/frete" className="text-sm text-accent-foreground/80 hover:text-accent-foreground transition-colors">
+                <Link to="/frete" className="text-sm text-accent-foreground/90 hover:text-accent-foreground transition-colors">
                   {t('nav.shipping')}
                 </Link>
               </li>
               <li>
-                <Link to="/sobre" className="text-sm text-accent-foreground/80 hover:text-accent-foreground transition-colors">
+                <Link to="/sobre" className="text-sm text-accent-foreground/90 hover:text-accent-foreground transition-colors">
                   {t('nav.about')}
                 </Link>
               </li>
               <li>
-                <Link to="/afiliado" className="text-sm text-accent-foreground/80 hover:text-accent-foreground transition-colors">
+                <Link to="/afiliado" className="text-sm text-accent-foreground/90 hover:text-accent-foreground transition-colors">
                   {t('footer.affiliate')}
                 </Link>
               </li>
@@ -139,13 +139,13 @@ const Footer: React.FC = () => {
                 <li className="pt-1">
                   <button
                     onClick={handleInstallClick}
-                    className="flex items-center gap-1.5 text-sm text-pink-300 hover:text-pink-200 font-semibold transition-colors"
+                    className="flex items-center gap-1.5 text-sm text-white underline underline-offset-2 hover:text-white/90 font-semibold transition-colors"
                   >
                     <Smartphone className="w-3.5 h-3.5" />
                     {platform === 'ios' ? t('footer.appInstallIOS') : t('footer.appInstall')}
                   </button>
                   {showIOSHint && (
-                    <p className="text-xs text-accent-foreground/50 mt-1 leading-snug">
+                    <p className="text-xs text-accent-foreground/90 mt-1 leading-snug">
                       {t('footer.iosHint')}
                     </p>
                   )}
@@ -164,20 +164,20 @@ const Footer: React.FC = () => {
             <h4 className="font-display font-semibold mb-4">{t('footer.contact')}</h4>
             <div className="space-y-3">
               <div className="flex items-start gap-2">
-                <MapPin className="w-4 h-4 mt-0.5 text-primary" />
-                <span className="text-sm text-accent-foreground/80">
+                <MapPin className="w-4 h-4 mt-0.5 text-accent-foreground/90" />
+                <span className="text-sm text-accent-foreground/90">
                   {isJapan ? COMPANY_PROFILE.fulfillmentOrigin.formattedJa : COMPANY_PROFILE.fulfillmentOrigin.formatted}
                 </span>
               </div>
               <a href={`mailto:${CONTACT_EMAIL}`} className="flex items-start gap-2 group">
-                <Mail className="w-4 h-4 mt-0.5 text-primary" />
-                <span className="text-sm text-accent-foreground/80 group-hover:text-accent-foreground transition-colors break-all">
+                <Mail className="w-4 h-4 mt-0.5 text-accent-foreground/90" />
+                <span className="text-sm text-accent-foreground/90 group-hover:text-accent-foreground transition-colors break-all">
                   {CONTACT_EMAIL}
                 </span>
               </a>
               <a href={WHATSAPP_LINK} target="_blank" rel="noopener noreferrer" className="flex items-start gap-2 group">
                 <MessageCircle className="w-4 h-4 mt-0.5 text-green-400" />
-                <span className="text-sm text-accent-foreground/80 group-hover:text-accent-foreground transition-colors">
+                <span className="text-sm text-accent-foreground/90 group-hover:text-accent-foreground transition-colors">
                   WhatsApp: {COMPANY_PROFILE.whatsapp.international}
                 </span>
               </a>
@@ -186,20 +186,20 @@ const Footer: React.FC = () => {
         </div>
 
         <div className="border-t border-accent-foreground/10 mt-10 pt-6 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <p className="text-sm text-accent-foreground/60">
+          <p className="text-sm text-accent-foreground/85">
             © {new Date().getFullYear()} {COMPANY_PROFILE.brand}. {t('footer.rights')}
           </p>
           <div className="flex items-center gap-4 flex-wrap justify-center">
-            <Link to="/privacidade" className="text-xs text-accent-foreground/50 hover:text-accent-foreground/80 transition-colors">
+            <Link to="/privacidade" className="text-xs text-accent-foreground/90 hover:text-accent-foreground/90 transition-colors">
               {t('footer.privacy')}
             </Link>
-            <Link to="/termos" className="text-xs text-accent-foreground/50 hover:text-accent-foreground/80 transition-colors">
+            <Link to="/termos" className="text-xs text-accent-foreground/90 hover:text-accent-foreground/90 transition-colors">
               {t('footer.terms')}
             </Link>
-            <Link to="/cookies" className="text-xs text-accent-foreground/50 hover:text-accent-foreground/80 transition-colors">
+            <Link to="/cookies" className="text-xs text-accent-foreground/90 hover:text-accent-foreground/90 transition-colors">
               {t('footer.cookies')}
             </Link>
-            <Link to="/devolucao" className="text-xs text-accent-foreground/50 hover:text-accent-foreground/80 transition-colors">
+            <Link to="/devolucao" className="text-xs text-accent-foreground/90 hover:text-accent-foreground/90 transition-colors">
               {t('footer.returns') || 'Devolução'}
             </Link>
           </div>

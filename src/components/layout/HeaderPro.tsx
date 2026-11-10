@@ -252,7 +252,7 @@ const HeaderPro: React.FC = () => {
         </motion.div>
 
         <div className="container mx-auto px-4">
-          <div className={cn('flex items-center justify-between gap-3 transition-[height] duration-300', compact ? 'h-16' : 'h-20')}>
+          <div className={cn('flex items-center justify-between gap-3 transition-[height] duration-300', compact ? 'h-14 md:h-16' : 'h-16 md:h-20')}>
             <Link
               to="/"
               // Já na página inicial o link não muda nada: volta ao topo.
@@ -382,13 +382,14 @@ const HeaderPro: React.FC = () => {
             </div>
           </div>
 
-          {/* Linha de navegação — some ao descer, volta ao subir. No celular
-              também: rola para o lado (o esmaecido à direita indica que há mais). */}
+          {/* Linha de navegação — some ao descer, volta ao subir. Só no desktop:
+              no celular as mesmas páginas estão no menu da barra de baixo
+              (MobileMenuDrawer), e a fileira repetida só empurrava o conteúdo. */}
           <motion.div
             initial={false}
             animate={{ height: navHidden ? 0 : 'auto', opacity: navHidden ? 0 : 1 }}
             transition={collapse}
-            className="overflow-hidden"
+            className="hidden overflow-hidden md:block"
           >
             <nav
               aria-label="Navegação principal"

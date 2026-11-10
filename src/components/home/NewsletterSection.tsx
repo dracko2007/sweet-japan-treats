@@ -21,19 +21,19 @@ const NewsletterSection: React.FC = () => {
   };
 
   return (
-    <section className="py-16 bg-gradient-to-br from-pink-600 to-amber-500">
+    <section className="py-12 md:py-16 bg-pink-50">
       <div className="container mx-auto px-4">
-        <div className="max-w-xl mx-auto text-center text-white">
-          <Mail className="w-10 h-10 mx-auto mb-3" />
+        <div className="max-w-xl mx-auto text-center text-foreground">
+          <Mail className="w-10 h-10 mx-auto mb-3 text-primary" />
           <h2 className="font-display text-2xl md:text-3xl font-bold mb-2">
             Fique por dentro das novidades
           </h2>
-          <p className="text-white/90 mb-6">
+          <p className="text-muted-foreground mb-6">
             Receba avisos de novos produtos e promoções direto no seu e-mail.
           </p>
 
           {status === 'done' ? (
-            <div className="flex items-center justify-center gap-2 bg-white/15 backdrop-blur rounded-xl py-3.5 px-5 font-semibold">
+            <div className="flex items-center justify-center gap-2 bg-white border border-pink-200 text-primary rounded-xl py-3.5 px-5 font-semibold">
               <CheckCircle2 className="w-5 h-5" />
               Inscrição confirmada! Obrigado 🎉
             </div>
@@ -44,20 +44,20 @@ const NewsletterSection: React.FC = () => {
                 value={email}
                 onChange={(e) => { setEmail(e.target.value); if (status === 'invalid') setStatus('idle'); }}
                 placeholder="seu@email.com"
-                className="flex-1 rounded-xl px-4 py-3 text-gray-900 font-medium placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-white"
+                className="flex-1 rounded-xl border border-pink-200 bg-white px-4 py-3 text-gray-900 font-medium placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary"
                 required
               />
               <button
                 type="submit"
                 disabled={status === 'loading'}
-                className="bg-gray-900 hover:bg-gray-800 text-white font-bold rounded-xl px-6 py-3 transition-colors flex items-center justify-center gap-2 disabled:opacity-70"
+                className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold rounded-xl px-6 py-3 transition-colors flex items-center justify-center gap-2 disabled:opacity-70"
               >
                 {status === 'loading' ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Inscrever'}
               </button>
             </form>
           )}
           {status === 'invalid' && (
-            <p className="text-sm text-white/90 mt-2 font-medium">Digite um e-mail válido.</p>
+            <p className="text-sm text-destructive mt-2 font-medium">Digite um e-mail válido.</p>
           )}
         </div>
       </div>

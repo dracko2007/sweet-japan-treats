@@ -205,7 +205,9 @@ const CinematicPosterShelf: React.FC<CinematicPosterShelfProps> = ({
           <h2 className="mb-2 font-display text-2xl font-light text-white md:text-4xl">
             {t(`${i18nKey}.title`)}
           </h2>
-          <p className="text-xs text-white/40 md:text-sm">{t(`${i18nKey}.hint`)}</p>
+          {/* "Passe o mouse" não existe no toque: no celular a dica é tocar. */}
+          <p className="hidden text-white/60 md:block md:text-sm">{t(`${i18nKey}.hint`)}</p>
+          <p className="text-xs text-white/60 md:hidden">{t('posterShelf.hintTouch')}</p>
         </div>
 
         <div className="flex flex-wrap justify-center gap-3.5 md:gap-4">
