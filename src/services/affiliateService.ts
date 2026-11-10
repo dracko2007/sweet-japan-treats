@@ -20,6 +20,7 @@ import {
 import { ensureAdminAuth } from '@/utils/adminAuth';
 import { submitPublicForm } from '@/services/publicSubmissionService';
 import { authenticatedFetch } from '@/services/authenticatedFetch';
+import { safeStorage } from '@/utils/storage';
 
 const isDev = import.meta.env.DEV;
 const devLog = isDev ? console.log.bind(console) : () => {};
@@ -71,8 +72,27 @@ const computeNextTier = (tier: AffiliateTier, revenue: number): AffiliateTier =>
   return next && revenue >= TIER_CONFIG[next].goalYen ? next : tier;
 };
 
+/**
+ * 'affiliate' = afiliado: comissão por venda, com metas e níveis.
+ * 'promoter'  = divulgador: recebe o produto grátis e divulga; sem comissão nem meta.
+ *               Cada código é de um produto/vídeo e medimos o retorno dele (visitas e compras).
+ */
+export type AffiliateKind = 'affiliate' | 'promoter';
+
+export const SITE_URL = 'https://japanexpress-store.com';
+
+/** Link divulgado: direto no produto quando o código é de um produto específico. */
+export const affiliateLink = (code: string, productId?: string) =>
+  productId ? `${SITE_URL}/produto/${productId}?ref=${code}` : `${SITE_URL}/?ref=${code}`;
+
 export interface Affiliate {
   code: string;
+  kind?: AffiliateKind;       // ausente = 'affiliate' (cadastros antigos)
+  productId?: string;         // divulgador: produto enviado
+  productName?: string;
+  visitCount?: number;        // pessoas que chegaram pelo link ou digitaram o código
+  linkVisits?: number;
+  codeVisits?: number;
   ownerName: string;
   ownerEmail: string;
   discountPercent: number;
@@ -91,7 +111,7 @@ export interface Affiliate {
 }
 
 /** O que o servidor devolve ao validar um código no carrinho. */
-export type AffiliateCouponInfo = Pick<Affiliate, 'code' | 'ownerName' | 'discountPercent' | 'expiresAt'>;
+export type AffiliateCouponInfo = Pick<Affiliate, 'code' | 'ownerName' | 'discountPercent' | 'expiresAt' | 'kind'>;
 
 export interface AffiliateTierSettings {
   bronzeGoalYen: number;
@@ -115,6 +135,12 @@ export type AffiliateDashboard = Pick<
   | 'tier'
   | 'currentMonthRevenue'
   | 'tierSettings'
+  | 'kind'
+  | 'productId'
+  | 'productName'
+  | 'visitCount'
+  | 'linkVisits'
+  | 'codeVisits'
 >;
 export type PendingCommissionSummary = Pick<
   PendingCommission,
@@ -122,6 +148,19 @@ export type PendingCommissionSummary = Pick<
 >;
 
 const normalize = (code: string) => code.trim().toUpperCase();
+
+export const isPromoter = (affiliate: { kind?: AffiliateKind }) => affiliate.kind === 'promoter';
+
+/** Id anônimo do navegador: o servidor conta cada visitante uma vez por código. */
+function visitorId(): string {
+  const key = 'je_visitor_id';
+  let id = safeStorage.getItem(key);
+  if (!id || !/^[A-Za-z0-9_-]{8,64}$/.test(id)) {
+    id = crypto.randomUUID();
+    safeStorage.setItem(key, id);
+  }
+  return id;
+}
 
 function monthKey(date = new Date()) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
@@ -143,6 +182,7 @@ export const affiliateService = {
       const mk = monthKey();
       await Promise.all(snap.docs.map(async (d) => {
         const data = d.data() as Affiliate;
+        if (isPromoter(data)) return; // divulgador não tem ciclo de metas
         if (data.currentMonthKey && data.currentMonthKey !== mk) {
           const previousRevenue = Number(data.currentMonthRevenue || 0);
           const nextTier = tierForRevenue(previousRevenue, data.tierSettings);
@@ -211,6 +251,29 @@ export const affiliateService = {
     } catch (e) {
       devWarn('affiliateService.validate falhou:', e);
       return { valid: false, error: 'Erro ao validar código.' };
+    }
+  },
+
+  /**
+   * Registra que alguém chegou por um código (abriu o link ou digitou no carrinho).
+   * É a base da contagem de retorno do divulgador. Nunca atrapalha a navegação.
+   */
+  async trackVisit(code: string, source: 'link' | 'code'): Promise<void> {
+    const normalized = normalize(code);
+    if (!normalized) return;
+    const sentKey = `affiliate_visit_${normalized}`;
+    if (safeStorage.getItem(sentKey)) return;
+    const init: RequestInit = {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'track-visit', code: normalized, source, visitorId: visitorId() }),
+    };
+    try {
+      // Com conta, o servidor conta por pessoa (uid); sem conta, por navegador.
+      const response = await authenticatedFetch('/api/affiliates', init).catch(() => fetch('/api/affiliates', init));
+      if (response.ok) safeStorage.setItem(sentKey, '1');
+    } catch (e) {
+      devWarn('affiliateService.trackVisit falhou:', e);
     }
   },
 
@@ -300,6 +363,7 @@ export const affiliateService = {
     Affiliate,
     'totalOrders' | 'totalRevenue' | 'totalEarnings' | 'createdAt'
     | 'tier' | 'currentMonthRevenue' | 'currentMonthKey' | 'tierUpdatedAt'
+    | 'visitCount' | 'linkVisits' | 'codeVisits'
   > & {
     createdAt?: string;
     totalOrders?: number;
@@ -314,12 +378,19 @@ export const affiliateService = {
       const existing = await getDoc(ref);
       const prev = existing.exists() ? (existing.data() as Affiliate) : null;
       const tier: AffiliateTier = prev?.tier || 'bronze';
+      const kind: AffiliateKind = input.kind === 'promoter' ? 'promoter' : 'affiliate';
       const affiliate: Affiliate = {
         code,
+        kind,
+        ...(input.productId ? { productId: input.productId, productName: input.productName || '' } : {}),
+        // Contagem de retorno: o formulário nunca zera.
+        visitCount: prev?.visitCount ?? 0,
+        linkVisits: prev?.linkVisits ?? 0,
+        codeVisits: prev?.codeVisits ?? 0,
         ownerName: input.ownerName,
         ownerEmail: input.ownerEmail.toLowerCase(),
         discountPercent: input.discountPercent,
-        commissionPercent: input.commissionPercent,
+        commissionPercent: kind === 'promoter' ? 0 : input.commissionPercent,
         active: input.active,
         expiresAt: input.expiresAt,
         createdAt: prev?.createdAt || input.createdAt || new Date().toISOString(),
@@ -330,7 +401,7 @@ export const affiliateService = {
         currentMonthRevenue: prev?.currentMonthRevenue ?? 0,
         currentMonthKey: prev?.currentMonthKey ?? monthKey(),
         ...(prev?.tierUpdatedAt ? { tierUpdatedAt: prev.tierUpdatedAt } : {}),
-        ...(input.tierSettings || prev?.tierSettings ? { tierSettings: input.tierSettings || prev?.tierSettings } : {}),
+        ...(kind === 'affiliate' && (input.tierSettings || prev?.tierSettings) ? { tierSettings: input.tierSettings || prev?.tierSettings } : {}),
       };
       await setDoc(ref, affiliate);
       return true;
@@ -423,6 +494,7 @@ export const affiliateService = {
       await Promise.all(snap.docs.map(async (d) => {
         try {
           const aff = d.data() as Affiliate;
+          if (isPromoter(aff)) return;
           const currentTier: AffiliateTier = aff.tier || 'bronze';
           const newTier = computeNextTier(currentTier, aff.currentMonthRevenue || 0);
           const commissionPercent = TIER_CONFIG[newTier].commissionPercent;
@@ -454,6 +526,7 @@ export const affiliateService = {
       const mk = monthKey();
       await Promise.all(snap.docs.map(async (d) => {
         try {
+          if (isPromoter(d.data() as Affiliate)) return;
           await updateDoc(doc(db!, COL, d.id), {
             tier: 'bronze',
             commissionPercent: TIER_CONFIG.bronze.commissionPercent,

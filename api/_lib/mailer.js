@@ -264,6 +264,7 @@ const MOTIVO_REVISAO = {
   coupon_already_used: 'cupom já usado por este e-mail',
   affiliate_unavailable: 'código de afiliado desativado',
   affiliate_coupon_already_used: 'CPF já usou um cupom de afiliado',
+  promoter_code_already_used: 'cliente já usou este código de divulgador',
   insufficient_points: 'saldo de pontos ficou abaixo do resgate',
   order_cancelled: 'pedido foi cancelado antes da confirmação',
   order_has_no_items: 'pedido sem itens',

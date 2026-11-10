@@ -231,6 +231,7 @@ export function checkoutErrorMessage(code: string): string {
     promotion_already_used: 'Você já usou esta promoção.',
     promotion_limit: 'Limite da promoção atingido para este CPF.',
     affiliate_coupon_already_used: 'Este código de afiliado já foi usado neste CPF.',
+    promoter_code_already_used: 'Você já usou este código de divulgador. Cada código vale uma vez por cadastro.',
     rate_limited: 'Muitas tentativas seguidas. Aguarde alguns minutos e tente de novo.',
   };
   return messages[code] || 'Revise os itens e tente novamente.';

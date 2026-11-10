@@ -6,7 +6,13 @@ const toast = vi.fn();
 
 vi.mock('@/hooks/use-toast', () => ({ useToast: () => ({ toast }) }));
 vi.mock('@/components/ConfirmDialog', () => ({ useConfirm: () => vi.fn() }));
+vi.mock('@/context/ProductsContext', () => ({
+  useProducts: () => ({ products: [{ id: 'fino-mask', name: 'Fino Hair Mask' }] }),
+}));
 vi.mock('@/services/affiliateService', () => ({
+  affiliateLink: (code: string, productId?: string) =>
+    productId ? `https://japanexpress-store.com/produto/${productId}?ref=${code}` : `https://japanexpress-store.com/?ref=${code}`,
+  isPromoter: (affiliate: { kind?: string }) => affiliate.kind === 'promoter',
   TIER_CONFIG: {
     bronze: { label: 'Bronze', emoji: '🥉', commissionPercent: 10, goalYen: 100000 },
   },
@@ -70,5 +76,25 @@ describe('AffiliateManager', () => {
     expect(screen.getByText('Cadastrar Influencer')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('Ex: JUNIOR10')).toHaveValue('');
     expect(screen.getByPlaceholderText('influencer@email.com')).toHaveValue('');
+  });
+
+  it('Divulgador exige o produto e salva sem comissão, com o link do produto', async () => {
+    render(<AffiliateManager />);
+    fireEvent.click(await screen.findByText('Novo Afiliado'));
+    fireEvent.change(screen.getByLabelText('Tipo de parceria *'), { target: { value: 'promoter' } });
+    fireEvent.change(screen.getByPlaceholderText('Ex: DIVULGADOR1FINO'), { target: { value: 'divulgador1fino' } });
+    fireEvent.change(screen.getByPlaceholderText('influencer@email.com'), { target: { value: 'div@x.com' } });
+    fireEvent.click(screen.getByText('Salvar'));
+    expect(save).not.toHaveBeenCalled();
+    expect(toast).toHaveBeenCalledWith(expect.objectContaining({ title: 'Escolha o produto enviado ao divulgador' }));
+
+    fireEvent.change(screen.getByLabelText('Produto enviado *'), { target: { value: 'fino-mask' } });
+    expect(screen.getByText('https://japanexpress-store.com/produto/fino-mask?ref=DIVULGADOR1FINO')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('Salvar'));
+    await waitFor(() => expect(save).toHaveBeenCalledWith(expect.objectContaining({
+      code: 'DIVULGADOR1FINO', kind: 'promoter', productId: 'fino-mask', productName: 'Fino Hair Mask',
+      commissionPercent: 0, discountPercent: 0,
+    })));
+    expect(save.mock.calls[0][0]).not.toHaveProperty('tierSettings');
   });
 });

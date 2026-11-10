@@ -80,7 +80,8 @@ export async function fulfillOrder(orderId, { provider, reference, confirmedBy }
     const couponRef = order.couponSource === 'global' && order.couponCode ? db.collection('coupons').doc(order.couponCode) : null;
     const couponUsageRef = order.couponSource === 'global' && order.couponCode ? db.collection('coupon_usage').doc(order.couponCode) : null;
     const affiliateRef = order.affiliateCode ? db.collection('affiliates').doc(order.affiliateCode) : null;
-    const pendingCommissionRef = order.affiliateCode ? db.collection('affiliate_pending').doc(`${order.affiliateCode}-${orderId}`) : null;
+    const promoterOrder = order.affiliateKind === 'promoter';
+    const pendingCommissionRef = order.affiliateCode && !promoterOrder ? db.collection('affiliate_pending').doc(`${order.affiliateCode}-${orderId}`) : null;
     const negotiationRef = order.negotiationId ? db.collection('negotiations').doc(order.negotiationId) : null;
     const recoveryProfileRef = order.userId ? db.collection('cart_recovery_profiles').doc(order.userId) : null;
 
@@ -139,7 +140,9 @@ export async function fulfillOrder(orderId, { provider, reference, confirmedBy }
     // Código de afiliado amarrado a produto (`affiliateProductId`) fica de
     // fora de propósito — é o caso de promoção específica onde reuso pelo
     // mesmo CPF é esperado enquanto a promoção estiver no ar.
-    if (order.affiliateCode && !order.affiliateProductId && cpfData.affiliateCodes?.length) throw new HttpError(409, 'affiliate_coupon_already_used');
+    if (order.affiliateCode && !promoterOrder && !order.affiliateProductId && cpfData.affiliateCodes?.length) throw new HttpError(409, 'affiliate_coupon_already_used');
+    // Divulgador: cada cadastro usa cada código uma única vez.
+    if (promoterOrder && cpfData.promoterCodes?.includes(order.affiliateCode)) throw new HttpError(409, 'promoter_code_already_used');
     if (promoUsageRef && byPath.get(promoUsageRef.path).exists) throw new HttpError(409, 'promotion_already_used');
 
     let nextHomePromo = null;
@@ -237,7 +240,8 @@ export async function fulfillOrder(orderId, { provider, reference, confirmedBy }
     if (cpfRef) {
       transaction.set(cpfRef, {
         productIds: unique([...(cpfData.productIds || []), ...limitedProducts]),
-        affiliateCodes: unique([...(cpfData.affiliateCodes || []), ...(order.affiliateCode && !order.affiliateProductId ? [order.affiliateCode] : [])]),
+        affiliateCodes: unique([...(cpfData.affiliateCodes || []), ...(order.affiliateCode && !promoterOrder && !order.affiliateProductId ? [order.affiliateCode] : [])]),
+        promoterCodes: unique([...(cpfData.promoterCodes || []), ...(promoterOrder ? [order.affiliateCode] : [])]),
       }, { merge: true });
     }
     if (promoUsageRef) {
@@ -309,6 +313,14 @@ export async function fulfillOrder(orderId, { provider, reference, confirmedBy }
         ownerEmail: affiliate.ownerEmail || '',
         status: 'pending',
         createdAt: new Date().toISOString(),
+      });
+    }
+    // Divulgador não tem comissão: a compra paga entra direto na contagem de retorno do código.
+    if (affiliateRef && promoterOrder) {
+      const affiliate = affiliateSnap.data();
+      transaction.update(affiliateRef, {
+        totalOrders: Number(affiliate.totalOrders || 0) + 1,
+        totalRevenue: Number(affiliate.totalRevenue || 0) + Number(order.netProductsYen || 0),
       });
     }
     if (negotiationRef && byPath.get(negotiationRef.path).exists) {

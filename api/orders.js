@@ -185,13 +185,16 @@ async function resolveCoupon(db, code, userDoc, customer, productSubtotalHint = 
   if (affiliateSnap.exists) {
     const affiliate = affiliateSnap.data();
     if (affiliate.active === false || !activeByDate(affiliate.expiresAt)) throw new HttpError(409, 'coupon_unavailable');
+    const promoter = affiliate.kind === 'promoter';
     return {
       code: normalized,
       discount: Number(affiliate.discountPercent || 0),
       discountType: 'percentage',
       affiliateCode: normalized,
+      affiliateKind: promoter ? 'promoter' : 'affiliate',
       affiliateProductId: affiliate.productId || '',
-      commissionPercent: Number(affiliate.commissionPercent || 0),
+      // Divulgador recebe o produto, não comissão.
+      commissionPercent: promoter ? 0 : Number(affiliate.commissionPercent || 0),
       ownerEmail: affiliate.ownerEmail || '',
       source: 'affiliate',
     };
@@ -615,9 +618,15 @@ async function handleCreate(req, res) {
     // pois é o caso de promoção específica onde reuso pelo mesmo CPF é
     // esperado enquanto ela estiver ativa. Espelhado em `fulfillment.js` como
     // segunda barreira no momento em que o pagamento é confirmado.
-    if (coupon?.affiliateCode && !coupon.affiliateProductId && cpfData?.affiliateCodes?.length) {
+    const promoterCoupon = coupon?.affiliateKind === 'promoter';
+    if (coupon?.affiliateCode && !promoterCoupon && !coupon.affiliateProductId && cpfData?.affiliateCodes?.length) {
       await registrarTentativaFraude(db, customer, { attemptType: 'affiliate_reuse', affiliateCode: coupon.affiliateCode });
       throw new HttpError(409, 'affiliate_coupon_already_used');
+    }
+    // Código de divulgador: cada cadastro usa cada código uma única vez
+    // (um código novo, de outro vídeo/produto, pode ser usado de novo).
+    if (promoterCoupon && cpfData?.promoterCodes?.includes(coupon.affiliateCode)) {
+      throw new HttpError(409, 'promoter_code_already_used');
     }
 
     const now = new Date().toISOString();
@@ -646,6 +655,7 @@ async function handleCreate(req, res) {
       couponCode: couponCode || '',
       couponSource: coupon?.source || '',
       affiliateCode: coupon?.affiliateCode || '',
+      affiliateKind: coupon?.affiliateKind || '',
       affiliateProductId: coupon?.affiliateProductId || '',
       commissionPercent: coupon?.commissionPercent || 0,
       affiliateOwnerEmail: coupon?.ownerEmail || '',

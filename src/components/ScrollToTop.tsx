@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { safeStorage } from '@/utils/storage';
 import { getLenis } from '@/lib/smoothScroll';
+import { affiliateService } from '@/services/affiliateService';
 
 // Extrai o productId de rotas como /produto/:id ou /produto/:id?ref=CODE
 const extractProductId = (pathname: string): string | null => {
@@ -35,6 +36,8 @@ const ScrollToTop = () => {
     const ref = params.get('ref');
     if (ref) {
       safeStorage.setItem('affiliate_ref', ref.trim().toUpperCase());
+      // Conta a chegada pelo link (retorno do divulgador/afiliado); uma vez por pessoa.
+      void affiliateService.trackVisit(ref, 'link');
       const productId = extractProductId(pathname);
       if (productId) {
         safeStorage.setItem('affiliate_ref_product', productId);

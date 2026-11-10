@@ -68,7 +68,7 @@ describe('affiliate code validation', () => {
     expect(res.statusCode).toBe(200);
     expect(res.body).toEqual({
       valid: true,
-      affiliate: { code: 'ANA10', ownerName: 'Ana Influencer', discountPercent: 10, expiresAt: '2099-01-01T00:00:00.000Z' },
+      affiliate: { code: 'ANA10', ownerName: 'Ana Influencer', discountPercent: 10, expiresAt: '2099-01-01T00:00:00.000Z', kind: 'affiliate' },
     });
     expect(JSON.stringify(res.body)).not.toMatch(/secret@example\.com|totalEarnings|totalRevenue|commission/);
     expect(mocks.reads).toHaveBeenCalledWith('ANA10');

@@ -26,7 +26,9 @@ import { taxDisclosure } from '../../shared/tax-disclosure.js';
 const affiliateToCoupon = (aff: AffiliateCouponInfo, productId?: string | null, source: 'link' | 'code' = 'code'): Coupon => ({
   id: `aff-${aff.code}`,
   code: aff.code,
-  description: `Indicação de ${aff.ownerName} — ${aff.discountPercent}% OFF`,
+  description: aff.discountPercent > 0
+    ? `Indicação de ${aff.ownerName} — ${aff.discountPercent}% OFF`
+    : `Indicação de ${aff.ownerName}`,
   discount: aff.discountPercent,
   discountType: 'percentage',
   expiresAt: aff.expiresAt,
@@ -95,6 +97,7 @@ const Cart: React.FC = () => {
     if (affiliateResult.valid && affiliateResult.affiliate) {
       applyCouponObject(affiliateToCoupon(affiliateResult.affiliate, null));
       safeStorage.setItem('affiliate_ref', affiliateResult.affiliate.code);
+      void affiliateService.trackVisit(affiliateResult.affiliate.code, 'code');
       safeStorage.removeItem('affiliate_ref_product');
       return;
     }

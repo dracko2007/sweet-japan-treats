@@ -1,15 +1,16 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Megaphone, Plus, Trash2, Link2, TrendingUp, DollarSign, Package, X, CheckCircle, Clock, RefreshCw } from 'lucide-react';
+import { Megaphone, Plus, Trash2, Link2, TrendingUp, DollarSign, Package, X, CheckCircle, Clock, RefreshCw, Users, ShoppingBag } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { useConfirm } from '@/components/ConfirmDialog';
-import { affiliateService, Affiliate, PendingCommission, TIER_CONFIG, AffiliateTier } from '@/services/affiliateService';
-
-const SITE_URL = 'https://japanexpress-store.com';
+import { affiliateService, affiliateLink, isPromoter, Affiliate, AffiliateKind, PendingCommission, TIER_CONFIG, AffiliateTier } from '@/services/affiliateService';
+import { useProducts } from '@/context/ProductsContext';
 
 const EMPTY_FORM = {
+  kind: 'affiliate' as AffiliateKind,
+  productId: '',
   code: '',
   ownerName: '',
   ownerEmail: '',
@@ -30,6 +31,7 @@ type AffiliateForm = typeof EMPTY_FORM;
 const AffiliateManager: React.FC = () => {
   const { toast } = useToast();
   const confirm = useConfirm();
+  const { products } = useProducts();
   const [affiliates, setAffiliates] = useState<Affiliate[]>([]);
   const [pending, setPending] = useState<PendingCommission[]>([]);
   const [loading, setLoading] = useState(true);
@@ -161,6 +163,11 @@ const AffiliateManager: React.FC = () => {
       return;
     }
     const newCode = form.code.trim().toUpperCase();
+    const promoter = form.kind === 'promoter';
+    if (promoter && !form.productId) {
+      toast({ title: 'Escolha o produto enviado ao divulgador', description: 'O link do código leva direto a esse produto.', variant: 'destructive' });
+      return;
+    }
     if (!editingCode && affiliates.some((a) => a.code.toUpperCase() === newCode)) {
       toast({ title: `O código ${newCode} já existe`, description: 'Escolha outro código ou use Editar na lista.', variant: 'destructive' });
       return;
@@ -168,21 +175,33 @@ const AffiliateManager: React.FC = () => {
     setSaving(true);
     const ok = await affiliateService.save({
       code: form.code.toUpperCase(),
+      kind: form.kind,
       ownerName: form.ownerName.trim() || form.code.toUpperCase(),
       ownerEmail: form.ownerEmail.trim(),
       discountPercent: Number(form.discountPercent),
-      commissionPercent: Number(form.bronzePercent),
-      tierSettings: {
-        bronzeGoalYen: Number(form.bronzeGoalYen), bronzePercent: Number(form.bronzePercent),
-        silverGoalYen: Number(form.silverGoalYen), silverPercent: Number(form.silverPercent),
-        goldGoalYen: Number(form.goldGoalYen), goldPercent: Number(form.goldPercent),
-      },
+      ...(promoter
+        ? {
+            commissionPercent: 0,
+            productId: form.productId,
+            productName: products.find((p) => p.id === form.productId)?.name || '',
+          }
+        : {
+            commissionPercent: Number(form.bronzePercent),
+            tierSettings: {
+              bronzeGoalYen: Number(form.bronzeGoalYen), bronzePercent: Number(form.bronzePercent),
+              silverGoalYen: Number(form.silverGoalYen), silverPercent: Number(form.silverPercent),
+              goldGoalYen: Number(form.goldGoalYen), goldPercent: Number(form.goldPercent),
+            },
+          }),
       active: form.active,
       expiresAt: new Date(Date.now() + form.validityDays * 86400000).toISOString(),
     });
     setSaving(false);
     if (ok) {
-      toast({ title: editingCode ? '✅ Afiliado atualizado' : '✅ Código criado', description: newCode });
+      toast({
+        title: editingCode ? '✅ Cadastro atualizado' : '✅ Código criado',
+        description: promoter ? affiliateLink(newCode, form.productId) : newCode,
+      });
       closeForm();
       load();
     } else {
@@ -207,6 +226,8 @@ const AffiliateManager: React.FC = () => {
   const startEdit = (affiliate: Affiliate) => {
     const settings = affiliate.tierSettings;
     openForm({
+      kind: isPromoter(affiliate) ? 'promoter' : 'affiliate',
+      productId: affiliate.productId || '',
       code: affiliate.code,
       ownerName: affiliate.ownerName,
       ownerEmail: affiliate.ownerEmail,
@@ -225,6 +246,9 @@ const AffiliateManager: React.FC = () => {
   const startAdditionalCode = (affiliate: Affiliate) => {
     const settings = affiliate.tierSettings;
     openForm({
+      // Divulgador: código novo = produto/vídeo novo, então o produto começa vazio.
+      kind: isPromoter(affiliate) ? 'promoter' : 'affiliate',
+      productId: '',
       code: '',
       ownerName: affiliate.ownerName,
       ownerEmail: affiliate.ownerEmail,
@@ -241,13 +265,14 @@ const AffiliateManager: React.FC = () => {
     }, null, affiliate.ownerName || affiliate.code);
   };
 
-  const copyLink = (code: string) => {
-    const link = `${SITE_URL}/?ref=${code}`;
+  const copyLink = (aff: Affiliate) => {
+    const link = affiliateLink(aff.code, isPromoter(aff) ? aff.productId : undefined);
     navigator.clipboard.writeText(link);
     toast({ title: 'Link copiado', description: link });
   };
 
   const yen = (v: number) => `¥${(v || 0).toLocaleString()}`;
+  const isPromoterForm = form.kind === 'promoter';
 
   return (
     <div className="space-y-6">
@@ -259,7 +284,7 @@ const AffiliateManager: React.FC = () => {
           <div>
             <h2 className="font-display text-2xl font-semibold">Afiliados / Influencers</h2>
             <p className="text-sm text-muted-foreground">
-              Códigos públicos que dão desconto ao comprador e comissão ao influencer
+              Afiliado: comissão por venda com metas · Divulgador: recebe o produto e você mede o retorno de cada código
             </p>
           </div>
         </div>
@@ -308,9 +333,52 @@ const AffiliateManager: React.FC = () => {
       {creating && (
         <div ref={formRef} className="bg-card rounded-xl border-2 border-primary/40 p-6 scroll-mt-40">
           <h3 className="font-semibold mb-4">
-            {editingCode ? `Editar afiliado ${editingCode}` : extraCodeFor ? `Novo código para ${extraCodeFor}` : 'Cadastrar Influencer'}
+            {editingCode ? `Editar ${isPromoterForm ? 'divulgador' : 'afiliado'} ${editingCode}` : extraCodeFor ? `Novo código para ${extraCodeFor}` : 'Cadastrar Influencer'}
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-1 md:col-span-2">
+              <Label htmlFor="affiliate-kind">Tipo de parceria *</Label>
+              <select
+                id="affiliate-kind"
+                value={form.kind}
+                onChange={(e) => setForm({
+                  ...form,
+                  kind: e.target.value as AffiliateKind,
+                  // Divulgador normalmente só rastreia; afiliado volta ao desconto padrão.
+                  discountPercent: e.target.value === 'promoter' ? 0 : (form.discountPercent || EMPTY_FORM.discountPercent),
+                })}
+                className="w-full h-10 px-3 text-sm rounded-md border border-input bg-background"
+              >
+                <option value="affiliate">Afiliado — comissão por venda, com metas</option>
+                <option value="promoter">Divulgador — recebe o produto grátis e divulga</option>
+              </select>
+              <p className="text-[11px] text-muted-foreground">
+                {isPromoterForm
+                  ? 'Sem comissão nem meta. Cada código é de um produto/vídeo e conta quantas pessoas vieram e quantas compraram.'
+                  : 'Ganha comissão sobre o lucro de cada venda, conforme as metas mensais.'}
+              </p>
+            </div>
+            {isPromoterForm && (
+              <div className="space-y-1 md:col-span-2">
+                <Label htmlFor="affiliate-product">Produto enviado *</Label>
+                <select
+                  id="affiliate-product"
+                  value={form.productId}
+                  onChange={(e) => setForm({ ...form, productId: e.target.value })}
+                  className="w-full h-10 px-3 text-sm rounded-md border border-input bg-background"
+                >
+                  <option value="">Escolha o produto deste código...</option>
+                  {products.map((p) => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+                {form.productId && form.code.trim() && (
+                  <p className="text-[11px] text-muted-foreground break-all">
+                    Link do código: <code className="text-foreground">{affiliateLink(form.code.trim().toUpperCase(), form.productId)}</code>
+                  </p>
+                )}
+              </div>
+            )}
             <div className="space-y-1">
               <div className="flex items-center justify-between">
                 <Label>Código anunciado *</Label>
@@ -318,8 +386,12 @@ const AffiliateManager: React.FC = () => {
                   <Plus className="w-3 h-3 mr-1" /> Outro código
                 </Button>
               </div>
-              <Input ref={codeInputRef} value={form.code} disabled={Boolean(editingCode)} onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })} placeholder="Ex: JUNIOR10" className="uppercase font-bold" />
-              <p className="text-[11px] text-muted-foreground">Cada código é independente e pode ter sua própria validade e desconto.</p>
+              <Input ref={codeInputRef} value={form.code} disabled={Boolean(editingCode)} onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })} placeholder={isPromoterForm ? 'Ex: DIVULGADOR1FINO' : 'Ex: JUNIOR10'} className="uppercase font-bold" />
+              <p className="text-[11px] text-muted-foreground">
+                {isPromoterForm
+                  ? 'Um código por produto/vídeo. Cada cliente usa cada código uma única vez.'
+                  : 'Cada código é independente e pode ter sua própria validade e desconto.'}
+              </p>
             </div>
             <div className="space-y-1">
               <Label>Validade do código (dias)</Label>
@@ -327,18 +399,22 @@ const AffiliateManager: React.FC = () => {
               <p className="text-[11px] text-muted-foreground">Define por quantos dias o código poderá ser usado. O link do afiliado não expira.</p>
             </div>
             <div className="space-y-1">
-              <Label>Nome do influencer</Label>
+              <Label>{isPromoterForm ? 'Nome do divulgador' : 'Nome do influencer'}</Label>
               <Input value={form.ownerName} onChange={(e) => setForm({ ...form, ownerName: e.target.value })} placeholder="Ex: Junior Vox" />
             </div>
             <div className="space-y-1 md:col-span-2">
-              <Label>E-mail da conta do influencer *</Label>
+              <Label>{isPromoterForm ? 'E-mail da conta do divulgador *' : 'E-mail da conta do influencer *'}</Label>
               <Input value={form.ownerEmail} onChange={(e) => setForm({ ...form, ownerEmail: e.target.value })} placeholder="influencer@email.com" />
-              <p className="text-[11px] text-muted-foreground">É com este e-mail que o influencer vê o painel dele em /afiliado.</p>
+              <p className="text-[11px] text-muted-foreground">É com este e-mail que ele vê o painel dele (códigos, links e retorno) em /afiliado.</p>
             </div>
             <div className="space-y-1">
               <Label>Desconto ao comprador (%)</Label>
               <Input type="number" min="0" max="100" value={form.discountPercent} onChange={(e) => setForm({ ...form, discountPercent: Number(e.target.value) })} />
+              {isPromoterForm && (
+                <p className="text-[11px] text-muted-foreground">Opcional. Com 0% o código serve só para medir o retorno.</p>
+              )}
             </div>
+            {!isPromoterForm && (
             <div className="md:col-span-2 border-t pt-4">
               <p className="font-semibold mb-1">Metas e comissão por nível</p>
               <p className="text-xs text-muted-foreground mb-3">Até a meta 1: Bronze · até a meta 2: Prata · acima: Ouro.</p>
@@ -357,6 +433,7 @@ const AffiliateManager: React.FC = () => {
                 ))}
               </div>
             </div>
+            )}
             <div className="flex items-center gap-2 pt-6">
               <input type="checkbox" checked={form.active} onChange={(e) => setForm({ ...form, active: e.target.checked })} className="w-4 h-4" />
               <Label className="cursor-pointer">Ativo</Label>
@@ -432,6 +509,72 @@ const AffiliateManager: React.FC = () => {
           <div className="grid gap-4">
             {affiliates.map((aff) => {
               const expired = new Date(aff.expiresAt) < new Date();
+              if (isPromoter(aff)) {
+                const link = affiliateLink(aff.code, aff.productId);
+                const visits = aff.visitCount || 0;
+                const buyers = aff.totalOrders || 0;
+                return (
+                  <div key={aff.code} className={`bg-card rounded-xl border p-6 ${!aff.active || expired ? 'border-border opacity-70' : 'border-sky-300/60'}`}>
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-3 mb-1 flex-wrap">
+                          <h3 className="font-bold text-lg font-mono">{aff.code}</h3>
+                          <span className={`px-2 py-0.5 rounded-full text-xs ${aff.active && !expired ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
+                            {expired ? 'Expirado' : aff.active ? 'Ativo' : 'Inativo'}
+                          </span>
+                          <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-sky-100 text-sky-700">📣 Divulgador</span>
+                        </div>
+                        <p className="text-sm text-muted-foreground">{aff.ownerName} · {aff.ownerEmail}</p>
+                        <p className="text-sm mt-1">
+                          <span className="text-muted-foreground">Produto enviado: </span>
+                          <strong>{aff.productName || products.find((p) => p.id === aff.productId)?.name || aff.productId || '—'}</strong>
+                        </p>
+                        <div className="mt-3 flex items-center gap-2 bg-secondary/40 rounded-lg p-2">
+                          <Link2 className="w-3.5 h-3.5 text-primary shrink-0" />
+                          <code className="text-xs text-foreground truncate flex-1">{link}</code>
+                          <button onClick={() => copyLink(aff)} className="text-xs font-semibold text-primary hover:underline shrink-0">copiar</button>
+                        </div>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mt-4">
+                          <div>
+                            <p className="text-muted-foreground text-xs flex items-center gap-1"><Users className="w-3 h-3" /> Pessoas que vieram</p>
+                            <p className="font-semibold text-lg">{visits}</p>
+                            <p className="text-[11px] text-muted-foreground">{aff.linkVisits || 0} pelo link · {aff.codeVisits || 0} pelo código</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground text-xs flex items-center gap-1"><ShoppingBag className="w-3 h-3" /> Compraram</p>
+                            <p className="font-semibold text-lg text-green-600">{buyers}</p>
+                            <p className="text-[11px] text-muted-foreground">{visits > 0 ? `${Math.round((buyers / visits) * 100)}% de quem veio` : 'pedidos pagos'}</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground text-xs flex items-center gap-1"><TrendingUp className="w-3 h-3" /> Vendas geradas</p>
+                            <p className="font-semibold text-lg">{yen(aff.totalRevenue)}</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground text-xs">Desconto</p>
+                            <p className="font-semibold text-lg">{aff.discountPercent}%</p>
+                          </div>
+                        </div>
+                        <div className="flex gap-2 mt-4">
+                          <Button variant="outline" size="sm" onClick={() => startEdit(aff)} title="Editar divulgador">
+                            Editar
+                          </Button>
+                          <Button variant="outline" size="sm" onClick={() => startAdditionalCode(aff)} title="Novo código para outro produto">
+                            <Plus className="w-3 h-3 mr-1" /> Código (novo produto)
+                          </Button>
+                        </div>
+                      </div>
+                      <div className="flex flex-col gap-2">
+                        <Button variant="outline" size="sm" onClick={() => copyLink(aff)} title="Copiar link">
+                          <Link2 className="w-4 h-4" />
+                        </Button>
+                        <Button variant="destructive" size="sm" onClick={() => handleDelete(aff.code)} title="Remover">
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
               const tier: AffiliateTier = aff.tier || 'bronze';
               const tierCfg = TIER_CONFIG[tier];
               const monthRev = aff.currentMonthRevenue || 0;
@@ -484,8 +627,8 @@ const AffiliateManager: React.FC = () => {
 
                       <div className="mt-3 flex items-center gap-2 bg-secondary/40 rounded-lg p-2">
                         <Link2 className="w-3.5 h-3.5 text-primary shrink-0" />
-                        <code className="text-xs text-foreground truncate flex-1">{`${SITE_URL}/?ref=${aff.code}`}</code>
-                        <button onClick={() => copyLink(aff.code)} className="text-xs font-semibold text-primary hover:underline shrink-0">copiar</button>
+                        <code className="text-xs text-foreground truncate flex-1">{affiliateLink(aff.code)}</code>
+                        <button onClick={() => copyLink(aff)} className="text-xs font-semibold text-primary hover:underline shrink-0">copiar</button>
                       </div>
                       <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm mt-4">
                         <div><p className="text-muted-foreground text-xs">Desconto</p><p className="font-semibold">{aff.discountPercent}%</p></div>
@@ -502,7 +645,7 @@ const AffiliateManager: React.FC = () => {
                       </div>
                     </div>
                     <div className="flex flex-col gap-2">
-                      <Button variant="outline" size="sm" onClick={() => copyLink(aff.code)} title="Copiar link">
+                      <Button variant="outline" size="sm" onClick={() => copyLink(aff)} title="Copiar link">
                         <Link2 className="w-4 h-4" />
                       </Button>
                       <Button variant="destructive" size="sm" onClick={() => handleDelete(aff.code)} title="Remover">

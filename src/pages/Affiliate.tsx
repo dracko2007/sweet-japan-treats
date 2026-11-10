@@ -1,16 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Megaphone, Link2, Copy, Check, DollarSign, Package, TrendingUp, Percent, Clock, PlayCircle, X, Trophy } from 'lucide-react';
+import { Megaphone, Link2, Copy, Check, DollarSign, Package, TrendingUp, Percent, Clock, X, Trophy, Users, ShoppingBag } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { useUser } from '@/context/UserContext';
 import { useProducts } from '@/context/ProductsContext';
 import { useToast } from '@/hooks/use-toast';
-import { affiliateService, TIER_CONFIG } from '@/services/affiliateService';
+import { affiliateService, affiliateLink, isPromoter, SITE_URL, TIER_CONFIG } from '@/services/affiliateService';
 import type { AffiliateDashboard, AffiliateTier } from '@/services/affiliateService';
 import { convertYen as fxConvert, loadFxRates } from '@/services/fxService';
-
-const SITE_URL = 'https://japanexpress-store.com';
 
 const AffiliatePage: React.FC = () => {
   const { user, isAuthenticated } = useUser();
@@ -34,7 +32,7 @@ const AffiliatePage: React.FC = () => {
       setAffiliates(list);
       const map: Record<string, { commissionYen: number; netYen: number; orders: number }> = {};
       await Promise.all(
-        list.map(async (aff) => {
+        list.filter((aff) => !isPromoter(aff)).map(async (aff) => {
           const pend = await affiliateService.getPendingByCode(aff.code);
           map[aff.code] = {
             commissionYen: pend.reduce((sum, p) => sum + (p.commissionYen || 0), 0),
@@ -55,6 +53,12 @@ const AffiliatePage: React.FC = () => {
   };
 
   const yen = (v: number) => `¥${(v || 0).toLocaleString()}`;
+  // Divulgador: um código por produto/vídeo; ativos primeiro.
+  const promoterCodes = affiliates
+    .filter(isPromoter)
+    .sort((a, b) => Number(b.active) - Number(a.active) || a.code.localeCompare(b.code));
+  const affiliateCodes = affiliates.filter((aff) => !isPromoter(aff));
+  const onlyPromoter = promoterCodes.length > 0 && affiliateCodes.length === 0;
   const brl = (v: number) => `R$ ${fxConvert(v || 0, 'BRL').toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   return (
@@ -62,13 +66,13 @@ const AffiliatePage: React.FC = () => {
       <div className="gradient-hero py-16">
         <div className="container mx-auto px-4 text-center">
           <div className="inline-flex items-center gap-2 bg-primary/10 text-primary font-semibold text-sm px-4 py-1.5 rounded-full mb-4">
-            <Megaphone className="w-4 h-4" /> Programa de Afiliados
+            <Megaphone className="w-4 h-4" /> {onlyPromoter ? 'Programa de Divulgadores' : 'Programa de Afiliados'}
           </div>
           <h1 className="font-display text-4xl lg:text-5xl font-bold text-foreground mb-3">
-            Painel do Influencer
+            {onlyPromoter ? 'Painel do Divulgador' : 'Painel do Influencer'}
           </h1>
           <p className="text-muted-foreground text-lg">
-            Acompanhe suas indicações e comissões
+            {onlyPromoter ? 'Seus códigos, links e o retorno de cada divulgação' : 'Acompanhe suas indicações e comissões'}
           </p>
         </div>
       </div>
@@ -94,7 +98,89 @@ const AffiliatePage: React.FC = () => {
             </div>
           ) : (
             <div className="space-y-6">
-              {affiliates.map((aff) => {
+              {promoterCodes.length > 0 && (
+                <div className="space-y-4">
+                  <div>
+                    <h2 className="font-display text-2xl font-bold">Seus códigos de divulgação</h2>
+                    <p className="text-sm text-muted-foreground">
+                      Cada produto que você recebe tem um código e um link próprios. Use o link ou o código do produto
+                      certo em cada vídeo: é assim que contamos quem veio por você.
+                    </p>
+                  </div>
+                  {promoterCodes.map((aff) => {
+                    const link = affiliateLink(aff.code, aff.productId);
+                    const expired = new Date(aff.expiresAt) < new Date();
+                    const visits = aff.visitCount || 0;
+                    const buyers = aff.totalOrders || 0;
+                    return (
+                      <div key={aff.code} className={`bg-card rounded-2xl border border-border p-6 lg:p-8 space-y-5 ${!aff.active || expired ? 'opacity-70' : ''}`}>
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="text-xs uppercase font-bold text-muted-foreground">Produto</p>
+                            <p className="font-display text-xl font-bold">
+                              {aff.productName || products.find((p) => p.id === aff.productId)?.name || 'Produto da divulgação'}
+                            </p>
+                          </div>
+                          <span className={`px-3 py-1 rounded-full text-sm font-semibold ${aff.active && !expired ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
+                            {expired ? 'Expirado' : aff.active ? 'Ativo' : 'Inativo'}
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="bg-secondary/30 rounded-xl p-4">
+                            <p className="text-xs text-muted-foreground flex items-center gap-1 mb-1"><Users className="w-3 h-3" /> Pessoas que vieram</p>
+                            <p className="text-2xl font-bold">{visits}</p>
+                            <p className="text-[10px] text-muted-foreground">{aff.linkVisits || 0} pelo link · {aff.codeVisits || 0} pelo código</p>
+                          </div>
+                          <div className="bg-primary/10 rounded-xl p-4 border border-primary/20">
+                            <p className="text-xs text-primary flex items-center gap-1 mb-1"><ShoppingBag className="w-3 h-3" /> Compraram</p>
+                            <p className="text-2xl font-bold text-primary">{buyers}</p>
+                            <p className="text-[10px] text-muted-foreground">pedidos pagos com seu link ou código</p>
+                          </div>
+                        </div>
+
+                        <div>
+                          <p className="text-xs uppercase font-bold text-muted-foreground mb-2">Seu código</p>
+                          <div className="flex gap-2">
+                            <input
+                              readOnly
+                              aria-label={`Código ${aff.code}`}
+                              value={aff.code}
+                              className="flex-1 min-w-0 px-3 py-2 text-lg rounded-lg border border-border bg-secondary/30 font-mono font-extrabold text-primary"
+                              onFocus={(e) => e.currentTarget.select()}
+                            />
+                            <Button variant="outline" onClick={() => copy(aff.code, `code-${aff.code}`)} className="px-3" aria-label="Copiar código">
+                              {copied === `code-${aff.code}` ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
+                            </Button>
+                          </div>
+                        </div>
+
+                        <div>
+                          <p className="text-xs uppercase font-bold text-muted-foreground mb-2 flex items-center gap-1"><Link2 className="w-3.5 h-3.5" /> Link deste produto</p>
+                          <div className="flex gap-2">
+                            <input
+                              readOnly
+                              aria-label={`Link do código ${aff.code}`}
+                              value={link}
+                              className="flex-1 min-w-0 px-3 py-2 text-sm rounded-lg border border-border bg-secondary/30 font-mono"
+                              onFocus={(e) => e.currentTarget.select()}
+                            />
+                            <Button variant="outline" onClick={() => copy(link, `link-${aff.code}`)} className="px-3" aria-label="Copiar link">
+                              {copied === `link-${aff.code}` ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
+                            </Button>
+                          </div>
+                          <p className="text-[11px] text-muted-foreground mt-2">
+                            Coloque este link na descrição do vídeo ou divulgue o código <strong>{aff.code}</strong>.
+                            {aff.discountPercent > 0 ? ` Quem usar ganha ${aff.discountPercent}% de desconto.` : ''}
+                            {' '}Cada cliente pode usar este código uma única vez.
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              {affiliateCodes.map((aff) => {
                 const link = `${SITE_URL}/?ref=${aff.code}`;
                 const expired = new Date(aff.expiresAt) < new Date();
                 const pend = pendingByCode[aff.code] || { commissionYen: 0, netYen: 0, orders: 0 };

@@ -34,6 +34,12 @@ function numberOrZero(value) {
   return Number.isFinite(number) ? number : 0;
 }
 
+// 'promoter' = divulgador: recebe o produto grátis, não tem comissão nem meta;
+// só medimos o retorno (visitas e compras) de cada código/link.
+export function affiliateKind(data) {
+  return data?.kind === 'promoter' ? 'promoter' : 'affiliate';
+}
+
 function affiliateSummary(document) {
   const data = document.data() || {};
   return {
@@ -48,6 +54,12 @@ function affiliateSummary(document) {
     tier: ['bronze', 'silver', 'gold'].includes(data.tier) ? data.tier : 'bronze',
     currentMonthRevenue: numberOrZero(data.currentMonthRevenue),
     tierSettings: data.tierSettings || null,
+    kind: affiliateKind(data),
+    productId: String(data.productId || ''),
+    productName: String(data.productName || ''),
+    visitCount: numberOrZero(data.visitCount),
+    linkVisits: numberOrZero(data.linkVisits),
+    codeVisits: numberOrZero(data.codeVisits),
   };
 }
 
@@ -130,8 +142,42 @@ async function validateCode(req, body) {
       ownerName: String(data.ownerName || '').slice(0, 120),
       discountPercent: Math.max(0, Math.min(100, numberOrZero(data.discountPercent))),
       expiresAt,
+      kind: affiliateKind(data),
     },
   };
+}
+
+// Conta quem chegou por um código: abriu o link (?ref=) ou digitou o código no carrinho.
+// Cada pessoa conta uma vez por código (conta logada = uid; visitante = id do navegador).
+async function trackVisit(req, body) {
+  assertExactKeys(body, ['action', 'code', 'source', 'visitorId']);
+  const code = requiredText(body.code, { max: 80, pattern: /^(?!\.\.?$)[^/]+$/ }).toUpperCase();
+  const source = body.source === 'code' ? 'code' : 'link';
+  const visitorId = requiredText(body.visitorId, { max: 64, pattern: /^[A-Za-z0-9_-]{8,64}$/ });
+  const user = await optionalUser(req);
+  await enforceRateLimit(req, user
+    ? { scope: 'affiliate-visit', limit: VALIDATE_PER_USER, windowMs: VALIDATE_WINDOW_MS, identity: user.uid }
+    : { scope: 'affiliate-visit:guest', limit: VALIDATE_PER_GUEST_IP, windowMs: VALIDATE_WINDOW_MS });
+
+  const db = adminDb();
+  const affiliateRef = db.collection('affiliates').doc(code);
+  const visitRef = db.collection('affiliate_visits').doc(`${code}__${user ? `u_${user.uid}` : `v_${visitorId}`}`);
+  return db.runTransaction(async (transaction) => {
+    const [affiliateSnap, visitSnap] = await Promise.all([transaction.get(affiliateRef), transaction.get(visitRef)]);
+    if (!affiliateSnap.exists || visitSnap.exists) return { counted: false };
+    const data = affiliateSnap.data() || {};
+    if (data.active !== true) return { counted: false };
+    // O próprio dono conferindo o link não é retorno.
+    const email = String(user?.email || '').trim().toLowerCase();
+    if (email && email === String(data.ownerEmail || '').trim().toLowerCase()) return { counted: false };
+    transaction.set(visitRef, { code, source, createdAt: new Date().toISOString() });
+    const sourceField = source === 'code' ? 'codeVisits' : 'linkVisits';
+    transaction.update(affiliateRef, {
+      visitCount: numberOrZero(data.visitCount) + 1,
+      [sourceField]: numberOrZero(data[sourceField]) + 1,
+    });
+    return { counted: true };
+  });
 }
 
 export default async function handler(req, res) {
@@ -142,6 +188,10 @@ export default async function handler(req, res) {
     const action = requiredText(body.action, { max: 20 });
     if (action === 'validate') {
       res.status(200).json(await validateCode(req, body));
+      return;
+    }
+    if (action === 'track-visit') {
+      res.status(200).json(await trackVisit(req, body));
       return;
     }
     const user = await requireUser(req);

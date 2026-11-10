@@ -439,3 +439,39 @@ describe('cupom global de uso único ancorado no CPF', () => {
       .rejects.toMatchObject({ code: 'coupon_already_used' });
   });
 });
+
+// Divulgador: recebe o produto, não comissão. O pedido pago entra na contagem
+// de retorno do código, e cada cadastro usa cada código uma única vez.
+describe('código de divulgador', () => {
+  const divulgador = { 'affiliates/DIVULGADOR1FINO': { kind: 'promoter', active: true, ownerEmail: 'div@example.com', commissionPercent: 0, totalOrders: 2, totalRevenue: 1000 } };
+  const pedido = (id, overrides = {}) => order(id, { affiliateCode: 'DIVULGADOR1FINO', affiliateKind: 'promoter', affiliateProductId: 'p1', netProductsYen: 3000, ...overrides });
+
+  it('conta a compra no código e não gera comissão', async () => {
+    const db = database(pedido('O1'), 5, divulgador);
+    injected.db = db;
+    await fulfillOrder('O1', { provider: 'manual', reference: 'div-1', confirmedBy: 'admin' });
+
+    expect(db.get('affiliates/DIVULGADOR1FINO')).toMatchObject({ totalOrders: 3, totalRevenue: 4000 });
+    expect(db.get('affiliate_pending/DIVULGADOR1FINO-O1')).toBeUndefined();
+    expect(db.get('cpf_index/uid_user-O1').promoterCodes).toEqual(['DIVULGADOR1FINO']);
+    expect(db.get('cpf_index/uid_user-O1').affiliateCodes).toEqual([]);
+  });
+
+  it('recusa o mesmo código pelo mesmo cadastro, mas aceita um código novo', async () => {
+    const usado = { 'cpf_index/uid_user-O2': { productIds: [], affiliateCodes: [], promoterCodes: ['DIVULGADOR1FINO'] } };
+    const db = database(pedido('O2'), 5, { ...divulgador, ...usado });
+    injected.db = db;
+    await expect(fulfillOrder('O2', { provider: 'manual', reference: 'div-2', confirmedBy: 'admin' }))
+      .rejects.toMatchObject({ code: 'promoter_code_already_used' });
+    expect(db.get('affiliates/DIVULGADOR1FINO').totalOrders).toBe(2);
+
+    const outro = database(pedido('O2', { affiliateCode: 'DIVULGADOR1OUTRO' }), 5, {
+      ...usado,
+      'affiliates/DIVULGADOR1OUTRO': { kind: 'promoter', active: true },
+    });
+    injected.db = outro;
+    await fulfillOrder('O2', { provider: 'manual', reference: 'div-3', confirmedBy: 'admin' });
+    expect(outro.get('affiliates/DIVULGADOR1OUTRO').totalOrders).toBe(1);
+    expect(outro.get('cpf_index/uid_user-O2').promoterCodes).toEqual(['DIVULGADOR1FINO', 'DIVULGADOR1OUTRO']);
+  });
+});
