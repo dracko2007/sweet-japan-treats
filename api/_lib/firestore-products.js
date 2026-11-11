@@ -7,7 +7,7 @@ const PUBLIC_FIELDS = [
   'image', 'thumbnail', 'gallery', 'video', 'videoCover', 'flavor',
   'deliveryRestrict', 'origin', 'discountPercent', 'i18n', 'weightGrams', 'weightVerified',
   'tags', 'featured', 'featuredAt', 'heroCarousel', 'heroCarouselAt',
-  'isNew', 'salesCount', 'rating', 'stock', 'promoGift',
+  'isNew', 'salesCount', 'rating', 'stock', 'promoGift', 'localStock',
 ];
 
 export function parseValue(v) {

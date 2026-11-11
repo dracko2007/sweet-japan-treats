@@ -300,3 +300,72 @@ describe('frete: tabelas conferidas no Japan Post (2026-11-08)', () => {
   });
 });
 
+
+// Produto que já está no país do cliente (empresa parceira): preço fixo na
+// moeda de lá, frete nacional de tabela, sem câmbio nem taxas de importação.
+describe('pedido de estoque local', () => {
+  const noBrasil = { ...product, discountPercent: 20, localStock: { Brasil: { enabled: true, price: 89, quantity: 3 } } };
+  const tabela = { Brasil: { regions: { sul: 30, sudeste: 22, centroOeste: 35, nordeste: 40, norte: 55 } }, Portugal: { flat: 6 } };
+  const local = (overrides = {}) => quote({
+    products: new Map([['p1', noBrasil]]),
+    fulfillment: 'local',
+    localShipping: tabela,
+    ...overrides,
+  });
+
+  it('cobra o preço fixo em real + PAC da região, sem câmbio, taxa PS ou desconto do produto', () => {
+    const result = local({ requestedItems: [{ productId: 'p1', variantId: 'small', quantity: 2 }] });
+    expect(result.currency).toBe('BRL');
+    expect(result.fulfillment).toBe('local');
+    expect(result.shipFrom).toBe('Brasil');
+    expect(result.items[0].price).toBe(89);
+    expect(result.display).toMatchObject({ subtotal: 178, products: 178, shipping: 22, psFee: 0, importDuty: 0, paymentFee: 0 });
+    expect(result.total).toBe(200);
+    expect(result.psFeeYen).toBe(0);
+  });
+
+  it('o câmbio não muda o valor cobrado', () => {
+    const outroCambio = { ...rates, BRL: 1 / 20 };
+    expect(local({ rates: outroCambio }).total).toBe(local().total);
+  });
+
+  it('PIX local não tem IOF nem tarifa de remessa', () => {
+    const result = local({ paymentMethod: 'pix' });
+    expect(result.display.paymentFee).toBe(0);
+    expect(result.total).toBe(89 + 22);
+  });
+
+  it('frete muda por região (UF ou nome do estado) e precisa estar na tabela', () => {
+    expect(local({ prefecture: 'AM' }).display.shipping).toBe(55);
+    expect(local({ prefecture: '', state: 'Rio Grande do Sul' }).display.shipping).toBe(30);
+    expect(() => local({ prefecture: 'XX', state: '' })).toThrow(expect.objectContaining({ code: 'local_shipping_unavailable' }));
+    expect(() => local({ localShipping: null })).toThrow(expect.objectContaining({ code: 'local_shipping_unavailable' }));
+  });
+
+  it('cupom percentual vale sobre o preço local; frete grátis zera o PAC', () => {
+    expect(local({ coupon: { discount: 10, discountType: 'percentage' } }).display).toMatchObject({ couponDiscount: 9, products: 80, shipping: 22 });
+    expect(local({ coupon: { freeShipping: true } }).total).toBe(89);
+  });
+
+  it('recusa produto sem estoque local, quantidade acima do estoque e país sem oferta', () => {
+    expect(() => local({ products: new Map([['p1', product]]) })).toThrow(expect.objectContaining({ code: 'local_unavailable' }));
+    expect(() => local({ requestedItems: [{ productId: 'p1', variantId: 'small', quantity: 4 }] })).toThrow(expect.objectContaining({ code: 'insufficient_stock' }));
+    expect(() => local({ country: 'Portugal', prefecture: '' })).toThrow(expect.objectContaining({ code: 'local_unavailable' }));
+    const desligado = { ...noBrasil, localStock: { Brasil: { enabled: false, price: 89, quantity: 3 } } };
+    expect(() => local({ products: new Map([['p1', desligado]]) })).toThrow(expect.objectContaining({ code: 'local_unavailable' }));
+  });
+
+  it('em outro país usa a moeda e o frete único de lá', () => {
+    const emPortugal = { ...product, localStock: { Portugal: { enabled: true, price: 15, quantity: 5 } } };
+    const result = local({ products: new Map([['p1', emPortugal]]), country: 'Portugal', prefecture: '' });
+    expect(result.currency).toBe('EUR');
+    expect(result.total).toBe(15 + 6);
+  });
+
+  it('o mesmo produto enviado do Japão continua com a conta de sempre', () => {
+    const doJapao = quote({ products: new Map([['p1', noBrasil]]) });
+    expect(doJapao.fulfillment).toBe('japan');
+    expect(doJapao.psFeeYen).toBeGreaterThan(0);
+    expect(doJapao.total).toBe(quote({ products: new Map([['p1', { ...product, discountPercent: 20 }]]) }).total);
+  });
+});

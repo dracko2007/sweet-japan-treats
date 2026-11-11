@@ -119,11 +119,18 @@ export async function fulfillOrder(orderId, { provider, reference, confirmedBy }
       throw new HttpError(409, 'payment_reference_reused');
     }
 
+    const localOrder = order.fulfillment === 'local' && Boolean(order.shipFrom);
     for (const ref of productRefs) {
       const productSnap = byPath.get(ref.path);
       if (!productSnap.exists) throw new HttpError(409, 'product_unavailable');
       const product = productSnap.data();
       const quantity = quantities.get(ref.id);
+      if (localOrder) {
+        // Pedido local: a unidade sai do estoque que está no país do cliente.
+        const entry = product.localStock?.[order.shipFrom];
+        if (!entry || Number(entry.quantity || 0) < quantity) throw new HttpError(409, 'insufficient_stock');
+        continue;
+      }
       if (product.stock?.unlimited === false && Number(product.stock.quantity || 0) < quantity) {
         throw new HttpError(409, 'insufficient_stock');
       }
@@ -211,7 +218,13 @@ export async function fulfillOrder(orderId, { provider, reference, confirmedBy }
       // updatedAt: o catálogo dos clientes (PWA) sincroniza por delta desse campo;
       // sem ele a baixa de estoque nunca chegava a quem já tinha o catálogo em cache.
       const update = { salesCount: Number(product.salesCount || 0) + quantity, updatedAt: FieldValue.serverTimestamp() };
-      if (product.stock?.unlimited === false) update['stock.quantity'] = Number(product.stock.quantity || 0) - quantity;
+      if (localOrder) {
+        // Baixa no estoque local; o do Japão não muda. O mapa inteiro é regravado
+        // porque o nome do país pode ter espaço ("Estados Unidos"), o que não
+        // cabe num caminho de campo com ponto.
+        const entry = product.localStock[order.shipFrom];
+        update.localStock = { ...product.localStock, [order.shipFrom]: { ...entry, quantity: Number(entry.quantity || 0) - quantity } };
+      } else if (product.stock?.unlimited === false) update['stock.quantity'] = Number(product.stock.quantity || 0) - quantity;
       transaction.update(ref, update);
     }
     // Pedido pago: a reserva de estoque vira baixa de verdade na linha acima

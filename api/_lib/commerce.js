@@ -7,8 +7,10 @@ import {
   displayTotals,
   productBenefits,
   psFeeDiscountYen,
+  rateCushion,
   US_COUNTRY,
 } from '../../shared/money.js';
+import { localOffer, localShippingAmount } from '../../shared/local-stock.js';
 import { HttpError } from './http.js';
 import { currencyForCountry } from './fx.js';
 
@@ -237,8 +239,27 @@ function informativeTax(amount, country) {
 }
 
 
-export function buildQuote({ requestedItems, products, country, prefecture, state, carrier, paymentMethod, coupon, redeemPoints, negotiation, campaign, homePromotion, rates, recentSpendYen = 0, psFeeWaived = false }) {
+/** Moeda local → ¥ equivalente, só para registro (comissão, pontos, relatórios). Não é cobrado. */
+function displayToYen(amount, currency, rates) {
+  if (currency === 'JPY') return Math.round(amount);
+  const rate = Number(rates?.[currency]);
+  if (!(rate > 0)) throw new HttpError(503, 'fx_unavailable');
+  return Math.round(amount / (rate * (1 + rateCushion(rates))));
+}
+
+export function buildQuote({ requestedItems, products, country, prefecture, state, carrier, paymentMethod, coupon, redeemPoints, negotiation, campaign, homePromotion, rates, recentSpendYen = 0, psFeeWaived = false, fulfillment = 'japan', localShipping = null }) {
   const now = Date.now();
+  // Pedido de estoque local: todos os itens saem do país do cliente, com preço
+  // fixo na moeda de lá e frete nacional. Campanha, promoção da home, negociação
+  // e isenção da taxa PS são coisas do envio do Japão e não entram aqui.
+  const local = fulfillment === 'local';
+  const currency = currencyForCountry(country);
+  if (local) {
+    campaign = null;
+    negotiation = null;
+    psFeeWaived = false;
+  }
+  const localQuantity = new Map();
   if (!Array.isArray(requestedItems) || requestedItems.length < 1 || requestedItems.length > 100) throw new HttpError(400, 'invalid_items');
   const lineItems = [];
   let homePromoQuantity = 0;
@@ -254,6 +275,20 @@ export function buildQuote({ requestedItems, products, country, prefecture, stat
     if (product.deliveryRestrict === 'exterior-only' && country === 'Japão') throw new HttpError(400, 'product_unavailable');
     const variantId = String(requested.variantId || requested.size || 'small');
     let unitYen;
+    if (local) {
+      const offer = isHomePromo ? null : localOffer(product, country);
+      if (!offer) throw new HttpError(409, 'local_unavailable');
+      const wanted = (localQuantity.get(productId) || 0) + quantity;
+      if (wanted > offer.quantity) throw new HttpError(409, 'insufficient_stock');
+      localQuantity.set(productId, wanted);
+      lineItems.push({
+        productId, requestedId, product, variantId, quantity,
+        unitYen: displayToYen(offer.price, currency, rates),
+        unitDisplay: offer.price,
+        homePromo: false, freeGift: false,
+      });
+      continue;
+    }
     if (isHomePromo) {
       if (!homePromotion || homePromotion.productId !== productId || (homePromotion.expiresAt && homePromotion.expiresAt <= now)) throw new HttpError(409, 'promotion_unavailable');
       const limit = Number(homePromotion.limitPerPerson || 1);
@@ -291,8 +326,10 @@ export function buildQuote({ requestedItems, products, country, prefecture, stat
     quantity: item.quantity,
     freeGift: item.freeGift,
     homePromo: item.homePromo,
-    productDiscounted: Number(item.product.discountPercent || 0) > 0,
-    noPsFee: Boolean(item.product.noPsFee),
+    // Estoque local: preço fixo, sem "desconto do produto" e sem taxa PS.
+    productDiscounted: !local && Number(item.product.discountPercent || 0) > 0,
+    noPsFee: local || Boolean(item.product.noPsFee),
+    ...(local ? { unitDisplay: item.unitDisplay } : {}),
   }));
   const benefits = productBenefits({ lines, coupon, redeemPoints });
   if (benefits.terms?.minOrderYen && benefits.productSubtotalYen < benefits.terms.minOrderYen) {
@@ -330,19 +367,28 @@ export function buildQuote({ requestedItems, products, country, prefecture, stat
   });
   const psFeeFinalYen = benefits.psFeeYen - psDiscountYen;
 
-  const shipping = shippingYen(
-    lineItems,
-    country,
-    prefecture,
-    carrier,
-    benefits.productSubtotalYen - benefits.couponDiscountYen,
-    benefits.terms?.freeShipping === true,
-  );
+  let shippingDisplay = null;
+  let shipping;
+  if (local) {
+    // Frete nacional de tabela (PAC no Brasil), já na moeda do cliente.
+    const table = localShippingAmount(localShipping, country, prefecture || state);
+    if (table === null) throw new HttpError(409, 'local_shipping_unavailable');
+    shippingDisplay = benefits.terms?.freeShipping === true ? 0 : table;
+    shipping = { amount: displayToYen(shippingDisplay, currency, rates), weightG: shippingShape(lineItems).totalWeightG };
+  } else {
+    shipping = shippingYen(
+      lineItems,
+      country,
+      prefecture,
+      carrier,
+      benefits.productSubtotalYen - benefits.couponDiscountYen,
+      benefits.terms?.freeShipping === true,
+    );
+  }
   const shippingDiscountYen = manualApproved && negotiation.type === 'shipping'
     ? Math.min(shipping.amount, Math.max(0, Number(negotiation.approvedDiscountYen || 0)))
     : 0;
   const finalShippingYen = Math.max(0, shipping.amount - shippingDiscountYen);
-  const currency = currencyForCountry(country);
 
   const shown = displayTotals({
     currency,
@@ -353,11 +399,13 @@ export function buildQuote({ requestedItems, products, country, prefecture, stat
     benefits,
     finalShippingYen,
     psFeeFinalYen,
+    local,
+    shippingDisplay,
   });
   // O imposto é só informativo (ver shared/tax-disclosure.js) e fica fora do
   // total. O imposto dos EUA é outra coisa: pré-pago pela loja (DDP), entra
   // no total como `importDuty`.
-  const taxDisplay = informativeTax(shown.products, country);
+  const taxDisplay = local ? 0 : informativeTax(shown.products, country);
   const total = shown.total;
   if (!(total > 0)) throw new HttpError(400, 'invalid_total');
 
@@ -378,6 +426,9 @@ export function buildQuote({ requestedItems, products, country, prefecture, stat
 
   return {
     currency,
+    // 'local' = sai do estoque do país do cliente; 'japan' = envio do Japão.
+    fulfillment: local ? 'local' : 'japan',
+    shipFrom: local ? country : 'Japão',
     total,
     totalYen: benefits.netProductsYen + finalShippingYen + psFeeFinalYen,
     productSubtotalYen: benefits.productSubtotalYen,
@@ -435,6 +486,7 @@ export function buildQuote({ requestedItems, products, country, prefecture, stat
       freeGift: item.freeGift,
       homePromo: item.homePromo,
       stockUnlimited: item.product.stock?.unlimited !== false,
+      ...(local ? { local: true } : {}),
     })),
   };
 }

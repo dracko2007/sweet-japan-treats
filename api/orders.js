@@ -360,7 +360,7 @@ async function handleIssuePsFeeWaiver(req, res) {
 const CHECKOUT_KEYS = [
   'items', 'country', 'prefecture', 'state', 'shippingCarrier', 'paymentMethod',
   'couponCode', 'redeemPoints', 'negotiationId', 'promoCode', 'psFeeWaiverToken',
-  'customer', 'expectedTotal', 'ratesId',
+  'customer', 'expectedTotal', 'ratesId', 'fulfillment',
 ];
 
 function parseExpectedTotal(value) {
@@ -384,7 +384,10 @@ function parseCheckout(body, user) {
     ? requiredText(body.prefecture, { max: 100 })
     : optionalText(body.prefecture, { max: 100 });
   const state = optionalText(body.state, { max: 100 });
-  const carrier = carrierId(body.shippingCarrier);
+  // 'local' = pedido só com itens que já estão no país do cliente (frete nacional de tabela).
+  const fulfillment = body.fulfillment === undefined || body.fulfillment === 'japan' ? 'japan' : body.fulfillment;
+  if (fulfillment !== 'japan' && fulfillment !== 'local') throw new HttpError(400, 'invalid_request');
+  const carrier = fulfillment === 'local' ? 'local' : carrierId(body.shippingCarrier);
   const paymentMethod = requiredText(body.paymentMethod, { max: 20 });
   if (!PAYMENT_METHODS.has(paymentMethod)) throw new HttpError(400, 'invalid_payment_method');
   // PayPay, Yucho e depósito são em ienes, no Japão; PIX é real brasileiro.
@@ -399,6 +402,7 @@ function parseCheckout(body, user) {
     prefecture,
     state,
     carrier,
+    fulfillment,
     paymentMethod,
     customer,
     couponCode: optionalText(body.couponCode, { max: 60 }).toUpperCase(),
@@ -420,6 +424,8 @@ function publicQuote(quote, rates) {
     ratesId: rates.id || '',
     fxSource: rates.source,
     display: quote.display,
+    fulfillment: quote.fulfillment,
+    shipFrom: quote.shipFrom,
     productSubtotalYen: quote.productSubtotalYen,
     couponDiscountYen: quote.couponDiscountYen,
     pointsDiscountYen: quote.pointsDiscountYen,
@@ -439,7 +445,7 @@ function publicQuote(quote, rates) {
 async function prepareQuote(db, user, input) {
   const {
     requestedItems, country, prefecture, state, carrier, paymentMethod, customer,
-    couponCode, promoCode, negotiationId, psFeeWaiverToken, requestedPoints, ratesId,
+    couponCode, promoCode, negotiationId, psFeeWaiverToken, requestedPoints, ratesId, fulfillment,
   } = input;
   const waiver = psFeeWaiverToken ? verifyPsFeeWaiver(psFeeWaiverToken, user.uid) : null;
   if (psFeeWaiverToken && !waiver) throw new HttpError(403, 'invalid_ps_fee_waiver');
@@ -502,6 +508,10 @@ async function prepareQuote(db, user, input) {
   const homePromoData = homePromoSnap.exists ? homePromoSnap.data() : null;
   const promoStateData = promoStateSnap.exists ? promoStateSnap.data() : null;
   const reservedCount = homePromoData ? quantidadeReservada(promoStateData, homePromoData) : 0;
+  // Tabela do frete nacional (admin → siteContent/localShipping); só lida em pedido local.
+  const localShipping = fulfillment === 'local'
+    ? ((await db.collection('siteContent').doc('localShipping').get()).data() || null)
+    : null;
   const quote = buildQuote({
     requestedItems,
     products,
@@ -518,6 +528,8 @@ async function prepareQuote(db, user, input) {
     rates,
     recentSpendYen,
     psFeeWaived: Boolean(waiver),
+    fulfillment,
+    localShipping,
   });
   return { quote, rates, waiver, campaign, products, coupon, cpfSnap, homePromoData };
 }
@@ -577,7 +589,9 @@ async function handleCreate(req, res) {
     for (const item of quote.items) stockByProduct.set(item.productId, (stockByProduct.get(item.productId) || 0) + item.quantity);
     // Só produtos com controle de estoque precisam de reserva — ilimitado
     // nunca disputa unidade com ninguém.
-    const stockControlledProducts = [...stockByProduct.keys()]
+    // Pedido local não toca no estoque do Japão: a quantidade local já foi
+    // conferida em `buildQuote` e a baixa acontece na confirmação do pagamento.
+    const stockControlledProducts = quote.fulfillment === 'local' ? [] : [...stockByProduct.keys()]
       .filter((productId) => products.get(productId)?.stock?.unlimited === false);
     const stockReserveSnaps = stockControlledProducts.length
       ? await db.getAll(...stockControlledProducts.map((productId) => refReservaEstoque(db, productId)))
@@ -587,7 +601,7 @@ async function handleCreate(req, res) {
     );
     for (const [productId, quantity] of stockByProduct) {
       const product = products.get(productId);
-      if (product?.stock?.unlimited === false) {
+      if (quote.fulfillment !== 'local' && product?.stock?.unlimited === false) {
         // Desconta o que pedidos concorrentes (cartão em checkout, PIX/Wise
         // ainda não confirmado) já estão segurando para este produto — sem
         // isso, dois checkouts na última unidade passariam os dois aqui, e o
@@ -675,6 +689,9 @@ async function handleCreate(req, res) {
       // dia; sem isso, uma contestação meses depois não tem como reconstruir
       // por que o total foi aquele.
       priceBreakdown: quote.display,
+      // 'local': sai do estoque do país do cliente (empresa parceira), não do Japão.
+      fulfillment: quote.fulfillment,
+      shipFrom: quote.shipFrom,
       shippingCarrier: carrier,
       shippingCostYen: quote.shippingYen,
       shipping: { carrier, cost: quote.shippingYen, weightG: quote.shippingWeightG },

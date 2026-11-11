@@ -475,3 +475,29 @@ describe('código de divulgador', () => {
     expect(outro.get('cpf_index/uid_user-O2').promoterCodes).toEqual(['DIVULGADOR1FINO', 'DIVULGADOR1OUTRO']);
   });
 });
+
+// Pedido local: a baixa é no estoque que está no país do cliente, não no do Japão.
+describe('pedido de estoque local', () => {
+  const comEstoqueLocal = (quantidade) => ({
+    'products/p1': { name: 'Produto', stock: { unlimited: false, quantity: 7 }, salesCount: 0, localStock: { Brasil: { enabled: true, price: 89, quantity: quantidade } } },
+  });
+  const pedido = (id) => order(id, { fulfillment: 'local', shipFrom: 'Brasil', items: [{ productId: 'p1', quantity: 2, unitYen: 2500, freeGift: false, homePromo: false }] });
+
+  it('baixa o estoque local e não mexe no do Japão', async () => {
+    const db = database(pedido('O1'), 7, comEstoqueLocal(3));
+    injected.db = db;
+    await fulfillOrder('O1', { provider: 'manual', reference: 'local-1', confirmedBy: 'admin' });
+    const produto = db.get('products/p1');
+    expect(produto.localStock.Brasil).toMatchObject({ enabled: true, price: 89, quantity: 1 });
+    expect(produto.stock.quantity).toBe(7);
+    expect(produto.salesCount).toBe(2);
+  });
+
+  it('recusa quando o estoque local não cobre o pedido', async () => {
+    const db = database(pedido('O2'), 7, comEstoqueLocal(1));
+    injected.db = db;
+    await expect(fulfillOrder('O2', { provider: 'manual', reference: 'local-2', confirmedBy: 'admin' }))
+      .rejects.toMatchObject({ code: 'insufficient_stock' });
+    expect(db.get('products/p1').localStock.Brasil.quantity).toBe(1);
+  });
+});

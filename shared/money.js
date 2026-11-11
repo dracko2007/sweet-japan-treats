@@ -201,8 +201,17 @@ export function displayTotals({
   benefits,
   finalShippingYen,
   psFeeFinalYen,
+  // Pedido de estoque local (shared/local-stock.js): preço e frete já estão na
+  // moeda do cliente e não há imposto de importação nem taxas de remessa.
+  local = false,
+  shippingDisplay = null,
 }) {
-  const units = lines.map((line) => (line.freeGift ? 0 : yenToDisplay(line.unitYen, currency, rates)));
+  const units = lines.map((line) => {
+    if (line.freeGift) return 0;
+    // Preço fixo na moeda do cliente: não passa por câmbio.
+    if (Number.isFinite(line.unitDisplay)) return line.unitDisplay;
+    return yenToDisplay(line.unitYen, currency, rates);
+  });
   let subtotal = 0;
   let regularSubtotal = 0;
   lines.forEach((line, index) => {
@@ -225,11 +234,11 @@ export function displayTotals({
     ? (benefits.netProductsYen === 0 ? room : Math.min(room, discountYenToDisplay(benefits.pointsDiscountYen, currency, rates)))
     : 0;
   const products = Math.max(0, subtotal - couponDiscount - pointsDiscount);
-  const shipping = yenToDisplay(finalShippingYen, currency, rates);
+  const shipping = shippingDisplay !== null ? shippingDisplay : yenToDisplay(finalShippingYen, currency, rates);
   const psFee = yenToDisplay(psFeeFinalYen, currency, rates, { exact: true });
-  const importDuty = country === US_COUNTRY ? usImportDuty(products, currency) : 0;
+  const importDuty = !local && country === US_COUNTRY ? usImportDuty(products, currency) : 0;
   const beforePaymentFee = products + shipping + psFee + importDuty;
-  const fees = paymentMethod === 'pix' ? pixFees(beforePaymentFee, currency) : { iof: 0, bankFee: 0, total: 0 };
+  const fees = !local && paymentMethod === 'pix' ? pixFees(beforePaymentFee, currency) : { iof: 0, bankFee: 0, total: 0 };
   return {
     units,
     subtotal,
