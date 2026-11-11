@@ -133,7 +133,8 @@ export const LocalShippingSettings: React.FC = () => {
   if (!table) return null;
 
   const regions = table.Brasil?.regions || {};
-  const others = Object.keys(table).filter((country) => country !== 'Brasil');
+  // Todo país (exceto Japão e Brasil) tem seu campo de frete nacional, preenchido ou não.
+  const others = COUNTRIES.filter((country) => country !== 'Brasil');
   const number = (text: string) => (text === '' ? undefined : Math.max(0, Math.round(Number(text) || 0)));
 
   const save = async () => {
@@ -149,7 +150,7 @@ export const LocalShippingSettings: React.FC = () => {
   };
 
   return (
-    <details className="bg-card border border-border rounded-xl p-4">
+    <details open className="bg-card border border-border rounded-xl p-4">
       <summary className="cursor-pointer text-sm font-semibold flex items-center gap-2">
         <MapPin className="w-4 h-4 text-emerald-600" /> Frete nacional (produtos que já estão no país do cliente)
       </summary>
@@ -188,15 +189,7 @@ export const LocalShippingSettings: React.FC = () => {
           </label>
         ))}
         <div className="flex flex-wrap items-center gap-3">
-          <select
-            aria-label="Adicionar país ao frete nacional"
-            value=""
-            onChange={(e) => { if (e.target.value) setTable({ ...table, [e.target.value]: { flat: undefined } }); }}
-            className="px-3 py-2 rounded-lg border border-border bg-background text-xs"
-          >
-            <option value="">+ Frete nacional de outro país…</option>
-            {COUNTRIES.filter((country) => country !== 'Brasil' && !others.includes(country)).map((country) => <option key={country} value={country}>{country}</option>)}
-          </select>
+
           <Button size="sm" onClick={save} disabled={saving} className="btn-primary gap-2">
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Salvar frete nacional
           </Button>

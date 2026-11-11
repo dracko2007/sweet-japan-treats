@@ -623,7 +623,7 @@ const Cart: React.FC = () => {
 
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">{t('cart.subtotal')}</span>
-                      <span className="font-semibold text-gray-800">{formatPrice(baseTotalPrice, currency)}</span>
+                      <span className="font-semibold text-gray-800">{formatPrice(baseTotalPrice, currency, localCart.localOrder)}</span>
                     </div>
 
                     {activeCoupon && (
@@ -634,7 +634,7 @@ const Cart: React.FC = () => {
                             {activeCoupon.discountType === 'percentage' ? ` −${activeCoupon.discount}%` : ''}
                           </span>
                           <span className="flex items-center gap-1">
-                            −{formatPrice(discountAmount, currency)}
+                            −{formatPrice(discountAmount, currency, localCart.localOrder)}
                             <button
                               onClick={handleRemoveCoupon}
                               className="text-red-500 hover:text-red-700 ml-1 text-xs"
@@ -656,7 +656,7 @@ const Cart: React.FC = () => {
                         )}
                         {affiliateCoupon && hasPromoItems && regularSubtotal > 0 && (
                           <p className="text-[11px] text-blue-600 font-medium bg-blue-50 border border-blue-200 rounded-lg px-2 py-1.5 leading-snug">
-                            ℹ️ Cupom aplicado apenas aos itens sem promoção ({formatPrice(regularSubtotal, currency)}). Itens com preço promocional não acumulam desconto.
+                            ℹ️ Cupom aplicado apenas aos itens sem promoção ({formatPrice(regularSubtotal, currency, localCart.localOrder)}). Itens com preço promocional não acumulam desconto.
                           </p>
                         )}
                       </div>
@@ -685,15 +685,15 @@ const Cart: React.FC = () => {
                       <div className="text-right">
                         {discountAmount > 0 && (
                           <p className="text-sm text-muted-foreground line-through">
-                            {formatPrice(baseTotalPrice, currency)}
+                            {formatPrice(baseTotalPrice, currency, localCart.localOrder)}
                           </p>
                         )}
                         <span className="font-black text-2xl text-pink-600">
-                          {formatPrice(grandTotal, currency)}
+                          {formatPrice(grandTotal, currency, localCart.localOrder)}
                         </span>
                         {discountAmount > 0 && (
                           <p className="text-[11px] text-green-600 font-bold mt-0.5">
-                            Você economiza {formatPrice(discountAmount, currency)}
+                            Você economiza {formatPrice(discountAmount, currency, localCart.localOrder)}
                           </p>
                         )}
                         {selectedCountry !== 'Japão' && !discountAmount ? (

@@ -9,6 +9,7 @@ import { useProducts } from '@/context/ProductsContext';
 import { useCart } from '@/context/CartContext';
 import { cn } from '@/lib/utils';
 import { useLanguage } from '@/context/LanguageContext';
+import { localOffer } from '@/utils/localStock';
 import { usePagination } from '@/hooks/usePagination';
 import Pagination from '@/components/Pagination';
 import { minEffectiveYen } from '@/utils/pricing';
@@ -90,6 +91,14 @@ const Products: React.FC = () => {
   const { products, loading } = useProducts();
   const { items: cartItems, totalItems, totalPrice } = useCart();
   const currency = getCurrencyByCountry(selectedCountry);
+  // Itens que já estão no país do cliente: preço fixo local, sem ¥ de referência.
+  const localLine = (item: (typeof cartItems)[number]): number | null => {
+    const offer = localOffer(item.product, selectedCountry);
+    return offer ? offer.price * item.quantity : null;
+  };
+  const localSubtotal: number | null = cartItems.length > 0 && cartItems.every((item) => localOffer(item.product, selectedCountry))
+    ? cartItems.reduce((sum, item) => sum + (localLine(item) || 0), 0)
+    : null;
   const convertYen = (yen: number) => fxConvert(yen, currency);
   const [query,      setQuery]      = useState(searchParams.get('q') || '');
   const [sort,       setSort]       = useState<SortKey | null>(null);
@@ -446,14 +455,14 @@ const Products: React.FC = () => {
                         <p className="truncate text-xs font-bold text-slate-700">{item.product.name}</p>
                         <p className="text-[11px] text-slate-500">Qtd. {item.quantity}</p>
                       </div>
-                      <span className="text-[11px] font-black text-primary">{formatPrice(convertYen(item.product.prices.small * item.quantity), currency)}</span>
+                      <span className="text-[11px] font-black text-primary">{localLine(item) !== null ? formatPrice(localLine(item) as number, currency, true) : formatPrice(convertYen(item.product.prices.small * item.quantity), currency)}</span>
                     </div>
                   ))}
                 </div>
                 <div className="border-t border-slate-100 bg-slate-50 p-3">
                   <div className="mb-3 flex items-center justify-between text-sm font-black text-slate-800">
                     <span>Subtotal</span>
-                    <span>{formatPrice(convertYen(totalPrice), currency)}</span>
+                    <span>{localSubtotal !== null ? formatPrice(localSubtotal, currency, true) : formatPrice(convertYen(totalPrice), currency)}</span>
                   </div>
                   <Link to="/carrinho" className="flex items-center justify-center gap-2 rounded-xl bg-primary px-3 py-2.5 text-xs font-black text-primary-foreground shadow-md transition hover:bg-primary/90">
                     Ir para o carrinho <ArrowRight className="h-4 w-4" />

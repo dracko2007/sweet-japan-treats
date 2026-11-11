@@ -1332,7 +1332,7 @@ const Checkout: React.FC = () => {
                   <div className="space-y-2 pt-2 text-xs">
                     <div className="flex justify-between gap-2">
                       <span className="text-muted-foreground min-w-0 truncate">Subtotal dos itens</span>
-                      <span className="font-semibold text-gray-800 shrink-0 whitespace-nowrap">{formatPrice(shown.subtotal, currency)}</span>
+                      <span className="font-semibold text-gray-800 shrink-0 whitespace-nowrap">{formatPrice(shown.subtotal, currency, localOrder)}</span>
                     </div>
 
                     {appliedCoupon && couponDiscount > 0 && (
@@ -1368,7 +1368,7 @@ const Checkout: React.FC = () => {
                       </span>
                       {selectedShipping ? (
                         <span className="font-semibold text-gray-800">
-                          {actualShippingCost === 0 ? 'Grátis' : formatPrice(actualShippingCost, currency)}
+                          {actualShippingCost === 0 ? 'Grátis' : formatPrice(actualShippingCost, currency, localOrder)}
                         </span>
                       ) : (
                         <span className="text-muted-foreground text-[10px]">
@@ -1501,15 +1501,15 @@ const Checkout: React.FC = () => {
                       <div className="text-right">
                         {totalSavings > 0 && (
                           <p className="text-xs text-muted-foreground line-through font-normal">
-                            {formatPrice(grandTotal + totalSavings, currency)}
+                            {formatPrice(grandTotal + totalSavings, currency, localOrder)}
                           </p>
                         )}
                         <span className="text-base text-pink-600">
-                          {formatPrice(grandTotal, currency)}
+                          {formatPrice(grandTotal, currency, localOrder)}
                         </span>
                         {totalSavings > 0 && (
                           <p className="text-[10px] text-green-600 font-bold mt-0.5">
-                            Você economiza {formatPrice(totalSavings, currency)}
+                            Você economiza {formatPrice(totalSavings, currency, localOrder)}
                           </p>
                         )}
                       </div>
