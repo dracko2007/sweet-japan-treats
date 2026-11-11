@@ -320,23 +320,30 @@ const Cart: React.FC = () => {
   // Grand total ONLY has items subtotal (no taxes added!)
   const grandTotal = subtotalWithDiscount;
 
-  // ---- Estoque local: carrinho com itens do país do cliente e do Japão é UM pedido só ----
-  // Um pagamento (em moeda local) e dois envios: o que está no país sai de lá com frete nacional,
-  // o resto sai do Japão. Nada é separado nem tirado do carrinho.
-  const goCheckout = (state: Record<string, unknown>) => navigate('/checkout', { state });
+  // ---- Estoque local: carrinho com itens do país do cliente e do Japão pede uma escolha ----
+  // "Enviar separado" = UM pedido e um pagamento, com dois envios (cada um com seu frete);
+  // "Tudo junto do Japão" = um envio só, tudo com o preço e o frete do Japão. Nada sai do carrinho.
+  const [mixedChoice, setMixedChoice] = useState<Record<string, unknown> | null>(null);
+  const goCheckout = (state: Record<string, unknown>) => {
+    if (localCart.split.kind === 'mixed' && !localCart.forcedJapan) { setMixedChoice(state); return; }
+    navigate('/checkout', { state });
+  };
+  const chooseAllFromJapan = () => {
+    setShipAllFromJapan(true);
+    const state = mixedChoice;
+    setMixedChoice(null);
+    navigate('/checkout', { state });
+  };
+  const chooseSeparate = () => {
+    setShipAllFromJapan(false);
+    const state = mixedChoice;
+    setMixedChoice(null);
+    navigate('/checkout', { state });
+  };
 
   return (
     <Layout>
       <WelcomeCouponBanner context="cart" />
-
-      {/* Carrinho com itens de dois lugares: um pedido, dois envios (cliente pode preferir tudo do Japão) */}
-      {localCart.split.kind === 'mixed' && !localCart.forcedJapan && (
-        <div className="bg-emerald-50 border-b border-emerald-200 px-4 py-3 text-center text-sm text-emerald-900">
-          {localCart.split.localItems.length} {localCart.split.localItems.length === 1 ? 'item sai' : 'itens saem'} do {selectedCountry} e{' '}
-          {localCart.split.japanItems.length} {localCart.split.japanItems.length === 1 ? 'sai' : 'saem'} do Japão: um pagamento só, dois envios, cada um com seu frete.{' '}
-          <button type="button" onClick={() => setShipAllFromJapan(true)} className="font-bold underline">Prefiro tudo do Japão</button>
-        </div>
-      )}
 
       {/* Cliente escolheu envio único do Japão: pode voltar atrás */}
       {localCart.forcedJapan && localCart.split.localItems.length > 0 && (
@@ -348,6 +355,32 @@ const Cart: React.FC = () => {
         </div>
       )}
 
+      {mixedChoice && (
+        <div className="fixed inset-0 z-[10002] flex items-center justify-center bg-black/60 p-4" role="dialog" aria-modal="true" aria-labelledby="mixed-cart-title">
+          <div className="w-full max-w-md rounded-2xl bg-card p-6 shadow-2xl">
+            <h2 id="mixed-cart-title" className="font-display text-xl font-bold text-foreground">Seu carrinho tem dois tipos de envio</h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              {localCart.split.localItems.length} {localCart.split.localItems.length === 1 ? 'item já está' : 'itens já estão'} no {selectedCountry} e{' '}
+              {localCart.split.japanItems.length} {localCart.split.japanItems.length === 1 ? 'vem' : 'vêm'} do Japão. Como você prefere receber?
+            </p>
+            <div className="mt-5 space-y-3">
+              <button type="button" onClick={chooseSeparate} className="w-full rounded-xl border-2 border-emerald-500 bg-emerald-50 p-4 text-left transition hover:bg-emerald-100">
+                <span className="block font-bold text-emerald-900">Enviar separado</span>
+                <span className="block text-xs text-emerald-800">
+                  Um pedido e um pagamento só, em dois envios: os itens do {selectedCountry} saem de lá com o frete nacional e os do Japão saem do Japão com o frete internacional.
+                </span>
+              </button>
+              <button type="button" onClick={chooseAllFromJapan} className="w-full rounded-xl border-2 border-border p-4 text-left transition hover:bg-secondary/50">
+                <span className="block font-bold text-foreground">Enviar tudo junto do Japão</span>
+                <span className="block text-xs text-muted-foreground">
+                  Um envio só, tudo sai do Japão. Todos os itens passam a usar o preço e o frete do Japão.
+                </span>
+              </button>
+            </div>
+            <button type="button" onClick={() => setMixedChoice(null)} className="mt-4 w-full text-center text-sm text-muted-foreground hover:underline">Voltar ao carrinho</button>
+          </div>
+        </div>
+      )}
       <div className="gradient-hero py-16">
         <div className="container mx-auto px-4">
           <div className="text-center">
