@@ -1,7 +1,7 @@
 import React from 'react';
 import { MapPin, Plus, X } from 'lucide-react';
 import type { LocalShippingOption, LocalStock } from '@/types';
-import { BR_REGION_LABELS } from '../../../shared/local-stock.js';
+import { BR_REGION_LABELS, discountedLocalPrice } from '../../../shared/local-stock.js';
 import { WORLD_COUNTRIES } from '@/data/worldCountries';
 import { formatPrice, getCurrencyByCountry } from '@/utils/currency';
 
@@ -42,7 +42,7 @@ export const LocalStockFields: React.FC<{
   const addOption = (country: string) => setOptions(country, [...optionsOf(stock[country] || { enabled: true, price: 0, quantity: 0 }), { name: '', price: null }]);
   // Zera (e esvazia os fretes) em vez de apagar a chave: o produto é salvo com merge, e uma chave
   // simplesmente ausente continuaria valendo no banco.
-  const remove = (country: string) => onChange({ ...stock, [country]: { enabled: false, price: 0, quantity: 0, shippingOptions: [], shipping: null } });
+  const remove = (country: string) => onChange({ ...stock, [country]: { enabled: false, price: 0, quantity: 0, discountPercent: null, shippingOptions: [], shipping: null } });
 
   return (
     <div className="bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800 rounded-lg p-3 space-y-3">
@@ -53,6 +53,7 @@ export const LocalStockFields: React.FC<{
         const entry = stock[country] || { enabled: false, price: 0, quantity: 0 };
         const currency = getCurrencyByCountry(country);
         const id = `local-stock-${country}`;
+        const finalPrice = discountedLocalPrice(entry.price, entry.discountPercent);
         return (
           <div key={country} className="space-y-2 rounded-lg bg-white/70 dark:bg-black/20 p-2.5">
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
@@ -68,7 +69,11 @@ export const LocalStockFields: React.FC<{
               </label>
               {entry.enabled && (
                 <span className="text-sm">
-                  Valor cobrado: <strong className="text-emerald-700 dark:text-emerald-300">{entry.price > 0 ? formatPrice(entry.price, currency, true) : '—'}</strong>
+                  Valor cobrado:{' '}
+                  {entry.price > 0 && finalPrice < entry.price && (
+                    <span className="mr-1 text-muted-foreground line-through">{formatPrice(entry.price, currency, true)}</span>
+                  )}
+                  <strong className="text-emerald-700 dark:text-emerald-300">{entry.price > 0 ? formatPrice(finalPrice, currency, true) : '—'}</strong>
                 </span>
               )}
               {country !== 'Brasil' && (
@@ -88,6 +93,20 @@ export const LocalStockFields: React.FC<{
                     onChange={(e) => set(country, { price: Math.max(0, Math.round(Number(e.target.value) || 0)) })}
                     placeholder="Ex: 89"
                     className="mt-1 block w-32 px-3 py-2 rounded-lg border border-border bg-background text-sm text-foreground"
+                  />
+                </label>
+                <label className="text-xs text-muted-foreground">
+                  Desconto % (opcional)
+                  <input
+                    type="number"
+                    min={0}
+                    max={90}
+                    step={1}
+                    aria-label={`Desconto no ${country}`}
+                    value={entry.discountPercent || ''}
+                    onChange={(e) => set(country, { discountPercent: e.target.value === '' ? null : Math.min(90, Math.max(0, Math.round(Number(e.target.value) || 0))) })}
+                    placeholder="Ex: 10"
+                    className="mt-1 block w-28 px-3 py-2 rounded-lg border border-border bg-background text-sm text-foreground"
                   />
                 </label>
                 <label className="text-xs text-muted-foreground">

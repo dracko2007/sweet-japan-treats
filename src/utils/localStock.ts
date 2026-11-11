@@ -5,7 +5,8 @@ import type { CartItem, Product } from '@/types';
 import { safeStorage } from '@/utils/storage';
 import { localOffer as sharedLocalOffer, localOrderShipping, shippingChoiceNames } from '../../shared/local-stock.js';
 
-export interface LocalOffer { price: number; quantity: number; shippingOptions: { name: string; price: number }[] }
+/** `price` = o que o cliente paga (com o desconto, se houver); `listPrice` = preço de tabela. */
+export interface LocalOffer { price: number; listPrice: number; discountPercent: number; quantity: number; shippingOptions: { name: string; price: number }[] }
 
 /** Oferta local do produto para o país do cliente (preço fixo na moeda de lá), ou null. */
 export const localOffer = (product: Product | undefined | null, country: string): LocalOffer | null =>

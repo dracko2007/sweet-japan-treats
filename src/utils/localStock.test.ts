@@ -13,7 +13,7 @@ const item = (product: Product, quantity = 1): CartItem => ({ product, size: 'sm
 
 describe('estoque local no navegador', () => {
   it('só há oferta local no país do estoque, com preço e unidades preenchidos', () => {
-    expect(localOffer(noBrasil, 'Brasil')).toEqual({ price: 89, quantity: 2, shippingOptions: [{ name: 'Sul', price: 22 }] });
+    expect(localOffer(noBrasil, 'Brasil')).toEqual({ price: 89, listPrice: 89, discountPercent: 0, quantity: 2, shippingOptions: [{ name: 'Sul', price: 22 }] });
     // Sem frete cadastrado o produto não vende do país (nunca sai com frete grátis por engano).
     expect(localOffer({ ...noBrasil, localStock: { Brasil: { enabled: true, price: 89, quantity: 2 } } } as Product, 'Brasil')).toBeNull();
     expect(localOffer({ ...noBrasil, localStock: { Brasil: { enabled: true, price: 89, quantity: 2, shippingOptions: [{ name: 'Sul', price: 0 }] } } } as Product, 'Brasil')?.shippingOptions[0].price).toBe(0);
@@ -71,5 +71,13 @@ describe('estoque local no navegador', () => {
     // Dois produtos: um pacote só, vale o maior.
     expect(localShippingFor([item(regioes), item(noBrasil)], 'Brasil', 'SP')?.price).toBe(22);
     expect(localShippingFor([item(regioes), item(noBrasil)], 'Brasil', 'RS')?.price).toBe(29);
+  });
+
+  it('desconto opcional do estoque local: price é o cobrado, listPrice o de tabela', () => {
+    const comDesconto = (percent: number) => ({ ...noBrasil, localStock: { Brasil: { enabled: true, price: 89, quantity: 2, discountPercent: percent, shippingOptions: [{ name: 'Sul', price: 22 }] } } }) as Product;
+    expect(localOffer(comDesconto(10), 'Brasil')).toMatchObject({ price: 80, listPrice: 89, discountPercent: 10 });
+    expect(localOffer(comDesconto(0), 'Brasil')).toMatchObject({ price: 89, listPrice: 89, discountPercent: 0 });
+    // Acima de 90% é ignorado (erro de digitação não vira produto quase de graça).
+    expect(localOffer(comDesconto(95), 'Brasil')?.price).toBe(89);
   });
 });

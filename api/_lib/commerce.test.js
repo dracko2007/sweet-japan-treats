@@ -424,6 +424,13 @@ describe('pedido de estoque local', () => {
     });
   });
 
+  it('desconto do produto do Brasil: cobra o preço com desconto', () => {
+    const comDesconto = { ...noBrasil, localStock: { Brasil: { enabled: true, price: 100, quantity: 3, discountPercent: 15, shippingOptions: [{ name: 'Sul', price: 22 }] } } };
+    const result = local({ products: new Map([['p1', comDesconto]]) });
+    expect(result.items[0].price).toBe(85);
+    expect(result.total).toBe(85 + 22);
+  });
+
   it('frete 0 é grátis; sem frete cadastrado o produto não vende do país', () => {
     const gratis = { ...noBrasil, localStock: { Brasil: { enabled: true, price: 89, quantity: 3, shippingOptions: [{ name: 'Sul', price: 0 }] } } };
     expect(local({ products: new Map([['p1', gratis]]) }).total).toBe(89);

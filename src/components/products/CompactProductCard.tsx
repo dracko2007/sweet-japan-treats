@@ -222,10 +222,15 @@ const CompactProductCard: React.FC<CompactProductCardProps> = ({ product }) => {
         ) : null}
         <div className="mt-auto flex items-end justify-between gap-1 pt-1">
           <div className="min-w-0">
-            <p className={cn('text-base font-black leading-none tracking-tight', promoActive ? 'text-red-600' : 'text-pink-600')}>
+            <p className={cn('text-base font-black leading-none tracking-tight', promoActive || (offer && offer.discountPercent > 0) ? 'text-red-600' : 'text-pink-600')}>
               {offer ? formatPrice(price, currency, true) : <PriceStack value={price} currency={currency} />}
             </p>
 
+            {offer && offer.discountPercent > 0 && (
+              <p className="mt-0.5 whitespace-nowrap text-[10px] leading-none text-gray-400 line-through">
+                {formatPrice(offer.listPrice, currency, true)}
+              </p>
+            )}
             {promoActive && (
               <p className="mt-0.5 whitespace-nowrap text-[10px] leading-none text-gray-400 line-through">
                 {formatPrice(originalPrice, currency, true)}

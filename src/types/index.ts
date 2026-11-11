@@ -216,4 +216,4 @@ export interface LocalShippingOption { name: string; price: number | null }
  * disponível lá e as opções de frete nacional (sem nenhuma, o produto não vende de lá).
  * `shipping` é o frete único de cadastros antigos.
  */
-export type LocalStock = Record<string, { enabled: boolean; price: number; quantity: number; shippingOptions?: LocalShippingOption[]; shipping?: number | null }>;
+export type LocalStock = Record<string, { enabled: boolean; price: number; quantity: number; /** Desconto opcional sobre o preço, em % (0–90). */ discountPercent?: number | null; shippingOptions?: LocalShippingOption[]; shipping?: number | null }>;

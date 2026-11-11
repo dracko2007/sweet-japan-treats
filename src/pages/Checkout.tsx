@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Package, ArrowRight, MapPin, User, Phone, Mail, Tag, CreditCard, Sparkles, Handshake, X, CheckCircle2, AlertCircle, Hourglass } from 'lucide-react';
+import { Package, ArrowRight, MapPin, User, Phone, Mail, Tag, CreditCard, Sparkles, Handshake, X, CheckCircle2, AlertCircle, Hourglass, Truck } from 'lucide-react';
 import { negotiationService } from '@/services/negotiationService';
 import type { Negotiation } from '@/types/negotiation';
 import Layout from '@/components/layout/Layout';
@@ -102,6 +102,7 @@ const Checkout: React.FC = () => {
   // No Brasil vale a região do cliente (opção "Sul", "Sudeste"…); sem região que combine,
   // ou em país com várias opções, o cliente escolhe.
   const [localShippingChoice, setLocalShippingChoice] = useState('');
+  const [shipChoiceOpen, setShipChoiceOpen] = useState(false);
   const localShippingPicked = anyLocal ? localShippingFor(split.localItems, formData.country, formData.prefecture, localShippingChoice) : null;
   const localShippingOptions = anyLocal ? localShippingChoices(split.localItems, formData.country, formData.prefecture) : [];
   const localShippingValue: number | null = localShippingPicked ? localShippingPicked.price : null;
@@ -652,6 +653,13 @@ const Checkout: React.FC = () => {
     });
   };
 
+  // Saiu do pedido todo do país do cliente para envio do Japão: o frete nacional escolhido sozinho não vale mais.
+  const wasLocalOrder = useRef(localOrder);
+  useEffect(() => {
+    if (wasLocalOrder.current && !localOrder) setSelectedShipping(null);
+    wasLocalOrder.current = localOrder;
+  }, [localOrder]);
+
   // Frete nacional: já vem do produto, então fica escolhido sozinho.
   useEffect(() => {
     if (!localOrder) return;
@@ -727,6 +735,43 @@ const Checkout: React.FC = () => {
 
   return (
     <Layout>
+      {/* Forma de envio: separado (um pedido, dois envios) ou tudo junto do Japão */}
+      {shipChoiceOpen && (
+        <div className="fixed inset-0 z-[10002] flex items-center justify-center bg-black/60 p-4" role="dialog" aria-modal="true" aria-labelledby="ship-choice-title">
+          <div className="w-full max-w-md rounded-2xl bg-card p-6 shadow-2xl">
+            <h2 id="ship-choice-title" className="font-display text-xl font-bold text-foreground">Como você prefere receber?</h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              {split.localItems.length} {split.localItems.length === 1 ? 'item já está' : 'itens já estão'} no {formData.country}
+              {split.japanItems.length > 0 ? ` e ${split.japanItems.length} ${split.japanItems.length === 1 ? 'vem' : 'vêm'} do Japão` : ''}.
+            </p>
+            <div className="mt-5 space-y-3">
+              <button
+                type="button"
+                onClick={() => { setShipAllFromJapan(false); setShipChoiceOpen(false); }}
+                className={`w-full rounded-xl border-2 p-4 text-left transition hover:bg-emerald-100 ${localKind !== 'japan' ? 'border-emerald-500 bg-emerald-50' : 'border-border'}`}
+              >
+                <span className="block font-bold text-emerald-900">{split.japanItems.length > 0 ? 'Enviar separado' : `Enviar do ${formData.country}`}</span>
+                <span className="block text-xs text-emerald-800">
+                  {split.japanItems.length > 0
+                    ? `Um pedido e um pagamento só, em dois envios: os itens do ${formData.country} saem de lá com o frete nacional e os do Japão saem do Japão com o frete internacional.`
+                    : `Os itens saem de lá com o frete nacional, sem taxas de importação.`}
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => { setShipAllFromJapan(true); setShipChoiceOpen(false); }}
+                className={`w-full rounded-xl border-2 p-4 text-left transition hover:bg-secondary/50 ${localKind === 'japan' ? 'border-emerald-500 bg-emerald-50' : 'border-border'}`}
+              >
+                <span className="block font-bold text-foreground">Enviar tudo junto do Japão</span>
+                <span className="block text-xs text-muted-foreground">
+                  Um envio só, tudo sai do Japão. Todos os itens passam a usar o preço e o frete do Japão.
+                </span>
+              </button>
+            </div>
+            <button type="button" onClick={() => setShipChoiceOpen(false)} className="mt-4 w-full text-center text-sm text-muted-foreground hover:underline">Fechar</button>
+          </div>
+        </div>
+      )}
       {/* Modal de negociação */}
       {negModalType && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
@@ -1232,6 +1277,22 @@ const Checkout: React.FC = () => {
                   </h2>
                 </div>
 
+                {/* Há itens que já estão no país do cliente: ele pode trocar a forma de envio a qualquer momento */}
+                {split.kind !== 'japan' && (
+                  <button
+                    type="button"
+                    onClick={() => setShipChoiceOpen(true)}
+                    className="mb-4 flex w-full items-center justify-between gap-3 rounded-xl border-2 border-emerald-500 bg-emerald-50 px-4 py-3 text-left transition hover:bg-emerald-100"
+                  >
+                    <span>
+                      <span className="block text-sm font-bold text-emerald-900">Modificar forma de envio</span>
+                      <span className="block text-xs text-emerald-800">
+                        {localKind === 'japan' ? 'Agora: tudo junto do Japão' : mixedOrder ? 'Agora: enviar separado (um pedido, dois envios)' : `Agora: tudo enviado do ${formData.country}`}
+                      </span>
+                    </span>
+                    <Truck className="h-5 w-5 shrink-0 text-emerald-700" />
+                  </button>
+                )}
                 <div className="space-y-4">
                   {items.map((item) => {
                     const itemIsPromo = item.product.id.endsWith('_promo');

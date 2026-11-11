@@ -419,6 +419,16 @@ const ProductDetail: React.FC = () => {
                         -{product.discountPercent}% OFF
                       </span>
                     </div>
+                  ) : offer && offer.discountPercent > 0 ? (
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <span className="text-3xl font-black text-primary">{formatPrice(offer.price, currency, true)}</span>
+                      <span className="text-lg font-semibold text-gray-500 dark:text-gray-400 line-through decoration-2">
+                        {formatPrice(offer.listPrice, currency, true)}
+                      </span>
+                      <span className="px-2.5 py-1 rounded-full bg-red-600 text-white text-xs font-extrabold shadow-sm">
+                        -{offer.discountPercent}% OFF
+                      </span>
+                    </div>
                   ) : (
                     <div className="text-3xl font-black text-primary">
                       {formatPrice(currentPrice, currency, Boolean(offer))}

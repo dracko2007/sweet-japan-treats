@@ -78,6 +78,13 @@ export function shippingOptionsOf(entry) {
   return out;
 }
 
+/** Preço de tabela menos o desconto opcional (0–90%), em unidade inteira da moeda do país; nunca abaixo de 1. */
+export function discountedLocalPrice(listPrice, discountPercent) {
+  const percent = Math.round(Number(discountPercent));
+  if (!(percent > 0) || percent > 90) return listPrice;
+  return Math.max(1, Math.round(listPrice * (100 - percent) / 100));
+}
+
 /**
  * Oferta local de um produto para um país, ou null.
  * Só vale com preço, unidades E ao menos um frete preenchido (frete 0 = grátis):
@@ -86,12 +93,14 @@ export function shippingOptionsOf(entry) {
 export function localOffer(product, country) {
   const entry = product?.localStock?.[country];
   if (!entry || entry.enabled !== true) return null;
-  const price = Math.round(Number(entry.price));
+  const listPrice = Math.round(Number(entry.price));
   const quantity = Math.floor(Number(entry.quantity));
-  if (!(price > 0) || !(quantity > 0)) return null;
+  if (!(listPrice > 0) || !(quantity > 0)) return null;
   const shippingOptions = shippingOptionsOf(entry);
   if (shippingOptions.length === 0) return null;
-  return { price, quantity, shippingOptions };
+  const price = discountedLocalPrice(listPrice, entry.discountPercent);
+  // `price` é o que o cliente paga (já com o desconto); `listPrice` é o de tabela, para mostrar riscado.
+  return { price, listPrice, discountPercent: price < listPrice ? Math.round(Number(entry.discountPercent)) : 0, quantity, shippingOptions };
 }
 
 /**
