@@ -17,6 +17,7 @@ import { productEnglishName } from '@/utils/productName';
 import { quoteShipping, JAPAN_FREE_SHIPPING_MIN_YEN } from '@/utils/shippingQuote';
 import { MAX_WEIGHT_G } from '@/utils/japanPostRates';
 import { taxDisclosure } from '../../shared/tax-disclosure.js';
+import { localOffer, localShippingChoices, localShippingFor, shipAllFromJapan, splitCart } from '@/utils/localStock';
 
 export type AssistantAction = 'finalizar_compra' | 'ver_carrinho' | 'continuar_comprando' | 'falar_whatsapp' | 'faca_seu_pedido';
 export const ASSISTANT_ACTIONS: AssistantAction[] = ['finalizar_compra', 'ver_carrinho', 'continuar_comprando', 'falar_whatsapp', 'faca_seu_pedido'];
@@ -146,18 +147,21 @@ function variantFor(p: Product, variantId?: string) {
     || [...variants].sort((a, b) => a.price - b.price)[0];
 }
 
-function describeProduct(p: Product, currency: string) {
+function describeProduct(p: Product, currency: string, country = '') {
   const variants = getVariants(p);
+  // Produto que já está no país do cliente: preço fixo na moeda dele, sem ¥ nem desconto da loja.
+  const offer = country ? localOffer(p, country) : null;
   return {
     id: p.id,
     nome: productEnglishName(p),
     variantes: variants.map((v) => ({
       id: v.id,
       nome: v.label,
-      preco: formatPrice(convertYen(effectiveYen(p, v.id), currency), currency),
+      preco: offer ? formatPrice(offer.price, currency, true) : formatPrice(convertYen(effectiveYen(p, v.id), currency), currency),
     })),
-    desconto: hasDiscount(p) ? `${p.discountPercent}%` : undefined,
-    esgotado: isSoldOut(p) || undefined,
+    desconto: offer ? (offer.discountPercent > 0 ? `${offer.discountPercent}%` : undefined) : hasDiscount(p) ? `${p.discountPercent}%` : undefined,
+    esgotado: (!offer && isSoldOut(p)) || undefined,
+    ...(offer ? { enviado_do_pais: `Já está no ${country}: preço final, envio nacional, sem taxa de serviço nem imposto de importação` } : {}),
   };
 }
 
@@ -193,17 +197,33 @@ export function quoteOrder(ctx: ToolContext, args: { itens?: QuoteItemInput[]; u
 
   const currency = getCurrencyByCountry(country);
   const prefecture = country === 'Japão' ? resolvePrefecture(args.provincia) ?? undefined : undefined;
-  const quote = quoteShipping(items, country, { prefecture });
+  const fmt = (v: number) => formatPrice(v, currency);
+  const fmtLocal = (v: number) => formatPrice(v, currency, true); // preço fixo local: sem referência em ¥
+
+  // Itens que já estão no país do cliente saem de lá (preço fixo, frete nacional, sem taxa de serviço);
+  // o resto sai do Japão. Mesma regra do carrinho e do checkout (um pedido, dois envios).
+  const split = splitCart(items, country);
+  const localSet = new Set(shipAllFromJapan() ? [] : split.localItems);
+  const japanItems = items.filter((i) => !localSet.has(i));
+  const localItems = items.filter((i) => localSet.has(i));
+  const unitOf = (i: CartItem) => (localSet.has(i) ? localOffer(i.product, country)?.price ?? 0 : convertYen(effectiveYen(i.product, i.size), currency));
+
+  const quote = japanItems.length ? quoteShipping(japanItems, country, { prefecture }) : null;
 
   const paid = items.filter((i) => !i.freeGift);
-  const subtotal = paid.reduce((s, i) => s + convertYen(effectiveYen(i.product, i.size), currency) * i.quantity, 0);
-  const psQty = paid.reduce((s, i) => (i.product.noPsFee ? s : s + i.quantity), 0);
+  const subtotal = paid.reduce((s, i) => s + unitOf(i) * i.quantity, 0);
+  const japanSubtotal = paid.filter((i) => !localSet.has(i)).reduce((s, i) => s + unitOf(i) * i.quantity, 0);
+  const psQty = paid.reduce((s, i) => (i.product.noPsFee || localSet.has(i) ? s : s + i.quantity), 0);
   const psFee = convertYen(psQty * PS_FEE_YEN_PER_UNIT, currency, true);
+
+  // Frete nacional dos itens de lá: o maior entre eles (um pacote só); no Brasil depende da região (UF em `provincia`).
+  const state = country === 'Japão' ? '' : String(args.provincia || '');
+  const national = localItems.length ? localShippingFor(localItems, country, state) : null;
+  const nationalChoices = localItems.length && !national ? localShippingChoices(localItems, country, state) : [];
 
   const cfg = getCountryConfig(country);
   const vat = country !== 'Brasil' && country !== 'Japão' ? cfg?.vat || 0 : 0;
 
-  const fmt = (v: number) => formatPrice(v, currency);
   const result: Record<string, unknown> = {
     ok: true,
     pais: country,
@@ -213,15 +233,28 @@ export function quoteOrder(ctx: ToolContext, args: { itens?: QuoteItemInput[]; u
       nome: productEnglishName(i.product),
       variante: i.variantLabel || variantFor(i.product, i.size)?.label,
       quantidade: i.quantity,
-      preco_unitario: fmt(convertYen(effectiveYen(i.product, i.size), currency)),
+      preco_unitario: localSet.has(i) ? fmtLocal(unitOf(i)) : fmt(unitOf(i)),
+      ...(localItems.length && japanItems.length ? { enviado_de: localSet.has(i) ? country : 'Japão' } : {}),
     })),
-    subtotal_produtos: fmt(subtotal),
-    taxa_servico: psQty ? `${fmt(psFee)} (¥1.000 por unidade — compra assistida no Japão)` : fmt(0),
-    peso_total: `${(quote.boxes.totalWeightG / 1000).toFixed(2).replace('.', ',')} kg (com embalagem)`,
+    subtotal_produtos: localItems.length ? fmtLocal(subtotal) : fmt(subtotal),
+    taxa_servico: psQty ? `${fmt(psFee)} (¥1.000 por unidade do Japão — compra assistida)` : fmt(0),
+    ...(quote ? { peso_total: `${(quote.boxes.totalWeightG / 1000).toFixed(2).replace('.', ',')} kg (com embalagem)` } : {}),
   };
+  if (localItems.length) {
+    result.envio = japanItems.length
+      ? `Um pedido e um pagamento, dois envios: ${localItems.length === 1 ? 'o item' : 'os itens'} do ${country} sai(em) de lá com frete nacional; o resto sai do Japão com frete internacional.`
+      : `Tudo sai do ${country}, com frete nacional e sem taxa de serviço nem imposto de importação.`;
+    result.frete_nacional = national
+      ? { servico: national.name, valor: national.price === 0 ? `${fmtLocal(0)} (grátis)` : fmtLocal(national.price) }
+      : { opcoes: nationalChoices.map((o) => ({ servico: o.name, valor: o.price === 0 ? `${fmtLocal(0)} (grátis)` : fmtLocal(o.price) })), dica: country === 'Brasil' ? 'O frete nacional depende da região: pergunte o estado (UF) do cliente e chame cotar_pedido de novo com provincia.' : 'Pergunte qual opção de frete o cliente prefere.' };
+  }
+  const nationalPrice = national?.price ?? 0;
   if (unknown.length) result.ids_desconhecidos = unknown;
 
-  if (quote.needsPrefecture) {
+  if (!quote) {
+    // Tudo sai do país do cliente: não há frete internacional.
+    if (national) result.total_com_frete = fmtLocal(subtotal + nationalPrice);
+  } else if (quote.needsPrefecture) {
     result.frete = 'precisa_da_provincia';
     result.dica = 'No Japão o frete depende da província de entrega. Pergunte a província ao cliente e chame cotar_pedido de novo.';
   } else if (quote.isOverweight) {
@@ -234,14 +267,15 @@ export function quoteOrder(ctx: ToolContext, args: { itens?: QuoteItemInput[]; u
           servico: o.name,
           prazo_dias: o.estimatedDays,
           frete: o.cost === 0 && o.originalCost ? `${fmt(0)} (grátis)` : fmt(o.cost),
-          total_com_frete_e_taxa: fmt(subtotal + o.cost + psFee),
+          // Com itens do país do cliente, soma também o frete nacional (quando já dá para saber qual é).
+          total_com_frete_e_taxa: localItems.length && !national ? 'depende do frete nacional' : fmt(subtotal + o.cost + psFee + nationalPrice),
         });
     if (country === 'Japão' && !quote.isFreeShipping) {
       result.frete_gratis = `No Japão o frete é grátis a partir de ${formatPrice(JAPAN_FREE_SHIPPING_MIN_YEN, 'JPY')} em produtos.`;
     }
   }
-  if (vat > 0) {
-    result.imposto_estimado = `${fmt(subtotal * vat)} (estimativa de ${Math.round(vat * 100)}% cobrada pela alfândega do destino, NÃO pela loja)`;
+  if (vat > 0 && japanSubtotal > 0) {
+    result.imposto_estimado = `${fmt(japanSubtotal * vat)} (estimativa de ${Math.round(vat * 100)}% cobrada pela alfândega do destino, NÃO pela loja)`;
   }
   if (country !== 'Japão') result.aviso_impostos = taxDisclosure(ctx.language).body;
   return json(result);
@@ -264,7 +298,7 @@ export function runAssistantTool(name: string, rawArgs: string | undefined, ctx:
       const found = searchCatalog(ctx.products, String(args.consulta || ''), limit);
       return {
         content: JSON.stringify(found.length
-          ? { ok: true, moeda: currency, produtos: found.map((p) => describeProduct(p, currency)) }
+          ? { ok: true, moeda: currency, produtos: found.map((p) => describeProduct(p, currency, ctx.country)) }
           : { ok: true, produtos: [], dica: 'Nada encontrado. Os nomes do catálogo estão em alfabeto latino (ex.: "Fino hair mask", "Biore UV"): se a busca foi em japonês ou com outra grafia, busque de novo com a marca/tipo em inglês ANTES de dizer que não temos. Se ainda assim não houver, ofereça o "Faça seu Pedido".' }),
       };
     }

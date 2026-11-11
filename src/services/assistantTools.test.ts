@@ -131,4 +131,44 @@ describe('assistantTools', () => {
     expect(resolvePrefecture('広島県')).toBe('Hiroshima');
     expect(resolvePrefecture('hiroshima')).toBe('Hiroshima');
   });
+
+  // Produto que já está no país do cliente: preço fixo, frete nacional, sem taxa de serviço.
+  describe('estoque local (itens já no país do cliente)', () => {
+    const sabonete = product({
+      id: 'sabonete', name: 'Sabonete', prices: { small: 1300, large: 0 }, weightGrams: 400,
+      localStock: { Brasil: { enabled: true, price: 200, quantity: 10, shippingOptions: [{ name: 'Sul', price: 30 }, { name: 'Sudeste', price: 22 }] } },
+    });
+    const ctx = (over: Partial<ToolContext> = {}) => ctxFor({ products: [fino, sabonete], ...over });
+
+    it('busca mostra o preço local, sem ¥, e avisa que já está no país', () => {
+      const item = run('buscar_produtos', { consulta: 'sabonete' }, ctx()).data.produtos[0];
+      expect(item.variantes[0].preco).toBe(formatPrice(200, 'BRL', true));
+      expect(item.enviado_do_pais).toContain('Brasil');
+    });
+
+    it('pedido misto: taxa de serviço só do item do Japão e os dois fretes', () => {
+      const { data } = run('cotar_pedido', { itens: [{ produto_id: 'sabonete' }, { produto_id: 'fino-mask' }], pais: 'Brasil', provincia: 'SP' }, ctx());
+      const japan = quoteShipping([{ product: fino, size: 'small', quantity: 1 }], 'Brasil');
+      const firstPaid = japan.options.find((o) => !o.isConsultar)!;
+      const subtotal = 200 + convertYen(1800, 'BRL');
+      const ps = convertYen(1000, 'BRL', true);
+      expect(data.taxa_servico).toContain(formatPrice(ps, 'BRL'));
+      expect(data.frete_nacional.valor).toBe(formatPrice(22, 'BRL', true));
+      expect(data.opcoes_frete[0].total_com_frete_e_taxa).toBe(formatPrice(subtotal + firstPaid.cost + ps + 22, 'BRL'));
+      expect(data.itens.map((i: { enviado_de: string }) => i.enviado_de)).toEqual(['Brasil', 'Japão']);
+    });
+
+    it('só item do país: sem taxa de serviço nem frete internacional, total = produto + frete nacional', () => {
+      const { data } = run('cotar_pedido', { itens: [{ produto_id: 'sabonete', quantidade: 2 }], pais: 'Brasil', provincia: 'RS' }, ctx());
+      expect(data.opcoes_frete).toBeUndefined();
+      expect(data.taxa_servico).toBe(formatPrice(0, 'BRL'));
+      expect(data.total_com_frete).toBe(formatPrice(400 + 30, 'BRL', true));
+    });
+
+    it('sem a região do cliente o frete nacional vira pergunta', () => {
+      const { data } = run('cotar_pedido', { itens: [{ produto_id: 'sabonete' }], pais: 'Brasil' }, ctx());
+      expect(data.frete_nacional.opcoes.map((o: { servico: string }) => o.servico)).toEqual(['Sul', 'Sudeste']);
+      expect(data.total_com_frete).toBeUndefined();
+    });
+  });
 });
