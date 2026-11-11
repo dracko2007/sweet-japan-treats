@@ -1,9 +1,9 @@
-import { randomInt } from 'node:crypto';
+import { randomInt, randomUUID } from 'node:crypto';
 import Stripe from 'stripe';
 import { requireAdmin, requireUser } from './_lib/auth.js';
 import { buildQuote } from './_lib/commerce.js';
 import { assertCouponEligibility } from './_lib/coupon-eligibility.js';
-import { adminDb } from './_lib/firebase-admin.js';
+import { adminAuth, adminDb } from './_lib/firebase-admin.js';
 import { comReserva, pontosDisponiveis } from './_lib/points-hold.js';
 import { comReservaPromo, quantidadeReservada, refEstadoPromo, semReservaPromo } from './_lib/promo-reserve.js';
 import { indiceDePessoaId, promoUsageId } from './_lib/promo-identity.js';
@@ -15,6 +15,7 @@ import { getFxRates } from './_lib/fx.js';
 import { autoApprovablePsDiscountYen, paymentMethodsForCountry } from '../shared/money.js';
 import {
   assertExactKeys,
+  getHeader,
   handleCors,
   HttpError,
   normalizeEmail,
@@ -536,6 +537,32 @@ async function prepareQuote(db, user, input) {
   return { quote, rates, waiver, campaign, products, coupon, cpfSnap, homePromoData };
 }
 
+/** Convidado: login anônimo do Firebase ou o token de convidado emitido por `handleGuestToken`. */
+function isGuestToken(user) {
+  return user?.firebase?.sign_in_provider === 'anonymous' || user?.guest === true;
+}
+
+/**
+ * Token de convidado. O checkout sempre aceitou comprar sem cadastro, mas isso dependia do login
+ * anônimo do Firebase estar ligado no projeto; desligado (`ADMIN_ONLY_OPERATION`) nenhum convidado
+ * conseguia cotar nem finalizar. Aqui o servidor emite um token próprio (uid `guest_…` + claim
+ * `guest`) que o navegador troca por uma sessão com `signInWithCustomToken`. O convidado continua
+ * sem e-mail provado, igual ao anônimo: não vale como identidade para cupom nominal nem pontos.
+ */
+async function handleGuestToken(req, res) {
+  if (!handleCors(req, res, { methods: ['POST'] })) return;
+  try {
+    // O Vercel reescreve estes cabeçalhos na borda, então não vêm do cliente.
+    const ip = String(getHeader(req, 'x-vercel-forwarded-for') || getHeader(req, 'x-real-ip') || String(getHeader(req, 'x-forwarded-for') || '').split(',')[0] || '').trim();
+    await enforceRateLimit(req, { scope: 'guest-token', limit: 30, windowMs: 60 * 60 * 1000, identity: ip ? `ip:${ip}` : undefined });
+    const token = await adminAuth().createCustomToken(`guest_${randomUUID()}`, { guest: true });
+    res.status(200).json({ ok: true, token });
+  } catch (error) {
+    console.error('[guest-token]', error instanceof Error ? error.message : error);
+    sendError(res, error);
+  }
+}
+
 async function handleQuote(req, res) {
   if (!handleCors(req, res, { methods: ['POST'] })) return;
 
@@ -717,7 +744,7 @@ async function handleCreate(req, res) {
       items: quote.items,
       createdAt: now,
       updatedAt: now,
-      customerType: user.firebase?.sign_in_provider === 'anonymous' ? 'guest' : 'registered',
+      customerType: isGuestToken(user) ? 'guest' : 'registered',
     };
 
     const waiverClaimRef = quote.psFeeWaiverApplied
@@ -961,10 +988,11 @@ export default async function handler(req, res) {
   if (action === 'mark-received') return handleMarkReceived(req, res);
   if (action === 'create') return handleCreate(req, res);
   if (action === 'quote') return handleQuote(req, res);
+  if (action === 'guest-token') return handleGuestToken(req, res);
   if (action === 'negotiation-auto-approve') return handleNegotiationAutoApprove(req, res);
   if (action === 'ps-fee-waiver') return handleIssuePsFeeWaiver(req, res);
   if (action === 'confirm-manual-payment') return handleConfirmManualPayment(req, res);
   return res.status(400).json({ error: 'invalid_action' });
 }
 
-export { handleCreate, handleQuote, handleMarkReceived, handleConfirmManualPayment, handleIssuePsFeeWaiver, handleNegotiationAutoApprove };
+export { handleCreate, handleGuestToken, handleQuote, handleMarkReceived, handleConfirmManualPayment, handleIssuePsFeeWaiver, handleNegotiationAutoApprove };

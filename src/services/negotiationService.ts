@@ -13,6 +13,7 @@ import {
 } from 'firebase/firestore';
 import { db, auth } from '@/config/firebase';
 import { Negotiation } from '@/types/negotiation';
+import { isGuestUser } from '@/services/checkoutService';
 
 const COL = 'negotiations';
 const EXPIRY_HOURS = 24;
@@ -39,7 +40,7 @@ export const negotiationService = {
   async create(data: CreateNegotiationInput): Promise<Negotiation> {
     // A identidade e o estado inicial vêm da sessão e deste serviço, nunca do caller.
     const cur = auth?.currentUser;
-    if (!cur || cur.isAnonymous) {
+    if (!cur || isGuestUser(cur)) {
       throw new Error('É preciso estar logado para enviar a negociação.');
     }
     // A regra do Firestore exige e-mail confirmado. Sem este aviso o cliente

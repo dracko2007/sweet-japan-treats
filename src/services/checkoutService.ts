@@ -1,4 +1,4 @@
-import { signInAnonymously } from 'firebase/auth';
+import { signInAnonymously, signInWithCustomToken, type User } from 'firebase/auth';
 import { auth } from '@/config/firebase';
 
 export type CheckoutPaymentMethod = 'bank' | 'paypay' | 'yucho' | 'wise' | 'pix' | 'card';
@@ -143,10 +143,37 @@ export class CheckoutError extends Error {
   }
 }
 
+/** Convidado: login anônimo do Firebase ou a sessão com o token de convidado do servidor (uid `guest_…`). */
+export const isGuestUser = (user: Pick<User, 'isAnonymous' | 'uid'> | null | undefined): boolean =>
+  Boolean(user && (user.isAnonymous || user.uid.startsWith('guest_')));
+
+// Várias chamadas ao mesmo tempo (cotação + isenção da taxa) não podem criar um convidado cada uma.
+let guestSignIn: Promise<User> | null = null;
+// O login anônimo está desligado no projeto: não adianta tentar de novo a cada chamada.
+let anonymousUnavailable = false;
+
+async function signInGuest(): Promise<User> {
+  if (!auth) throw new Error('Autenticação indisponível. Recarregue a página.');
+  const firebaseAuth = auth;
+  if (!anonymousUnavailable) {
+    try {
+      return (await signInAnonymously(firebaseAuth)).user;
+    } catch {
+      anonymousUnavailable = true;
+    }
+  }
+  // Sem login anônimo no Firebase, o servidor emite um token de convidado.
+  const response = await fetch('/api/guest-token', { method: 'POST' });
+  const payload = await response.json().catch(() => ({})) as { token?: string; error?: string };
+  if (!response.ok || !payload.token) throw new CheckoutError(payload.error || 'guest_unavailable');
+  return (await signInWithCustomToken(firebaseAuth, payload.token)).user;
+}
+
 export async function checkoutToken(): Promise<string> {
   if (!auth) throw new Error('Autenticação indisponível. Recarregue a página.');
-  const currentUser = auth.currentUser || (await signInAnonymously(auth)).user;
-  return currentUser.getIdToken();
+  if (auth.currentUser) return auth.currentUser.getIdToken();
+  guestSignIn ??= signInGuest().finally(() => { guestSignIn = null; });
+  return (await guestSignIn).getIdToken();
 }
 
 /** Corpo comum à cotação e à criação: os dois passam pela mesma conta no servidor. */

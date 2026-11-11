@@ -42,6 +42,7 @@
     { "source": "/api/admin-users", "destination": "/api/admin?action=users" },
     { "source": "/api/create-order", "destination": "/api/orders?action=create" },
     { "source": "/api/checkout-quote", "destination": "/api/orders?action=quote" },
+    { "source": "/api/guest-token", "destination": "/api/orders?action=guest-token" },
     { "source": "/api/negotiation-auto-approve", "destination": "/api/orders?action=negotiation-auto-approve" },
     { "source": "/api/ps-fee-waiver", "destination": "/api/orders?action=ps-fee-waiver" },
     { "source": "/api/confirm-manual-payment", "destination": "/api/orders?action=confirm-manual-payment" },
