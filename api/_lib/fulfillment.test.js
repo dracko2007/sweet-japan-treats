@@ -481,7 +481,7 @@ describe('pedido de estoque local', () => {
   const comEstoqueLocal = (quantidade) => ({
     'products/p1': { name: 'Produto', stock: { unlimited: false, quantity: 7 }, salesCount: 0, localStock: { Brasil: { enabled: true, price: 89, quantity: quantidade, shippingOptions: [{ name: 'Sul', price: 22 }] } } },
   });
-  const pedido = (id) => order(id, { fulfillment: 'local', shipFrom: 'Brasil', items: [{ productId: 'p1', quantity: 2, unitYen: 2500, freeGift: false, homePromo: false }] });
+  const pedido = (id) => order(id, { fulfillment: 'local', shipFrom: 'Brasil', items: [{ productId: 'p1', quantity: 2, unitYen: 2500, freeGift: false, homePromo: false, local: true }] });
 
   it('baixa o estoque local e não mexe no do Japão', async () => {
     const db = database(pedido('O1'), 7, comEstoqueLocal(3));
@@ -499,5 +499,22 @@ describe('pedido de estoque local', () => {
     await expect(fulfillOrder('O2', { provider: 'manual', reference: 'local-2', confirmedBy: 'admin' }))
       .rejects.toMatchObject({ code: 'insufficient_stock' });
     expect(db.get('products/p1').localStock.Brasil.quantity).toBe(1);
+  });
+
+  it('pedido misto: o item local baixa o estoque de lá e o do Japão baixa o estoque do Japão', async () => {
+    const misto = order('O3', { fulfillment: 'mixed', shipFrom: 'Brasil', items: [
+      { productId: 'p1', quantity: 2, unitYen: 2500, freeGift: false, homePromo: false, local: true },
+      { productId: 'p2', quantity: 1, unitYen: 2380, freeGift: false, homePromo: false },
+    ] });
+    const db = database(misto, 7, {
+      ...comEstoqueLocal(3),
+      'products/p2': { name: 'Do Japão', stock: { unlimited: false, quantity: 5 }, salesCount: 0 },
+    });
+    injected.db = db;
+    await fulfillOrder('O3', { provider: 'manual', reference: 'local-3', confirmedBy: 'admin' });
+    expect(db.get('products/p1').localStock.Brasil.quantity).toBe(1);
+    expect(db.get('products/p1').stock.quantity).toBe(7);
+    expect(db.get('products/p2').stock.quantity).toBe(4);
+    expect(db.get('products/p2').localStock).toBeUndefined();
   });
 });

@@ -25,7 +25,7 @@ import { effectiveYen, baseYen, hasDiscount } from '@/utils/pricing';
 import { convertYen as fxConvert, getRates } from '@/services/fxService';
 import { cartBenefits, computeCheckoutTotals, psFeeUnits } from '@/utils/checkoutTotals';
 import { useLocalCart } from '@/hooks/useLocalCart';
-import { isLocalOrder, localOffer, localShippingChoices, localShippingFor, setShipAllFromJapan } from '@/utils/localStock';
+import { localOffer, localShippingChoices, localShippingFor, setShipAllFromJapan, splitCart } from '@/utils/localStock';
 import { localCarrierLabel } from '../../shared/local-stock.js';
 import { autoApprovablePsDiscountYen, PS_FEE_PER_UNIT_YEN } from '../../shared/money.js';
 import { POINTS } from '@/services/pointsService';
@@ -89,16 +89,24 @@ const Checkout: React.FC = () => {
   // Pedido de estoque local: todos os itens já estão no país do cliente (preço
   // fixo na moeda dele + frete nacional do produto), e ele não pediu envio do Japão.
   const localCart = useLocalCart();
-  const localOrder = isLocalOrder(items, formData.country) && !localCart.forcedJapan;
+  // Carrinho com itens do país e do Japão é UM pedido só: preço fixo + frete nacional para os de lá,
+  // conta do Japão para o resto, os dois fretes somados, tudo na moeda do cliente.
+  const split = splitCart(items, formData.country);
+  const localKind: 'japan' | 'local' | 'mixed' = localCart.forcedJapan ? 'japan' : split.kind;
+  const localOrder = localKind === 'local';      // tudo sai do país do cliente
+  const mixedOrder = localKind === 'mixed';      // parte de lá, parte do Japão
+  const anyLocal = localKind !== 'japan';
+  const localItemSet = new Set(anyLocal ? split.localItems : []);
+  const isLocalItem = (item: (typeof items)[number]) => localItemSet.has(item);
   // Frete nacional: cadastrado no próprio produto (o maior entre os itens, um pacote só).
   // No Brasil vale a região do cliente (opção "Sul", "Sudeste"…); sem região que combine,
   // ou em país com várias opções, o cliente escolhe.
   const [localShippingChoice, setLocalShippingChoice] = useState('');
-  const localShippingPicked = localOrder ? localShippingFor(items, formData.country, formData.prefecture, localShippingChoice) : null;
-  const localShippingOptions = localOrder ? localShippingChoices(items, formData.country, formData.prefecture) : [];
+  const localShippingPicked = anyLocal ? localShippingFor(split.localItems, formData.country, formData.prefecture, localShippingChoice) : null;
+  const localShippingOptions = anyLocal ? localShippingChoices(split.localItems, formData.country, formData.prefecture) : [];
   const localShippingValue: number | null = localShippingPicked ? localShippingPicked.price : null;
   const unitDisplayOf = (item: (typeof items)[number]) =>
-    (localOrder ? localOffer(item.product, formData.country)?.price : undefined) ?? fxConvert(effectiveYen(item.product, item.size), currency);
+    (isLocalItem(item) ? localOffer(item.product, formData.country)?.price : undefined) ?? fxConvert(effectiveYen(item.product, item.size), currency);
 
   // Mantém o cupom validado no carrinho ao avançar para o checkout.
   const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(
@@ -111,15 +119,16 @@ const Checkout: React.FC = () => {
   // Em carrinho misto, a base inclui somente itens elegíveis.
   const regularSubtotalForCoupon = items.reduce(
     (sum, item) => {
-      const hasProductDiscount = !localOrder && (item.product.discountPercent || 0) > 0;
+      const hasProductDiscount = !isLocalItem(item) && (item.product.discountPercent || 0) > 0;
       const affiliateCoupon = Boolean(appliedCoupon?.affiliateCode);
       return (!item.freeGift && !item.product.id.endsWith('_promo') && (!affiliateCoupon || !hasProductDiscount))
         ? sum + unitDisplayOf(item) * item.quantity
         : sum;
     }, 0
   );
+  // (item enviado do país do cliente tem preço fixo: não conta como "com desconto da loja")
   const discountedItemCount = items.filter((item) =>
-    !item.freeGift && (item.product.id.endsWith('_promo') || (item.product.discountPercent || 0) > 0)
+    !item.freeGift && !isLocalItem(item) && (item.product.id.endsWith('_promo') || (item.product.discountPercent || 0) > 0)
   ).length;
   const [selectedShipping, setSelectedShipping] = useState<{
     carrier: string;
@@ -139,7 +148,7 @@ const Checkout: React.FC = () => {
   // Cupom e pontos em ienes pela MESMA conta do servidor (`shared/money.js`):
   // os pontos pagam só a mercadoria que sobra depois do cupom.
   // Base em ¥ para cupom e pontos; no pedido local é o equivalente do preço fixo.
-  const localBenefits = localOrder ? { country: formData.country, currency, shippingDisplay: 0 } : null;
+  const localBenefits = anyLocal ? { country: formData.country, currency, shippingDisplay: 0 } : null;
   const couponOnly = cartBenefits(items, appliedCoupon, 0, localBenefits);
   const maxRedeemable = canRedeem
     ? Math.min(availablePoints, Math.floor((couponOnly.productSubtotalYen - couponOnly.couponDiscountYen) / POINTS.yenPerPoint))
@@ -162,7 +171,7 @@ const Checkout: React.FC = () => {
 
   // PS fee — ¥1000 por unidade comprada (exceto produtos isentos: noPsFee)
   const totalQty = items.reduce((s, i) => i.freeGift ? s : s + i.quantity, 0);
-  const psFeeQty = localOrder ? 0 : psFeeUnits(items); // estoque local não tem taxa de Personal Shopper
+  const psFeeQty = psFeeUnits(items, localBenefits); // item enviado do país do cliente não tem taxa de Personal Shopper
   const psFeeYen = psFeeQty * PS_FEE_PER_UNIT_YEN;
   // Até ¥300 por item sai aprovado na hora pelo servidor; acima, a vendedora decide.
   const maxAutoApprovable = autoApprovablePsDiscountYen(psFeeQty);
@@ -611,7 +620,7 @@ const Checkout: React.FC = () => {
       return;
     }
 
-    if (!selectedShipping) {
+    if (!selectedShipping || (anyLocal && localShippingValue === null)) {
       toast({
         title: "Método de envio pendente",
         description: "Por favor, selecione uma forma de entrega.",
@@ -635,9 +644,10 @@ const Checkout: React.FC = () => {
         negotiationId: localOrder ? null : activeNegId,
         isGuest,
         // Pedido de estoque local: a revisão manda isto ao servidor e refaz a conta com o frete nacional.
-        fulfillment: localOrder ? 'local' : 'japan',
-        localShippingDisplay: localOrder ? selectedShipping.cost : null,
-        localShippingChoice: localOrder ? localShippingPicked?.name || '' : '',
+        fulfillment: anyLocal ? 'local' : 'japan',
+        localKind,
+        localShippingDisplay: anyLocal ? localShippingValue : null,
+        localShippingChoice: anyLocal ? localShippingPicked?.name || '' : '',
       }
     });
   };
@@ -675,7 +685,7 @@ const Checkout: React.FC = () => {
     shippingDiscountYen,
     psFeeWaived,
     negotiatedPsFee,
-    local: localOrder ? { country: formData.country, currency, shippingDisplay: localShippingValue ?? 0 } : null,
+    local: anyLocal ? { country: formData.country, currency, shippingDisplay: localShippingValue ?? 0 } : null,
   });
   const { shown } = totals;
   const couponDiscount = shown.couponDiscount;
@@ -1109,16 +1119,18 @@ const Checkout: React.FC = () => {
 
                   {/* Shipping Calculator Section */}
                   <div className="pt-4 border-t border-border">
-                    {localOrder ? (
-                      <>
+                    {anyLocal && (
+                      <div className={mixedOrder ? 'mb-6' : ''}>
                         <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wide mb-4">
-                          Envio nacional
+                          {mixedOrder ? `Envio nacional (itens do ${formData.country})` : 'Envio nacional'}
                         </h3>
                         {localShippingValue !== null ? (
                           <div className="flex items-center justify-between rounded-xl border-2 border-emerald-500 bg-emerald-50 p-4">
                             <div>
                               <p className="font-bold text-emerald-900">📍 {localCarrierLabel(formData.country)}{localShippingPicked && localShippingOptions.length > 1 ? ` • ${localShippingPicked.name}` : ''}</p>
-                              <p className="text-xs text-emerald-800">Seus produtos já estão no {formData.country}: sem taxas de importação.</p>
+                              <p className="text-xs text-emerald-800">
+                                {mixedOrder ? `Estes itens já estão no ${formData.country} e saem de lá: sem taxas de importação.` : `Seus produtos já estão no ${formData.country}: sem taxas de importação.`}
+                              </p>
                             </div>
                             <span className="font-extrabold text-emerald-900">
                               {localShippingValue === 0 ? 'Grátis' : formatPrice(localShippingValue, currency, true)}
@@ -1140,17 +1152,19 @@ const Checkout: React.FC = () => {
                             ))}
                           </div>
                         )}
-                      </>
-                    ) : (
+                      </div>
+                    )}
+                    {!localOrder && (
                       <>
                     <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wide mb-4">
-                      Forma de Envio Internacional
+                      {mixedOrder ? 'Envio do Japão (demais itens)' : 'Forma de Envio Internacional'}
                     </h3>
                     <ShippingCalculator 
                       selectedPrefecture={formData.prefecture}
                       onShippingSelect={setSelectedShipping}
                       destinationCountry={formData.country as CountryType}
                       couponDiscount={couponDiscount}
+                      items={mixedOrder ? split.japanItems : undefined}
                     />
                       </>
                     )}
@@ -1179,7 +1193,7 @@ const Checkout: React.FC = () => {
                             Limpar e tentar novamente
                           </button>
                         </div>
-                        <Button type="submit" className="w-full btn-primary rounded-xl py-6 text-lg font-bold" disabled={!selectedShipping}>
+                        <Button type="submit" className="w-full btn-primary rounded-xl py-6 text-lg font-bold" disabled={!selectedShipping || (anyLocal && localShippingValue === null)}>
                           Ir para a Revisão do Pedido <ArrowRight className="w-5 h-5 ml-2" />
                         </Button>
                       </div>
@@ -1189,12 +1203,12 @@ const Checkout: React.FC = () => {
                         <Button
                           type="submit"
                           className="w-full btn-primary rounded-xl py-6 text-lg font-bold"
-                          disabled={!selectedShipping}
+                          disabled={!selectedShipping || (anyLocal && localShippingValue === null)}
                         >
                           Ir para a Revisão do Pedido
                           <ArrowRight className="w-5 h-5 ml-2" />
                         </Button>
-                        {!selectedShipping && (
+                        {(!selectedShipping || (anyLocal && localShippingValue === null)) && (
                           <p className="text-xs text-muted-foreground text-center mt-2">
                             Selecione uma forma de entrega para continuar
                           </p>
@@ -1222,11 +1236,11 @@ const Checkout: React.FC = () => {
                   {items.map((item) => {
                     const itemIsPromo = item.product.id.endsWith('_promo');
                     const currentUnitPrice = item.freeGift ? 0 : unitDisplayOf(item);
-                    const originalUnitPrice = item.freeGift ? 0 : (localOrder ? currentUnitPrice : fxConvert(baseYen(item.product, item.size), currency));
+                    const originalUnitPrice = item.freeGift ? 0 : (isLocalItem(item) ? currentUnitPrice : fxConvert(baseYen(item.product, item.size), currency));
                     const displayItemPrice = currentUnitPrice * item.quantity;
                     const originalItemPrice = originalUnitPrice * item.quantity;
                     const productName = productEnglishName(item.product);
-                    const hasProductDiscount = hasDiscount(item.product);
+                    const hasProductDiscount = !isLocalItem(item) && hasDiscount(item.product);
                     const affiliateEligible = Boolean(appliedCoupon?.affiliateCode)
                       && !item.freeGift && !itemIsPromo && !hasProductDiscount;
                     const itemCouponDiscount = affiliateEligible && regularSubtotalForCoupon > 0
@@ -1261,12 +1275,17 @@ const Checkout: React.FC = () => {
                               −{appliedCoupon?.discount}% cupom de afiliado
                             </p>
                           )}
+                          {mixedOrder && !item.freeGift && (
+                            <p className={`text-[10px] font-bold ${isLocalItem(item) ? 'text-emerald-700' : 'text-gray-500'}`}>
+                              {isLocalItem(item) ? `📍 Enviado do ${formData.country}` : '✈️ Enviado do Japão'}
+                            </p>
+                          )}
                           <p className="text-[10px] text-gray-400 font-semibold mt-0.5">
                             {item.freeGift ? '🎁 Presente da promoção' : (item.variantLabel || (item.size === 'small' ? 'Pequeno' : 'Grande'))} • {item.quantity}x
                           </p>
                         </div>
                         <p className={`font-bold text-xs ${item.freeGift ? 'text-green-600' : 'text-gray-800'}`}>
-                          {item.freeGift ? 'GRÁTIS' : formatPrice(finalItemPrice, currency)}
+                          {item.freeGift ? 'GRÁTIS' : formatPrice(finalItemPrice, currency, isLocalItem(item))}
                         </p>
                       </div>
                     );
@@ -1334,7 +1353,7 @@ const Checkout: React.FC = () => {
                   <div className="space-y-2 pt-2 text-xs">
                     <div className="flex justify-between gap-2">
                       <span className="text-muted-foreground min-w-0 truncate">Subtotal dos itens</span>
-                      <span className="font-semibold text-gray-800 shrink-0 whitespace-nowrap">{formatPrice(shown.subtotal, currency, localOrder)}</span>
+                      <span className="font-semibold text-gray-800 shrink-0 whitespace-nowrap">{formatPrice(shown.subtotal, currency, anyLocal)}</span>
                     </div>
 
                     {appliedCoupon && couponDiscount > 0 && (
@@ -1364,13 +1383,26 @@ const Checkout: React.FC = () => {
                       </div>
                     )}
 
+                    {/* Frete do Japão (itens que vêm de lá) e frete nacional (itens do país do cliente): duas remessas */}
+                    {mixedOrder && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Frete nacional ({formData.country})</span>
+                        {localShippingValue !== null ? (
+                          <span className="font-semibold text-gray-800">
+                            {shown.nationalShipping === 0 ? 'Grátis' : formatPrice(shown.nationalShipping, currency, true)}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground text-[10px]">Escolha o frete</span>
+                        )}
+                      </div>
+                    )}
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">
-                        {localOrder ? 'Frete nacional' : formData.country === 'Japão' ? 'Frete Local' : 'Frete Internacional'}
+                        {localOrder ? 'Frete nacional' : formData.country === 'Japão' ? 'Frete Local' : mixedOrder ? 'Frete Internacional (Japão)' : 'Frete Internacional'}
                       </span>
                       {selectedShipping ? (
                         <span className="font-semibold text-gray-800">
-                          {actualShippingCost === 0 ? 'Grátis' : formatPrice(actualShippingCost, currency, localOrder)}
+                          {(actualShippingCost - shown.nationalShipping) === 0 ? 'Grátis' : formatPrice(actualShippingCost - shown.nationalShipping, currency, anyLocal)}
                         </span>
                       ) : (
                         <span className="text-muted-foreground text-[10px]">
@@ -1503,15 +1535,15 @@ const Checkout: React.FC = () => {
                       <div className="text-right">
                         {totalSavings > 0 && (
                           <p className="text-xs text-muted-foreground line-through font-normal">
-                            {formatPrice(grandTotal + totalSavings, currency, localOrder)}
+                            {formatPrice(grandTotal + totalSavings, currency, anyLocal)}
                           </p>
                         )}
                         <span className="text-base text-pink-600">
-                          {formatPrice(grandTotal, currency, localOrder)}
+                          {formatPrice(grandTotal, currency, anyLocal)}
                         </span>
                         {totalSavings > 0 && (
                           <p className="text-[10px] text-green-600 font-bold mt-0.5">
-                            Você economiza {formatPrice(totalSavings, currency, localOrder)}
+                            Você economiza {formatPrice(totalSavings, currency, anyLocal)}
                           </p>
                         )}
                       </div>

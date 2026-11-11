@@ -358,6 +358,72 @@ describe('pedido de estoque local', () => {
     expect(() => em('BA', { localShippingChoice: 'Inexistente' })).toThrow(expect.objectContaining({ code: 'local_shipping_unavailable' }));
   });
 
+  // Carrinho misto: um pedido, um pagamento, dois envios (um do país do cliente, outro do Japão).
+  describe('carrinho misto (Brasil + Japão no mesmo pedido)', () => {
+    const doJapao = { ...product, id: 'p2', name: 'Do Japão', prices: { small: 2380 }, stock: { unlimited: true, quantity: 0 } };
+    const itens = [{ productId: 'p1', variantId: 'small', quantity: 1 }, { productId: 'p2', variantId: 'small', quantity: 1 }];
+    const misto = (overrides = {}) => quote({
+      products: new Map([['p1', noBrasil], ['p2', doJapao]]),
+      requestedItems: itens,
+      fulfillment: 'local',
+      carrier: 'ems',
+      ...overrides,
+    });
+    const soJapao = (overrides = {}) => quote({
+      products: new Map([['p2', doJapao]]),
+      requestedItems: [{ productId: 'p2', variantId: 'small', quantity: 1 }],
+      carrier: 'ems',
+      ...overrides,
+    });
+
+    it('soma preço fixo do Brasil + preço do Japão em real, com os dois fretes, num total só', () => {
+      const result = misto();
+      const japao = soJapao();
+      expect(result.fulfillment).toBe('mixed');
+      expect(result.shipFrom).toBe('Brasil');
+      expect(result.currency).toBe('BRL');
+      expect(result.items.map((item) => Boolean(item.local))).toEqual([true, false]);
+      expect(result.items[0].price).toBe(89);
+      // Produto do Japão: a mesma conta de sempre, na moeda do cliente.
+      expect(result.items[1].price).toBe(japao.items[0].price);
+      // Frete: o internacional do Japão (só da parte de lá) + o nacional do produto.
+      expect(result.display.localShipping).toBe(22);
+      expect(result.display.shipping).toBe(japao.display.shipping + 22);
+      // Taxa PS só dos itens do Japão.
+      expect(result.display.psFee).toBe(japao.display.psFee);
+      expect(result.display.products).toBe(89 + japao.display.products);
+      expect(result.total).toBe(89 + japao.display.products + japao.display.shipping + 22 + japao.display.psFee);
+    });
+
+    it('PIX: IOF e tarifa só sobre a parte do Japão; a parte do Brasil entra sem taxa', () => {
+      const result = misto({ paymentMethod: 'pix' });
+      const japao = soJapao({ paymentMethod: 'pix' });
+      expect(result.display.paymentFee).toBe(japao.display.paymentFee);
+      expect(result.total).toBe(89 + 22 + japao.total);
+    });
+
+    it('cupom de frete grátis zera os dois fretes; sem item do país no carrinho o pedido "local" é recusado', () => {
+      const result = misto({ coupon: { freeShipping: true } });
+      expect(result.display.shipping).toBe(0);
+      expect(result.display.localShipping).toBe(0);
+      expect(() => misto({ products: new Map([['p1', product], ['p2', doJapao]]) })).toThrow(expect.objectContaining({ code: 'local_unavailable' }));
+    });
+
+    it('sem região que combine e sem escolha, o frete nacional do pedido misto também exige escolha', () => {
+      const duas = { ...noBrasil, localStock: { Brasil: { enabled: true, price: 89, quantity: 3, shippingOptions: [{ name: 'Sul', price: 30 }, { name: 'Norte', price: 55 }] } } };
+      expect(() => misto({ products: new Map([['p1', duas], ['p2', doJapao]]), prefecture: 'BA' })).toThrow(expect.objectContaining({ code: 'local_shipping_unavailable' }));
+      expect(misto({ products: new Map([['p1', duas], ['p2', doJapao]]), prefecture: 'BA', localShippingChoice: 'Norte' }).display.localShipping).toBe(55);
+    });
+
+    it('quantidade acima do estoque de lá: o produto inteiro vem do Japão; sem nada de lá, o pedido "local" é recusado', () => {
+      const poucos = { ...noBrasil, localStock: { Brasil: { enabled: true, price: 89, quantity: 3, shippingOptions: [{ name: 'Sul', price: 22 }] } } };
+      const pedido = [{ productId: 'p1', variantId: 'small', quantity: 5 }, { productId: 'p2', variantId: 'small', quantity: 1 }];
+      expect(() => misto({ requestedItems: pedido, products: new Map([['p1', poucos], ['p2', doJapao]]) })).toThrow(expect.objectContaining({ code: 'local_unavailable' }));
+      // A tela manda 'japan' nesse caso e a conta é a de sempre.
+      expect(misto({ requestedItems: pedido, products: new Map([['p1', poucos], ['p2', doJapao]]), fulfillment: 'japan' }).fulfillment).toBe('japan');
+    });
+  });
+
   it('frete 0 é grátis; sem frete cadastrado o produto não vende do país', () => {
     const gratis = { ...noBrasil, localStock: { Brasil: { enabled: true, price: 89, quantity: 3, shippingOptions: [{ name: 'Sul', price: 0 }] } } };
     expect(local({ products: new Map([['p1', gratis]]) }).total).toBe(89);
@@ -370,9 +436,10 @@ describe('pedido de estoque local', () => {
     expect(local({ coupon: { freeShipping: true } }).total).toBe(89);
   });
 
-  it('recusa produto sem estoque local, quantidade acima do estoque e país sem oferta', () => {
+  it('recusa produto sem estoque local, quantidade acima do estoque e país sem oferta (nada sairia de lá)', () => {
     expect(() => local({ products: new Map([['p1', product]]) })).toThrow(expect.objectContaining({ code: 'local_unavailable' }));
-    expect(() => local({ requestedItems: [{ productId: 'p1', variantId: 'small', quantity: 4 }] })).toThrow(expect.objectContaining({ code: 'insufficient_stock' }));
+    // Estoque de lá não cobre as unidades pedidas: o produto vem do Japão, então nada sai do país.
+    expect(() => local({ requestedItems: [{ productId: 'p1', variantId: 'small', quantity: 4 }] })).toThrow(expect.objectContaining({ code: 'local_unavailable' }));
     expect(() => local({ country: 'Portugal', prefecture: '' })).toThrow(expect.objectContaining({ code: 'local_unavailable' }));
     const desligado = { ...noBrasil, localStock: { Brasil: { enabled: false, price: 89, quantity: 3, shippingOptions: [{ name: 'Sul', price: 22 }] } } };
     expect(() => local({ products: new Map([['p1', desligado]]) })).toThrow(expect.objectContaining({ code: 'local_unavailable' }));

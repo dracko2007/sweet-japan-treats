@@ -205,6 +205,9 @@ export function displayTotals({
   // moeda do cliente e não há imposto de importação nem taxas de remessa.
   local = false,
   shippingDisplay = null,
+  // Pedido misto (itens do país do cliente + itens do Japão, um pagamento só):
+  // frete nacional já na moeda do cliente, somado ao frete do Japão.
+  localShippingDisplay = 0,
 }) {
   const units = lines.map((line) => {
     if (line.freeGift) return 0;
@@ -234,18 +237,28 @@ export function displayTotals({
     ? (benefits.netProductsYen === 0 ? room : Math.min(room, discountYenToDisplay(benefits.pointsDiscountYen, currency, rates)))
     : 0;
   const products = Math.max(0, subtotal - couponDiscount - pointsDiscount);
-  const shipping = shippingDisplay !== null ? shippingDisplay : yenToDisplay(finalShippingYen, currency, rates);
+  // Linhas de preço fixo (estoque do país do cliente) num pedido que também tem itens do Japão.
+  const localSubtotal = lines.reduce((sum, line, index) => (Number.isFinite(line.unitDisplay) ? sum + units[index] * (Number(line.quantity) || 0) : sum), 0);
+  const mixed = !local && localSubtotal > 0 && subtotal > 0;
+  const nationalShipping = mixed ? Math.max(0, Number(localShippingDisplay) || 0) : 0;
+  const japanShipping = shippingDisplay !== null ? shippingDisplay : yenToDisplay(finalShippingYen, currency, rates);
+  const shipping = japanShipping + nationalShipping;
   const psFee = yenToDisplay(psFeeFinalYen, currency, rates, { exact: true });
-  const importDuty = !local && country === US_COUNTRY ? usImportDuty(products, currency) : 0;
+  // Imposto dos EUA e taxas do PIX (remessa ao Japão) só incidem sobre a parte que vem do Japão.
+  const japanProducts = mixed ? products - Math.round(products * localSubtotal / subtotal) : products;
+  const importDuty = !local && country === US_COUNTRY ? usImportDuty(japanProducts, currency) : 0;
   const beforePaymentFee = products + shipping + psFee + importDuty;
-  const fees = !local && paymentMethod === 'pix' ? pixFees(beforePaymentFee, currency) : { iof: 0, bankFee: 0, total: 0 };
+  const feeBase = mixed ? japanProducts + japanShipping + psFee + importDuty : beforePaymentFee;
+  const fees = !local && paymentMethod === 'pix' ? pixFees(feeBase, currency) : { iof: 0, bankFee: 0, total: 0 };
   return {
     units,
     subtotal,
     couponDiscount,
     pointsDiscount,
     products,
+    japanProducts,
     shipping,
+    nationalShipping,
     psFee,
     importDuty,
     paymentFee: fees.total,

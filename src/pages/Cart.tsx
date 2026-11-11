@@ -21,7 +21,7 @@ import { SESSION_END_EVENT } from '@/utils/localData';
 import WelcomeCouponBanner from '@/components/WelcomeCouponBanner';
 import { useLocalCart } from '@/hooks/useLocalCart';
 import { useToast } from '@/hooks/use-toast';
-import { clearDeferredJapanItems, deferJapanItems, deferredJapanItems, setShipAllFromJapan } from '@/utils/localStock';
+import { setShipAllFromJapan } from '@/utils/localStock';
 import { computeCouponDiscount } from '@/components/checkout/CouponSelector';
 import { taxDisclosure } from '../../shared/tax-disclosure.js';
 
@@ -320,56 +320,21 @@ const Cart: React.FC = () => {
   // Grand total ONLY has items subtotal (no taxes added!)
   const grandTotal = subtotalWithDiscount;
 
-  // ---- Estoque local: carrinho misto pede uma escolha antes do checkout ----
-  const [mixedChoice, setMixedChoice] = useState<Record<string, unknown> | null>(null);
-  const goCheckout = (state: Record<string, unknown>) => {
-    if (localCart.split.kind === 'mixed' && !localCart.forcedJapan) { setMixedChoice(state); return; }
-    navigate('/checkout', { state });
-  };
-  // "Enviar tudo do Japão": um envio só, com o preço normal do Japão para todos os itens.
-  const chooseAllFromJapan = () => {
-    setShipAllFromJapan(true);
-    const state = mixedChoice;
-    setMixedChoice(null);
-    navigate('/checkout', { state });
-  };
-  // "Enviar separado": fecha agora só os itens que já estão no país (frete nacional);
-  // os do Japão ficam guardados e voltam ao carrinho depois deste pedido.
-  const chooseSeparate = () => {
-    const state = mixedChoice;
-    setMixedChoice(null);
-    deferJapanItems(localCart.split.japanItems);
-    localCart.split.japanItems.forEach((item) => removeFromCart(item.product.id, item.size));
-    setShipAllFromJapan(false);
-    navigate('/checkout', { state });
-  };
-  // Itens guardados voltam quando o carrinho esvazia (pedido local concluído) ou a pedido do cliente.
-  const [deferredCount, setDeferredCount] = useState(() => deferredJapanItems().length);
-  const restoreDeferred = () => {
-    for (const saved of deferredJapanItems()) {
-      const product = products.find((p) => p.id === saved.productId);
-      if (product) addToCart(product, saved.size, saved.quantity);
-    }
-    clearDeferredJapanItems();
-    setDeferredCount(0);
-  };
-  useEffect(() => {
-    if (items.length === 0 && deferredCount > 0 && products.length > 0) {
-      restoreDeferred();
-      toast({ title: 'Itens do Japão de volta ao carrinho', description: 'Agora finalize o pedido dos produtos que vêm do Japão.' });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items.length, deferredCount, products.length]);
+  // ---- Estoque local: carrinho com itens do país do cliente e do Japão é UM pedido só ----
+  // Um pagamento (em moeda local) e dois envios: o que está no país sai de lá com frete nacional,
+  // o resto sai do Japão. Nada é separado nem tirado do carrinho.
+  const goCheckout = (state: Record<string, unknown>) => navigate('/checkout', { state });
 
   return (
     <Layout>
       <WelcomeCouponBanner context="cart" />
 
-      {/* Itens do Japão guardados enquanto o cliente fecha o pedido dos que já estão no país */}
-      {deferredCount > 0 && items.length > 0 && (
+      {/* Carrinho com itens de dois lugares: um pedido, dois envios (cliente pode preferir tudo do Japão) */}
+      {localCart.split.kind === 'mixed' && !localCart.forcedJapan && (
         <div className="bg-emerald-50 border-b border-emerald-200 px-4 py-3 text-center text-sm text-emerald-900">
-          {deferredCount} {deferredCount === 1 ? 'item que vem do Japão está guardado' : 'itens que vêm do Japão estão guardados'} para o próximo pedido.{' '}
-          <button type="button" onClick={restoreDeferred} className="font-bold underline">Devolver ao carrinho</button>
+          {localCart.split.localItems.length} {localCart.split.localItems.length === 1 ? 'item sai' : 'itens saem'} do {selectedCountry} e{' '}
+          {localCart.split.japanItems.length} {localCart.split.japanItems.length === 1 ? 'sai' : 'saem'} do Japão: um pagamento só, dois envios, cada um com seu frete.{' '}
+          <button type="button" onClick={() => setShipAllFromJapan(true)} className="font-bold underline">Prefiro tudo do Japão</button>
         </div>
       )}
 
@@ -383,32 +348,6 @@ const Cart: React.FC = () => {
         </div>
       )}
 
-      {mixedChoice && (
-        <div className="fixed inset-0 z-[10002] flex items-center justify-center bg-black/60 p-4" role="dialog" aria-modal="true" aria-labelledby="mixed-cart-title">
-          <div className="w-full max-w-md rounded-2xl bg-card p-6 shadow-2xl">
-            <h2 id="mixed-cart-title" className="font-display text-xl font-bold text-foreground">Seu carrinho tem dois tipos de envio</h2>
-            <p className="mt-2 text-sm text-muted-foreground">
-              {localCart.split.localItems.length} {localCart.split.localItems.length === 1 ? 'item já está' : 'itens já estão'} no {selectedCountry} e{' '}
-              {localCart.split.japanItems.length} {localCart.split.japanItems.length === 1 ? 'vem' : 'vêm'} do Japão. Como você prefere receber?
-            </p>
-            <div className="mt-5 space-y-3">
-              <button type="button" onClick={chooseSeparate} className="w-full rounded-xl border-2 border-emerald-500 bg-emerald-50 p-4 text-left transition hover:bg-emerald-100">
-                <span className="block font-bold text-emerald-900">Enviar separado</span>
-                <span className="block text-xs text-emerald-800">
-                  Os itens do {selectedCountry} saem agora, com o preço local e frete nacional. Os do Japão ficam guardados e você finaliza em seguida, em outro pedido.
-                </span>
-              </button>
-              <button type="button" onClick={chooseAllFromJapan} className="w-full rounded-xl border-2 border-border p-4 text-left transition hover:bg-secondary/50">
-                <span className="block font-bold text-foreground">Enviar tudo direto do Japão</span>
-                <span className="block text-xs text-muted-foreground">
-                  Um envio só. Todos os itens passam a usar o preço e o frete do Japão.
-                </span>
-              </button>
-            </div>
-            <button type="button" onClick={() => setMixedChoice(null)} className="mt-4 w-full text-center text-sm text-muted-foreground hover:underline">Voltar ao carrinho</button>
-          </div>
-        </div>
-      )}
       <div className="gradient-hero py-16">
         <div className="container mx-auto px-4">
           <div className="text-center">
@@ -623,7 +562,7 @@ const Cart: React.FC = () => {
 
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">{t('cart.subtotal')}</span>
-                      <span className="font-semibold text-gray-800">{formatPrice(baseTotalPrice, currency, localCart.localOrder)}</span>
+                      <span className="font-semibold text-gray-800">{formatPrice(baseTotalPrice, currency, localCart.anyLocal)}</span>
                     </div>
 
                     {activeCoupon && (
@@ -634,7 +573,7 @@ const Cart: React.FC = () => {
                             {activeCoupon.discountType === 'percentage' ? ` −${activeCoupon.discount}%` : ''}
                           </span>
                           <span className="flex items-center gap-1">
-                            −{formatPrice(discountAmount, currency, localCart.localOrder)}
+                            −{formatPrice(discountAmount, currency, localCart.anyLocal)}
                             <button
                               onClick={handleRemoveCoupon}
                               className="text-red-500 hover:text-red-700 ml-1 text-xs"
@@ -656,7 +595,7 @@ const Cart: React.FC = () => {
                         )}
                         {affiliateCoupon && hasPromoItems && regularSubtotal > 0 && (
                           <p className="text-[11px] text-blue-600 font-medium bg-blue-50 border border-blue-200 rounded-lg px-2 py-1.5 leading-snug">
-                            ℹ️ Cupom aplicado apenas aos itens sem promoção ({formatPrice(regularSubtotal, currency, localCart.localOrder)}). Itens com preço promocional não acumulam desconto.
+                            ℹ️ Cupom aplicado apenas aos itens sem promoção ({formatPrice(regularSubtotal, currency, localCart.anyLocal)}). Itens com preço promocional não acumulam desconto.
                           </p>
                         )}
                       </div>
@@ -685,15 +624,15 @@ const Cart: React.FC = () => {
                       <div className="text-right">
                         {discountAmount > 0 && (
                           <p className="text-sm text-muted-foreground line-through">
-                            {formatPrice(baseTotalPrice, currency, localCart.localOrder)}
+                            {formatPrice(baseTotalPrice, currency, localCart.anyLocal)}
                           </p>
                         )}
                         <span className="font-black text-2xl text-pink-600">
-                          {formatPrice(grandTotal, currency, localCart.localOrder)}
+                          {formatPrice(grandTotal, currency, localCart.anyLocal)}
                         </span>
                         {discountAmount > 0 && (
                           <p className="text-[11px] text-green-600 font-bold mt-0.5">
-                            Você economiza {formatPrice(discountAmount, currency, localCart.localOrder)}
+                            Você economiza {formatPrice(discountAmount, currency, localCart.anyLocal)}
                           </p>
                         )}
                         {selectedCountry !== 'Japão' && !discountAmount ? (

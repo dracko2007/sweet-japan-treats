@@ -12,7 +12,7 @@ import {
   psFeeDiscountYen as finalPsFeeDiscountYen,
 } from '../../shared/money.js';
 import { localUnitYen } from '../../shared/local-stock.js';
-import { localOffer } from '@/utils/localStock';
+import { localOffer, splitCart } from '@/utils/localStock';
 
 export interface CheckoutCoupon {
   code?: string;
@@ -25,41 +25,47 @@ export interface CheckoutCoupon {
   minOrderValue?: number;
 }
 
-/** Pedido de estoque local: país do cliente e frete nacional de tabela (na moeda dele). */
+/** Pedido com itens do estoque do país do cliente: país, moeda e frete nacional (na moeda dele). */
 export interface LocalCheckout {
   country: string;
   currency: string;
   shippingDisplay: number;
 }
 
-/** Linhas de um pedido local: preço fixo na moeda do cliente, sem taxa PS nem "desconto do produto". */
-function localMoneyLines(items: CartItem[], local: LocalCheckout) {
-  const rates = getMoneyRates();
-  return items.map((item) => {
-    const price = item.freeGift ? 0 : (localOffer(item.product, local.country)?.price || 0);
-    return {
-      unitYen: localUnitYen(price, local.currency, rates),
-      unitDisplay: price,
-      quantity: item.quantity,
-      freeGift: Boolean(item.freeGift),
-      homePromo: false,
-      productDiscounted: false,
-      noPsFee: true,
-    };
-  });
+/**
+ * Itens que saem do país do cliente (preço fixo na moeda dele): os que o estoque de lá cobre por
+ * inteiro. O resto do carrinho sai do Japão, no mesmo pedido (mesma regra do servidor).
+ */
+function localItemSet(items: CartItem[], country: string): Set<CartItem> {
+  return new Set(splitCart(items, country).localItems);
 }
 
-/** Linhas no formato de `shared/money.js`, na ordem do carrinho. */
+/** Linhas do pedido: preço fixo local nos itens do país do cliente, conta do Japão nos demais. */
 export function checkoutMoneyLines(items: CartItem[], local: LocalCheckout | null = null) {
-  if (local) return localMoneyLines(items, local);
-  return items.map((item) => ({
-    unitYen: item.freeGift ? 0 : effectiveYen(item.product, item.size),
-    quantity: item.quantity,
-    freeGift: Boolean(item.freeGift),
-    homePromo: item.product.id.endsWith('_promo'),
-    productDiscounted: Number(item.product.discountPercent || 0) > 0,
-    noPsFee: Boolean(item.product.noPsFee),
-  }));
+  const localItems = local ? localItemSet(items, local.country) : null;
+  const rates = local ? getMoneyRates() : null;
+  return items.map((item) => {
+    if (local && localItems?.has(item)) {
+      const price = localOffer(item.product, local.country)?.price || 0;
+      return {
+        unitYen: localUnitYen(price, local.currency, rates),
+        unitDisplay: price,
+        quantity: item.quantity,
+        freeGift: false,
+        homePromo: false,
+        productDiscounted: false,
+        noPsFee: true,
+      };
+    }
+    return {
+      unitYen: item.freeGift ? 0 : effectiveYen(item.product, item.size),
+      quantity: item.quantity,
+      freeGift: Boolean(item.freeGift),
+      homePromo: item.product.id.endsWith('_promo'),
+      productDiscounted: Number(item.product.discountPercent || 0) > 0,
+      noPsFee: Boolean(item.product.noPsFee),
+    };
+  });
 }
 
 /** Cupom e pontos em ¥ sobre o carrinho, sem frete nem taxa (para limitar o resgate). */
@@ -67,9 +73,10 @@ export function cartBenefits(items: CartItem[], coupon: CheckoutCoupon | null = 
   return productBenefits({ lines: checkoutMoneyLines(items, local), coupon, redeemPoints });
 }
 
-/** Unidades que pagam a taxa PS (brinde e produto isento ficam fora). */
-export function psFeeUnits(items: CartItem[]): number {
-  return items.reduce((sum, item) => (item.freeGift || item.product.noPsFee ? sum : sum + item.quantity), 0);
+/** Unidades que pagam a taxa PS (brinde, produto isento e item enviado do país do cliente ficam fora). */
+export function psFeeUnits(items: CartItem[], local: LocalCheckout | null = null): number {
+  const localItems = local ? localItemSet(items, local.country) : null;
+  return items.reduce((sum, item) => (item.freeGift || item.product.noPsFee || localItems?.has(item) ? sum : sum + item.quantity), 0);
 }
 
 export interface NegotiatedPsFee {
@@ -93,7 +100,7 @@ interface TotalsInput {
   shippingDiscountYen?: number;
   psFeeWaived?: boolean;
   negotiatedPsFee?: NegotiatedPsFee | null;
-  /** Pedido de estoque local (preço fixo + frete nacional); ignora frete em ¥, isenção e negociação. */
+  /** Itens do estoque do país (preço fixo + frete nacional). Se TODOS são de lá, ignora frete em ¥, isenção e negociação. */
   local?: LocalCheckout | null;
 }
 
@@ -110,15 +117,17 @@ export function computeCheckoutTotals({
   negotiatedPsFee = null,
   local = null,
 }: TotalsInput) {
-  if (local) {
+  // Todos os itens saem do país do cliente: não há frete do Japão, isenção nem negociação.
+  const allLocal = Boolean(local) && splitCart(items, local!.country).kind === 'local';
+  if (allLocal) {
     psFeeWaived = false;
     negotiatedPsFee = null;
     shippingDiscountYen = 0;
-    shippingYen = localUnitYen(local.shippingDisplay, local.currency, getMoneyRates());
+    shippingYen = 0;
   }
   const lines = checkoutMoneyLines(items, local);
   const benefits = productBenefits({ lines, coupon, redeemPoints });
-  const units = psFeeUnits(items);
+  const units = psFeeUnits(items, local);
   const maxAutoYen = autoApprovablePsDiscountYen(units);
 
   // Mesma regra do servidor: aprovação manual vale o que a vendedora deu;
@@ -149,8 +158,9 @@ export function computeCheckoutTotals({
     benefits,
     finalShippingYen,
     psFeeFinalYen,
-    local: Boolean(local),
-    shippingDisplay: local ? (freeShipping ? 0 : local.shippingDisplay) : null,
+    local: allLocal,
+    shippingDisplay: allLocal ? (freeShipping ? 0 : local!.shippingDisplay) : null,
+    localShippingDisplay: local && !allLocal ? (freeShipping ? 0 : local.shippingDisplay) : 0,
   });
 
   return {

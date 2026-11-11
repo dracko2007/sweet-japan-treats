@@ -119,14 +119,17 @@ export async function fulfillOrder(orderId, { provider, reference, confirmedBy }
       throw new HttpError(409, 'payment_reference_reused');
     }
 
-    const localOrder = order.fulfillment === 'local' && Boolean(order.shipFrom);
+    // Item enviado do país do cliente (`local`) sai do estoque de lá; os demais, do estoque do Japão.
+    const localProducts = new Set(order.shipFrom && order.shipFrom !== 'Japão' && (order.fulfillment === 'local' || order.fulfillment === 'mixed')
+      ? items.filter((item) => item.local === true).map((item) => item.productId)
+      : []);
     for (const ref of productRefs) {
       const productSnap = byPath.get(ref.path);
       if (!productSnap.exists) throw new HttpError(409, 'product_unavailable');
       const product = productSnap.data();
       const quantity = quantities.get(ref.id);
-      if (localOrder) {
-        // Pedido local: a unidade sai do estoque que está no país do cliente.
+      if (localProducts.has(ref.id)) {
+        // Item local: a unidade sai do estoque que está no país do cliente.
         const entry = product.localStock?.[order.shipFrom];
         if (!entry || Number(entry.quantity || 0) < quantity) throw new HttpError(409, 'insufficient_stock');
         continue;
@@ -218,7 +221,7 @@ export async function fulfillOrder(orderId, { provider, reference, confirmedBy }
       // updatedAt: o catálogo dos clientes (PWA) sincroniza por delta desse campo;
       // sem ele a baixa de estoque nunca chegava a quem já tinha o catálogo em cache.
       const update = { salesCount: Number(product.salesCount || 0) + quantity, updatedAt: FieldValue.serverTimestamp() };
-      if (localOrder) {
+      if (localProducts.has(ref.id)) {
         // Baixa no estoque local; o do Japão não muda. O mapa inteiro é regravado
         // porque o nome do país pode ter espaço ("Estados Unidos"), o que não
         // cabe num caminho de campo com ponto.

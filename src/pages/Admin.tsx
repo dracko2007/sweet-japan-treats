@@ -39,11 +39,13 @@ const CustomRequestManager = lazy(() => import('@/components/admin/CustomRequest
 const B2BRequestManager = lazy(() => import('@/components/admin/B2BRequestManager'));
 /** Pedido que sai do estoque que já está no país do cliente (empresa parceira), não do Japão. */
 const isLocalOrder = (order: Order): boolean => order.fulfillment === 'local' && Boolean(order.shipFrom);
+/** Um pedido, dois envios: os itens marcados `local` saem do país do cliente, os outros do Japão. */
+const isMixedOrder = (order: Order): boolean => order.fulfillment === 'mixed' && Boolean(order.shipFrom);
 const carrierText = (order: Order): string =>
   (isLocalOrder(order) ? localCarrierLabel(order.shipFrom) : order.shippingCarrier || '');
 /** Frete nacional como foi cobrado, na moeda do pedido; null em pedido do Japão (frete em ¥). */
 const localShippingText = (order: Order): string | null => {
-  if (!isLocalOrder(order) || order.priceBreakdown?.shipping == null) return null;
+  if (!(isLocalOrder(order) || isMixedOrder(order)) || order.priceBreakdown?.shipping == null) return null;
   const amount = Number(order.priceBreakdown.shipping);
   return amount > 0 ? formatPrice(amount, order.currency || 'JPY', true) : 'Grátis';
 };
@@ -570,7 +572,7 @@ _This is an automated test message_
 
     const itemsHtml = order.items.map((item: OrderItem) => `
       <tr>
-        <td style="padding:6px 8px;border-bottom:1px solid #eee;">${escapeHtml(item.productName || item.name)}${item.size ? ` <span style="color:#888;font-size:12px;">(${escapeHtml(item.size)})</span>` : ''}</td>
+        <td style="padding:6px 8px;border-bottom:1px solid #eee;">${isMixedOrder(order) && item.local ? '📍 ' : ''}${escapeHtml(item.productName || item.name)}${item.size ? ` <span style="color:#888;font-size:12px;">(${escapeHtml(item.size)})</span>` : ''}</td>
         <td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:center;">${Number(item.quantity) || 0}</td>
         <td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:right;">R$ ${(Number(item.price) * Number(item.quantity)).toFixed(2)}</td>
       </tr>
@@ -623,6 +625,7 @@ _This is an automated test message_
       <div class="status-badge">${escapeHtml(statusLabel[order.status] || order.status || 'N/A')}</div>
     </div>
   </div>
+  ${isMixedOrder(order) ? `<div style="margin:0 0 14px;padding:10px 14px;border:2px solid #059669;background:#ecfdf5;color:#065f46;font-weight:800;border-radius:8px;">📍 DOIS ENVIOS — itens marcados com 📍 saem do estoque do ${escapeHtml(String(order.shipFrom))} (frete nacional); os demais saem do Japão.</div>` : ''}
   ${isLocalOrder(order) ? `<div style="margin:0 0 14px;padding:10px 14px;border:2px solid #059669;background:#ecfdf5;color:#065f46;font-weight:800;border-radius:8px;">📍 ENVIAR DO ${escapeHtml(String(order.shipFrom).toUpperCase())} — estoque local, frete nacional. Não sai do Japão.</div>` : ''}
   <div class="grid">
     <div class="section">
@@ -1037,7 +1040,17 @@ _This is an automated test message_
                               📍 Enviar do {order.shipFrom}
                             </span>
                           )}
+                          {isMixedOrder(order) && (
+                            <span className="rounded-full bg-emerald-600 px-3 py-1 text-xs font-extrabold uppercase text-white">
+                              📍 2 envios: {order.shipFrom} + Japão
+                            </span>
+                          )}
                         </div>
+                        {isMixedOrder(order) && (
+                          <p className="mb-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800">
+                            Um pagamento, dois envios: os itens marcados com 📍 saem do estoque do {order.shipFrom} (frete nacional); os demais saem do Japão.
+                          </p>
+                        )}
                         {isLocalOrder(order) && (
                           <p className="mb-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800">
                             Este pedido NÃO sai do Japão: as unidades estão no estoque do {order.shipFrom} e seguem por frete nacional.
@@ -1124,7 +1137,7 @@ _This is an automated test message_
                         <div className="space-y-2">
                           {order.items.map((item: OrderItem, i: number) => (
                             <div key={i} className="flex justify-between text-sm">
-                               <span>{item.productName || item.name} ({item.size}) x{item.quantity}</span>
+                               <span>{isMixedOrder(order) && item.local ? '📍 ' : ''}{item.productName || item.name} ({item.size}) x{item.quantity}</span>
                                <span className="font-semibold font-mono">R$ {(item.price * item.quantity).toFixed(2)}</span>
                             </div>
                           ))}

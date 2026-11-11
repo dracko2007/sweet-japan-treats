@@ -98,6 +98,8 @@ export interface OrderItem {
   price: number;
   cost?: number; // Custo de aquisição em ¥ no momento da compra (snapshot, admin)
   image?: string;
+  /** Enviado do estoque que já está no país do cliente (`order.shipFrom`), não do Japão. */
+  local?: boolean;
 }
 
 export interface OrderShippingAddress {
@@ -133,11 +135,11 @@ export interface Order {
   shippingCarrier?: string;
   shippingCost?: number;
   shipping?: { cost?: number; carrier?: string };
-  /** 'local' = sai do estoque que já está no país do cliente (`shipFrom`), não do Japão. */
-  fulfillment?: 'japan' | 'local';
+  /** 'local' = tudo sai do estoque do país do cliente (`shipFrom`); 'mixed' = parte de lá e parte do Japão (dois envios). */
+  fulfillment?: 'japan' | 'local' | 'mixed';
   shipFrom?: string;
   /** Conta congelada no pedido, na moeda do pedido. */
-  priceBreakdown?: { shipping?: number };
+  priceBreakdown?: { shipping?: number; localShipping?: number };
   shippingAddress?: OrderShippingAddress;
   trackingNumber?: string;
   trackingUrl?: string;

@@ -384,10 +384,15 @@ function parseCheckout(body, user) {
     ? requiredText(body.prefecture, { max: 100 })
     : optionalText(body.prefecture, { max: 100 });
   const state = optionalText(body.state, { max: 100 });
-  // 'local' = pedido só com itens que já estão no país do cliente (frete nacional de tabela).
+  // 'local' = usa o estoque que já está no país do cliente onde houver (frete nacional do produto);
+  // o que não estiver lá segue do Japão, no mesmo pedido, com a transportadora escolhida.
   const fulfillment = body.fulfillment === undefined || body.fulfillment === 'japan' ? 'japan' : body.fulfillment;
   if (fulfillment !== 'japan' && fulfillment !== 'local') throw new HttpError(400, 'invalid_request');
-  const carrier = fulfillment === 'local' ? 'local' : carrierId(body.shippingCarrier);
+  // Pedido todo do país do cliente não tem transportadora internacional: o nome vem como rótulo do frete nacional.
+  let carrier;
+  if (fulfillment === 'local') {
+    try { carrier = carrierId(body.shippingCarrier); } catch { carrier = 'local'; }
+  } else carrier = carrierId(body.shippingCarrier);
   const paymentMethod = requiredText(body.paymentMethod, { max: 20 });
   if (!PAYMENT_METHODS.has(paymentMethod)) throw new HttpError(400, 'invalid_payment_method');
   // PayPay, Yucho e depósito são em ienes, no Japão; PIX é real brasileiro.
@@ -583,12 +588,15 @@ async function handleCreate(req, res) {
     }
 
     const stockByProduct = new Map();
-    for (const item of quote.items) stockByProduct.set(item.productId, (stockByProduct.get(item.productId) || 0) + item.quantity);
+    // Itens que saem do país do cliente não tocam no estoque do Japão: a quantidade local já foi
+    // conferida em `buildQuote` e a baixa dela acontece na confirmação do pagamento.
+    for (const item of quote.items) {
+      if (item.local) continue;
+      stockByProduct.set(item.productId, (stockByProduct.get(item.productId) || 0) + item.quantity);
+    }
     // Só produtos com controle de estoque precisam de reserva — ilimitado
     // nunca disputa unidade com ninguém.
-    // Pedido local não toca no estoque do Japão: a quantidade local já foi
-    // conferida em `buildQuote` e a baixa acontece na confirmação do pagamento.
-    const stockControlledProducts = quote.fulfillment === 'local' ? [] : [...stockByProduct.keys()]
+    const stockControlledProducts = [...stockByProduct.keys()]
       .filter((productId) => products.get(productId)?.stock?.unlimited === false);
     const stockReserveSnaps = stockControlledProducts.length
       ? await db.getAll(...stockControlledProducts.map((productId) => refReservaEstoque(db, productId)))
@@ -598,7 +606,7 @@ async function handleCreate(req, res) {
     );
     for (const [productId, quantity] of stockByProduct) {
       const product = products.get(productId);
-      if (quote.fulfillment !== 'local' && product?.stock?.unlimited === false) {
+      if (product?.stock?.unlimited === false) {
         // Desconta o que pedidos concorrentes (cartão em checkout, PIX/Wise
         // ainda não confirmado) já estão segurando para este produto — sem
         // isso, dois checkouts na última unidade passariam os dois aqui, e o

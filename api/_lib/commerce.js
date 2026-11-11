@@ -246,18 +246,22 @@ function displayToYen(amount, currency, rates) {
 
 export function buildQuote({ requestedItems, products, country, prefecture, state, carrier, paymentMethod, coupon, redeemPoints, negotiation, campaign, homePromotion, rates, recentSpendYen = 0, psFeeWaived = false, fulfillment = 'japan', localShippingChoice = '' }) {
   const now = Date.now();
-  // Pedido de estoque local: todos os itens saem do país do cliente, com preço
-  // fixo na moeda de lá e frete nacional. Campanha, promoção da home, negociação
-  // e isenção da taxa PS são coisas do envio do Japão e não entram aqui.
-  const local = fulfillment === 'local';
+  // `fulfillment: 'local'` = usar o estoque que já está no país do cliente onde houver:
+  // esses itens saem de lá, com preço fixo na moeda dele e frete nacional; o resto
+  // sai do Japão com a conta de sempre, no MESMO pedido e pagamento (envio separado).
+  // Todos de lá = pedido 'local'; parte e parte = 'mixed'. Campanha, promoção da home,
+  // negociação e isenção da taxa PS só valem para a parte do Japão.
+  const wantsLocal = fulfillment === 'local';
   const currency = currencyForCountry(country);
-  if (local) {
-    campaign = null;
-    negotiation = null;
-    psFeeWaived = false;
-  }
-  const localQuantity = new Map();
   const localOffers = [];
+  const wantedByProduct = new Map();
+  if (wantsLocal && Array.isArray(requestedItems)) {
+    for (const requested of requestedItems) {
+      const id = String(requested?.productId || '');
+      if (id.endsWith('_promo')) continue;
+      wantedByProduct.set(id, (wantedByProduct.get(id) || 0) + Number(requested.quantity));
+    }
+  }
   if (!Array.isArray(requestedItems) || requestedItems.length < 1 || requestedItems.length > 100) throw new HttpError(400, 'invalid_items');
   const lineItems = [];
   let homePromoQuantity = 0;
@@ -273,18 +277,16 @@ export function buildQuote({ requestedItems, products, country, prefecture, stat
     if (product.deliveryRestrict === 'exterior-only' && country === 'Japão') throw new HttpError(400, 'product_unavailable');
     const variantId = String(requested.variantId || requested.size || 'small');
     let unitYen;
-    if (local) {
-      const offer = isHomePromo ? null : localOffer(product, country);
-      if (!offer) throw new HttpError(409, 'local_unavailable');
-      const wanted = (localQuantity.get(productId) || 0) + quantity;
-      if (wanted > offer.quantity) throw new HttpError(409, 'insufficient_stock');
-      localQuantity.set(productId, wanted);
+    // Só é local se o estoque de lá cobre TODAS as unidades pedidas do produto
+    // (mesma regra de `splitCart`, no navegador); senão o produto inteiro vem do Japão.
+    const offer = wantsLocal && !isHomePromo ? localOffer(product, country) : null;
+    if (offer && (wantedByProduct.get(productId) || 0) <= offer.quantity) {
       localOffers.push(offer);
       lineItems.push({
         productId, requestedId, product, variantId, quantity,
         unitYen: displayToYen(offer.price, currency, rates),
         unitDisplay: offer.price,
-        homePromo: false, freeGift: false,
+        homePromo: false, freeGift: false, local: true,
       });
       continue;
     }
@@ -305,8 +307,19 @@ export function buildQuote({ requestedItems, products, country, prefecture, stat
     lineItems.push({ productId, requestedId, product, variantId, quantity, unitYen, homePromo: isHomePromo, freeGift: false });
   }
 
+  const hasLocalLines = lineItems.some((item) => item.local);
+  if (wantsLocal && !hasLocalLines) throw new HttpError(409, 'local_unavailable');
+  // Tudo sai do país do cliente: campanha, negociação e isenção da taxa PS são do envio do Japão.
+  const allLocal = hasLocalLines && lineItems.every((item) => item.local);
+  const local = allLocal;
+  if (allLocal) {
+    campaign = null;
+    negotiation = null;
+    psFeeWaived = false;
+  }
+
   if (campaign && (campaign.mechanic === 'bogo' || campaign.mechanic === 'bogo_other')) {
-    const trigger = lineItems.find((item) => item.productId === campaign.productId && !item.freeGift);
+    const trigger = lineItems.find((item) => item.productId === campaign.productId && !item.freeGift && !item.local);
     if (trigger) {
       const giftId = campaign.mechanic === 'bogo' ? campaign.productId : campaign.giftProductId;
       const giftProduct = products.get(giftId);
@@ -326,9 +339,9 @@ export function buildQuote({ requestedItems, products, country, prefecture, stat
     freeGift: item.freeGift,
     homePromo: item.homePromo,
     // Estoque local: preço fixo, sem "desconto do produto" e sem taxa PS.
-    productDiscounted: !local && Number(item.product.discountPercent || 0) > 0,
-    noPsFee: local || Boolean(item.product.noPsFee),
-    ...(local ? { unitDisplay: item.unitDisplay } : {}),
+    productDiscounted: !item.local && Number(item.product.discountPercent || 0) > 0,
+    noPsFee: Boolean(item.local) || Boolean(item.product.noPsFee),
+    ...(item.local ? { unitDisplay: item.unitDisplay } : {}),
   }));
   const benefits = productBenefits({ lines, coupon, redeemPoints });
   if (benefits.terms?.minOrderYen && benefits.productSubtotalYen < benefits.terms.minOrderYen) {
@@ -366,24 +379,33 @@ export function buildQuote({ requestedItems, products, country, prefecture, stat
   });
   const psFeeFinalYen = benefits.psFeeYen - psDiscountYen;
 
+  // Frete do Japão (itens que vêm de lá) + frete nacional (itens do país do cliente,
+  // cadastrado no produto; um pacote só: vale o maior). Cada parte é uma remessa.
+  const japanLines = lineItems.filter((item) => !item.local);
+  const freeShipping = benefits.terms?.freeShipping === true;
   let shippingDisplay = null;
-  let shipping;
-  if (local) {
-    // Frete nacional cadastrado no produto, já na moeda do cliente (um pacote: vale o maior).
+  let shipping = { amount: 0, weightG: 0 };
+  if (japanLines.length > 0) {
+    let shippableYen = benefits.productSubtotalYen - benefits.couponDiscountYen;
+    if (hasLocalLines) {
+      // Pedido misto: a faixa de frete grátis do Japão olha só a mercadoria que vem de lá.
+      const japanYen = japanLines.reduce((sum, item) => sum + (item.freeGift ? 0 : item.unitYen * item.quantity), 0);
+      const share = benefits.productSubtotalYen > 0 ? japanYen / benefits.productSubtotalYen : 1;
+      shippableYen = japanYen - Math.round(benefits.couponDiscountYen * share);
+    }
+    shipping = shippingYen(japanLines, country, prefecture, carrier, shippableYen, freeShipping);
+  }
+  let nationalShippingDisplay = 0;
+  if (hasLocalLines) {
     const picked = localOrderShipping(localOffers, { country, state: prefecture || state, choice: localShippingChoice });
     if (!picked) throw new HttpError(409, 'local_shipping_unavailable');
-    shippingDisplay = benefits.terms?.freeShipping === true ? 0 : picked.price;
-    shipping = { amount: displayToYen(shippingDisplay, currency, rates), weightG: shippingShape(lineItems).totalWeightG };
-  } else {
-    shipping = shippingYen(
-      lineItems,
-      country,
-      prefecture,
-      carrier,
-      benefits.productSubtotalYen - benefits.couponDiscountYen,
-      benefits.terms?.freeShipping === true,
-    );
+    nationalShippingDisplay = freeShipping ? 0 : picked.price;
+    if (allLocal) {
+      shippingDisplay = nationalShippingDisplay;
+      shipping = { amount: 0, weightG: shippingShape(lineItems).totalWeightG };
+    }
   }
+  const nationalShippingYen = hasLocalLines ? displayToYen(nationalShippingDisplay, currency, rates) : 0;
   const shippingDiscountYen = manualApproved && negotiation.type === 'shipping'
     ? Math.min(shipping.amount, Math.max(0, Number(negotiation.approvedDiscountYen || 0)))
     : 0;
@@ -400,11 +422,12 @@ export function buildQuote({ requestedItems, products, country, prefecture, stat
     psFeeFinalYen,
     local,
     shippingDisplay,
+    localShippingDisplay: nationalShippingDisplay,
   });
   // O imposto é só informativo (ver shared/tax-disclosure.js) e fica fora do
   // total. O imposto dos EUA é outra coisa: pré-pago pela loja (DDP), entra
   // no total como `importDuty`.
-  const taxDisplay = local ? 0 : informativeTax(shown.products, country);
+  const taxDisplay = local ? 0 : informativeTax(shown.japanProducts, country);
   const total = shown.total;
   if (!(total > 0)) throw new HttpError(400, 'invalid_total');
 
@@ -417,7 +440,7 @@ export function buildQuote({ requestedItems, products, country, prefecture, stat
   // senão bastava colar o código com qualquer carrinho para levar os pontos.
   // Brinde não conta como gatilho, pelo mesmo motivo.
   const promoPoints = campaign?.mechanic === 'points'
-    && lineItems.some((item) => !item.freeGift && item.productId === campaign.productId)
+    && lineItems.some((item) => !item.freeGift && !item.local && item.productId === campaign.productId)
     ? Math.max(0, Math.floor(Number(campaign.points || 0)))
     : 0;
 
@@ -425,11 +448,12 @@ export function buildQuote({ requestedItems, products, country, prefecture, stat
 
   return {
     currency,
-    // 'local' = sai do estoque do país do cliente; 'japan' = envio do Japão.
-    fulfillment: local ? 'local' : 'japan',
-    shipFrom: local ? country : 'Japão',
+    // 'local' = tudo sai do país do cliente; 'mixed' = parte de lá e parte do Japão
+    // (um pagamento, dois envios); 'japan' = tudo do Japão.
+    fulfillment: allLocal ? 'local' : hasLocalLines ? 'mixed' : 'japan',
+    shipFrom: hasLocalLines ? country : 'Japão',
     total,
-    totalYen: benefits.netProductsYen + finalShippingYen + psFeeFinalYen,
+    totalYen: benefits.netProductsYen + finalShippingYen + nationalShippingYen + psFeeFinalYen,
     productSubtotalYen: benefits.productSubtotalYen,
     netProductsYen: benefits.netProductsYen,
     productCostYen: lineItems.reduce((sum, item) => sum + Math.max(0, Number(item.product.cost || 0)) * item.quantity, 0),
@@ -439,7 +463,7 @@ export function buildQuote({ requestedItems, products, country, prefecture, stat
     earnedPoints: earnedPointsForOrder(benefits.productSubtotalYen, benefits.pointsDiscountYen, pointsMultiplier),
     pointsMultiplier,
     promoPoints,
-    shippingYen: finalShippingYen,
+    shippingYen: finalShippingYen + nationalShippingYen,
     shippingDiscountYen,
     shippingWeightG: shipping.weightG,
     psFeeYen: psFeeFinalYen,
@@ -458,6 +482,8 @@ export function buildQuote({ requestedItems, products, country, prefecture, stat
       paymentDiscount: 0,
       products: shown.products,
       shipping: shown.shipping,
+      // Parte do frete que é nacional (itens enviados do país do cliente); o resto é do Japão.
+      localShipping: shown.nationalShipping,
       psFee: shown.psFee,
       importDuty: shown.importDuty,
       paymentFee: shown.paymentFee,
@@ -485,7 +511,7 @@ export function buildQuote({ requestedItems, products, country, prefecture, stat
       freeGift: item.freeGift,
       homePromo: item.homePromo,
       stockUnlimited: item.product.stock?.unlimited !== false,
-      ...(local ? { local: true } : {}),
+      ...(item.local ? { local: true } : {}),
     })),
   };
 }

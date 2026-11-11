@@ -32,6 +32,8 @@ export function useLocalCart() {
       localPrice,
       /** Todo o carrinho sai do país do cliente (e ele não pediu envio único do Japão). */
       localOrder: split.kind === 'local' && !forcedJapan,
+      /** Algum item sai do país do cliente (pedido todo de lá ou misto): a referência em ¥ não vale. */
+      anyLocal: split.kind !== 'japan' && !forcedJapan,
       country: selectedCountry,
     };
   }, [items, selectedCountry, forcedJapan]);

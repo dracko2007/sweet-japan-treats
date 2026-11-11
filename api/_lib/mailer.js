@@ -186,6 +186,8 @@ const row = (label, value, { bold = false } = {}) =>
  */
 /** Pedido que sai do estoque que já está no país do cliente, não do Japão. */
 const isLocalOrder = (order) => order?.fulfillment === 'local' && Boolean(order.shipFrom);
+/** Um pedido, dois envios: parte sai do país do cliente (`item.local`), o resto do Japão. */
+const isMixedOrder = (order) => order?.fulfillment === 'mixed' && Boolean(order.shipFrom);
 
 function breakdownRows(order, currency) {
   const pb = order.priceBreakdown;
@@ -199,7 +201,11 @@ function breakdownRows(order, currency) {
   const carrier = isLocalOrder(order)
     ? localCarrierLabel(order.shipFrom)
     : CARRIER_LABEL[order.shippingCarrier || order.shipping?.carrier] || '';
-  out.push(row(`Frete${carrier ? ` (${escapeHtml(carrier)})` : ''}`, n(pb.shipping) > 0 ? orderMoney(pb.shipping, currency) : 'Gratis'));
+  // Pedido misto: o frete tem duas partes, uma por remessa.
+  const nacional = isMixedOrder(order) ? n(pb.localShipping) : 0;
+  const freteJapao = n(pb.shipping) - nacional;
+  out.push(row(`Frete${isMixedOrder(order) ? ' do Japao' : ''}${carrier ? ` (${escapeHtml(carrier)})` : ''}`, freteJapao > 0 ? orderMoney(freteJapao, currency) : 'Gratis'));
+  if (isMixedOrder(order)) out.push(row(`Frete nacional (${escapeHtml(localCarrierLabel(order.shipFrom))})`, nacional > 0 ? orderMoney(nacional, currency) : 'Gratis'));
   if (n(pb.psFee) > 0) out.push(row('Taxa PS', orderMoney(pb.psFee, currency)));
   if (n(pb.importDuty) > 0) out.push(row('Imposto de importacao dos EUA (pre-pago)', orderMoney(pb.importDuty, currency)));
   if (n(pb.pixIof) > 0 || n(pb.pixBankFee) > 0) {
@@ -220,7 +226,10 @@ export function buildOrderEmail(order, { tracking = false, store = false } = {})
       const quantity = Math.max(1, Number(item.quantity || 1));
       const value = item.freeGift ? 'Brinde' : orderMoney(Number(item.price || 0) * quantity, currency);
       const option = item.freeGift ? '' : String(item.variantLabel || '');
-      return row(`${escapeHtml(item.productName || item.name)}${option ? ` <span style="color:#777">(${escapeHtml(option)})</span>` : ''} × ${quantity}`, value);
+      const origem = isMixedOrder(order) && !item.freeGift
+        ? ` <span style="color:${item.local ? '#047857' : '#777'}">[${item.local ? `enviado do ${escapeHtml(order.shipFrom)}` : 'enviado do Japao'}]</span>`
+        : '';
+      return row(`${escapeHtml(item.productName || item.name)}${option ? ` <span style="color:#777">(${escapeHtml(option)})</span>` : ''}${origem} × ${quantity}`, value);
     }).join('')
     : '';
   const breakdown = breakdownRows(order, currency);
@@ -246,13 +255,15 @@ export function buildOrderEmail(order, { tracking = false, store = false } = {})
     : '';
   // Pedido local: a loja precisa ver de cara que NÃO é para separar no Japão;
   // o cliente fica sabendo que o envio é nacional.
-  const shipFrom = isLocalOrder(order) ? escapeHtml(order.shipFrom) : '';
-  const localBlock = !shipFrom ? '' : store
+  const shipFrom = isLocalOrder(order) || isMixedOrder(order) ? escapeHtml(order.shipFrom) : '';
+  const localBlock = !shipFrom ? '' : isMixedOrder(order) ? (store
+    ? `<div style="margin:12px 0;padding:12px;border:2px solid #059669;background:#ecfdf5;border-radius:10px;color:#065f46"><strong>DOIS ENVIOS:</strong> os itens marcados [enviado do ${shipFrom}] saem do estoque de la, por frete nacional; os demais saem do Japao.</div>`
+    : `<p style="color:#047857"><strong>Seu pedido tem dois envios:</strong> os itens marcados saem direto do ${shipFrom} e os demais saem do Japao, cada um com seu frete.</p>`) : store
     ? `<div style="margin:12px 0;padding:12px;border:2px solid #059669;background:#ecfdf5;border-radius:10px;color:#065f46"><strong>ENVIAR DO ${shipFrom.toUpperCase()}</strong> — estoque local, frete nacional. Este pedido nao sai do Japao.</div>`
     : `<p style="color:#047857"><strong>Enviado direto do ${shipFrom}</strong>, por frete nacional.</p>`;
   const subject = tracking
     ? `Pedido enviado - #${orderNumber}`
-    : store ? `Novo pedido${shipFrom ? ` (enviar do ${shipFrom})` : ''} - #${orderNumber}` : `Pedido recebido - #${orderNumber}`;
+    : store ? `Novo pedido${shipFrom ? (isMixedOrder(order) ? ` (${shipFrom} + Japao)` : ` (enviar do ${shipFrom})`) : ''} - #${orderNumber}` : `Pedido recebido - #${orderNumber}`;
   const table = `<table style="width:100%;border-collapse:collapse">${items}${breakdown ?? ''}${total}</table>`;
   const html = wrapEmail(`<p>Ola, <strong>${name}</strong>.</p><p>${tracking ? 'Seu pedido foi enviado.' : 'Recebemos seu pedido. O pagamento sera confirmado antes da separacao.'}</p>${trackingBlock}${localBlock}${table}${paymentBlock}${wiseBlock}${addressBlock}${storeBlock}<p>Pedido: <strong>${orderNumber}</strong></p>`);
   return { subject, html };

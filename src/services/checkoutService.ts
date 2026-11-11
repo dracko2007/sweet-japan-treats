@@ -50,6 +50,8 @@ export interface CheckoutPriceBreakdown {
   paymentDiscount: number;
   products: number;
   shipping: number;
+  /** Parte do frete que é nacional (pedido misto: itens enviados do país do cliente). */
+  localShipping?: number;
   psFee: number;
   /** EUA: imposto de importação pré-pago pela loja (DDP). */
   importDuty: number;

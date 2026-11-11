@@ -19,7 +19,7 @@ import { formatPrice, getCurrencyByCountry } from '@/utils/currency';
 import { effectiveYen } from '@/utils/pricing';
 import { convertYen as fxConvert, getRatesId } from '@/services/fxService';
 import { cartBenefits, computeCheckoutTotals } from '@/utils/checkoutTotals';
-import { setShipAllFromJapan } from '@/utils/localStock';
+import { localOffer, setShipAllFromJapan, splitCart } from '@/utils/localStock';
 import { negotiationService } from '@/services/negotiationService';
 import { psFeeWaiver } from '@/utils/psFeeWaiver';
 import { productService } from '@/services/productService';
@@ -87,6 +87,9 @@ const OrderReview: React.FC = () => {
   const isGuest: boolean = !!location.state?.isGuest;
   // Pedido de estoque local: preço fixo na moeda do cliente + frete nacional (vem do checkout).
   const localOrder: boolean = location.state?.fulfillment === 'local';
+  // 'local' = tudo sai do país do cliente; 'mixed' = parte de lá e parte do Japão (um pedido, dois envios).
+  const mixedOrder: boolean = localOrder && location.state?.localKind === 'mixed';
+  const pureLocalOrder: boolean = localOrder && !mixedOrder;
   const localShippingDisplay: number = Number(location.state?.localShippingDisplay) || 0;
   const [couponInput, setCouponInput] = useState('');
   const [couponError, setCouponError] = useState('');
@@ -199,10 +202,10 @@ const OrderReview: React.FC = () => {
     shippingCarrier: shipping.carrier,
     couponCode: appliedCoupon?.code || '',
     // Campanha, negociação e isenção da taxa PS são do envio do Japão.
-    promoCode: localOrder ? '' : safeStorage.getItem('promo_applied') || '',
+    promoCode: pureLocalOrder ? '' : safeStorage.getItem('promo_applied') || '',
     pointsToRedeem: redeemPoints,
-    negotiationId: localOrder ? '' : negotiationId || '',
-    psFeeWaiverToken: localOrder ? '' : psFeeWaiver.token(),
+    negotiationId: pureLocalOrder ? '' : negotiationId || '',
+    psFeeWaiverToken: pureLocalOrder ? '' : psFeeWaiver.token(),
     ...(localOrder ? { fulfillment: 'local' as const, localShippingChoice: String(location.state?.localShippingChoice || '') } : {}),
     ratesId: getRatesId(),
   } : null;
@@ -262,6 +265,9 @@ const OrderReview: React.FC = () => {
   const couponDiscount = view.couponDiscount;
   const pointsDiscount = view.pointsDiscount;
   const finalShippingCost = view.shipping;
+  // Pedido misto: parte do frete é nacional (itens do país do cliente), o resto é do Japão.
+  const nationalShipping = mixedOrder ? Number(serverQuote ? serverQuote.display.localShipping : local.shown.nationalShipping) || 0 : 0;
+  const japanShippingCost = finalShippingCost - nationalShipping;
   const psFeeDisplay = view.psFee;
   const psFeeFinalYen = serverQuote ? serverQuote.psFeeYen : local.psFeeFinalYen;
   const psFeeGrossYen = serverQuote ? serverQuote.psFeeYen + serverQuote.psFeeDiscountYen : local.psFeeYen;
@@ -276,9 +282,13 @@ const OrderReview: React.FC = () => {
     (serverQuote?.items || []).filter((item) => !item.freeGift)
       .map((item) => [`${item.requestedId || item.productId}:${item.variantId}`, item.price]),
   );
+  // Itens que saem do país do cliente (preço fixo na moeda dele), antes e depois da cotação do servidor.
+  const localItemSet = new Set(localOrder ? splitCart(items, country).localItems : []);
   const unitPriceFor = (item: (typeof items)[number]) => {
     if (item.freeGift) return 0;
-    return serverUnitPrice.get(`${item.product.id}:${item.size}`) ?? fxConvert(effectiveYen(item.product, item.size), currency);
+    return serverUnitPrice.get(`${item.product.id}:${item.size}`)
+      ?? (localItemSet.has(item) ? localOffer(item.product, country)?.price : undefined)
+      ?? fxConvert(effectiveYen(item.product, item.size), currency);
   };
 
   // Imposto do destino só informativo (não entra no total). EUA: pré-pago e
@@ -484,9 +494,14 @@ const OrderReview: React.FC = () => {
                         <p className="text-xs text-muted-foreground mt-0.5">
                           Opção: {item.freeGift ? '🎁 Presente da promoção' : (item.variantLabel || (item.size === 'small' ? 'Pequeno' : 'Grande'))} • Quantidade: {item.quantity}x
                         </p>
+                        {mixedOrder && !item.freeGift && (
+                          <p className={`text-xs font-bold ${localItemSet.has(item) ? 'text-emerald-700' : 'text-gray-500'}`}>
+                            {localItemSet.has(item) ? `📍 Enviado do ${country}` : '✈️ Enviado do Japão'}
+                          </p>
+                        )}
                         {!item.freeGift && (
                           <p className="text-xs text-gray-400">
-                            Preço unitário: {formatPrice(displayUnitPrice, currency)}
+                            Preço unitário: {formatPrice(displayUnitPrice, currency, localOrder)}
                           </p>
                         )}
                       </div>
@@ -495,7 +510,7 @@ const OrderReview: React.FC = () => {
                           <p className="font-bold text-base text-green-600">GRÁTIS 🎁</p>
                         ) : (
                           <p className="font-bold text-base text-foreground">
-                            {formatPrice(displayItemPrice, currency)}
+                            {formatPrice(displayItemPrice, currency, localOrder)}
                           </p>
                         )}
                       </div>
@@ -507,7 +522,7 @@ const OrderReview: React.FC = () => {
                 <div className="pt-4 space-y-2.5 text-sm border-t border-border">
                   <div className="flex justify-between text-muted-foreground">
                     <span>Subtotal</span>
-                    <span>{formatPrice(view.subtotal, currency)}</span>
+                    <span>{formatPrice(view.subtotal, currency, localOrder)}</span>
                   </div>
 
                   {/* Coupon input */}
@@ -540,7 +555,7 @@ const OrderReview: React.FC = () => {
                         Desconto do Cupom {appliedCoupon ? `(${appliedCoupon.code})` : ''}
                         <button type="button" onClick={() => setAppliedCoupon(null)} className="text-[10px] text-red-400 hover:text-red-600 underline font-normal print:hidden">remover</button>
                       </span>
-                      <span>-{formatPrice(couponDiscount, currency)}</span>
+                      <span>-{formatPrice(couponDiscount, currency, localOrder)}</span>
                     </div>
                   )}
 
@@ -585,7 +600,7 @@ const OrderReview: React.FC = () => {
                   {pointsDiscount > 0 && (
                     <div className="flex justify-between text-purple-700 font-bold bg-purple-50/60 p-2 rounded border border-dashed border-purple-200">
                       <span>Desconto em pontos ({redeemPoints} pts)</span>
-                      <span>-{formatPrice(pointsDiscount, currency)}</span>
+                      <span>-{formatPrice(pointsDiscount, currency, localOrder)}</span>
                     </div>
                   )}
 
@@ -601,7 +616,7 @@ const OrderReview: React.FC = () => {
                     <div className="bg-pink-50/50 dark:bg-pink-950/10 border border-pink-200/60 rounded-xl p-3 space-y-2 mt-2">
                       <div className="flex justify-between text-xs font-bold text-orange-850 dark:text-pink-300">
                         <span>{taxLabel}</span>
-                        <span>{formatPrice(estimatedTax, currency)}</span>
+                        <span>{formatPrice(estimatedTax, currency, localOrder)}</span>
                       </div>
                       <p className="text-[10px] text-pink-700 dark:text-pink-400 leading-relaxed font-semibold">
                         ⚠️ <strong>Nota:</strong> Este imposto é aproximado e poderá ser cobrado pela alfândega local na chegada do pacote no país de destino. Ele <strong>NÃO</strong> foi adicionado ao total geral cobrado no site.
@@ -609,14 +624,20 @@ const OrderReview: React.FC = () => {
                     </div>
                   )}
 
+                  {mixedOrder && (
+                    <div className="flex justify-between text-muted-foreground">
+                      <span>Frete nacional ({formData.country})</span>
+                      <span>{nationalShipping === 0 ? 'Grátis' : formatPrice(nationalShipping, currency, true)}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between text-muted-foreground">
-                    <span>{isJapan ? 'Frete Local' : 'Frete Aéreo'} ({shipping.carrier})</span>
-                    <span>{finalShippingCost === 0 ? 'Grátis' : formatPrice(finalShippingCost, currency)}</span>
+                    <span>{pureLocalOrder ? 'Frete nacional' : isJapan ? 'Frete Local' : 'Frete Aéreo'} ({shipping.carrier})</span>
+                    <span>{japanShippingCost === 0 ? 'Grátis' : formatPrice(japanShippingCost, currency, localOrder)}</span>
                   </div>
 
-                  <div className="text-[10px] text-gray-400 text-right">
+                  {!pureLocalOrder && <div className="text-[10px] text-gray-400 text-right">
                     {isJapan ? 'Envio doméstico seguro de Hiroshima Prefecture.' : `Envio internacional de Hiroshima para ${formData.country}.`} Entrega estimada: {shipping.estimatedDays} dias úteis
-                  </div>
+                  </div>}
 
                   {psFeeGrossYen > 0 && (
                     <div className="flex justify-between text-muted-foreground">
@@ -639,7 +660,7 @@ const OrderReview: React.FC = () => {
                     <div>
                       <div className="flex justify-between text-muted-foreground">
                         <span>Imposto de importação EUA (pré-pago, DDP)</span>
-                        <span>{formatPrice(view.importDuty, currency)}</span>
+                        <span>{formatPrice(view.importDuty, currency, localOrder)}</span>
                       </div>
                       <p className="text-[10px] text-gray-400 text-right">
                         A loja paga o imposto antes de postar. Nada é cobrado na entrega.
@@ -654,19 +675,19 @@ const OrderReview: React.FC = () => {
                       </p>
                       <div className="flex justify-between text-xs text-gray-500 border-b border-pink-100 pb-1.5">
                         <span>Subtotal (antes das taxas PIX)</span>
-                        <span>{formatPrice(grandTotal, currency)}</span>
+                        <span>{formatPrice(grandTotal, currency, localOrder)}</span>
                       </div>
                       <div className="flex justify-between text-xs text-pink-700">
                         <span>+ IOF (3,5% sobre o subtotal)</span>
-                        <span>+ {formatPrice(pixIofFee, currency)}</span>
+                        <span>+ {formatPrice(pixIofFee, currency, localOrder)}</span>
                       </div>
                       <div className="flex justify-between text-xs text-pink-700">
                         <span>+ Taxa bancária de remessa (fixa)</span>
-                        <span>+ {formatPrice(pixBankFee, currency)}</span>
+                        <span>+ {formatPrice(pixBankFee, currency, localOrder)}</span>
                       </div>
                       <div className="flex justify-between text-xs font-bold text-orange-900 bg-pink-100 rounded px-1.5 py-1 mt-0.5">
                         <span>= Total com taxas PIX</span>
-                        <span>{formatPrice(finalGrandTotal, currency)}</span>
+                        <span>{formatPrice(finalGrandTotal, currency, localOrder)}</span>
                       </div>
                     </div>
                   )}
@@ -674,7 +695,7 @@ const OrderReview: React.FC = () => {
                   <div className="flex justify-between pt-3 border-t border-border font-black text-lg">
                     <span>Total Geral</span>
                     <span className="text-2xl text-pink-600">
-                      {formatPrice(finalGrandTotal, currency)}
+                      {formatPrice(finalGrandTotal, currency, localOrder)}
                     </span>
                   </div>
                   {quoteErrorMessage && (
@@ -978,26 +999,26 @@ const OrderReview: React.FC = () => {
                       {/* Itens */}
                       <div className="flex justify-between text-muted-foreground">
                         <span>Itens ({items.filter(i => !i.freeGift).length}x)</span>
-                        <span>{formatPrice(view.subtotal, currency)}</span>
+                        <span>{formatPrice(view.subtotal, currency, localOrder)}</span>
                       </div>
 
                       {couponDiscount > 0 && (
                         <div className="flex justify-between text-green-600 font-semibold">
                           <span>Cupom ({appliedCoupon?.code})</span>
-                          <span>−{formatPrice(couponDiscount, currency)}</span>
+                          <span>−{formatPrice(couponDiscount, currency, localOrder)}</span>
                         </div>
                       )}
 
                       {pointsDiscount > 0 && (
                         <div className="flex justify-between text-purple-600 font-semibold">
                           <span>Pontos ({redeemPoints} pts)</span>
-                          <span>−{formatPrice(pointsDiscount, currency)}</span>
+                          <span>−{formatPrice(pointsDiscount, currency, localOrder)}</span>
                         </div>
                       )}
 
                       <div className="flex justify-between text-muted-foreground">
                         <span>Frete</span>
-                        <span>{finalShippingCost === 0 ? 'Grátis' : formatPrice(finalShippingCost, currency)}</span>
+                        <span>{finalShippingCost === 0 ? 'Grátis' : formatPrice(finalShippingCost, currency, localOrder)}</span>
                       </div>
 
                       {psFeeGrossYen > 0 && (
@@ -1012,13 +1033,13 @@ const OrderReview: React.FC = () => {
                       {view.importDuty > 0 && (
                         <div className="flex justify-between text-muted-foreground">
                           <span>Imposto EUA (pré-pago)</span>
-                          <span>{formatPrice(view.importDuty, currency)}</span>
+                          <span>{formatPrice(view.importDuty, currency, localOrder)}</span>
                         </div>
                       )}
 
                       {estimatedTax > 0 && (
                         <p className="text-[10px] text-pink-600 bg-pink-50 rounded px-2 py-1 leading-snug">
-                          ⚠️ {taxLabel} ~{formatPrice(estimatedTax, currency)} (cobrado pela alfândega, NÃO incluso)
+                          ⚠️ {taxLabel} ~{formatPrice(estimatedTax, currency, localOrder)} (cobrado pela alfândega, NÃO incluso)
                         </p>
                       )}
                     </div>
@@ -1030,19 +1051,19 @@ const OrderReview: React.FC = () => {
                           <p className="text-[10px] font-bold text-pink-700 uppercase tracking-wide">Pagamento via PIX</p>
                           <div className="flex justify-between text-xs text-pink-700">
                             <span>Subtotal</span>
-                            <span>{formatPrice(grandTotal, currency)}</span>
+                            <span>{formatPrice(grandTotal, currency, localOrder)}</span>
                           </div>
                           <div className="flex justify-between text-xs text-pink-700">
                             <span>+ IOF (3,5%)</span>
-                            <span>+ {formatPrice(pixIofFee, currency)}</span>
+                            <span>+ {formatPrice(pixIofFee, currency, localOrder)}</span>
                           </div>
                           <div className="flex justify-between text-xs text-pink-700">
                             <span>+ Taxa bancária</span>
-                            <span>+ {formatPrice(pixBankFee, currency)}</span>
+                            <span>+ {formatPrice(pixBankFee, currency, localOrder)}</span>
                           </div>
                           <div className="flex justify-between text-xs font-bold text-orange-900 border-t border-pink-200 pt-1 mt-1">
                             <span>Total PIX</span>
-                            <span className="text-base">{formatPrice(finalGrandTotal, currency)}</span>
+                            <span className="text-base">{formatPrice(finalGrandTotal, currency, localOrder)}</span>
                           </div>
                           <p className="text-[10px] text-amber-600 mt-1">⏱ Remessa em até 3 dias úteis após confirmação</p>
                         </div>
@@ -1054,7 +1075,7 @@ const OrderReview: React.FC = () => {
                           <p className="text-[10px] font-bold text-emerald-700 uppercase tracking-wide">Pagamento via Wise</p>
                           <div className="flex justify-between text-xs text-emerald-700">
                             <span>Total</span>
-                            <span className="font-bold">{formatPrice(grandTotal, currency)}</span>
+                            <span className="font-bold">{formatPrice(grandTotal, currency, localOrder)}</span>
                           </div>
                           <div className="bg-emerald-100 rounded-lg p-2 text-center mt-1">
                             <p className="text-[10px] text-emerald-700 mb-0.5">No campo <strong>Valor</strong> do Wise, insira:</p>
@@ -1069,7 +1090,7 @@ const OrderReview: React.FC = () => {
                       {!isPix && paymentMethod !== 'wise' && (
                         <div className="flex justify-between font-black text-xl mb-3">
                           <span>Total</span>
-                          <span className="text-pink-600">{formatPrice(finalGrandTotal, currency)}</span>
+                          <span className="text-pink-600">{formatPrice(finalGrandTotal, currency, localOrder)}</span>
                         </div>
                       )}
 
@@ -1077,7 +1098,7 @@ const OrderReview: React.FC = () => {
                       {(isPix || paymentMethod === 'wise') && (
                         <div className="flex justify-between font-black text-base text-muted-foreground mb-3">
                           <span>Total Geral</span>
-                          <span className="text-pink-600 text-xl">{formatPrice(finalGrandTotal, currency)}</span>
+                          <span className="text-pink-600 text-xl">{formatPrice(finalGrandTotal, currency, localOrder)}</span>
                         </div>
                       )}
 
@@ -1146,7 +1167,7 @@ const OrderReview: React.FC = () => {
         const waPhone = paySettings.contactPhone
           ? paySettings.contactPhone.replace(/[-\s]/g, '').replace(/^0/, '81')
           : '';
-        const waMessage = encodeURIComponent(`Olá! Acabei de fazer o pagamento do pedido ${pendingOrder.id} no valor de ${formatPrice(pendingOrder.total, pendingOrder.currency)}. Segue o comprovante:`);
+        const waMessage = encodeURIComponent(`Olá! Acabei de fazer o pagamento do pedido ${pendingOrder.id} no valor de ${formatPrice(pendingOrder.total, pendingOrder.currency, localOrder)}. Segue o comprovante:`);
         const whatsappLink = waPhone ? `https://wa.me/${waPhone}?text=${waMessage}` : '';
 
         return (
@@ -1161,7 +1182,7 @@ const OrderReview: React.FC = () => {
 
               <div className="p-6 space-y-5 text-center">
                 <p className="text-sm text-muted-foreground">
-                  Pedido <span className="font-mono font-bold text-foreground">{pendingOrder.id}</span> — Total: <strong>{formatPrice(pendingOrder.total, pendingOrder.currency)}</strong>
+                  Pedido <span className="font-mono font-bold text-foreground">{pendingOrder.id}</span> — Total: <strong>{formatPrice(pendingOrder.total, pendingOrder.currency, localOrder)}</strong>
                 </p>
 
                 {/* PIX */}
@@ -1172,7 +1193,7 @@ const OrderReview: React.FC = () => {
                     </div>
                     {pixPayload ? (
                       <>
-                        <p className="text-sm text-gray-600">Pague <strong>{formatPrice(pendingOrder.total, pendingOrder.currency)}</strong> escaneando o QR Code ou copiando a chave abaixo.</p>
+                        <p className="text-sm text-gray-600">Pague <strong>{formatPrice(pendingOrder.total, pendingOrder.currency, localOrder)}</strong> escaneando o QR Code ou copiando a chave abaixo.</p>
                         <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 inline-block">
                           <QRCodeSVG value={pixPayload} size={180} includeMargin />
                         </div>
@@ -1245,7 +1266,7 @@ const OrderReview: React.FC = () => {
                     <div className="flex items-center justify-center gap-2 text-emerald-600 font-extrabold text-base">
                       <WalletIcon className="w-5 h-5" /> PAGAMENTO VIA WISE
                     </div>
-                    <p className="text-sm text-muted-foreground">Pague <strong>{formatPrice(pendingOrder.total, pendingOrder.currency)}</strong> pelo Wise com câmbio justo.</p>
+                    <p className="text-sm text-muted-foreground">Pague <strong>{formatPrice(pendingOrder.total, pendingOrder.currency, localOrder)}</strong> pelo Wise com câmbio justo.</p>
                     {(pendingOrder.priceBreakdown?.wiseYen ?? 0) > 0 && (
                       <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 max-w-xs mx-auto">
                         <p className="text-[11px] text-emerald-700 mb-0.5">No campo <strong>Valor</strong> da Wise, insira:</p>

@@ -15,17 +15,21 @@ interface ShippingCalculatorProps {
   onShippingSelect?: (shipping: { carrier: string; cost: number; costYen: number; estimatedDays: string } | null) => void;
   destinationCountry?: string;
   couponDiscount?: number;
+  /** Itens a enviar do Japão (pedido misto: só os que não saem do país do cliente). Padrão: o carrinho todo. */
+  items?: import('@/types').CartItem[];
 }
 
 const ShippingCalculator: React.FC<ShippingCalculatorProps> = ({
   selectedPrefecture: externalPrefecture,
   onShippingSelect,
   destinationCountry = 'Brasil',
-  couponDiscount = 0
+  couponDiscount = 0,
+  items: itemsProp,
 }) => {
   const [selectedPrefecture, setSelectedPrefecture] = useState<string>(externalPrefecture || '');
   const [selectedCarrier, setSelectedCarrier] = useState<string | null>(null);
-  const { items } = useCart();
+  const cart = useCart();
+  const items = itemsProp ?? cart.items;
   const { t } = useLanguage();
 
   useEffect(() => {

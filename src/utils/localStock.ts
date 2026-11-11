@@ -54,29 +54,6 @@ export function localUnitPrice(item: CartItem, country: string, local: boolean):
   return localOffer(item.product, country)?.price ?? null;
 }
 
-// ---- "Enviar separado": itens do Japão guardados enquanto o pedido local é fechado ----
-const DEFERRED_KEY = 'cart_deferred_japan';
-export interface DeferredItem { productId: string; size: string; quantity: number }
-
-export function deferredJapanItems(): DeferredItem[] {
-  try {
-    const parsed = JSON.parse(safeStorage.getItem(DEFERRED_KEY) || '[]') as DeferredItem[];
-    return Array.isArray(parsed) ? parsed.filter((item) => item?.productId && item.quantity > 0) : [];
-  } catch {
-    return [];
-  }
-}
-
-/** Soma aos já guardados (o cliente pode escolher "separado" mais de uma vez). */
-export function deferJapanItems(items: CartItem[]): void {
-  const all = [...deferredJapanItems(), ...items.filter((item) => !item.freeGift).map((item) => ({ productId: item.product.id, size: item.size, quantity: item.quantity }))];
-  safeStorage.setItem(DEFERRED_KEY, JSON.stringify(all));
-}
-
-export function clearDeferredJapanItems(): void {
-  safeStorage.removeItem(DEFERRED_KEY);
-}
-
 /** Frete nacional do pedido local para este cliente, ou null enquanto ele precisa escolher. */
 export function localShippingFor(items: CartItem[], country: string, state: string, choice = ''): { name: string; price: number } | null {
   const offers = items.filter((item) => !item.freeGift).map((item) => localOffer(item.product, country));
