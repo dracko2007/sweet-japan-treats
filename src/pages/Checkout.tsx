@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Package, ArrowRight, MapPin, User, Phone, Mail, Tag, CreditCard, Sparkles, Handshake, X, CheckCircle2, AlertCircle, Hourglass, Truck } from 'lucide-react';
 import { negotiationService } from '@/services/negotiationService';
@@ -91,7 +91,8 @@ const Checkout: React.FC = () => {
   const localCart = useLocalCart();
   // Carrinho com itens do país e do Japão é UM pedido só: preço fixo + frete nacional para os de lá,
   // conta do Japão para o resto, os dois fretes somados, tudo na moeda do cliente.
-  const split = splitCart(items, formData.country);
+  // Memorizado: `split.japanItems` vai para o calculador de frete, e uma lista nova a cada render o põe em laço.
+  const split = useMemo(() => splitCart(items, formData.country), [items, formData.country]);
   const localKind: 'japan' | 'local' | 'mixed' = localCart.forcedJapan ? 'japan' : split.kind;
   const localOrder = localKind === 'local';      // tudo sai do país do cliente
   const mixedOrder = localKind === 'mixed';      // parte de lá, parte do Japão
