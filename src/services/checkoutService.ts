@@ -30,6 +30,8 @@ export interface CheckoutDraft {
   psFeeWaiverToken?: string;
   /** 'local' = pedido só com itens que já estão no país do cliente (preço fixo + frete nacional). */
   fulfillment?: 'local' | 'japan';
+  /** Nome do frete nacional escolhido (pedido local com mais de uma opção). */
+  localShippingChoice?: string;
   /** Total que o cliente está vendo. Se o servidor calcular outro, nada é cobrado (409 `price_changed`). */
   expectedTotal?: number;
   /** Id da cotação de câmbio usada para montar a tela. */
@@ -160,7 +162,7 @@ function checkoutBody(draft: Omit<CheckoutDraft, 'orderId'>) {
     promoCode: draft.promoCode || '',
     psFeeWaiverToken: draft.psFeeWaiverToken || '',
     ratesId: draft.ratesId || '',
-    ...(draft.fulfillment === 'local' ? { fulfillment: 'local' } : {}),
+    ...(draft.fulfillment === 'local' ? { fulfillment: 'local', localShippingChoice: draft.localShippingChoice || '' } : {}),
     customer: {
       ...draft.customer,
       postalCode: draft.shippingAddress.postalCode,

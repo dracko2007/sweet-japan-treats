@@ -3,9 +3,9 @@
 // (a mesma do servidor).
 import type { CartItem, Product } from '@/types';
 import { safeStorage } from '@/utils/storage';
-import { localOffer as sharedLocalOffer, localOrderShipping } from '../../shared/local-stock.js';
+import { localOffer as sharedLocalOffer, localOrderShipping, shippingChoiceNames } from '../../shared/local-stock.js';
 
-export interface LocalOffer { price: number; quantity: number; shipping: number }
+export interface LocalOffer { price: number; quantity: number; shippingOptions: { name: string; price: number }[] }
 
 /** Oferta local do produto para o país do cliente (preço fixo na moeda de lá), ou null. */
 export const localOffer = (product: Product | undefined | null, country: string): LocalOffer | null =>
@@ -77,7 +77,16 @@ export function clearDeferredJapanItems(): void {
   safeStorage.removeItem(DEFERRED_KEY);
 }
 
-/** Frete nacional do pedido local (maior frete entre os produtos: um pacote só), na moeda do país. */
-export function localShippingFor(items: CartItem[], country: string): number {
-  return localOrderShipping(items.filter((item) => !item.freeGift).map((item) => localOffer(item.product, country))) as number;
+/** Frete nacional do pedido local para este cliente, ou null enquanto ele precisa escolher. */
+export function localShippingFor(items: CartItem[], country: string, state: string, choice = ''): { name: string; price: number } | null {
+  const offers = items.filter((item) => !item.freeGift).map((item) => localOffer(item.product, country));
+  return localOrderShipping(offers, { country, state, choice }) as { name: string; price: number } | null;
+}
+
+/** Opções que o cliente pode escolher (com o valor que cada uma custaria no pedido todo). */
+export function localShippingChoices(items: CartItem[], country: string, state: string): { name: string; price: number }[] {
+  const offers = items.filter((item) => !item.freeGift).map((item) => localOffer(item.product, country));
+  return (shippingChoiceNames(offers) as string[])
+    .map((name) => localOrderShipping(offers, { country, state, choice: name }) as { name: string; price: number } | null)
+    .filter((option): option is { name: string; price: number } => option !== null);
 }

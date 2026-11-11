@@ -9,6 +9,7 @@ import { newsletterService } from '@/services/newsletterService';
 import { requestPsFeeWaiver } from '@/services/psFeeWaiverService';
 import { checkoutPointsCoverage, psFeeWaiver } from '@/utils/psFeeWaiver';
 import { safeStorage } from '@/utils/storage';
+import { isLocalOrder } from '@/utils/localStock';
 import { effectiveYen } from '@/utils/pricing';
 import type { CartItem } from '@/types';
 import { overlayHistory } from '@/lib/overlayHistory';
@@ -119,6 +120,8 @@ const ExitIntentPopup: React.FC = () => {
     const list = itemsRef.current;
     const path = pathRef.current;
     if (AUTH_ROUTES.some((rota) => path.startsWith(rota))) return null;
+    // Pedido enviado do país do cliente: sem taxa PS, isenção nem oferta; nenhum popup de saída.
+    if (list.length > 0 && isLocalOrder(list, safeStorage.getItem('sakura_selected_country') || 'Brasil')) return null;
     // Dentro do funil de checkout (cliente já está finalizando).
     if (inFunnel(path)) {
       if (list.length === 0) return null;

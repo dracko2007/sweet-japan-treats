@@ -25,7 +25,7 @@ import { effectiveYen, baseYen, hasDiscount } from '@/utils/pricing';
 import { convertYen as fxConvert, getRates } from '@/services/fxService';
 import { cartBenefits, computeCheckoutTotals, psFeeUnits } from '@/utils/checkoutTotals';
 import { useLocalCart } from '@/hooks/useLocalCart';
-import { isLocalOrder, localOffer, localShippingFor, setShipAllFromJapan } from '@/utils/localStock';
+import { isLocalOrder, localOffer, localShippingChoices, localShippingFor, setShipAllFromJapan } from '@/utils/localStock';
 import { localCarrierLabel } from '../../shared/local-stock.js';
 import { autoApprovablePsDiscountYen, PS_FEE_PER_UNIT_YEN } from '../../shared/money.js';
 import { POINTS } from '@/services/pointsService';
@@ -91,7 +91,12 @@ const Checkout: React.FC = () => {
   const localCart = useLocalCart();
   const localOrder = isLocalOrder(items, formData.country) && !localCart.forcedJapan;
   // Frete nacional: cadastrado no próprio produto (o maior entre os itens, um pacote só).
-  const localShippingValue: number | null = localOrder ? localShippingFor(items, formData.country) : null;
+  // No Brasil vale a região do cliente (opção "Sul", "Sudeste"…); sem região que combine,
+  // ou em país com várias opções, o cliente escolhe.
+  const [localShippingChoice, setLocalShippingChoice] = useState('');
+  const localShippingPicked = localOrder ? localShippingFor(items, formData.country, formData.prefecture, localShippingChoice) : null;
+  const localShippingOptions = localOrder ? localShippingChoices(items, formData.country, formData.prefecture) : [];
+  const localShippingValue: number | null = localShippingPicked ? localShippingPicked.price : null;
   const unitDisplayOf = (item: (typeof items)[number]) =>
     (localOrder ? localOffer(item.product, formData.country)?.price : undefined) ?? fxConvert(effectiveYen(item.product, item.size), currency);
 
@@ -632,6 +637,7 @@ const Checkout: React.FC = () => {
         // Pedido de estoque local: a revisão manda isto ao servidor e refaz a conta com o frete nacional.
         fulfillment: localOrder ? 'local' : 'japan',
         localShippingDisplay: localOrder ? selectedShipping.cost : null,
+        localShippingChoice: localOrder ? localShippingPicked?.name || '' : '',
       }
     });
   };
@@ -640,13 +646,13 @@ const Checkout: React.FC = () => {
   useEffect(() => {
     if (!localOrder) return;
     setSelectedShipping(localShippingValue === null ? null : {
-      carrier: localCarrierLabel(formData.country) as string,
+      carrier: `${localCarrierLabel(formData.country) as string}${localShippingPicked && localShippingOptions.length > 1 ? ` • ${localShippingPicked.name}` : ''}`,
       cost: localShippingValue,
       costYen: 0,
       estimatedDays: '',
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [localOrder, localShippingValue, formData.country]);
+  }, [localOrder, localShippingValue, localShippingPicked?.name, formData.country]);
 
   // A conta inteira pela MESMA função do servidor (`shared/money.js`): cada
   // linha é um valor inteiro na moeda do cliente e o total é a soma delas.
@@ -1111,7 +1117,7 @@ const Checkout: React.FC = () => {
                         {localShippingValue !== null ? (
                           <div className="flex items-center justify-between rounded-xl border-2 border-emerald-500 bg-emerald-50 p-4">
                             <div>
-                              <p className="font-bold text-emerald-900">📍 {localCarrierLabel(formData.country)}</p>
+                              <p className="font-bold text-emerald-900">📍 {localCarrierLabel(formData.country)}{localShippingPicked && localShippingOptions.length > 1 ? ` • ${localShippingPicked.name}` : ''}</p>
                               <p className="text-xs text-emerald-800">Seus produtos já estão no {formData.country}: sem taxas de importação.</p>
                             </div>
                             <span className="font-extrabold text-emerald-900">
@@ -1119,6 +1125,21 @@ const Checkout: React.FC = () => {
                             </span>
                           </div>
                         ) : null}
+                        {/* Mais de uma opção e nenhuma casa com o cliente: ele escolhe. */}
+                        {localShippingValue === null && localShippingOptions.length > 0 && (
+                          <div className="space-y-2" role="radiogroup" aria-label="Frete nacional">
+                            <p className="text-sm text-muted-foreground">Escolha o frete:</p>
+                            {localShippingOptions.map((option) => (
+                              <label key={option.name} className="flex cursor-pointer items-center justify-between rounded-xl border-2 border-border p-3 hover:border-emerald-500">
+                                <span className="flex items-center gap-2 font-semibold">
+                                  <input type="radio" name="local-shipping" checked={localShippingChoice === option.name} onChange={() => setLocalShippingChoice(option.name)} />
+                                  {option.name}
+                                </span>
+                                <span className="font-extrabold">{option.price === 0 ? 'Grátis' : formatPrice(option.price, currency, true)}</span>
+                              </label>
+                            ))}
+                          </div>
+                        )}
                       </>
                     ) : (
                       <>
@@ -1364,8 +1385,8 @@ const Checkout: React.FC = () => {
                       </div>
                     )}
 
-                    {/* Taxa Personal Shopper */}
-                    {totalQty > 0 && (
+                    {/* Taxa Personal Shopper (e negociação de taxa/frete): não existe em pedido enviado do país do cliente */}
+                    {totalQty > 0 && !localOrder && (
                       <div className="pt-2 border-t border-border/60">
                         <div className="flex justify-between items-center">
                           <span className="text-muted-foreground">Taxa Personal Shopper</span>

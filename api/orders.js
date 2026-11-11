@@ -360,7 +360,7 @@ async function handleIssuePsFeeWaiver(req, res) {
 const CHECKOUT_KEYS = [
   'items', 'country', 'prefecture', 'state', 'shippingCarrier', 'paymentMethod',
   'couponCode', 'redeemPoints', 'negotiationId', 'promoCode', 'psFeeWaiverToken',
-  'customer', 'expectedTotal', 'ratesId', 'fulfillment',
+  'customer', 'expectedTotal', 'ratesId', 'fulfillment', 'localShippingChoice',
 ];
 
 function parseExpectedTotal(value) {
@@ -403,6 +403,7 @@ function parseCheckout(body, user) {
     state,
     carrier,
     fulfillment,
+    localShippingChoice: optionalText(body.localShippingChoice, { max: 60 }),
     paymentMethod,
     customer,
     couponCode: optionalText(body.couponCode, { max: 60 }).toUpperCase(),
@@ -445,7 +446,7 @@ function publicQuote(quote, rates) {
 async function prepareQuote(db, user, input) {
   const {
     requestedItems, country, prefecture, state, carrier, paymentMethod, customer,
-    couponCode, promoCode, negotiationId, psFeeWaiverToken, requestedPoints, ratesId, fulfillment,
+    couponCode, promoCode, negotiationId, psFeeWaiverToken, requestedPoints, ratesId, fulfillment, localShippingChoice,
   } = input;
   const waiver = psFeeWaiverToken ? verifyPsFeeWaiver(psFeeWaiverToken, user.uid) : null;
   if (psFeeWaiverToken && !waiver) throw new HttpError(403, 'invalid_ps_fee_waiver');
@@ -525,6 +526,7 @@ async function prepareQuote(db, user, input) {
     recentSpendYen,
     psFeeWaived: Boolean(waiver),
     fulfillment,
+    localShippingChoice,
   });
   return { quote, rates, waiver, campaign, products, coupon, cpfSnap, homePromoData };
 }

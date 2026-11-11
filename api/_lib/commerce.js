@@ -244,7 +244,7 @@ function displayToYen(amount, currency, rates) {
   return localUnitYen(amount, currency, rates);
 }
 
-export function buildQuote({ requestedItems, products, country, prefecture, state, carrier, paymentMethod, coupon, redeemPoints, negotiation, campaign, homePromotion, rates, recentSpendYen = 0, psFeeWaived = false, fulfillment = 'japan' }) {
+export function buildQuote({ requestedItems, products, country, prefecture, state, carrier, paymentMethod, coupon, redeemPoints, negotiation, campaign, homePromotion, rates, recentSpendYen = 0, psFeeWaived = false, fulfillment = 'japan', localShippingChoice = '' }) {
   const now = Date.now();
   // Pedido de estoque local: todos os itens saem do país do cliente, com preço
   // fixo na moeda de lá e frete nacional. Campanha, promoção da home, negociação
@@ -370,7 +370,9 @@ export function buildQuote({ requestedItems, products, country, prefecture, stat
   let shipping;
   if (local) {
     // Frete nacional cadastrado no produto, já na moeda do cliente (um pacote: vale o maior).
-    shippingDisplay = benefits.terms?.freeShipping === true ? 0 : localOrderShipping(localOffers);
+    const picked = localOrderShipping(localOffers, { country, state: prefecture || state, choice: localShippingChoice });
+    if (!picked) throw new HttpError(409, 'local_shipping_unavailable');
+    shippingDisplay = benefits.terms?.freeShipping === true ? 0 : picked.price;
     shipping = { amount: displayToYen(shippingDisplay, currency, rates), weightG: shippingShape(lineItems).totalWeightG };
   } else {
     shipping = shippingYen(

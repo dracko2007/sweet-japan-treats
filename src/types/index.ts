@@ -206,8 +206,12 @@ export interface Coupon {
   minOrderValue?: number; // Valor mínimo do pedido em ¥ para usar o cupom
 }
 
+/** Uma opção de frete nacional do produto: nome (ex.: "Sul") e valor na moeda do país (0 = grátis). */
+export interface LocalShippingOption { name: string; price: number | null }
+
 /**
  * Estoque local por país: preço final na moeda daquele país (sem câmbio), quantidade
- * disponível lá e frete nacional (mesma moeda; 0 = grátis, ausente = não vende de lá).
+ * disponível lá e as opções de frete nacional (sem nenhuma, o produto não vende de lá).
+ * `shipping` é o frete único de cadastros antigos.
  */
-export type LocalStock = Record<string, { enabled: boolean; price: number; quantity: number; shipping?: number | null }>;
+export type LocalStock = Record<string, { enabled: boolean; price: number; quantity: number; shippingOptions?: LocalShippingOption[]; shipping?: number | null }>;

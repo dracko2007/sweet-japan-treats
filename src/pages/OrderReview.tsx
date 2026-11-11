@@ -203,7 +203,7 @@ const OrderReview: React.FC = () => {
     pointsToRedeem: redeemPoints,
     negotiationId: localOrder ? '' : negotiationId || '',
     psFeeWaiverToken: localOrder ? '' : psFeeWaiver.token(),
-    ...(localOrder ? { fulfillment: 'local' as const } : {}),
+    ...(localOrder ? { fulfillment: 'local' as const, localShippingChoice: String(location.state?.localShippingChoice || '') } : {}),
     ratesId: getRatesId(),
   } : null;
   const quoteInputKey = quoteInput ? JSON.stringify(quoteInput) : '';
