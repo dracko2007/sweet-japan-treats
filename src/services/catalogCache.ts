@@ -13,7 +13,9 @@ import type { Product } from '@/types';
 const DB_NAME = 'jp_catalog';
 const DB_VERSION = 1;
 const STORE = 'snapshot';
-const KEY = 'overrides';
+// -v2: o catálogo gravado antes de 11/11/2026 veio sem `localStock` (o /api/products não enviava) e o
+// delta por `updatedAt` nunca o buscaria de novo. Chave nova = o navegador refaz o catálogo uma vez.
+const KEY = 'overrides-v2';
 
 export interface CatalogSnapshot {
   items: Product[];

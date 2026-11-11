@@ -145,4 +145,22 @@ describe('GET /api/catalog?action=products', () => {
     expect(retried.statusCode).toBe(200);
     expect(retried.body.items).toEqual([{ id: 'p1', name: 'A' }]);
   });
+
+  it('envia `localStock` (estoque no país do cliente) na leitura completa e no delta', async () => {
+    const localStock = { Brasil: { enabled: true, price: 89, quantity: 3, shippingOptions: [{ name: 'Sul', price: 29 }] } };
+    mocks.adminDb.mockReturnValue({
+      collection: () => fakeCollection([
+        ['com-estoque-local', { name: 'Z', image: 'https://x/z.jpg', localStock, updatedAt: { toMillis: () => 1000 } }],
+      ]),
+    });
+
+    const completo = response();
+    await catalog({ query: { action: 'products' } }, completo);
+    expect(completo.body.items[0].localStock).toEqual(localStock);
+
+    resetCatalogCache();
+    const delta = response();
+    await catalog({ query: { action: 'products', since: '500' } }, delta);
+    expect(delta.body.items[0].localStock).toEqual(localStock);
+  });
 });

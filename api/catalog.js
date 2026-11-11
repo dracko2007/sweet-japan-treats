@@ -12,6 +12,9 @@ const PUBLIC_FIELDS = [
   'deliveryRestrict', 'origin', 'discountPercent', 'i18n', 'weightGrams', 'weightVerified',
   'tags', 'featured', 'featuredAt', 'heroCarousel', 'heroCarouselAt',
   'isNew', 'salesCount', 'rating', 'stock', 'promoGift',
+  // Produto que já está no país do cliente (preço fixo, unidades e frete de lá); sem isto a vitrine
+  // servida por /api/products nunca sabe que o produto tem estoque local.
+  'localStock',
 ];
 
 function querySince(value) {
