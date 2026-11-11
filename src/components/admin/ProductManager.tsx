@@ -28,6 +28,7 @@ import { categoryService, DEFAULT_CATEGORIES, type ProductCategory } from '@/ser
 import { useConfirm } from '@/components/ConfirmDialog';
 import { authenticatedFetch } from '@/services/authenticatedFetch';
 import { errorMessage } from '@/utils/errorMessage';
+import { LocalStockFields, LocalShippingSettings } from '@/components/admin/LocalStockFields';
 
 const slugify = (s: string) =>
   s
@@ -641,6 +642,7 @@ const ProductManager: React.FC = () => {
   return (
     <div>
       {/* Header */}
+      <div className="mb-4"><LocalShippingSettings /></div>
       <div className="flex items-center justify-between mb-6">
         <div>
           <h2 className="font-display text-2xl font-bold text-foreground">Produtos</h2>
@@ -1263,6 +1265,9 @@ const ProductManager: React.FC = () => {
                   A cada venda confirmada o estoque é descontado automaticamente. Ao chegar a zero aparece tarja "Sold Out".
                 </p>
               </div>
+
+              {/* Estoque em outro país (empresa parceira): preço fixo na moeda de lá */}
+              <LocalStockFields value={editing.localStock} onChange={(localStock) => setEditing({ ...editing, localStock })} />
 
               {/* Promoção: Compre X, ganhe +1 deste mesmo produto grátis */}
               <div className="bg-purple-50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-800 rounded-lg p-3 space-y-3">

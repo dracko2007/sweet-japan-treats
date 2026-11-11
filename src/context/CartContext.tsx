@@ -12,8 +12,16 @@ const CART_STORAGE_KEY = 'sakura_cart';
 // limite quando o produto é ilimitado (ou não tem controle de estoque).
 // Reaproveitado pelo seletor de quantidade da página do produto para manter
 // o mesmo comportamento de clamping em toda a loja.
-export const getMaxQty = (product: Product): number =>
-  product.stock && !product.stock.unlimited ? product.stock.quantity : Infinity;
+export const getMaxQty = (product: Product): number => {
+  if (!product.stock || product.stock.unlimited) return Infinity;
+  // Unidades que já estão em outro país também contam: o estoque do Japão pode
+  // estar zerado e o produto seguir à venda para o cliente daquele país. Quem
+  // decide de onde sai (e se a quantidade cabe) é o servidor.
+  const local = Object.values(product.localStock || {})
+    .filter((entry) => entry.enabled && entry.price > 0)
+    .map((entry) => Number(entry.quantity) || 0);
+  return Math.max(product.stock.quantity, ...local);
+};
 
 const loadCart = (): CartItem[] => {
   try {

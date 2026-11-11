@@ -9,6 +9,7 @@ import { getTranslatedProductFlavor } from '@/data/translations';
 import { formatPrice, getCurrencyByCountry } from '@/utils/currency';
 import { effectiveYen, baseYen, hasDiscount } from '@/utils/pricing';
 import { convertYen as fxConvert } from '@/services/fxService';
+import { useLocalCart } from '@/hooks/useLocalCart';
 import { productEnglishName } from '@/utils/productName';
 import { localImage } from '@/utils/localImage';
 
@@ -31,8 +32,11 @@ const CartItemComponent: React.FC<CartItemProps> = ({ item, couponDiscount = 0 }
   const isEuro = ['Portugal', 'França', 'Itália', 'Espanha'].includes(selectedCountry);
   const currency = getCurrencyByCountry(selectedCountry);
   const basePrice = effectiveYen(item.product, item.size);
-  const unitPrice = fxConvert(basePrice, currency);
-  const originalPrice = fxConvert(baseYen(item.product, item.size), currency);
+  // Item que já está no país do cliente: preço fixo na moeda dele, sem ¥ nem desconto de vitrine.
+  const localPrice = useLocalCart().localPrice(item);
+  const isLocal = localPrice !== null;
+  const unitPrice = isLocal ? localPrice : fxConvert(basePrice, currency);
+  const originalPrice = isLocal ? localPrice : fxConvert(baseYen(item.product, item.size), currency);
 
   const finalPrice = unitPrice * item.quantity;
   const originalTotalPrice = originalPrice * item.quantity;
@@ -155,18 +159,21 @@ const CartItemComponent: React.FC<CartItemProps> = ({ item, couponDiscount = 0 }
 
           {/* Price */}
           <div className="text-right">
-            {hasProductDiscount && (
+            {hasProductDiscount && !isLocal && (
               <p className="text-xs text-muted-foreground line-through">{formatPrice(originalTotalPrice, currency)}</p>
             )}
-            {hasProductDiscount && (
+            {hasProductDiscount && !isLocal && (
               <p className="text-[11px] font-bold text-red-600">−{item.product.discountPercent}% promoção</p>
             )}
             {couponDiscount > 0 && (
-              <p className="text-xs text-muted-foreground line-through">{formatPrice(finalPrice, currency)}</p>
+              <p className="text-xs text-muted-foreground line-through">{formatPrice(finalPrice, currency, isLocal)}</p>
             )}
             <p className={`font-sans text-lg font-extrabold ${isPromo ? 'text-green-600' : 'text-primary'}`}>
-              {formatPrice(finalPrice - couponDiscount, currency)}
+              {formatPrice(finalPrice - couponDiscount, currency, isLocal)}
             </p>
+            {isLocal && (
+              <p className="mt-0.5 text-[10px] font-bold text-emerald-700">📍 Envio do {selectedCountry}</p>
+            )}
           </div>
         </div>
       </div>

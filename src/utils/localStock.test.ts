@@ -1,0 +1,60 @@
+import { describe, expect, it, vi } from 'vitest';
+
+vi.mock('@/services/fxService', () => ({ getMoneyRates: () => ({ BRL: 1 / 28, EUR: 0.16 / 28, USD: 1 / 150, source: 'wise' }) }));
+
+import type { CartItem, Product } from '@/types';
+import { computeCheckoutTotals } from './checkoutTotals';
+import { localOffer, splitCart } from './localStock';
+
+const base = { category: 'cosmeticos', description: '', image: 'x', prices: { small: 1450, large: 0 } } as unknown as Product;
+const noBrasil = { ...base, id: 'fino', name: 'Fino', discountPercent: 10, localStock: { Brasil: { enabled: true, price: 89, quantity: 2 } } } as Product;
+const doJapao = { ...base, id: 'tsubaki', name: 'Tsubaki' } as Product;
+const item = (product: Product, quantity = 1): CartItem => ({ product, size: 'small', quantity } as CartItem);
+
+describe('estoque local no navegador', () => {
+  it('só há oferta local no país do estoque, com preço e unidades preenchidos', () => {
+    expect(localOffer(noBrasil, 'Brasil')).toEqual({ price: 89, quantity: 2 });
+    expect(localOffer(noBrasil, 'Portugal')).toBeNull();
+    expect(localOffer(doJapao, 'Brasil')).toBeNull();
+    expect(localOffer({ ...noBrasil, localStock: { Brasil: { enabled: true, price: 89, quantity: 0 } } } as Product, 'Brasil')).toBeNull();
+  });
+
+  it('separa o carrinho em local, Japão ou misto', () => {
+    expect(splitCart([item(noBrasil)], 'Brasil').kind).toBe('local');
+    expect(splitCart([item(doJapao)], 'Brasil').kind).toBe('japan');
+    expect(splitCart([item(noBrasil), item(doJapao)], 'Brasil').kind).toBe('mixed');
+    // Mesmo carrinho visto de outro país: tudo vem do Japão.
+    expect(splitCart([item(noBrasil)], 'Portugal').kind).toBe('japan');
+    // Pediu mais do que há no Brasil: esse item passa a vir do Japão.
+    expect(splitCart([item(noBrasil, 3)], 'Brasil').kind).toBe('japan');
+  });
+
+  it('pedido local: preço fixo + frete nacional, sem taxa PS, câmbio ou desconto do produto', () => {
+    const totals = computeCheckoutTotals({
+      items: [item(noBrasil, 2)],
+      currency: 'BRL',
+      country: 'Brasil',
+      paymentMethod: 'pix',
+      shippingYen: 99999, // ignorado no pedido local
+      psFeeWaived: true,
+      local: { country: 'Brasil', currency: 'BRL', shippingDisplay: 22 },
+    });
+    expect(totals.shown).toMatchObject({ subtotal: 178, products: 178, shipping: 22, psFee: 0, paymentFee: 0, total: 200 });
+    expect(totals.psFeeYen).toBe(0);
+  });
+
+  it('o mesmo carrinho enviado do Japão usa a conta de sempre (com taxa PS)', () => {
+    const totals = computeCheckoutTotals({ items: [item(noBrasil, 2)], currency: 'BRL', country: 'Brasil', shippingYen: 2000 });
+    expect(totals.psFeeYen).toBe(2000);
+    expect(totals.shown.total).not.toBe(200);
+  });
+
+  it('cupom percentual desconta do preço local', () => {
+    const totals = computeCheckoutTotals({
+      items: [item(noBrasil)], currency: 'BRL', country: 'Brasil',
+      coupon: { discount: 10, discountType: 'percentage' }, shippingYen: 0,
+      local: { country: 'Brasil', currency: 'BRL', shippingDisplay: 22 },
+    });
+    expect(totals.shown).toMatchObject({ couponDiscount: 9, products: 80, total: 102 });
+  });
+});

@@ -63,6 +63,8 @@ export interface Product {
   salesCount?: number;       // Quantidade vendida (usado no filtro "Mais Vendidos"); atualizado manualmente pelo admin
   rating?: number;           // Avaliação de 0 a 5 (curada manualmente pelo admin); ausente = não mostra estrelas
   stock?: { unlimited: boolean; quantity: number }; // undefined = ilimitado (retrocompat)
+  /** Unidades que já estão em outro país (empresa parceira), com preço fixo na moeda de lá. Ver shared/local-stock.js. */
+  localStock?: LocalStock;
   promoGift?: { buyQuantity: number; giftProductId: string; giftProductName: string; minOrderValueYen?: number };
 }
 
@@ -198,3 +200,6 @@ export interface Coupon {
   freeShipping?: boolean; // Se o cupom dá frete grátis em vez de desconto
   minOrderValue?: number; // Valor mínimo do pedido em ¥ para usar o cupom
 }
+
+/** Estoque local por país: preço final na moeda daquele país (sem câmbio) e quantidade disponível lá. */
+export type LocalStock = Record<string, { enabled: boolean; price: number; quantity: number }>;

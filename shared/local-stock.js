@@ -11,6 +11,20 @@
 // Mora em `shared/` porque a vitrine, o carrinho e o servidor precisam chegar
 // na MESMA resposta sobre "este produto está no país do cliente?".
 
+import { rateCushion } from './money.js';
+
+/**
+ * Preço local → ¥ equivalente. NÃO é cobrado: serve de base em ¥ para cupom
+ * fixo, pontos, comissão e relatórios. Servidor e navegador usam esta mesma
+ * conta, senão o total da tela e o cobrado divergem.
+ */
+export function localUnitYen(amount, currency, rates) {
+  if (currency === 'JPY') return Math.round(amount);
+  const rate = Number(rates?.[currency]);
+  if (!(rate > 0)) return 0;
+  return Math.round(amount / (rate * (1 + rateCushion(rates))));
+}
+
 /** Oferta local de um produto para um país, ou null. */
 export function localOffer(product, country) {
   const entry = product?.localStock?.[country];

@@ -19,6 +19,7 @@ import { formatPrice, getCurrencyByCountry } from '@/utils/currency';
 import { effectiveYen } from '@/utils/pricing';
 import { convertYen as fxConvert, getRatesId } from '@/services/fxService';
 import { cartBenefits, computeCheckoutTotals } from '@/utils/checkoutTotals';
+import { setShipAllFromJapan } from '@/utils/localStock';
 import { negotiationService } from '@/services/negotiationService';
 import { psFeeWaiver } from '@/utils/psFeeWaiver';
 import { productService } from '@/services/productService';
@@ -84,6 +85,9 @@ const OrderReview: React.FC = () => {
   const shippingDiscountYen: number = location.state?.shippingDiscountYen || 0;
   const negotiationId: string | null = location.state?.negotiationId || null;
   const isGuest: boolean = !!location.state?.isGuest;
+  // Pedido de estoque local: preço fixo na moeda do cliente + frete nacional (vem do checkout).
+  const localOrder: boolean = location.state?.fulfillment === 'local';
+  const localShippingDisplay: number = Number(location.state?.localShippingDisplay) || 0;
   const [couponInput, setCouponInput] = useState('');
   const [couponError, setCouponError] = useState('');
   const [couponLoading, setCouponLoading] = useState(false);
@@ -143,7 +147,7 @@ const OrderReview: React.FC = () => {
   // Pontos pagam só a mercadoria que sobra depois do cupom — o servidor
   // limita igual (`shared/money.js`).
   const availablePoints = user?.points || 0;
-  const couponOnly = cartBenefits(items, appliedCoupon);
+  const couponOnly = cartBenefits(items, appliedCoupon, 0, localOrder ? { country, currency, shippingDisplay: 0 } : null);
   const maxRedeemable = Math.min(
     availablePoints,
     Math.max(0, Math.floor((couponOnly.productSubtotalYen - couponOnly.couponDiscountYen) / POINTS.yenPerPoint)),
@@ -167,6 +171,7 @@ const OrderReview: React.FC = () => {
     shippingDiscountYen,
     // O checkout já mandou o desconto efetivo (isenção ou negociação, com o teto).
     negotiatedPsFee: psFeeDiscountYen > 0 ? { status: 'approved', approvedDiscountYen: psFeeDiscountYen } : null,
+    local: localOrder ? { country, currency, shippingDisplay: localShippingDisplay } : null,
   });
 
   // Cotação do servidor: a conta que vale para a cobrança. Refeita a cada
@@ -193,10 +198,12 @@ const OrderReview: React.FC = () => {
     },
     shippingCarrier: shipping.carrier,
     couponCode: appliedCoupon?.code || '',
-    promoCode: safeStorage.getItem('promo_applied') || '',
+    // Campanha, negociação e isenção da taxa PS são do envio do Japão.
+    promoCode: localOrder ? '' : safeStorage.getItem('promo_applied') || '',
     pointsToRedeem: redeemPoints,
-    negotiationId: negotiationId || '',
-    psFeeWaiverToken: psFeeWaiver.token(),
+    negotiationId: localOrder ? '' : negotiationId || '',
+    psFeeWaiverToken: localOrder ? '' : psFeeWaiver.token(),
+    ...(localOrder ? { fulfillment: 'local' as const } : {}),
     ratesId: getRatesId(),
   } : null;
   const quoteInputKey = quoteInput ? JSON.stringify(quoteInput) : '';
@@ -393,6 +400,7 @@ const OrderReview: React.FC = () => {
     void thermalPrintService.printOrder(pendingOrder);
 
     clearCart();
+    setShipAllFromJapan(false); // a escolha "tudo do Japão" vale só para o pedido que acabou de ser feito
     safeStorage.removeItem('redeem_points');
     safeStorage.removeItem('promo_applied');
     safeStorage.removeItem('pending_promo');

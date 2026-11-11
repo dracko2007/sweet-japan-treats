@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Heart, Plus, Star } from 'lucide-react';
+import { Heart, Plus, Star, MapPin } from 'lucide-react';
 import { Product } from '@/types';
 import { useCart } from '@/context/CartContext';
 import { useUser } from '@/context/UserContext';
@@ -11,6 +11,7 @@ import { useLanguage } from '@/context/LanguageContext';
 import { formatPrice, getCurrencyByCountry } from '@/utils/currency';
 import PriceStack from '@/components/PriceStack';
 import { effectiveYen, baseYen, hasDiscount, getVariants } from '@/utils/pricing';
+import { localOffer } from '@/utils/localStock';
 import { convertYen as fxConvert } from '@/services/fxService';
 import { productEnglishName } from '@/utils/productName';
 import { cdnVideo } from '@/services/cloudinaryService';
@@ -48,10 +49,12 @@ const CompactProductCard: React.FC<CompactProductCardProps> = ({ product }) => {
   const currency = getCurrencyByCountry(selectedCountry);
   const convertYen = (yen: number) => fxConvert(yen, currency);
 
-  const promoActive = hasDiscount(product);
-  const price = convertYen(effectiveYen(product, firstVariant?.id || 'small'));
+  // Produto que já está no país do cliente: preço fixo na moeda dele, sem ¥ nem desconto de vitrine.
+  const offer = localOffer(product, selectedCountry);
+  const promoActive = !offer && hasDiscount(product);
+  const price = offer ? offer.price : convertYen(effectiveYen(product, firstVariant?.id || 'small'));
   const originalPrice = convertYen(baseYen(product, firstVariant?.id || 'small'));
-  const isSoldOut = product.stock && !product.stock.unlimited && product.stock.quantity === 0;
+  const isSoldOut = !offer && product.stock && !product.stock.unlimited && product.stock.quantity === 0;
   const name = productEnglishName(product);
   const cartQuantity = cartItems
     .filter((item) => item.product.id === product.id && !item.freeGift)
@@ -212,8 +215,13 @@ const CompactProductCard: React.FC<CompactProductCardProps> = ({ product }) => {
         <div className="mt-auto flex items-end justify-between gap-1 pt-1">
           <div className="min-w-0">
             <p className={cn('text-base font-black leading-none tracking-tight', promoActive ? 'text-red-600' : 'text-pink-600')}>
-              <PriceStack value={price} currency={currency} />
+              {offer ? formatPrice(price, currency, true) : <PriceStack value={price} currency={currency} />}
             </p>
+            {offer && (
+              <p className="mt-1 inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold leading-none text-emerald-700">
+                <MapPin className="h-2.5 w-2.5" aria-hidden /> Envio do {selectedCountry}
+              </p>
+            )}
             {promoActive && (
               <p className="mt-0.5 whitespace-nowrap text-[10px] leading-none text-gray-400 line-through">
                 {formatPrice(originalPrice, currency, true)}

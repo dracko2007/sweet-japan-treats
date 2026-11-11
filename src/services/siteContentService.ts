@@ -53,6 +53,10 @@ const DEFAULT_VLOG: VlogContent = { featured: null, videos: [] };
 // Sem vídeos de exemplo: o vlog só mostra o que o admin cadastrou e os reviews aprovados.
 export const DEFAULT_VLOG_CONTENT: VlogContent = { featured: null, videos: [] };
 
+/* ------------------------- Frete nacional (estoque local) ------------------------- */
+/** PAC por região no Brasil; valor único nos outros países. Na moeda de cada país. */
+export type LocalShippingTable = Record<string, { regions?: Record<string, number | undefined>; flat?: number }>;
+
 /* ----------------------------- Settings ----------------------------- */
 export interface SiteSettings {
   vlogEnabled: boolean;
@@ -122,6 +126,27 @@ export const siteContentService = {
       devWarn('siteContentService.getVlog falhou:', e);
       return DEFAULT_VLOG;
     }
+  },
+
+  /** Tabela do frete nacional (pública: o checkout mostra o valor antes da cotação do servidor). */
+  async getLocalShipping(): Promise<LocalShippingTable> {
+    if (!db) return {};
+    try {
+      const snap = await getDoc(doc(db, 'siteContent', 'localShipping'));
+      const { updatedAt: _ignored, ...table } = (snap.exists() ? snap.data() : {}) as Record<string, unknown>;
+      return table as LocalShippingTable;
+    } catch (e) {
+      devWarn('siteContentService.getLocalShipping falhou:', e);
+      return {};
+    }
+  },
+
+  async saveLocalShipping(table: LocalShippingTable): Promise<void> {
+    if (!db) throw new Error('Firebase indisponível');
+    await ensureAdminAuth();
+    // JSON tira os `undefined` (campo apagado no formulário), que o Firestore recusa.
+    const clean = JSON.parse(JSON.stringify(table)) as LocalShippingTable;
+    await setDoc(doc(db, 'siteContent', 'localShipping'), { ...clean, updatedAt: serverTimestamp() });
   },
 
   async saveVlog(content: VlogContent): Promise<void> {

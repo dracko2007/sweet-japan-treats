@@ -24,6 +24,7 @@ import { effectiveYen, baseYen, hasDiscount, getVariants } from '@/utils/pricing
 import { convertYen as fxConvert } from '@/services/fxService';
 import { productEnglishName } from '@/utils/productName';
 import ProductJsonLd from '@/components/ProductJsonLd';
+import { localOffer } from '@/utils/localStock';
 import { localImage } from '@/utils/localImage';
 import ProductVideoReviews from '@/components/products/ProductVideoReviews';
 import { useSeo } from '@/hooks/useSeo';
@@ -169,8 +170,10 @@ const ProductDetail: React.FC = () => {
   const convertYen = (yen: number) => fxConvert(yen, currency);
   const getDisplayPrice = (size: string) => convertYen(effectiveYen(product, size));
 
-  const currentPrice = getDisplayPrice(selectedSize);
-  const promoActive = hasDiscount(product);
+  // Produto que já está no país do cliente: preço fixo na moeda dele (vale para qualquer opção do produto).
+  const offer = localOffer(product, selectedCountry);
+  const currentPrice = offer ? offer.price : getDisplayPrice(selectedSize);
+  const promoActive = !offer && hasDiscount(product);
   const originalPrice = convertYen(baseYen(product, selectedSize));
   const maxQty = getMaxQty(product);
   const isSoldOut = Number.isFinite(maxQty) && maxQty <= 0;
@@ -390,7 +393,7 @@ const ProductDetail: React.FC = () => {
                           >
                             {v.label}
                             <span className="block text-[11px] font-normal text-muted-foreground">
-                              {formatPrice(convertYen(effectiveYen(product, v.id)), currency)}
+                              {offer ? formatPrice(offer.price, currency, true) : formatPrice(convertYen(effectiveYen(product, v.id)), currency)}
                             </span>
                           </button>
                         );
@@ -401,6 +404,11 @@ const ProductDetail: React.FC = () => {
 
                 <div className="mb-6 border-b pb-4 border-border/50">
                   <span className="block text-sm font-semibold text-muted-foreground mb-1">Preço Unitário</span>
+                  {offer && (
+                    <p className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-700">
+                      📍 Já está no {selectedCountry}: preço final, sem taxas de importação · envio nacional
+                    </p>
+                  )}
                   {promoActive ? (
                     <div className="flex items-center gap-3 flex-wrap">
                       <span className="text-3xl font-black text-primary">{formatPrice(currentPrice, currency)}</span>
@@ -413,7 +421,7 @@ const ProductDetail: React.FC = () => {
                     </div>
                   ) : (
                     <div className="text-3xl font-black text-primary">
-                      {formatPrice(currentPrice, currency)}
+                      {formatPrice(currentPrice, currency, Boolean(offer))}
                     </div>
                   )}
                 </div>

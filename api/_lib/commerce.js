@@ -7,10 +7,9 @@ import {
   displayTotals,
   productBenefits,
   psFeeDiscountYen,
-  rateCushion,
   US_COUNTRY,
 } from '../../shared/money.js';
-import { localOffer, localShippingAmount } from '../../shared/local-stock.js';
+import { localOffer, localShippingAmount, localUnitYen } from '../../shared/local-stock.js';
 import { HttpError } from './http.js';
 import { currencyForCountry } from './fx.js';
 
@@ -241,10 +240,8 @@ function informativeTax(amount, country) {
 
 /** Moeda local → ¥ equivalente, só para registro (comissão, pontos, relatórios). Não é cobrado. */
 function displayToYen(amount, currency, rates) {
-  if (currency === 'JPY') return Math.round(amount);
-  const rate = Number(rates?.[currency]);
-  if (!(rate > 0)) throw new HttpError(503, 'fx_unavailable');
-  return Math.round(amount / (rate * (1 + rateCushion(rates))));
+  if (currency !== 'JPY' && !(Number(rates?.[currency]) > 0)) throw new HttpError(503, 'fx_unavailable');
+  return localUnitYen(amount, currency, rates);
 }
 
 export function buildQuote({ requestedItems, products, country, prefecture, state, carrier, paymentMethod, coupon, redeemPoints, negotiation, campaign, homePromotion, rates, recentSpendYen = 0, psFeeWaived = false, fulfillment = 'japan', localShipping = null }) {

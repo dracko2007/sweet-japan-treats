@@ -28,6 +28,8 @@ export interface CheckoutDraft {
   pointsToRedeem?: number;
   negotiationId?: string;
   psFeeWaiverToken?: string;
+  /** 'local' = pedido só com itens que já estão no país do cliente (preço fixo + frete nacional). */
+  fulfillment?: 'local' | 'japan';
   /** Total que o cliente está vendo. Se o servidor calcular outro, nada é cobrado (409 `price_changed`). */
   expectedTotal?: number;
   /** Id da cotação de câmbio usada para montar a tela. */
@@ -158,6 +160,7 @@ function checkoutBody(draft: Omit<CheckoutDraft, 'orderId'>) {
     promoCode: draft.promoCode || '',
     psFeeWaiverToken: draft.psFeeWaiverToken || '',
     ratesId: draft.ratesId || '',
+    ...(draft.fulfillment === 'local' ? { fulfillment: 'local' } : {}),
     customer: {
       ...draft.customer,
       postalCode: draft.shippingAddress.postalCode,
@@ -231,6 +234,8 @@ export function checkoutErrorMessage(code: string): string {
     promotion_already_used: 'Você já usou esta promoção.',
     promotion_limit: 'Limite da promoção atingido para este CPF.',
     affiliate_coupon_already_used: 'Este código de afiliado já foi usado neste CPF.',
+    local_unavailable: 'Um dos produtos não está mais disponível no seu país. Volte ao carrinho para enviar do Japão.',
+    local_shipping_unavailable: 'Ainda não temos frete nacional para a sua região. Volte ao carrinho para enviar do Japão.',
     promoter_code_already_used: 'Você já usou este código de divulgador. Cada código vale uma vez por cadastro.',
     rate_limited: 'Muitas tentativas seguidas. Aguarde alguns minutos e tente de novo.',
   };
