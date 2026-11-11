@@ -8,6 +8,7 @@ import { useLanguage } from '@/context/LanguageContext';
 import { effectiveYen } from '@/utils/pricing';
 import { formatPrice, getCurrencyByCountry } from '@/utils/currency';
 import { convertYen } from '@/services/fxService';
+import { useLocalCart } from '@/hooks/useLocalCart';
 import { productEnglishName } from '@/utils/productName';
 import { useEscape, useScrollLock } from './useScrollLock';
 import { productThumb } from '@/utils/localImage';
@@ -27,6 +28,11 @@ const MiniCartDrawer: React.FC<Props> = ({ open, onClose }) => {
   const { t, selectedCountry } = useLanguage();
   const reduce = useReducedMotion();
   const currency = getCurrencyByCountry(selectedCountry);
+  // Item que já está no país do cliente: preço fixo local, sem câmbio nem ¥.
+  const { localPrice } = useLocalCart();
+  // Com item de preço local na soma, a referência em ¥ deixaria de ser verdadeira.
+  const hasLocalLine = items.some((i) => localPrice(i) !== null);
+  const unitOf = (i: (typeof items)[number]) => localPrice(i) ?? convertYen(effectiveYen(i.product, i.size), currency);
 
   useScrollLock(open);
   useEscape(open, onClose);
@@ -36,7 +42,7 @@ const MiniCartDrawer: React.FC<Props> = ({ open, onClose }) => {
 
   // Mesma conta do CartItem: converte o unitário e multiplica (brindes não somam).
   const subtotal = items.reduce(
-    (sum, i) => (i.freeGift ? sum : sum + convertYen(effectiveYen(i.product, i.size), currency) * i.quantity),
+    (sum, i) => (i.freeGift ? sum : sum + unitOf(i) * i.quantity),
     0,
   );
 
@@ -116,7 +122,7 @@ const MiniCartDrawer: React.FC<Props> = ({ open, onClose }) => {
                 >
                   <AnimatePresence>
                     {items.map((item) => {
-                      const unit = convertYen(effectiveYen(item.product, item.size), currency);
+                      const unit = unitOf(item);
                       const atMax = item.quantity >= getMaxQty(item.product);
                       return (
                         <motion.li
@@ -173,7 +179,7 @@ const MiniCartDrawer: React.FC<Props> = ({ open, onClose }) => {
                               <div className="flex items-center gap-2">
                                 {!item.freeGift && (
                                   <span className="text-sm font-extrabold text-pink-600">
-                                    {formatPrice(unit * item.quantity, currency)}
+                                    {formatPrice(unit * item.quantity, currency, localPrice(item) !== null)}
                                   </span>
                                 )}
                                 {!item.freeGift && (
@@ -204,7 +210,7 @@ const MiniCartDrawer: React.FC<Props> = ({ open, onClose }) => {
                       animate={{ scale: 1, color: '#0f172a' }}
                       className="text-xl font-black"
                     >
-                      {formatPrice(subtotal, currency)}
+                      {formatPrice(subtotal, currency, hasLocalLine)}
                     </motion.span>
                   </div>
                   {/* O /checkout depende do carrinho (cupom + convidado/conta no

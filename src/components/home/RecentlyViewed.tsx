@@ -7,6 +7,7 @@ import { formatPrice, getCurrencyByCountry } from '@/utils/currency';
 import { effectiveYen } from '@/utils/pricing';
 import { convertYen as fxConvert } from '@/services/fxService';
 import { useLanguage } from '@/context/LanguageContext';
+import { localOffer } from '@/utils/localStock';
 import { productEnglishName } from '@/utils/productName';
 import { productThumb } from '@/utils/localImage';
 
@@ -36,7 +37,8 @@ const RecentlyViewed: React.FC = () => {
 
         <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide">
           {items.map((product) => {
-            const price = fxConvert(effectiveYen(product, 'small'), currency);
+            const offer = localOffer(product, selectedCountry);
+            const price = offer ? offer.price : fxConvert(effectiveYen(product, 'small'), currency);
             return (
               <Link
                 key={product.id}
@@ -55,7 +57,7 @@ const RecentlyViewed: React.FC = () => {
                   <p className="text-xs font-bold text-gray-800 line-clamp-2 leading-snug min-h-[2.2em]">
                     {productEnglishName(product)}
                   </p>
-                  <p className="text-sm font-bold text-primary mt-1">{formatPrice(price, currency)}</p>
+                  <p className="text-sm font-bold text-primary mt-1">{formatPrice(price, currency, Boolean(offer))}</p>
                 </div>
               </Link>
             );

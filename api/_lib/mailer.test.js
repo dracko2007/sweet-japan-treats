@@ -251,4 +251,16 @@ describe('buildOrderEmail: a conta inteira do pedido', () => {
     expect(buildOrderEmail(pedido(), { store: true }).html).toContain('ana@exemplo.com');
     expect(buildOrderEmail(pedido()).html).not.toContain('119999');
   });
+
+  it('pedido local: a loja vê "enviar do Brasil" e o frete nacional; pedido do Japão não muda', () => {
+    const local = pedido({ fulfillment: 'local', shipFrom: 'Brasil', shippingCarrier: 'local' });
+    const loja = buildOrderEmail(local, { store: true });
+    expect(loja.subject).toContain('(enviar do Brasil)');
+    expect(loja.html).toContain('ENVIAR DO BRASIL');
+    expect(loja.html).toContain('PAC (Correios)');
+    expect(buildOrderEmail(local).html).toContain('Enviado direto do Brasil');
+    const japao = buildOrderEmail(pedido(), { store: true });
+    expect(japao.subject).not.toContain('enviar do');
+    expect(japao.html).not.toContain('ENVIAR DO');
+  });
 });

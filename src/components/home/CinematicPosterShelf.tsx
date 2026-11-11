@@ -10,6 +10,7 @@ import { Product } from '@/types';
 import { effectiveYen, baseYen, hasDiscount, getVariants } from '@/utils/pricing';
 import { formatPrice, getCurrencyByCountry } from '@/utils/currency';
 import { convertYen as fxConvert } from '@/services/fxService';
+import { localOffer } from '@/utils/localStock';
 import { productEnglishName } from '@/utils/productName';
 import { i18nDesc } from '@/utils/productI18n';
 import { cn } from '@/lib/utils';
@@ -141,12 +142,16 @@ const CinematicPosterShelf: React.FC<CinematicPosterShelfProps> = ({
   if (loading || items.length === 0) return null;
 
   const priceOf = (p: Product) => {
+    // Já está no país do cliente: preço fixo local, sem ¥ nem desconto de vitrine.
+    const offer = localOffer(p, selectedCountry);
+    if (offer) return { price: offer.price, original: offer.price, discounted: false, local: true };
     const variant = [...getVariants(p)].sort((a, b) => a.price - b.price)[0];
     const size = variant?.id || 'small';
     return {
       price: fxConvert(effectiveYen(p, size), currency),
       original: fxConvert(baseYen(p, size), currency),
       discounted: hasDiscount(p),
+      local: false,
     };
   };
 
@@ -217,7 +222,7 @@ const CinematicPosterShelf: React.FC<CinematicPosterShelfProps> = ({
               key={p.id}
               product={p}
               name={productEnglishName(p)}
-              priceLabel={formatPrice(priceOf(p).price, currency)}
+              priceLabel={formatPrice(priceOf(p).price, currency, priceOf(p).local)}
               onOpen={() => setSelectedId(p.id)}
             />
           ))}
@@ -301,7 +306,7 @@ const CinematicPosterShelf: React.FC<CinematicPosterShelfProps> = ({
 
                 <div className="mb-6 flex items-baseline gap-2">
                   <span className="font-display text-2xl text-white">
-                    {formatPrice(priceOf(selected).price, currency)}
+                    {formatPrice(priceOf(selected).price, currency, priceOf(selected).local)}
                   </span>
                   {priceOf(selected).discounted && (
                     <span className="text-sm text-white/40 line-through">

@@ -23,6 +23,8 @@ import { auth } from '@/config/firebase';
 import { affiliateService } from '@/services/affiliateService';
 import { trackingUrlFor } from '@/utils/trackingUrl';
 import type { Order, OrderItem } from '@/types';
+import { formatPrice } from '@/utils/currency';
+import { localCarrierLabel } from '../../shared/local-stock.js';
 
 // Cada aba (e os modais dos pedidos) só baixa quando é aberta: antes as ~30
 // telas vinham juntas num pacote de ~940 KB, pesado para abrir no celular.
@@ -35,6 +37,17 @@ const HomeContentManager = lazy(() => import('@/components/admin/HomeContentMana
 const VlogManager = lazy(() => import('@/components/admin/VlogManager'));
 const CustomRequestManager = lazy(() => import('@/components/admin/CustomRequestManager'));
 const B2BRequestManager = lazy(() => import('@/components/admin/B2BRequestManager'));
+/** Pedido que sai do estoque que já está no país do cliente (empresa parceira), não do Japão. */
+const isLocalOrder = (order: Order): boolean => order.fulfillment === 'local' && Boolean(order.shipFrom);
+const carrierText = (order: Order): string =>
+  (isLocalOrder(order) ? localCarrierLabel(order.shipFrom) : order.shippingCarrier || '');
+/** Frete nacional como foi cobrado, na moeda do pedido; null em pedido do Japão (frete em ¥). */
+const localShippingText = (order: Order): string | null => {
+  if (!isLocalOrder(order) || order.priceBreakdown?.shipping == null) return null;
+  const amount = Number(order.priceBreakdown.shipping);
+  return amount > 0 ? formatPrice(amount, order.currency || 'JPY', true) : 'Grátis';
+};
+
 const AdminAccessManager = lazy(() => import('@/components/admin/AdminAccessManager'));
 const CN23Modal = lazy(() => import('@/components/admin/CN23Modal'));
 const ImageMigration = lazy(() => import('@/components/admin/ImageMigration'));
@@ -610,6 +623,7 @@ _This is an automated test message_
       <div class="status-badge">${escapeHtml(statusLabel[order.status] || order.status || 'N/A')}</div>
     </div>
   </div>
+  ${isLocalOrder(order) ? `<div style="margin:0 0 14px;padding:10px 14px;border:2px solid #059669;background:#ecfdf5;color:#065f46;font-weight:800;border-radius:8px;">📍 ENVIAR DO ${escapeHtml(String(order.shipFrom).toUpperCase())} — estoque local, frete nacional. Não sai do Japão.</div>` : ''}
   <div class="grid">
     <div class="section">
       <h3>👤 Cliente</h3>
@@ -651,9 +665,9 @@ _This is an automated test message_
       </tr>
       ${discount > 0 ? `<tr class="discount"><td>Cupom ${order.couponCode ? `(${escapeHtml(order.couponCode)})` : ''}</td><td></td><td>-R$ ${discount.toFixed(2)}</td></tr>` : ''}
       <tr>
-        <td>Frete ${order.shippingCarrier ? `(${escapeHtml(order.shippingCarrier)})` : ''}</td>
+        <td>Frete ${order.shippingCarrier ? `(${escapeHtml(carrierText(order))})` : ''}</td>
         <td></td>
-        <td>${shippingCost != null ? (shippingCost === 0 ? 'Grátis' : `¥ ${Math.round(shippingCost).toLocaleString('pt-BR')}`) : 'N/A'}</td>
+        <td>${localShippingText(order) ? escapeHtml(localShippingText(order) as string) : shippingCost != null ? (shippingCost === 0 ? 'Grátis' : `¥ ${Math.round(shippingCost).toLocaleString('pt-BR')}`) : 'N/A'}</td>
       </tr>
       ${(order.federalTax > 0 || order.icmsTax > 0 || order.taxAmount > 0) ? `<tr><td style="color:#888;font-size:12px;">Impostos (II + ICMS)</td><td></td><td style="color:#888;font-size:12px;">R$ ${Number(order.federalTax && order.icmsTax ? (order.federalTax + order.icmsTax) : order.taxAmount || 0).toFixed(2)}</td></tr>` : ''}
       <tr class="grand">
@@ -1018,7 +1032,17 @@ _This is an automated test message_
                           <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(order.status || 'pending')}`}>
                             {getStatusLabel(order.status || 'pending')}
                           </span>
+                          {isLocalOrder(order) && (
+                            <span className="rounded-full bg-emerald-600 px-3 py-1 text-xs font-extrabold uppercase text-white">
+                              📍 Enviar do {order.shipFrom}
+                            </span>
+                          )}
                         </div>
+                        {isLocalOrder(order) && (
+                          <p className="mb-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800">
+                            Este pedido NÃO sai do Japão: as unidades estão no estoque do {order.shipFrom} e seguem por frete nacional.
+                          </p>
+                        )}
                         <p className="text-sm text-muted-foreground mb-1">
                           <Calendar className="w-4 h-4 inline mr-1" />
                           {new Date(order.orderDate).toLocaleString('pt-BR')}
@@ -1132,9 +1156,9 @@ _This is an automated test message_
                                 <div className="flex justify-between text-sm">
                                   <span className="flex items-center gap-1">
                                     <Truck className="w-3 h-3" />
-                                    Frete {order.shippingCarrier && <span className="text-muted-foreground text-xs">({order.shippingCarrier})</span>}
+                                    Frete {order.shippingCarrier && <span className="text-muted-foreground text-xs">({carrierText(order)})</span>}
                                   </span>
-                                  <span className="font-mono">{shippingCost != null ? (shippingCost === 0 ? <span className="text-green-600">Grátis</span> : `¥ ${Math.round(shippingCost).toLocaleString('pt-BR')}`) : 'N/A'}</span>
+                                  <span className="font-mono">{localShippingText(order) ?? (shippingCost != null ? (shippingCost === 0 ? <span className="text-green-600">Grátis</span> : `¥ ${Math.round(shippingCost).toLocaleString('pt-BR')}`) : 'N/A')}</span>
                                 </div>
 
                                 {/* Impostos */}

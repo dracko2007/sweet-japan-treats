@@ -9,7 +9,7 @@ import { useProducts } from '@/context/ProductsContext';
 import { useCart } from '@/context/CartContext';
 import { cn } from '@/lib/utils';
 import { useLanguage } from '@/context/LanguageContext';
-import { localOffer } from '@/utils/localStock';
+import { useLocalCart } from '@/hooks/useLocalCart';
 import { usePagination } from '@/hooks/usePagination';
 import Pagination from '@/components/Pagination';
 import { minEffectiveYen } from '@/utils/pricing';
@@ -92,11 +92,13 @@ const Products: React.FC = () => {
   const { items: cartItems, totalItems, totalPrice } = useCart();
   const currency = getCurrencyByCountry(selectedCountry);
   // Itens que já estão no país do cliente: preço fixo local, sem ¥ de referência.
+  // Mesma regra do carrinho (estoque local cobre a quantidade e o cliente não pediu envio único do Japão).
+  const localCart = useLocalCart();
   const localLine = (item: (typeof cartItems)[number]): number | null => {
-    const offer = localOffer(item.product, selectedCountry);
-    return offer ? offer.price * item.quantity : null;
+    const unit = localCart.localPrice(item);
+    return unit === null ? null : unit * item.quantity;
   };
-  const localSubtotal: number | null = cartItems.length > 0 && cartItems.every((item) => localOffer(item.product, selectedCountry))
+  const localSubtotal: number | null = localCart.localOrder
     ? cartItems.reduce((sum, item) => sum + (localLine(item) || 0), 0)
     : null;
   const convertYen = (yen: number) => fxConvert(yen, currency);

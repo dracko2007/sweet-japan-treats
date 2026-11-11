@@ -302,18 +302,16 @@ describe('frete: tabelas conferidas no Japan Post (2026-11-08)', () => {
 
 
 // Produto que já está no país do cliente (empresa parceira): preço fixo na
-// moeda de lá, frete nacional de tabela, sem câmbio nem taxas de importação.
+// moeda de lá, frete nacional do produto, sem câmbio nem taxas de importação.
 describe('pedido de estoque local', () => {
-  const noBrasil = { ...product, discountPercent: 20, localStock: { Brasil: { enabled: true, price: 89, quantity: 3 } } };
-  const tabela = { Brasil: { regions: { sul: 30, sudeste: 22, centroOeste: 35, nordeste: 40, norte: 55 } }, Portugal: { flat: 6 } };
+  const noBrasil = { ...product, discountPercent: 20, localStock: { Brasil: { enabled: true, price: 89, quantity: 3, shipping: 22 } } };
   const local = (overrides = {}) => quote({
     products: new Map([['p1', noBrasil]]),
     fulfillment: 'local',
-    localShipping: tabela,
     ...overrides,
   });
 
-  it('cobra o preço fixo em real + PAC da região, sem câmbio, taxa PS ou desconto do produto', () => {
+  it('cobra o preço fixo em real + frete nacional do produto, sem câmbio, taxa PS ou desconto do produto', () => {
     const result = local({ requestedItems: [{ productId: 'p1', variantId: 'small', quantity: 2 }] });
     expect(result.currency).toBe('BRL');
     expect(result.fulfillment).toBe('local');
@@ -335,14 +333,24 @@ describe('pedido de estoque local', () => {
     expect(result.total).toBe(89 + 22);
   });
 
-  it('frete muda por região (UF ou nome do estado) e precisa estar na tabela', () => {
-    expect(local({ prefecture: 'AM' }).display.shipping).toBe(55);
-    expect(local({ prefecture: '', state: 'Rio Grande do Sul' }).display.shipping).toBe(30);
-    expect(() => local({ prefecture: 'XX', state: '' })).toThrow(expect.objectContaining({ code: 'local_shipping_unavailable' }));
-    expect(() => local({ localShipping: null })).toThrow(expect.objectContaining({ code: 'local_shipping_unavailable' }));
+  it('frete é o do produto; com vários produtos vale o maior (um pacote só), não a soma', () => {
+    const outro = { ...product, localStock: { Brasil: { enabled: true, price: 50, quantity: 5, shipping: 35 } } };
+    const result = local({
+      products: new Map([['p1', noBrasil], ['p2', outro]]),
+      requestedItems: [{ productId: 'p1', variantId: 'small', quantity: 1 }, { productId: 'p2', variantId: 'small', quantity: 2 }],
+    });
+    expect(result.display.shipping).toBe(35);
+    expect(result.total).toBe(89 + 100 + 35);
   });
 
-  it('cupom percentual vale sobre o preço local; frete grátis zera o PAC', () => {
+  it('frete 0 é grátis; sem frete cadastrado o produto não vende do país', () => {
+    const gratis = { ...noBrasil, localStock: { Brasil: { enabled: true, price: 89, quantity: 3, shipping: 0 } } };
+    expect(local({ products: new Map([['p1', gratis]]) }).total).toBe(89);
+    const semFrete = { ...noBrasil, localStock: { Brasil: { enabled: true, price: 89, quantity: 3 } } };
+    expect(() => local({ products: new Map([['p1', semFrete]]) })).toThrow(expect.objectContaining({ code: 'local_unavailable' }));
+  });
+
+  it('cupom percentual vale sobre o preço local; frete grátis zera o frete nacional', () => {
     expect(local({ coupon: { discount: 10, discountType: 'percentage' } }).display).toMatchObject({ couponDiscount: 9, products: 80, shipping: 22 });
     expect(local({ coupon: { freeShipping: true } }).total).toBe(89);
   });
@@ -351,12 +359,12 @@ describe('pedido de estoque local', () => {
     expect(() => local({ products: new Map([['p1', product]]) })).toThrow(expect.objectContaining({ code: 'local_unavailable' }));
     expect(() => local({ requestedItems: [{ productId: 'p1', variantId: 'small', quantity: 4 }] })).toThrow(expect.objectContaining({ code: 'insufficient_stock' }));
     expect(() => local({ country: 'Portugal', prefecture: '' })).toThrow(expect.objectContaining({ code: 'local_unavailable' }));
-    const desligado = { ...noBrasil, localStock: { Brasil: { enabled: false, price: 89, quantity: 3 } } };
+    const desligado = { ...noBrasil, localStock: { Brasil: { enabled: false, price: 89, quantity: 3, shipping: 22 } } };
     expect(() => local({ products: new Map([['p1', desligado]]) })).toThrow(expect.objectContaining({ code: 'local_unavailable' }));
   });
 
   it('em outro país usa a moeda e o frete único de lá', () => {
-    const emPortugal = { ...product, localStock: { Portugal: { enabled: true, price: 15, quantity: 5 } } };
+    const emPortugal = { ...product, localStock: { Portugal: { enabled: true, price: 15, quantity: 5, shipping: 6 } } };
     const result = local({ products: new Map([['p1', emPortugal]]), country: 'Portugal', prefecture: '' });
     expect(result.currency).toBe('EUR');
     expect(result.total).toBe(15 + 6);

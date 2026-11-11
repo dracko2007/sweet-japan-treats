@@ -9,7 +9,7 @@ import {
   psFeeDiscountYen,
   US_COUNTRY,
 } from '../../shared/money.js';
-import { localOffer, localShippingAmount, localUnitYen } from '../../shared/local-stock.js';
+import { localOffer, localOrderShipping, localUnitYen } from '../../shared/local-stock.js';
 import { HttpError } from './http.js';
 import { currencyForCountry } from './fx.js';
 
@@ -244,7 +244,7 @@ function displayToYen(amount, currency, rates) {
   return localUnitYen(amount, currency, rates);
 }
 
-export function buildQuote({ requestedItems, products, country, prefecture, state, carrier, paymentMethod, coupon, redeemPoints, negotiation, campaign, homePromotion, rates, recentSpendYen = 0, psFeeWaived = false, fulfillment = 'japan', localShipping = null }) {
+export function buildQuote({ requestedItems, products, country, prefecture, state, carrier, paymentMethod, coupon, redeemPoints, negotiation, campaign, homePromotion, rates, recentSpendYen = 0, psFeeWaived = false, fulfillment = 'japan' }) {
   const now = Date.now();
   // Pedido de estoque local: todos os itens saem do país do cliente, com preço
   // fixo na moeda de lá e frete nacional. Campanha, promoção da home, negociação
@@ -257,6 +257,7 @@ export function buildQuote({ requestedItems, products, country, prefecture, stat
     psFeeWaived = false;
   }
   const localQuantity = new Map();
+  const localOffers = [];
   if (!Array.isArray(requestedItems) || requestedItems.length < 1 || requestedItems.length > 100) throw new HttpError(400, 'invalid_items');
   const lineItems = [];
   let homePromoQuantity = 0;
@@ -278,6 +279,7 @@ export function buildQuote({ requestedItems, products, country, prefecture, stat
       const wanted = (localQuantity.get(productId) || 0) + quantity;
       if (wanted > offer.quantity) throw new HttpError(409, 'insufficient_stock');
       localQuantity.set(productId, wanted);
+      localOffers.push(offer);
       lineItems.push({
         productId, requestedId, product, variantId, quantity,
         unitYen: displayToYen(offer.price, currency, rates),
@@ -367,10 +369,8 @@ export function buildQuote({ requestedItems, products, country, prefecture, stat
   let shippingDisplay = null;
   let shipping;
   if (local) {
-    // Frete nacional de tabela (PAC no Brasil), já na moeda do cliente.
-    const table = localShippingAmount(localShipping, country, prefecture || state);
-    if (table === null) throw new HttpError(409, 'local_shipping_unavailable');
-    shippingDisplay = benefits.terms?.freeShipping === true ? 0 : table;
+    // Frete nacional cadastrado no produto, já na moeda do cliente (um pacote: vale o maior).
+    shippingDisplay = benefits.terms?.freeShipping === true ? 0 : localOrderShipping(localOffers);
     shipping = { amount: displayToYen(shippingDisplay, currency, rates), weightG: shippingShape(lineItems).totalWeightG };
   } else {
     shipping = shippingYen(

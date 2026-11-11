@@ -5,9 +5,8 @@ import { ArrowRight } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import type { ProductCategory } from '@/services/categoryService';
 import type { Product } from '@/types';
-import { minEffectiveYen } from '@/utils/pricing';
 import { productEnglishName } from '@/utils/productName';
-import { usePrice } from './usePrice';
+import { useProductPrice } from './usePrice';
 import { productThumb } from '@/utils/localImage';
 
 interface Props {
@@ -24,7 +23,7 @@ interface Props {
 
 const MegaMenu: React.FC<Props> = ({ id, categories, counts, tags, highlights, onNavigate, onMouseEnter, onMouseLeave }) => {
   const { t } = useLanguage();
-  const price = usePrice();
+  const price = useProductPrice();
   const reduce = useReducedMotion();
   const eyebrow = 'mb-3 text-[11px] font-black uppercase tracking-[0.18em] text-pink-500';
 
@@ -120,7 +119,7 @@ const MegaMenu: React.FC<Props> = ({ id, categories, counts, tags, highlights, o
                     <span className="mt-2 line-clamp-2 text-xs font-semibold text-slate-700 group-hover:text-pink-700">
                       {productEnglishName(p)}
                     </span>
-                    <span className="text-xs font-extrabold text-pink-600">{price(minEffectiveYen(p))}</span>
+                    <span className="text-xs font-extrabold text-pink-600">{price(p)}</span>
                   </Link>
                 </motion.div>
               ))}

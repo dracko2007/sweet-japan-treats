@@ -7,16 +7,19 @@ import { computeCheckoutTotals } from './checkoutTotals';
 import { localOffer, splitCart } from './localStock';
 
 const base = { category: 'cosmeticos', description: '', image: 'x', prices: { small: 1450, large: 0 } } as unknown as Product;
-const noBrasil = { ...base, id: 'fino', name: 'Fino', discountPercent: 10, localStock: { Brasil: { enabled: true, price: 89, quantity: 2 } } } as Product;
+const noBrasil = { ...base, id: 'fino', name: 'Fino', discountPercent: 10, localStock: { Brasil: { enabled: true, price: 89, quantity: 2, shipping: 22 } } } as Product;
 const doJapao = { ...base, id: 'tsubaki', name: 'Tsubaki' } as Product;
 const item = (product: Product, quantity = 1): CartItem => ({ product, size: 'small', quantity } as CartItem);
 
 describe('estoque local no navegador', () => {
   it('só há oferta local no país do estoque, com preço e unidades preenchidos', () => {
-    expect(localOffer(noBrasil, 'Brasil')).toEqual({ price: 89, quantity: 2 });
+    expect(localOffer(noBrasil, 'Brasil')).toEqual({ price: 89, quantity: 2, shipping: 22 });
+    // Sem frete cadastrado o produto não vende do país (nunca sai com frete grátis por engano).
+    expect(localOffer({ ...noBrasil, localStock: { Brasil: { enabled: true, price: 89, quantity: 2 } } } as Product, 'Brasil')).toBeNull();
+    expect(localOffer({ ...noBrasil, localStock: { Brasil: { enabled: true, price: 89, quantity: 2, shipping: 0 } } } as Product, 'Brasil')?.shipping).toBe(0);
     expect(localOffer(noBrasil, 'Portugal')).toBeNull();
     expect(localOffer(doJapao, 'Brasil')).toBeNull();
-    expect(localOffer({ ...noBrasil, localStock: { Brasil: { enabled: true, price: 89, quantity: 0 } } } as Product, 'Brasil')).toBeNull();
+    expect(localOffer({ ...noBrasil, localStock: { Brasil: { enabled: true, price: 89, quantity: 0, shipping: 22 } } } as Product, 'Brasil')).toBeNull();
   });
 
   it('separa o carrinho em local, Japão ou misto', () => {

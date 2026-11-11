@@ -235,7 +235,7 @@ export function checkoutErrorMessage(code: string): string {
     promotion_limit: 'Limite da promoção atingido para este CPF.',
     affiliate_coupon_already_used: 'Este código de afiliado já foi usado neste CPF.',
     local_unavailable: 'Um dos produtos não está mais disponível no seu país. Volte ao carrinho para enviar do Japão.',
-    local_shipping_unavailable: 'Ainda não temos frete nacional para a sua região. Volte ao carrinho para enviar do Japão.',
+    local_shipping_unavailable: 'Este produto ainda não tem frete nacional. Volte ao carrinho para enviar do Japão.',
     promoter_code_already_used: 'Você já usou este código de divulgador. Cada código vale uma vez por cadastro.',
     rate_limited: 'Muitas tentativas seguidas. Aguarde alguns minutos e tente de novo.',
   };

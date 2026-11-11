@@ -1,5 +1,6 @@
 import { encodeEmail, unsubscribeToken } from './email-optout.js';
 import { escapeHtml, HttpError } from './http.js';
+import { localCarrierLabel } from '../../shared/local-stock.js';
 
 // Remetente padrão: subdomínio dedicado ao envio (`mail.`), com reputação
 // separada do domínio principal (que recebe e-mail pela Zoho). Endereço de
@@ -183,6 +184,9 @@ const row = (label, value, { bold = false } = {}) =>
  * Linhas da conta como o cliente viu no checkout, a partir de `priceBreakdown`
  * (congelado no pedido, já na moeda do pedido). Pedido antigo, sem ele: null.
  */
+/** Pedido que sai do estoque que já está no país do cliente, não do Japão. */
+const isLocalOrder = (order) => order?.fulfillment === 'local' && Boolean(order.shipFrom);
+
 function breakdownRows(order, currency) {
   const pb = order.priceBreakdown;
   if (!pb || typeof pb !== 'object') return null;
@@ -192,7 +196,9 @@ function breakdownRows(order, currency) {
   if (n(pb.couponDiscount) > 0) out.push(row(`Cupom${order.couponCode ? ` ${escapeHtml(order.couponCode)}` : ''}`, `− ${orderMoney(pb.couponDiscount, currency)}`));
   if (n(pb.pointsDiscount) > 0) out.push(row('Pontos usados', `− ${orderMoney(pb.pointsDiscount, currency)}`));
   if (n(pb.paymentDiscount) > 0) out.push(row('Desconto do pagamento', `− ${orderMoney(pb.paymentDiscount, currency)}`));
-  const carrier = CARRIER_LABEL[order.shippingCarrier || order.shipping?.carrier] || '';
+  const carrier = isLocalOrder(order)
+    ? localCarrierLabel(order.shipFrom)
+    : CARRIER_LABEL[order.shippingCarrier || order.shipping?.carrier] || '';
   out.push(row(`Frete${carrier ? ` (${escapeHtml(carrier)})` : ''}`, n(pb.shipping) > 0 ? orderMoney(pb.shipping, currency) : 'Gratis'));
   if (n(pb.psFee) > 0) out.push(row('Taxa PS', orderMoney(pb.psFee, currency)));
   if (n(pb.importDuty) > 0) out.push(row('Imposto de importacao dos EUA (pre-pago)', orderMoney(pb.importDuty, currency)));
@@ -238,11 +244,17 @@ export function buildOrderEmail(order, { tracking = false, store = false } = {})
   const storeBlock = store
     ? `<p><strong>Cliente:</strong> ${escapeHtml(order.customerEmail || address.email || '')}${address.phone ? ` · ${escapeHtml(address.phone)}` : ''}</p>`
     : '';
+  // Pedido local: a loja precisa ver de cara que NÃO é para separar no Japão;
+  // o cliente fica sabendo que o envio é nacional.
+  const shipFrom = isLocalOrder(order) ? escapeHtml(order.shipFrom) : '';
+  const localBlock = !shipFrom ? '' : store
+    ? `<div style="margin:12px 0;padding:12px;border:2px solid #059669;background:#ecfdf5;border-radius:10px;color:#065f46"><strong>ENVIAR DO ${shipFrom.toUpperCase()}</strong> — estoque local, frete nacional. Este pedido nao sai do Japao.</div>`
+    : `<p style="color:#047857"><strong>Enviado direto do ${shipFrom}</strong>, por frete nacional.</p>`;
   const subject = tracking
     ? `Pedido enviado - #${orderNumber}`
-    : store ? `Novo pedido - #${orderNumber}` : `Pedido recebido - #${orderNumber}`;
+    : store ? `Novo pedido${shipFrom ? ` (enviar do ${shipFrom})` : ''} - #${orderNumber}` : `Pedido recebido - #${orderNumber}`;
   const table = `<table style="width:100%;border-collapse:collapse">${items}${breakdown ?? ''}${total}</table>`;
-  const html = wrapEmail(`<p>Ola, <strong>${name}</strong>.</p><p>${tracking ? 'Seu pedido foi enviado.' : 'Recebemos seu pedido. O pagamento sera confirmado antes da separacao.'}</p>${trackingBlock}${table}${paymentBlock}${wiseBlock}${addressBlock}${storeBlock}<p>Pedido: <strong>${orderNumber}</strong></p>`);
+  const html = wrapEmail(`<p>Ola, <strong>${name}</strong>.</p><p>${tracking ? 'Seu pedido foi enviado.' : 'Recebemos seu pedido. O pagamento sera confirmado antes da separacao.'}</p>${trackingBlock}${localBlock}${table}${paymentBlock}${wiseBlock}${addressBlock}${storeBlock}<p>Pedido: <strong>${orderNumber}</strong></p>`);
   return { subject, html };
 }
 

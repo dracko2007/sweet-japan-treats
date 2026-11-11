@@ -3,9 +3,9 @@
 // (a mesma do servidor).
 import type { CartItem, Product } from '@/types';
 import { safeStorage } from '@/utils/storage';
-import { localOffer as sharedLocalOffer } from '../../shared/local-stock.js';
+import { localOffer as sharedLocalOffer, localOrderShipping } from '../../shared/local-stock.js';
 
-export interface LocalOffer { price: number; quantity: number }
+export interface LocalOffer { price: number; quantity: number; shipping: number }
 
 /** Oferta local do produto para o país do cliente (preço fixo na moeda de lá), ou null. */
 export const localOffer = (product: Product | undefined | null, country: string): LocalOffer | null =>
@@ -75,4 +75,9 @@ export function deferJapanItems(items: CartItem[]): void {
 
 export function clearDeferredJapanItems(): void {
   safeStorage.removeItem(DEFERRED_KEY);
+}
+
+/** Frete nacional do pedido local (maior frete entre os produtos: um pacote só), na moeda do país. */
+export function localShippingFor(items: CartItem[], country: string): number {
+  return localOrderShipping(items.filter((item) => !item.freeGift).map((item) => localOffer(item.product, country))) as number;
 }

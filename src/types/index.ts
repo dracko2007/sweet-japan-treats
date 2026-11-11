@@ -133,6 +133,11 @@ export interface Order {
   shippingCarrier?: string;
   shippingCost?: number;
   shipping?: { cost?: number; carrier?: string };
+  /** 'local' = sai do estoque que já está no país do cliente (`shipFrom`), não do Japão. */
+  fulfillment?: 'japan' | 'local';
+  shipFrom?: string;
+  /** Conta congelada no pedido, na moeda do pedido. */
+  priceBreakdown?: { shipping?: number };
   shippingAddress?: OrderShippingAddress;
   trackingNumber?: string;
   trackingUrl?: string;
@@ -201,5 +206,8 @@ export interface Coupon {
   minOrderValue?: number; // Valor mínimo do pedido em ¥ para usar o cupom
 }
 
-/** Estoque local por país: preço final na moeda daquele país (sem câmbio) e quantidade disponível lá. */
-export type LocalStock = Record<string, { enabled: boolean; price: number; quantity: number }>;
+/**
+ * Estoque local por país: preço final na moeda daquele país (sem câmbio), quantidade
+ * disponível lá e frete nacional (mesma moeda; 0 = grátis, ausente = não vende de lá).
+ */
+export type LocalStock = Record<string, { enabled: boolean; price: number; quantity: number; shipping?: number | null }>;

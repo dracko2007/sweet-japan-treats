@@ -7,13 +7,12 @@ import { useProducts } from '@/context/ProductsContext';
 import { useLanguage } from '@/context/LanguageContext';
 import type { ProductCategory } from '@/services/categoryService';
 import type { Product } from '@/types';
-import { minEffectiveYen } from '@/utils/pricing';
 import { productEnglishName } from '@/utils/productName';
 import { safeStorage } from '@/utils/storage';
 import { SESSION_END_EVENT } from '@/utils/localData';
 import { cn } from '@/lib/utils';
 import { useEscape, useScrollLock } from './useScrollLock';
-import { usePrice } from './usePrice';
+import { useProductPrice } from './usePrice';
 import { productThumb } from '@/utils/localImage';
 
 const RECENT_KEY = 'sandbox_recent_searches';
@@ -79,7 +78,7 @@ const SearchPalette: React.FC<Props> = ({ open, onClose, categories }) => {
   const { products } = useProducts();
   const { t } = useLanguage();
   const navigate = useNavigate();
-  const price = usePrice();
+  const price = useProductPrice();
   const reduce = useReducedMotion();
   const inputRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState('');
@@ -306,7 +305,7 @@ const SearchPalette: React.FC<Props> = ({ open, onClose, categories }) => {
                         <span className="mt-1.5 line-clamp-2 text-[11px] font-semibold leading-snug text-slate-700 group-hover:text-pink-700">
                           {productEnglishName(p)}
                         </span>
-                        <span className="text-[11px] font-extrabold text-pink-600">{price(minEffectiveYen(p))}</span>
+                        <span className="text-[11px] font-extrabold text-pink-600">{price(p)}</span>
                       </motion.button>
                     ))}
                   </div>
@@ -358,7 +357,7 @@ const SearchPalette: React.FC<Props> = ({ open, onClose, categories }) => {
                         {categories.find((c) => c.id === p.category)?.label || p.category}
                       </span>
                     </span>
-                    <span className="relative max-w-[40%] shrink-0 text-right text-xs font-extrabold text-pink-600 sm:text-sm">{price(minEffectiveYen(p))}</span>
+                    <span className="relative max-w-[40%] shrink-0 text-right text-xs font-extrabold text-pink-600 sm:text-sm">{price(p)}</span>
                     {i === active && <CornerDownLeft className="relative h-4 w-4 shrink-0 text-pink-400" aria-hidden />}
                   </motion.button>
                 ))}

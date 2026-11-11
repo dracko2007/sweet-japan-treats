@@ -508,10 +508,6 @@ async function prepareQuote(db, user, input) {
   const homePromoData = homePromoSnap.exists ? homePromoSnap.data() : null;
   const promoStateData = promoStateSnap.exists ? promoStateSnap.data() : null;
   const reservedCount = homePromoData ? quantidadeReservada(promoStateData, homePromoData) : 0;
-  // Tabela do frete nacional (admin → siteContent/localShipping); só lida em pedido local.
-  const localShipping = fulfillment === 'local'
-    ? ((await db.collection('siteContent').doc('localShipping').get()).data() || null)
-    : null;
   const quote = buildQuote({
     requestedItems,
     products,
@@ -529,7 +525,6 @@ async function prepareQuote(db, user, input) {
     recentSpendYen,
     psFeeWaived: Boolean(waiver),
     fulfillment,
-    localShipping,
   });
   return { quote, rates, waiver, campaign, products, coupon, cpfSnap, homePromoData };
 }

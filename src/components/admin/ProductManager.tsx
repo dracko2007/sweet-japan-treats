@@ -28,7 +28,7 @@ import { categoryService, DEFAULT_CATEGORIES, type ProductCategory } from '@/ser
 import { useConfirm } from '@/components/ConfirmDialog';
 import { authenticatedFetch } from '@/services/authenticatedFetch';
 import { errorMessage } from '@/utils/errorMessage';
-import { LocalStockFields, LocalShippingSettings } from '@/components/admin/LocalStockFields';
+import { LocalStockFields } from '@/components/admin/LocalStockFields';
 
 const slugify = (s: string) =>
   s
@@ -642,7 +642,6 @@ const ProductManager: React.FC = () => {
   return (
     <div>
       {/* Header */}
-      <div className="mb-4"><LocalShippingSettings /></div>
       <div className="flex items-center justify-between mb-6">
         <div>
           <h2 className="font-display text-2xl font-bold text-foreground">Produtos</h2>

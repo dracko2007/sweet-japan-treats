@@ -25,9 +25,8 @@ import { effectiveYen, baseYen, hasDiscount } from '@/utils/pricing';
 import { convertYen as fxConvert, getRates } from '@/services/fxService';
 import { cartBenefits, computeCheckoutTotals, psFeeUnits } from '@/utils/checkoutTotals';
 import { useLocalCart } from '@/hooks/useLocalCart';
-import { isLocalOrder, localOffer, setShipAllFromJapan } from '@/utils/localStock';
-import { siteContentService, type LocalShippingTable } from '@/services/siteContentService';
-import { localCarrierLabel, localShippingAmount } from '../../shared/local-stock.js';
+import { isLocalOrder, localOffer, localShippingFor, setShipAllFromJapan } from '@/utils/localStock';
+import { localCarrierLabel } from '../../shared/local-stock.js';
 import { autoApprovablePsDiscountYen, PS_FEE_PER_UNIT_YEN } from '../../shared/money.js';
 import { POINTS } from '@/services/pointsService';
 import { safeStorage } from '@/utils/storage';
@@ -88,16 +87,11 @@ const Checkout: React.FC = () => {
   const isUsa = formData.country === 'Estados Unidos';
   const currency = getCurrencyByCountry(formData.country);
   // Pedido de estoque local: todos os itens já estão no país do cliente (preço
-  // fixo na moeda dele + frete nacional de tabela), e ele não pediu envio do Japão.
+  // fixo na moeda dele + frete nacional do produto), e ele não pediu envio do Japão.
   const localCart = useLocalCart();
   const localOrder = isLocalOrder(items, formData.country) && !localCart.forcedJapan;
-  const [localShippingTable, setLocalShippingTable] = useState<LocalShippingTable | null>(null);
-  useEffect(() => {
-    if (localOrder && !localShippingTable) siteContentService.getLocalShipping().then(setLocalShippingTable);
-  }, [localOrder, localShippingTable]);
-  const localShippingValue = localOrder && localShippingTable
-    ? (localShippingAmount(localShippingTable, formData.country, formData.prefecture) as number | null)
-    : null;
+  // Frete nacional: cadastrado no próprio produto (o maior entre os itens, um pacote só).
+  const localShippingValue: number | null = localOrder ? localShippingFor(items, formData.country) : null;
   const unitDisplayOf = (item: (typeof items)[number]) =>
     (localOrder ? localOffer(item.product, formData.country)?.price : undefined) ?? fxConvert(effectiveYen(item.product, item.size), currency);
 
@@ -642,7 +636,7 @@ const Checkout: React.FC = () => {
     });
   };
 
-  // Frete nacional de tabela: escolhido sozinho assim que a região do cliente é conhecida.
+  // Frete nacional: já vem do produto, então fica escolhido sozinho.
   useEffect(() => {
     if (!localOrder) return;
     setSelectedShipping(localShippingValue === null ? null : {
@@ -1124,20 +1118,7 @@ const Checkout: React.FC = () => {
                               {localShippingValue === 0 ? 'Grátis' : formatPrice(localShippingValue, currency, true)}
                             </span>
                           </div>
-                        ) : (
-                          <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
-                            {!localShippingTable
-                              ? 'Calculando o frete nacional…'
-                              : (formData.prefecture)
-                                ? 'Ainda não temos frete nacional para a sua região.'
-                                : 'Informe o CEP/estado para calcular o frete nacional.'}
-                            {localShippingTable && (formData.prefecture) && (
-                              <button type="button" onClick={() => setShipAllFromJapan(true)} className="mt-2 block font-bold underline">
-                                Enviar do Japão
-                              </button>
-                            )}
-                          </div>
-                        )}
+                        ) : null}
                       </>
                     ) : (
                       <>

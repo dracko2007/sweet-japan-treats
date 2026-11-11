@@ -479,7 +479,7 @@ describe('código de divulgador', () => {
 // Pedido local: a baixa é no estoque que está no país do cliente, não no do Japão.
 describe('pedido de estoque local', () => {
   const comEstoqueLocal = (quantidade) => ({
-    'products/p1': { name: 'Produto', stock: { unlimited: false, quantity: 7 }, salesCount: 0, localStock: { Brasil: { enabled: true, price: 89, quantity: quantidade } } },
+    'products/p1': { name: 'Produto', stock: { unlimited: false, quantity: 7 }, salesCount: 0, localStock: { Brasil: { enabled: true, price: 89, quantity: quantidade, shipping: 22 } } },
   });
   const pedido = (id) => order(id, { fulfillment: 'local', shipFrom: 'Brasil', items: [{ productId: 'p1', quantity: 2, unitYen: 2500, freeGift: false, homePromo: false }] });
 

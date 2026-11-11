@@ -1,12 +1,8 @@
-import React, { useEffect, useState } from 'react';
-import { MapPin, Save, Loader2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { useToast } from '@/hooks/use-toast';
+import React from 'react';
+import { MapPin } from 'lucide-react';
 import type { LocalStock } from '@/types';
 import { WORLD_COUNTRIES } from '@/data/worldCountries';
 import { formatPrice, getCurrencyByCountry } from '@/utils/currency';
-import { siteContentService, type LocalShippingTable } from '@/services/siteContentService';
-import { BR_REGION_LABELS } from '../../../shared/local-stock.js';
 
 const SYMBOL: Record<string, string> = { BRL: 'R$', EUR: '€', USD: 'US$', JPY: '¥' };
 // O Japão é a origem normal da loja: "estoque local" só faz sentido fora dele.
@@ -15,7 +11,8 @@ const COUNTRIES = WORLD_COUNTRIES.map((c) => c.name).filter((name) => name !== '
 /**
  * Cadastro do produto: "este produto já está no país X" (empresa parceira).
  * Para cada país marcado, o preço fixo na moeda de lá — é exatamente o valor
- * cobrado do cliente daquele país, sem câmbio — e quantas unidades estão lá.
+ * cobrado do cliente daquele país, sem câmbio —, quantas unidades estão lá e
+ * o frete nacional daquele produto.
  */
 export const LocalStockFields: React.FC<{
   value: LocalStock | undefined;
@@ -30,9 +27,9 @@ export const LocalStockFields: React.FC<{
     const current = stock[country] || { enabled: false, price: 0, quantity: 0 };
     onChange({ ...stock, [country]: { ...current, ...patch } });
   };
-  // Zera em vez de apagar a chave: o produto é salvo com merge, e uma chave
+  // Zera (e grava frete null) em vez de apagar a chave: o produto é salvo com merge, e uma chave
   // simplesmente ausente continuaria valendo no banco.
-  const remove = (country: string) => onChange({ ...stock, [country]: { enabled: false, price: 0, quantity: 0 } });
+  const remove = (country: string) => onChange({ ...stock, [country]: { enabled: false, price: 0, quantity: 0, shipping: null } });
 
   return (
     <div className="bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800 rounded-lg p-3 space-y-3">
@@ -93,9 +90,22 @@ export const LocalStockFields: React.FC<{
                     className="mt-1 block w-28 px-3 py-2 rounded-lg border border-border bg-background text-sm text-foreground"
                   />
                 </label>
-                {(!(entry.price > 0) || !(entry.quantity > 0)) && (
+                <label className="text-xs text-muted-foreground">
+                  Frete no {country} ({SYMBOL[currency] || currency}, 0 = grátis)
+                  <input
+                    type="number"
+                    min={0}
+                    step={1}
+                    aria-label={`Frete no ${country}`}
+                    value={entry.shipping ?? ''}
+                    onChange={(e) => set(country, { shipping: e.target.value === '' ? null : Math.max(0, Math.round(Number(e.target.value) || 0)) })}
+                    placeholder="Ex: 25"
+                    className="mt-1 block w-28 px-3 py-2 rounded-lg border border-border bg-background text-sm text-foreground"
+                  />
+                </label>
+                {(!(entry.price > 0) || !(entry.quantity > 0) || entry.shipping == null) && (
                   <span className="text-[11px] font-semibold text-amber-700 bg-amber-100 px-2 py-1 rounded">
-                    Preencha preço e unidades: sem os dois o produto segue vendido só do Japão.
+                    Preencha preço, unidades e frete: sem os três o produto segue vendido só do Japão.
                   </span>
                 )}
               </div>
@@ -113,88 +123,9 @@ export const LocalStockFields: React.FC<{
         {COUNTRIES.filter((country) => !rows.includes(country)).map((country) => <option key={country} value={country}>{country}</option>)}
       </select>
       <p className="text-[11px] text-muted-foreground">
-        O cliente daquele país vê só este preço, na moeda dele, e recebe com frete nacional (tabela abaixo da lista de produtos).
+        O cliente daquele país vê só este preço, na moeda dele, e paga o frete informado aqui. Com vários produtos no mesmo pedido vale o maior frete (um pacote só), não a soma.
         A cada venda confirmada as unidades de lá diminuem; ao zerar, o produto volta a ser vendido do Japão, com o preço normal.
       </p>
     </div>
-  );
-};
-
-const REGION_LABELS = BR_REGION_LABELS as Record<string, string>;
-const REGIONS = Object.keys(REGION_LABELS);
-
-/** Tabela do frete nacional: PAC por região no Brasil, valor único nos outros países. */
-export const LocalShippingSettings: React.FC = () => {
-  const { toast } = useToast();
-  const [table, setTable] = useState<LocalShippingTable | null>(null);
-  const [saving, setSaving] = useState(false);
-
-  useEffect(() => { siteContentService.getLocalShipping().then(setTable); }, []);
-  if (!table) return null;
-
-  const regions = table.Brasil?.regions || {};
-  // Todo país (exceto Japão e Brasil) tem seu campo de frete nacional, preenchido ou não.
-  const others = COUNTRIES.filter((country) => country !== 'Brasil');
-  const number = (text: string) => (text === '' ? undefined : Math.max(0, Math.round(Number(text) || 0)));
-
-  const save = async () => {
-    setSaving(true);
-    try {
-      await siteContentService.saveLocalShipping(table);
-      toast({ title: '✅ Frete nacional salvo' });
-    } catch (e) {
-      toast({ title: 'Erro ao salvar o frete nacional', description: e instanceof Error ? e.message : String(e), variant: 'destructive' });
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <details open className="bg-card border border-border rounded-xl p-4">
-      <summary className="cursor-pointer text-sm font-semibold flex items-center gap-2">
-        <MapPin className="w-4 h-4 text-emerald-600" /> Frete nacional (produtos que já estão no país do cliente)
-      </summary>
-      <div className="mt-4 space-y-4">
-        <div>
-          <p className="text-xs font-semibold mb-2">Brasil — PAC por região (R$)</p>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
-            {REGIONS.map((region) => (
-              <label key={region} className="text-xs text-muted-foreground">
-                {REGION_LABELS[region]}
-                <input
-                  type="number"
-                  min={0}
-                  aria-label={`PAC ${REGION_LABELS[region]}`}
-                  value={regions[region] ?? ''}
-                  onChange={(e) => setTable({ ...table, Brasil: { regions: { ...regions, [region]: number(e.target.value) } } })}
-                  placeholder="R$"
-                  className="mt-1 block w-full px-3 py-2 rounded-lg border border-border bg-background text-sm text-foreground"
-                />
-              </label>
-            ))}
-          </div>
-          <p className="text-[11px] text-muted-foreground mt-1.5">Região sem valor não vende do Brasil: o pedido daquela região segue do Japão. Use 0 para frete grátis.</p>
-        </div>
-        {others.map((country) => (
-          <label key={country} className="block text-xs text-muted-foreground">
-            {country} — frete nacional único ({SYMBOL[getCurrencyByCountry(country)] || getCurrencyByCountry(country)})
-            <input
-              type="number"
-              min={0}
-              aria-label={`Frete nacional ${country}`}
-              value={table[country]?.flat ?? ''}
-              onChange={(e) => setTable({ ...table, [country]: { flat: number(e.target.value) } })}
-              className="mt-1 block w-32 px-3 py-2 rounded-lg border border-border bg-background text-sm text-foreground"
-            />
-          </label>
-        ))}
-        <div className="flex flex-wrap items-center gap-3">
-
-          <Button size="sm" onClick={save} disabled={saving} className="btn-primary gap-2">
-            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Salvar frete nacional
-          </Button>
-        </div>
-      </div>
-    </details>
   );
 };
