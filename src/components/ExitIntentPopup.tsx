@@ -9,7 +9,7 @@ import { newsletterService } from '@/services/newsletterService';
 import { requestPsFeeWaiver } from '@/services/psFeeWaiverService';
 import { checkoutPointsCoverage, psFeeWaiver } from '@/utils/psFeeWaiver';
 import { safeStorage } from '@/utils/storage';
-import { isLocalOrder } from '@/utils/localStock';
+import { isLocalOrder, shipAllFromJapan, splitCart } from '@/utils/localStock';
 import { effectiveYen } from '@/utils/pricing';
 import type { CartItem } from '@/types';
 import { overlayHistory } from '@/lib/overlayHistory';
@@ -40,8 +40,12 @@ const flagSet = (k: string): void => {
 };
 
 // Quantidade de itens que pagam taxa PS (¥1.000/un): exclui brindes e isentos (noPsFee).
-const psFeeQtyOf = (list: CartItem[]): number =>
-  list.reduce((s, i) => (i.freeGift || i.product?.noPsFee) ? s : s + i.quantity, 0);
+// Itens enviados do país do cliente (estoque local) também ficam de fora: não pagam taxa PS.
+const psFeeQtyOf = (list: CartItem[]): number => {
+  const country = safeStorage.getItem('sakura_selected_country') || 'Brasil';
+  const local = new Set(shipAllFromJapan() ? [] : splitCart(list, country).localItems);
+  return list.reduce((s, i) => (i.freeGift || i.product?.noPsFee || local.has(i)) ? s : s + i.quantity, 0);
+};
 
 // Subtotal da mercadoria em ¥ (exclui brindes): base dos pontos
 const productSubtotalYenOf = (list: CartItem[]): number =>

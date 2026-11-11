@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   toast: vi.fn(),
   requestPsFeeWaiver: vi.fn(),
   localStock: undefined as undefined | Record<string, unknown>,
+  extraJapanItem: false,
 }));
 
 vi.mock('react-router-dom', async (importOriginal) => ({
@@ -26,7 +27,11 @@ vi.mock('@/context/CartContext', () => ({
       product: { id: 'produto-1', prices: { small: 1450 }, noPsFee: false, localStock: mocks.localStock },
       size: 'small',
       quantity: 1,
-    } as unknown as CartItem],
+    } as unknown as CartItem, ...(mocks.extraJapanItem ? [{
+      product: { id: 'produto-2', prices: { small: 2380 }, noPsFee: false },
+      size: 'small',
+      quantity: 1,
+    } as unknown as CartItem] : [])],
   }),
 }));
 vi.mock('@/hooks/use-toast', () => ({ useToast: () => ({ toast: mocks.toast }) }));
@@ -51,6 +56,7 @@ describe('ExitIntentPopup com resgate de pontos', () => {
     localStorage.clear();
     sessionStorage.clear();
     mocks.localStock = undefined;
+    mocks.extraJapanItem = false;
     mocks.requestPsFeeWaiver.mockReset().mockResolvedValue({
       token: 'autorizacao-assinada',
       expiresAt: Date.now() + 60 * 60 * 1000,
@@ -101,5 +107,17 @@ describe('ExitIntentPopup com resgate de pontos', () => {
     triggerDesktopExit();
 
     expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('pedido misto: a taxa PS da oferta conta só o item do Japão (¥1.000, não ¥2.000)', () => {
+    localStorage.setItem('sakura_selected_country', 'Brasil');
+    mocks.localStock = { Brasil: { enabled: true, price: 89, quantity: 5, shippingOptions: [{ name: 'Sul', price: 29 }] } };
+    mocks.extraJapanItem = true;
+    render(<ExitIntentPopup />);
+
+    triggerDesktopExit();
+
+    expect(screen.getByRole('button', { name: /economizar ¥ 1,000/ })).toBeTruthy();
+    expect(screen.queryByText(/2,000/)).toBeNull();
   });
 });
