@@ -191,6 +191,14 @@ const CompactProductCard: React.FC<CompactProductCardProps> = ({ product }) => {
         >
           <Heart className={cn('h-5 w-5 transition-all', isFavorite && 'animate-[pop_0.35s_ease-out] fill-current')} />
         </button>
+        {/* Tarja verde na base da foto: o produto já está no país do cliente. */}
+        {offer && (
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-center justify-center gap-1 bg-emerald-600 px-1 py-1 text-[9px] font-extrabold uppercase leading-tight text-white sm:text-[11px] sm:tracking-wide">
+            {/* No celular o card é estreito: sem ícone, o texto cabe inteiro numa linha. */}
+            <MapPin className="hidden h-3 w-3 shrink-0 sm:block" aria-hidden />
+            <span className="whitespace-nowrap">Enviado direto do {selectedCountry}</span>
+          </div>
+        )}
         {isSoldOut && (
           <div className="absolute inset-0 flex items-center justify-center bg-white/70">
             <span className="text-[11px] font-black text-red-600">ESGOTADO</span>
@@ -217,11 +225,7 @@ const CompactProductCard: React.FC<CompactProductCardProps> = ({ product }) => {
             <p className={cn('text-base font-black leading-none tracking-tight', promoActive ? 'text-red-600' : 'text-pink-600')}>
               {offer ? formatPrice(price, currency, true) : <PriceStack value={price} currency={currency} />}
             </p>
-            {offer && (
-              <p className="mt-1 inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold leading-none text-emerald-700">
-                <MapPin className="h-2.5 w-2.5" aria-hidden /> Envio do {selectedCountry}
-              </p>
-            )}
+
             {promoActive && (
               <p className="mt-0.5 whitespace-nowrap text-[10px] leading-none text-gray-400 line-through">
                 {formatPrice(originalPrice, currency, true)}
