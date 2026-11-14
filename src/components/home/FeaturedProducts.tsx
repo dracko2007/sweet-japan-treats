@@ -67,18 +67,17 @@ const FeaturedProducts: React.FC = () => {
           <div className="max-w-2xl">
             <p className="text-[11px] font-black uppercase tracking-[0.2em] text-pink-500">{t('featured.badge')}</p>
             <h2 className="mt-2 bg-gradient-to-r from-slate-950 via-pink-700 to-fuchsia-600 bg-clip-text text-3xl font-bold tracking-tight text-transparent md:text-4xl">{t('featured.title')}</h2>
-            <p className="mt-3 text-base leading-relaxed text-slate-600 md:text-lg">{t('featured.subtitle')}</p>
           </div>
           <Link
             to="/produtos"
-            className="group inline-flex w-fit items-center gap-2 rounded-xl border border-pink-200 bg-gradient-to-r from-pink-50 to-white px-5 py-2.5 text-sm font-bold text-pink-600 shadow-sm transition-all duration-300 hover:scale-105 hover:border-pink-300 hover:shadow-md hover:from-pink-100 focus-visible:ring-2 focus-visible:ring-pink-500 focus-visible:ring-offset-2"
+            className="group inline-flex w-fit items-center gap-2 rounded-xl border border-pink-200 bg-gradient-to-r from-pink-50 to-white px-5 py-2.5 text-sm font-bold text-pink-600 shadow-sm transition-[transform,border-color,box-shadow] duration-200 hover:-translate-y-0.5 hover:border-pink-300 hover:shadow-md hover:from-pink-100 focus-visible:ring-2 focus-visible:ring-pink-500 focus-visible:ring-offset-2"
           >
             {t('featured.viewAll')}
             <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
           </Link>
         </div>
 
-        <div className="mb-7 flex gap-2 overflow-x-auto rounded-2xl border border-white/80 bg-white/55 p-2 shadow-[0_10px_30px_-18px_rgba(219,39,119,0.5)] backdrop-blur-xl scrollbar-hide md:w-fit">
+        <div className="mb-7 flex gap-2 overflow-x-auto rounded-2xl border border-pink-100 bg-white p-2 shadow-sm scrollbar-hide md:w-fit">
           {tabs.map(({ id, label, icon: Icon }) => (
             <button
               type="button"

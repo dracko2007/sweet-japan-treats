@@ -31,7 +31,7 @@ const Footer: React.FC = () => {
   };
 
   return (
-    <footer className="bg-accent text-accent-foreground">
+    <footer className="border-t-2 border-pink-500 bg-slate-950 text-accent-foreground">
       <div className="container mx-auto px-4 py-12">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           {/* Brand */}
@@ -49,13 +49,13 @@ const Footer: React.FC = () => {
             <p className="text-accent-foreground/90 text-xs leading-relaxed max-w-md mt-3">
               {operatorDisclosure}
             </p>
-            <div className="flex items-center gap-4 mt-6">
+            <div className="flex items-center gap-3 mt-6">
               <a
                 href={INSTAGRAM_URL}
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label="Instagram @japan_express_official"
-                className="p-2 rounded-full bg-white/15 hover:bg-white/25 transition-colors"
+                className="flex h-11 w-11 items-center justify-center rounded-full bg-white/10 hover:bg-white/20 transition-colors"
               >
                 <Instagram className="w-5 h-5" />
               </a>
@@ -64,7 +64,7 @@ const Footer: React.FC = () => {
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label="Facebook Japan Express Store"
-                className="p-2 rounded-full bg-white/15 hover:bg-white/25 transition-colors"
+                className="flex h-11 w-11 items-center justify-center rounded-full bg-white/10 hover:bg-white/20 transition-colors"
               >
                 <Facebook className="w-5 h-5" />
               </a>
@@ -73,7 +73,7 @@ const Footer: React.FC = () => {
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label="TikTok @japanexpressoficial"
-                className="p-2 rounded-full bg-white/15 hover:bg-white/25 transition-colors"
+                className="flex h-11 w-11 items-center justify-center rounded-full bg-white/10 hover:bg-white/20 transition-colors"
               >
                 <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
                   <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.5 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.28 0 .54.04.79.1V9.01a6.33 6.33 0 0 0-.79-.05 6.34 6.34 0 0 0-6.34 6.34 6.34 6.34 0 0 0 6.34 6.34 6.34 6.34 0 0 0 6.33-6.34V8.69a8.18 8.18 0 0 0 4.78 1.52V6.77a4.85 4.85 0 0 1-1.01-.08z"/>
@@ -84,7 +84,7 @@ const Footer: React.FC = () => {
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label="X (Twitter) @japanexpress_of"
-                className="p-2 rounded-full bg-white/15 hover:bg-white/25 transition-colors"
+                className="flex h-11 w-11 items-center justify-center rounded-full bg-white/10 hover:bg-white/20 transition-colors"
               >
                 <Twitter className="w-5 h-5" />
               </a>
@@ -93,13 +93,13 @@ const Footer: React.FC = () => {
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label="WhatsApp"
-                className="p-2 rounded-full bg-green-500/80 hover:bg-green-500 transition-colors"
+                className="flex h-11 w-11 items-center justify-center rounded-full bg-green-500/80 hover:bg-green-500 transition-colors"
               >
                 <MessageCircle className="w-5 h-5" />
               </a>
               <a
                 href={`mailto:${CONTACT_EMAIL}`}
-                className="p-2 rounded-full bg-white/15 hover:bg-white/25 transition-colors"
+                className="flex h-11 w-11 items-center justify-center rounded-full bg-white/10 hover:bg-white/20 transition-colors"
               >
                 <Mail className="w-5 h-5" />
               </a>
@@ -109,29 +109,29 @@ const Footer: React.FC = () => {
           {/* Links */}
           <div>
             <h4 className="font-display font-semibold mb-4">{t('footer.links')}</h4>
-            <ul className="space-y-2">
+            <ul className="space-y-0.5">
               <li>
-                <Link to="/produtos" className="text-sm text-accent-foreground/90 hover:text-accent-foreground transition-colors">
+                <Link to="/produtos" className="inline-flex min-h-[44px] items-center text-sm text-accent-foreground/90 hover:text-accent-foreground transition-colors">
                   {t('nav.products')}
                 </Link>
               </li>
               <li>
-                <Link to="/vlog" className="text-sm text-accent-foreground/90 hover:text-accent-foreground transition-colors">
+                <Link to="/vlog" className="inline-flex min-h-[44px] items-center text-sm text-accent-foreground/90 hover:text-accent-foreground transition-colors">
                   {t('nav.vlog')}
                 </Link>
               </li>
               <li>
-                <Link to="/frete" className="text-sm text-accent-foreground/90 hover:text-accent-foreground transition-colors">
+                <Link to="/frete" className="inline-flex min-h-[44px] items-center text-sm text-accent-foreground/90 hover:text-accent-foreground transition-colors">
                   {t('nav.shipping')}
                 </Link>
               </li>
               <li>
-                <Link to="/sobre" className="text-sm text-accent-foreground/90 hover:text-accent-foreground transition-colors">
+                <Link to="/sobre" className="inline-flex min-h-[44px] items-center text-sm text-accent-foreground/90 hover:text-accent-foreground transition-colors">
                   {t('nav.about')}
                 </Link>
               </li>
               <li>
-                <Link to="/afiliado" className="text-sm text-accent-foreground/90 hover:text-accent-foreground transition-colors">
+                <Link to="/afiliado" className="inline-flex min-h-[44px] items-center text-sm text-accent-foreground/90 hover:text-accent-foreground transition-colors">
                   {t('footer.affiliate')}
                 </Link>
               </li>
@@ -190,16 +190,16 @@ const Footer: React.FC = () => {
             © {new Date().getFullYear()} {COMPANY_PROFILE.brand}. {t('footer.rights')}
           </p>
           <div className="flex items-center gap-4 flex-wrap justify-center">
-            <Link to="/privacidade" className="text-xs text-accent-foreground/90 hover:text-accent-foreground/90 transition-colors">
+            <Link to="/privacidade" className="inline-flex min-h-[44px] items-center text-xs text-accent-foreground/90 hover:text-accent-foreground transition-colors">
               {t('footer.privacy')}
             </Link>
-            <Link to="/termos" className="text-xs text-accent-foreground/90 hover:text-accent-foreground/90 transition-colors">
+            <Link to="/termos" className="inline-flex min-h-[44px] items-center text-xs text-accent-foreground/90 hover:text-accent-foreground transition-colors">
               {t('footer.terms')}
             </Link>
-            <Link to="/cookies" className="text-xs text-accent-foreground/90 hover:text-accent-foreground/90 transition-colors">
+            <Link to="/cookies" className="inline-flex min-h-[44px] items-center text-xs text-accent-foreground/90 hover:text-accent-foreground transition-colors">
               {t('footer.cookies')}
             </Link>
-            <Link to="/devolucao" className="text-xs text-accent-foreground/90 hover:text-accent-foreground/90 transition-colors">
+            <Link to="/devolucao" className="inline-flex min-h-[44px] items-center text-xs text-accent-foreground/90 hover:text-accent-foreground transition-colors">
               {t('footer.returns') || 'Devolução'}
             </Link>
           </div>

@@ -302,7 +302,7 @@ const HeaderPro: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => restoreAndOpen('whatsapp')}
-                  className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-500 text-white shadow-md transition-transform hover:scale-105 active:scale-95"
+                  className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-500 text-white shadow-md transition-transform hover:scale-105 active:scale-95"
                   aria-label="Abrir atendimento no WhatsApp"
                   title="WhatsApp"
                 >
@@ -313,7 +313,7 @@ const HeaderPro: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => restoreAndOpen('assistant')}
-                  className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-tr from-primary via-accent to-primary text-white shadow-md transition-transform hover:scale-105 active:scale-95"
+                  className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-tr from-primary via-accent to-primary text-white shadow-md transition-transform hover:scale-105 active:scale-95"
                   aria-label={t('kimiclaw.title')}
                   title={t('kimiclaw.title')}
                 >
