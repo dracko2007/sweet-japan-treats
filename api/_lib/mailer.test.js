@@ -377,3 +377,15 @@ describe('taxa PS no e-mail: aparece também quando foi isenta', () => {
     expect(buildOrderEmail(base({ psFee: 12, psFeeGross: 12, psFeeDiscount: 0 }), { tracking: true }).html).toContain('Taxa PS (Personal Shopper)');
   });
 });
+
+describe('texto do e-mail de pedido recebido conforme o pagamento', () => {
+  const base = { orderNumber: 'SE-BR-1', customerName: 'Ana', currency: 'BRL', totalPrice: 10, items: [{ productName: 'X', quantity: 1, price: 10 }] };
+  it('pagamento já confirmado (cartão pelo webhook): não diz que será confirmado depois', () => {
+    const { html } = buildOrderEmail({ ...base, paymentConfirmed: true });
+    expect(html).toContain('pagamento ja foi confirmado');
+    expect(html).not.toContain('sera confirmado antes da separacao');
+  });
+  it('pagamento pendente (PIX/Wise): mantém o aviso', () => {
+    expect(buildOrderEmail(base).html).toContain('sera confirmado antes da separacao');
+  });
+});

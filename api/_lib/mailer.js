@@ -405,7 +405,7 @@ export function buildOrderEmail(order, { tracking = false, store = false } = {})
     ? `Pedido enviado - #${orderNumber}`
     : store ? `Novo pedido${shipFrom ? (isMixedOrder(order) ? ` (${shipFrom} + Japao)` : ` (enviar do ${shipFrom})`) : ''} - #${orderNumber}` : `Pedido recebido - #${orderNumber}`;
   const table = `<table style="width:100%;border-collapse:collapse">${items}${breakdown ?? ''}${total}</table>`;
-  const html = wrapEmail(`<p>Ola, <strong>${name}</strong>.</p><p>${tracking ? 'Seu pedido foi enviado.' : 'Recebemos seu pedido. O pagamento sera confirmado antes da separacao.'}</p>${trackingBlock}${localBlock}${table}${paymentBlock}${wiseBlock}${addressBlock}${storeBlock}<p>Pedido: <strong>${orderNumber}</strong></p>`);
+  const html = wrapEmail(`<p>Ola, <strong>${name}</strong>.</p><p>${tracking ? 'Seu pedido foi enviado.' : order.paymentConfirmed === true ? 'Recebemos seu pedido e o pagamento ja foi confirmado. Agora vamos separar e embalar.' : 'Recebemos seu pedido. O pagamento sera confirmado antes da separacao.'}</p>${trackingBlock}${localBlock}${table}${paymentBlock}${wiseBlock}${addressBlock}${storeBlock}<p>Pedido: <strong>${orderNumber}</strong></p>`);
   return { subject, html };
 }
 
