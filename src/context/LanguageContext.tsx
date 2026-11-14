@@ -118,10 +118,23 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
   }, []);
 
   const t = useCallback((key: string): string => {
-    const suffix = selectedCountry === 'Japão' ? 'japan' : 'brazil';
+    // Japão → `.japan`; Brasil → `.brazil`; demais países → `.international`
+    // (cai para `.brazil`, que é a cópia de envio internacional genérica, quando
+    // a chave internacional não existe). Sem isso, um cliente nos EUA lia
+    // "entregamos em todo o Brasil pelos Correios".
+    const suffixes = selectedCountry === 'Japão'
+      ? ['japan']
+      : selectedCountry === 'Brasil' ? ['brazil'] : ['international', 'brazil'];
     const dict = translations[language] || translations['pt'];
-    const suffixedKey = `${key}.${suffix}`;
-    return dict[suffixedKey] || dict[key] || translations['pt'][suffixedKey] || translations['pt'][key] || key;
+    const pt = translations['pt'];
+    for (const d of [dict, pt]) {
+      for (const suffix of suffixes) {
+        const v = d[`${key}.${suffix}`];
+        if (v) return v;
+      }
+      if (d === dict && d[key]) return d[key];
+    }
+    return pt[key] || key;
   }, [language, selectedCountry]);
 
   return (

@@ -137,3 +137,44 @@ describe('LanguageContext detecção por IP', () => {
     expect(alvos.some((url) => url.includes('/api/geo'))).toBe(false);
   });
 });
+
+function CopyProbe() {
+  const { t } = useLanguage();
+  return (
+    <div>
+      <span data-testid="subtitle">{t('shipping.subtitle')}</span>
+      <span data-testid="carrier1">{t('shippingBanner.carrier1.title')}</span>
+    </div>
+  );
+}
+
+describe('LanguageContext country-specific copy', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    localStorage.setItem('preferred-language', 'pt');
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network disabled in test')));
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('não promete entrega "em todo o Brasil" a quem escolheu outro país', () => {
+    localStorage.setItem('sakura_selected_country', 'Estados Unidos');
+    render(<LanguageProvider><CopyProbe /></LanguageProvider>);
+    expect(screen.getByTestId('subtitle').textContent).toContain('o seu país');
+    expect(screen.getByTestId('subtitle').textContent).not.toContain('Brasil');
+    // Sem chave .international, cai para a cópia internacional (.brazil), não para a do Japão.
+    expect(screen.getByTestId('carrier1').textContent).toBe('Japan Post & EMS');
+  });
+
+  it('mantém a cópia do Brasil e do Japão', () => {
+    localStorage.setItem('sakura_selected_country', 'Brasil');
+    const { unmount } = render(<LanguageProvider><CopyProbe /></LanguageProvider>);
+    expect(screen.getByTestId('subtitle').textContent).toContain('todo o Brasil');
+    unmount();
+    localStorage.setItem('sakura_selected_country', 'Japão');
+    render(<LanguageProvider><CopyProbe /></LanguageProvider>);
+    expect(screen.getByTestId('carrier1').textContent).toBe('3 Transportadoras');
+  });
+});
