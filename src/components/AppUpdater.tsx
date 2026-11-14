@@ -19,6 +19,8 @@ const AppUpdater = () => {
     anterior.current = pathname;
     if (atualizacaoPronta() && podeAplicarAoNavegar(de, pathname)) {
       // A URL já é a da página nova: recarregar abre ela com a versão nova.
+      // Sobe ao topo ANTES: o reload no iPhone restaura a rolagem da página anterior.
+      window.scrollTo(0, 0);
       window.location.reload();
     }
   }, [pathname]);

@@ -6,6 +6,10 @@ import { migrateLocalStorage } from "./utils/migrate";
 import { isChunkLoadError, recoverFromChunkError } from "./utils/recoverFromChunkError";
 import { marcarAtualizacaoPronta } from "./utils/appUpdate";
 
+// A loja sempre abre a página no topo: o WebKit (iPhone, principalmente no PWA) restaura a
+// posição de rolagem depois de um reload e desfazia o "voltar ao topo". Desligado antes de tudo.
+try { window.history.scrollRestoration = "manual"; } catch { /* navegador sem suporte */ }
+
 migrateLocalStorage();
 
 // Registra o Service Worker. Atualização como numa loja de apps: o build novo
