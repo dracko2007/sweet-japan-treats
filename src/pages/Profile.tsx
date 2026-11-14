@@ -548,7 +548,7 @@ const Profile: React.FC = () => {
                   </div>
                   <div className="h-2.5 rounded-full bg-white/25 overflow-hidden">
                     <div
-                      className="h-full rounded-full bg-white transition-all duration-500"
+                      className="h-full rounded-full bg-white transition duration-500"
                       style={{ width: `${tierInfo.percent}%` }}
                     />
                   </div>
@@ -734,7 +734,7 @@ const Profile: React.FC = () => {
                         // Troca o país e limpa estado/cidade pra evitar mistura de listas.
                         address: { ...prev.address, country: e.target.value, prefecture: '', city: '' } as any,
                       }))}
-                      className="w-full p-3 rounded-lg border border-border bg-background text-foreground focus:ring-2 focus:ring-primary focus:border-primary transition-all"
+                      className="w-full p-3 rounded-lg border border-border bg-background text-foreground focus:ring-2 focus:ring-primary focus:border-primary transition"
                     >
                       {['Brasil', 'Japão', 'Portugal', 'França', 'Itália', 'Espanha', 'Alemanha'].map((c) => (
                         <option key={c} value={c}>{c}</option>
@@ -777,7 +777,7 @@ const Profile: React.FC = () => {
                             address: { ...prev.address, prefecture: e.target.value }
                           }));
                         }}
-                        className="w-full p-3 rounded-lg border border-border bg-background text-foreground focus:ring-2 focus:ring-primary focus:border-primary transition-all"
+                        className="w-full p-3 rounded-lg border border-border bg-background text-foreground focus:ring-2 focus:ring-primary focus:border-primary transition"
                       >
                         <option value="">{isJapanAddress ? t('profile.field.state.placeholder.jp') : t('profile.field.state.placeholder.br')}</option>
                         {addressList.map((pref) => (

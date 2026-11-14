@@ -80,13 +80,13 @@ const CookieBanner: React.FC = () => {
               <div className="flex flex-col sm:flex-row gap-2 mt-4">
                 <button
                   onClick={accept}
-                  className="flex-1 bg-pink-500 hover:bg-pink-600 active:scale-95 text-white font-bold text-sm py-2.5 px-5 rounded-xl transition-all duration-200 shadow-sm"
+                  className="flex-1 bg-pink-500 hover:bg-pink-600 active:scale-95 text-white font-bold text-sm py-2.5 px-5 rounded-xl transition duration-200 shadow-sm"
                 >
                   {t('cookieBanner.acceptAll')}
                 </button>
                 <button
                   onClick={decline}
-                  className="flex-1 bg-gray-100 hover:bg-gray-200 active:scale-95 text-gray-700 font-bold text-sm py-2.5 px-5 rounded-xl transition-all duration-200"
+                  className="flex-1 bg-gray-100 hover:bg-gray-200 active:scale-95 text-gray-700 font-bold text-sm py-2.5 px-5 rounded-xl transition duration-200"
                 >
                   {t('cookieBanner.essentialOnly')}
                 </button>

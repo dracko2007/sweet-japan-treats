@@ -184,7 +184,7 @@ const Business: React.FC = () => {
                 <div className="grid sm:grid-cols-3 gap-3">
                   {SHIPPING_OPTIONS.map((opt) => (
                     <button type="button" key={opt.value} onClick={() => set('shipping', opt.value)}
-                      className={`text-left p-3 rounded-xl border-2 transition-all ${
+                      className={`text-left p-3 rounded-xl border-2 transition ${
                         form.shipping === opt.value ? 'border-primary bg-primary/5' : 'border-border hover:border-gray-300'
                       }`}>
                       <div className="flex items-center gap-2 text-primary mb-1">{opt.icon}<span className="font-semibold text-sm text-foreground">{t(opt.labelKey)}</span></div>

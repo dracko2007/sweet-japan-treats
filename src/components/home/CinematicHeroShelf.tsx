@@ -577,7 +577,7 @@ const CinematicHeroShelf: React.FC<CinematicHeroShelfProps> = ({
       {introVideo.showOverlayLogo && (
         <div
         className={cn(
-          'pointer-events-none absolute inset-0 z-20 flex items-center justify-center transition-all duration-1000 ease-out',
+          'pointer-events-none absolute inset-0 z-20 flex items-center justify-center transition duration-1000 ease-out',
           logoMoment ? 'scale-100 opacity-100' : 'scale-90 opacity-0',
         )}
         aria-hidden

@@ -1021,7 +1021,7 @@ const Checkout: React.FC = () => {
                             }));
                           }}
                           required
-                          className="w-full p-2.5 rounded-lg border border-border bg-background text-foreground focus:ring-2 focus:ring-primary focus:border-primary transition-all font-medium text-sm"
+                          className="w-full p-2.5 rounded-lg border border-border bg-background text-foreground focus:ring-2 focus:ring-primary focus:border-primary transition font-medium text-sm"
                         >
                           {WORLD_COUNTRIES.map((c) => (
                             <option key={c.name} value={c.name}>
@@ -1093,7 +1093,7 @@ const Checkout: React.FC = () => {
                               value={formData.prefecture}
                               onChange={handleInputChange}
                               required
-                              className="w-full p-2.5 rounded-lg border border-border bg-background text-foreground focus:ring-2 focus:ring-primary focus:border-primary transition-all font-medium text-sm"
+                              className="w-full p-2.5 rounded-lg border border-border bg-background text-foreground focus:ring-2 focus:ring-primary focus:border-primary transition font-medium text-sm"
                             >
                               <option value="">
                                 {formData.country === 'Japão' ? 'Escolha a Província...'

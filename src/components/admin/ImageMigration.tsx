@@ -321,7 +321,7 @@ const ImageMigration: React.FC = () => {
             <span className="font-medium">{state.done}/{state.total} ({pct}%)</span>
           </div>
           <div className="w-full bg-secondary rounded-full h-3 overflow-hidden">
-            <div className="h-full bg-primary rounded-full transition-all duration-500" style={{ width: `${pct}%` }} />
+            <div className="h-full bg-primary rounded-full transition-[width] duration-500" style={{ width: `${pct}%` }} />
           </div>
           {state.errors.length > 0 && <p className="text-xs text-orange-600">{state.errors.length} erro(s) — continuando...</p>}
         </div>
@@ -442,7 +442,7 @@ const ImageMigration: React.FC = () => {
                 <span className="font-bold">{hdState.done}/{hdState.total} ({Math.round(hdState.done / hdState.total * 100)}%)</span>
               </div>
               <div className="w-full bg-blue-200 rounded-full h-2.5 overflow-hidden">
-                <div className="h-full bg-blue-600 rounded-full transition-all duration-500" style={{ width: `${Math.round(hdState.done / hdState.total * 100)}%` }} />
+                <div className="h-full bg-blue-600 rounded-full transition-[width] duration-500" style={{ width: `${Math.round(hdState.done / hdState.total * 100)}%` }} />
               </div>
             </div>
           )}

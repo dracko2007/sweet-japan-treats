@@ -354,7 +354,7 @@ const PromotionManager: React.FC = () => {
               {active.maxProducts != null && (active.soldCount ?? 0) < active.maxProducts && (
                 <div className="mt-1">
                   <div className="h-1.5 bg-secondary rounded-full overflow-hidden w-full max-w-xs">
-                    <div className="h-full bg-amber-500 rounded-full transition-all"
+                    <div className="h-full bg-amber-500 rounded-full transition"
                       style={{ width: `${Math.min(100, ((active.soldCount ?? 0) / active.maxProducts) * 100)}%` }} />
                   </div>
                 </div>

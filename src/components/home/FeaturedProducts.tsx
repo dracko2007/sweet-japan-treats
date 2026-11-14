@@ -84,7 +84,7 @@ const FeaturedProducts: React.FC = () => {
               key={id}
               onClick={() => setTab(id)}
               className={cn(
-                'shrink-0 flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-extrabold transition-all duration-300',
+                'shrink-0 flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-extrabold transition duration-300',
                 tab === id
                   ? 'bg-gradient-to-r from-pink-500 to-fuchsia-500 text-white shadow-lg shadow-pink-500/20'
                   : 'text-slate-500 hover:bg-pink-50 hover:text-pink-600'

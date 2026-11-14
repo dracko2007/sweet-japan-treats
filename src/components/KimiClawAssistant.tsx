@@ -1483,7 +1483,7 @@ const KimiClawAssistant: React.FC = () => {
           aria-haspopup="dialog"
           aria-expanded={false}
           aria-controls="kimiclaw-panel"
-          className="w-14 h-14 rounded-full bg-gradient-to-tr from-primary via-accent to-primary text-white flex items-center justify-center shadow-elevated hover:shadow-[0_8px_30px_rgb(249,115,22,0.4)] transition-all duration-300 transform hover:scale-105 border border-white/20 group relative overflow-hidden focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+          className="w-14 h-14 rounded-full bg-gradient-to-tr from-primary via-accent to-primary text-white flex items-center justify-center shadow-elevated hover:shadow-[0_8px_30px_rgb(249,115,22,0.4)] transition duration-300 transform hover:scale-105 border border-white/20 group relative overflow-hidden focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
         >
           <Bot className="w-7 h-7 text-white transform group-hover:rotate-12 transition-transform duration-300" />
           <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-green-500 rounded-full border border-white animate-ping" />
@@ -1577,13 +1577,13 @@ const KimiClawAssistant: React.FC = () => {
                     <div className="flex gap-2 mt-1">
                       <button
                         onClick={() => handleConsentAction(true, msg.orderToShare)}
-                        className="text-[11px] font-bold bg-primary hover:bg-primary/95 text-white px-3 py-1.5 rounded-lg shadow-soft transition-all"
+                        className="text-[11px] font-bold bg-primary hover:bg-primary/95 text-white px-3 py-1.5 rounded-lg shadow-soft transition"
                       >
                         ✅ {language === 'pt' ? 'Sim, quero receber!' : 'Yes, subscribe me!'}
                       </button>
                       <button
                         onClick={() => handleConsentAction(false, msg.orderToShare)}
-                        className="text-[11px] font-semibold bg-secondary hover:bg-secondary/80 text-foreground px-3 py-1.5 rounded-lg transition-all"
+                        className="text-[11px] font-semibold bg-secondary hover:bg-secondary/80 text-foreground px-3 py-1.5 rounded-lg transition"
                       >
                         ❌ {language === 'pt' ? 'Não, obrigado' : 'No, thanks'}
                       </button>
@@ -1605,7 +1605,7 @@ const KimiClawAssistant: React.FC = () => {
                                   {formatPrice(fxConvert(effectiveYen(product, 'small'), getCurrencyByCountry(selectedCountry)), getCurrencyByCountry(selectedCountry))}
                                 </p>
                               </div>
-                              <ChevronRight className="w-3.5 h-3.5 text-muted-foreground shrink-0 group-hover:text-primary group-hover:translate-x-0.5 transition-all" />
+                              <ChevronRight className="w-3.5 h-3.5 text-muted-foreground shrink-0 group-hover:text-primary group-hover:translate-x-0.5 transition" />
                             </Link>
                             <button
                               onClick={() => {
@@ -1716,7 +1716,7 @@ const KimiClawAssistant: React.FC = () => {
               <div className="flex flex-wrap gap-1.5 max-h-[85px] overflow-y-auto scrollbar-hide py-0.5">
                 <button
                   onClick={() => handleSuggestionClick(t('kimiclaw.skill.search_products'), 'buscar produtos')}
-                  className="text-[11px] bg-primary/10 hover:bg-primary/20 border border-primary/20 rounded-full px-2.5 py-1 text-primary-dark dark:text-primary font-bold flex items-center gap-1 transition-all duration-200"
+                  className="text-[11px] bg-primary/10 hover:bg-primary/20 border border-primary/20 rounded-full px-2.5 py-1 text-primary-dark dark:text-primary font-bold flex items-center gap-1 transition duration-200"
                 >
                   🔍 {language === 'pt' ? 'Buscar Produtos' : 'Search Products'}
                 </button>
@@ -1724,31 +1724,31 @@ const KimiClawAssistant: React.FC = () => {
                   <>
                     <button
                       onClick={() => handleSuggestionClick('Qual o faturamento desse mês?', 'faturamento', { agent: true })}
-                      className="text-[11px] bg-green-500/10 hover:bg-green-500/20 border border-green-500/30 rounded-full px-2.5 py-1 text-green-700 dark:text-green-400 font-bold flex items-center gap-1 transition-all duration-200"
+                      className="text-[11px] bg-green-500/10 hover:bg-green-500/20 border border-green-500/30 rounded-full px-2.5 py-1 text-green-700 dark:text-green-400 font-bold flex items-center gap-1 transition duration-200"
                     >
                       📊 {language === 'pt' ? 'Faturamento' : 'Revenue'}
                     </button>
                     <button
                       onClick={() => handleSuggestionClick('Calcular frete do biore para Brasil', 'frete biore brasil', { agent: true })}
-                      className="text-[11px] bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 rounded-full px-2.5 py-1 text-amber-700 dark:text-amber-400 font-bold flex items-center gap-1 transition-all duration-200"
+                      className="text-[11px] bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 rounded-full px-2.5 py-1 text-amber-700 dark:text-amber-400 font-bold flex items-center gap-1 transition duration-200"
                     >
                       ⚖️ {language === 'pt' ? 'Frete por Produto' : 'Product Shipping'}
                     </button>
                     <button
                       onClick={() => handleSuggestionClick('Mostrar os produtos ocultos', 'mostrar produtos ocultos', { agent: true })}
-                      className="text-[11px] bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 rounded-full px-2.5 py-1 text-amber-700 dark:text-amber-400 font-medium transition-all duration-200"
+                      className="text-[11px] bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 rounded-full px-2.5 py-1 text-amber-700 dark:text-amber-400 font-medium transition duration-200"
                     >
                       👁️ {language === 'pt' ? 'Ver Catálogo Completo' : 'Full Catalog'}
                     </button>
                     <button
                       onClick={() => handleSuggestionClick('Quais produtos têm a menor margem? Mostre custo e margem.', 'margem lucro produto', { agent: true })}
-                      className="text-[11px] bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 rounded-full px-2.5 py-1 text-amber-700 dark:text-amber-400 font-medium transition-all duration-200"
+                      className="text-[11px] bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 rounded-full px-2.5 py-1 text-amber-700 dark:text-amber-400 font-medium transition duration-200"
                     >
                       📊 {language === 'pt' ? 'Margem/Custo' : 'Margin/Cost'}
                     </button>
                     <button
                       onClick={() => handleSuggestionClick(t('kimiclaw.skill.calc_shipping'), 'calcular frete')}
-                      className="text-[11px] bg-card hover:bg-primary/10 border border-border hover:border-primary/30 rounded-full px-2.5 py-1 text-foreground transition-all duration-200"
+                      className="text-[11px] bg-card hover:bg-primary/10 border border-border hover:border-primary/30 rounded-full px-2.5 py-1 text-foreground transition duration-200"
                     >
                       📦 {language === 'pt' ? 'Frete Manual' : 'Manual Shipping'}
                     </button>
@@ -1757,19 +1757,19 @@ const KimiClawAssistant: React.FC = () => {
                   <>
                     <button
                       onClick={() => handleSuggestionClick(t('kimiclaw.skill.calc_shipping'), 'calcular frete')}
-                      className="text-[11px] bg-primary/10 hover:bg-primary/20 border border-primary/20 rounded-full px-2.5 py-1 text-primary-dark dark:text-primary font-bold flex items-center gap-1 transition-all duration-200"
+                      className="text-[11px] bg-primary/10 hover:bg-primary/20 border border-primary/20 rounded-full px-2.5 py-1 text-primary-dark dark:text-primary font-bold flex items-center gap-1 transition duration-200"
                     >
                       📦 {language === 'pt' ? 'Calcular Frete' : 'Calc. Shipping'}
                     </button>
                     <button
                       onClick={() => handleSuggestionClick(t('kimiclaw.skill.apply_coupon'), 'cupom')}
-                      className="text-[11px] bg-card hover:bg-primary/10 border border-border hover:border-primary/30 rounded-full px-2.5 py-1 text-foreground transition-all duration-200"
+                      className="text-[11px] bg-card hover:bg-primary/10 border border-border hover:border-primary/30 rounded-full px-2.5 py-1 text-foreground transition duration-200"
                     >
                       {t('kimiclaw.skill.apply_coupon')}
                     </button>
                     <button
                       onClick={() => handleSuggestionClick('📱 Receber novidades no WhatsApp', 'enviar whatsapp')}
-                      className="text-[11px] bg-card hover:bg-primary/10 border border-border hover:border-primary/30 rounded-full px-2.5 py-1 text-foreground flex items-center gap-1 transition-all duration-200"
+                      className="text-[11px] bg-card hover:bg-primary/10 border border-border hover:border-primary/30 rounded-full px-2.5 py-1 text-foreground flex items-center gap-1 transition duration-200"
                     >
                       <Smartphone className="w-3 h-3" />
                       {language === 'pt' ? 'WhatsApp' : 'WhatsApp'}
@@ -1778,7 +1778,7 @@ const KimiClawAssistant: React.FC = () => {
                 )}
                 <button
                   onClick={() => handleSuggestionClick(t('kimiclaw.skill.clear_cart'), 'limpar carrinho')}
-                  className="text-[11px] bg-card hover:bg-destructive/10 border border-border hover:border-destructive/30 rounded-full px-2.5 py-1 text-destructive font-medium transition-all duration-200"
+                  className="text-[11px] bg-card hover:bg-destructive/10 border border-border hover:border-destructive/30 rounded-full px-2.5 py-1 text-destructive font-medium transition duration-200"
                 >
                   {t('kimiclaw.skill.clear_cart')}
                 </button>

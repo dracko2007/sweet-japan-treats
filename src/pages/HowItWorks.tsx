@@ -377,11 +377,11 @@ const JourneyStepper: React.FC<JourneyStepperProps> = ({ language, t }) => {
       <div className="relative mb-8 pt-6">
         <div className="absolute left-0 right-0 top-[42px] h-1.5 bg-secondary rounded-full" />
         <div
-          className="absolute left-0 top-[42px] h-1.5 rounded-full transition-all duration-700 ease-out"
+          className="absolute left-0 top-[42px] h-1.5 rounded-full transition duration-700 ease-out"
           style={{ width: `${pct}%`, background: 'linear-gradient(90deg,#ec4899,#f59e0b)' }}
         />
         <div
-          className="absolute -top-1 transition-all duration-700 ease-out z-10"
+          className="absolute -top-1 transition duration-700 ease-out z-10"
           style={{ left: `calc(${pct}% - 16px)` }}
         >
           <div className="w-9 h-9 rounded-full bg-white shadow-lg border-2 flex items-center justify-center animate-bounce"
@@ -403,7 +403,7 @@ const JourneyStepper: React.FC<JourneyStepperProps> = ({ language, t }) => {
               >
                 <span
                   className={cn(
-                    'w-11 h-11 rounded-full flex items-center justify-center border-2 transition-all duration-300 shrink-0',
+                    'w-11 h-11 rounded-full flex items-center justify-center border-2 transition duration-300 shrink-0',
                     done ? 'scale-100' : 'scale-90 opacity-50',
                     i === active && 'ring-4 ring-offset-2 ring-offset-card'
                   )}
@@ -467,7 +467,7 @@ const PaymentMethods: React.FC<PaymentMethodsProps> = ({ language, t }) => {
             key={p.id}
             onClick={() => setOpen(p.id)}
             className={cn(
-              'text-left rounded-2xl border p-5 transition-all duration-300',
+              'text-left rounded-2xl border p-5 transition duration-300',
               isOpen ? 'shadow-lg scale-[1.02] bg-card' : 'bg-card/60 hover:bg-card'
             )}
             style={{ borderColor: isOpen ? p.color : undefined }}
@@ -484,7 +484,7 @@ const PaymentMethods: React.FC<PaymentMethodsProps> = ({ language, t }) => {
             </div>
             <p className="text-xs text-muted-foreground mb-3">{p.short}</p>
 
-            <div className={cn('overflow-hidden transition-all duration-500', isOpen ? 'max-h-72' : 'max-h-0')}>
+            <div className={cn('overflow-hidden transition duration-500', isOpen ? 'max-h-72' : 'max-h-0')}>
               <ol className="space-y-2 pt-2 border-t border-border">
                 {p.steps.map((s, i) => (
                   <li key={i} className="flex gap-2.5 text-xs text-foreground">
@@ -517,7 +517,7 @@ const TaxExplainer: React.FC<TaxExplainerProps> = ({ language }) => {
             key={k}
             onClick={() => setC(k)}
             className={cn(
-              'flex-1 py-2.5 rounded-xl text-sm font-semibold border transition-all',
+              'flex-1 py-2.5 rounded-xl text-sm font-semibold border transition',
               c === k ? 'text-white shadow' : 'bg-secondary/40 text-muted-foreground hover:text-foreground'
             )}
             style={{ background: c === k ? TAX[k].tone : undefined, borderColor: c === k ? TAX[k].tone : 'transparent' }}
@@ -613,7 +613,7 @@ const CorreiosTracking: React.FC<CorreiosTrackingProps> = ({ language, t }) => {
                 return (
                   <div key={i} className="flex gap-2.5 items-start">
                     <div className="flex flex-col items-center">
-                      <span className={cn('w-6 h-6 rounded-full flex items-center justify-center transition-all duration-500',
+                      <span className={cn('w-6 h-6 rounded-full flex items-center justify-center transition duration-500',
                         current && 'ring-4', reached ? '' : 'opacity-30')}
                         style={{ background: reached ? s.color : '#cbd5e1', boxShadow: current ? `0 0 0 3px ${s.color}44` : undefined }}>
                         <Ico className="w-3 h-3 text-white" />
@@ -731,7 +731,7 @@ const BusinessImport: React.FC<BusinessImportProps> = ({ t, language }) => {
         <ChevronDown className={cn('w-5 h-5 text-primary shrink-0 transition-transform', open && 'rotate-180')} />
       </button>
 
-      <div className={cn('transition-all duration-500 overflow-hidden', open ? 'max-h-[700px]' : 'max-h-0')}>
+      <div className={cn('transition duration-500 overflow-hidden', open ? 'max-h-[700px]' : 'max-h-0')}>
         <div className="px-5 pb-5 space-y-4">
           <p className="text-sm text-muted-foreground leading-relaxed bg-background/60 rounded-xl p-3 border border-border">
             {bizBody.intro}

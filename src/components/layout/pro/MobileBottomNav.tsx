@@ -57,7 +57,7 @@ const MobileBottomNav: React.FC<Props> = ({ cartCount, cartKick, onOpenMenu, onO
               <motion.span
                 key={key === 'cart' ? cartKick : undefined}
                 className="relative block"
-                whileTap={reduce ? undefined : { scale: 0.8 }}
+                whileTap={reduce ? undefined : { scale: 0.95, transition: { duration: 0.12, ease: [0.23, 1, 0.32, 1] } }}
                 animate={key === 'cart' && cartKick && !reduce ? CART_KICK : undefined}
                 transition={{ duration: 0.6, ease: 'easeOut' }}
               >

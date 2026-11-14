@@ -149,7 +149,7 @@ const Header: React.FC = () => {
 
           {/* Search Bar — Desktop (escondida no admin) */}
           {!isAdminPage && (
-            <form onSubmit={handleSearch} className="mx-4 hidden max-w-2xl flex-1 items-center gap-2 overflow-hidden rounded-2xl border border-pink-100 bg-white/90 shadow-sm transition-all focus-within:border-pink-300 focus-within:shadow-lg focus-within:shadow-pink-100/60 md:flex">
+            <form onSubmit={handleSearch} className="mx-4 hidden max-w-2xl flex-1 items-center gap-2 overflow-hidden rounded-2xl border border-pink-100 bg-white/90 shadow-sm transition focus-within:border-pink-300 focus-within:shadow-lg focus-within:shadow-pink-100/60 md:flex">
               <input
                 type="text"
                 placeholder={t('nav.search') || 'Buscar...'}
@@ -169,7 +169,7 @@ const Header: React.FC = () => {
                   <option key={c.id} value={c.id}>{c.icon} {c.label}</option>
                 ))}
               </select>
-              <button type="submit" className="m-1 flex h-9 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-accent text-primary-foreground shadow-md transition-all hover:scale-105 hover:shadow-lg" aria-label={t('nav.search') || 'Buscar'}>
+              <button type="submit" className="m-1 flex h-9 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-accent text-primary-foreground shadow-md transition hover:scale-105 hover:shadow-lg" aria-label={t('nav.search') || 'Buscar'}>
                 <Search className="h-4 w-4" />
               </button>
             </form>
@@ -222,7 +222,7 @@ const Header: React.FC = () => {
                 )}
                 <Link
                   to="/carrinho"
-                  className="relative rounded-xl border border-transparent p-2 transition-all hover:border-pink-100 hover:bg-pink-50"
+                  className="relative rounded-xl border border-transparent p-2 transition hover:border-pink-100 hover:bg-pink-50"
                   aria-label={`${t('nav.cart') || 'Carrinho'}${totalItems > 0 ? ` — ${totalItems}` : ''}`}
                 >
                   <ShoppingCart className="h-5 w-5 text-foreground" />
@@ -250,7 +250,7 @@ const Header: React.FC = () => {
         {/* Navigation Menu — Desktop (hidden no admin) */}
         {!isAdminPage && (
           <nav className="hidden items-center gap-1 border-t border-pink-100/60 pb-2 pt-2 md:flex" aria-label="Navegação principal">
-            <Link to="/produtos" className="rounded-full bg-pink-50 px-3 py-1.5 text-sm font-bold text-pink-600 transition-all hover:-translate-y-0.5 hover:bg-pink-100 whitespace-nowrap shrink-0">
+            <Link to="/produtos" className="rounded-full bg-pink-50 px-3 py-1.5 text-sm font-bold text-pink-600 transition hover:-translate-y-0.5 hover:bg-pink-100 whitespace-nowrap shrink-0">
               {t('nav.products')}
             </Link>
             {primaryNavItems.map((item) => (

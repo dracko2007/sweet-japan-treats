@@ -104,7 +104,7 @@ const CouponSelector: React.FC<CouponSelectorProps> = ({
                         key={coupon.id}
                         type="button"
                         onClick={() => handleSelectCoupon(coupon)}
-                        className="w-full p-3 rounded-lg border-2 border-border hover:border-primary transition-all text-left"
+                        className="w-full p-3 rounded-lg border-2 border-border hover:border-primary transition text-left"
                       >
                         <div className="flex items-start justify-between">
                           <div className="flex-1">

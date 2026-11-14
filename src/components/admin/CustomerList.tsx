@@ -515,7 +515,7 @@ const CustomerList: React.FC = () => {
             ) : customersPagination.pageItems.map((customer) => (
               <Card
                 key={customer.email}
-                className={`transition-all hover:shadow-md ${
+                className={`transition hover:shadow-md ${
                   selectedCustomer?.email === customer.email ? 'ring-2 ring-primary' : ''
                 }`}
               >

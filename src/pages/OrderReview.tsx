@@ -809,7 +809,7 @@ const OrderReview: React.FC = () => {
                     <>
                       {/* PayPay Option for Japan */}
                       <div className={cn(
-                        "flex items-start space-x-3 p-4 rounded-xl border-2 transition-all cursor-pointer",
+                        "flex items-start space-x-3 p-4 rounded-xl border-2 transition cursor-pointer",
                         paymentMethod === 'paypay' ? "border-pink-500 bg-pink-50/50" : "border-border hover:border-gray-300"
                       )}>
                         <RadioGroupItem value="paypay" id="paypay" className="mt-1" />
@@ -826,7 +826,7 @@ const OrderReview: React.FC = () => {
 
                       {/* Bank Transfer Option for Japan */}
                       <div className={cn(
-                        "flex items-start space-x-3 p-4 rounded-xl border-2 transition-all cursor-pointer",
+                        "flex items-start space-x-3 p-4 rounded-xl border-2 transition cursor-pointer",
                         paymentMethod === 'yucho' ? "border-pink-500 bg-pink-50/50" : "border-border hover:border-gray-300"
                       )}>
                         <RadioGroupItem value="yucho" id="yucho" className="mt-1" />
@@ -846,7 +846,7 @@ const OrderReview: React.FC = () => {
                       {/* Wise Option (transferência internacional) — principal */}
                       {paySettings.wiseEnabled ? (
                       <div className={cn(
-                        "flex items-start space-x-3 p-4 rounded-xl border-2 transition-all cursor-pointer",
+                        "flex items-start space-x-3 p-4 rounded-xl border-2 transition cursor-pointer",
                         paymentMethod === 'wise' ? "border-emerald-500 bg-emerald-50/50" : "border-border hover:border-gray-300"
                       )}>
                         <RadioGroupItem value="wise" id="wise" className="mt-1" />
@@ -917,7 +917,7 @@ const OrderReview: React.FC = () => {
                           efeito da linha ~97 já troca para o primeiro método ativo. */}
                       {paySettings.pixEnabled && (
                       <div className={cn(
-                        "flex items-start space-x-3 p-4 rounded-xl border-2 transition-all cursor-pointer",
+                        "flex items-start space-x-3 p-4 rounded-xl border-2 transition cursor-pointer",
                         paymentMethod === 'pix' ? "border-pink-500 bg-pink-50/50" : "border-border hover:border-gray-300"
                       )}>
                         <RadioGroupItem value="pix" id="pix" className="mt-1" />
@@ -936,7 +936,7 @@ const OrderReview: React.FC = () => {
                       {/* Credit Card Option (Stripe) */}
                       {paySettings.cardEnabled ? (
                       <div className={cn(
-                        "flex items-start space-x-3 p-4 rounded-xl border-2 transition-all cursor-pointer",
+                        "flex items-start space-x-3 p-4 rounded-xl border-2 transition cursor-pointer",
                         paymentMethod === 'card' ? "border-indigo-500 bg-indigo-50/50" : "border-border hover:border-gray-300"
                       )}>
                         <RadioGroupItem value="card" id="card" className="mt-1" />

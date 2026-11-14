@@ -596,7 +596,7 @@ const Dashboard: React.FC<DashboardProps> = ({ pending, onNavigate }) => {
                         <span className="text-sm font-bold">¥{method.revenue.toLocaleString()} ({percent}%)</span>
                       </div>
                       <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                        <div className="bg-primary rounded-full h-2 transition-all duration-500" style={{ width: `${percent}%` }} />
+                        <div className="bg-primary rounded-full h-2 transition-[width] duration-500" style={{ width: `${percent}%` }} />
                       </div>
                     </div>
                   );
@@ -619,7 +619,7 @@ const Dashboard: React.FC<DashboardProps> = ({ pending, onNavigate }) => {
                       <span className="text-sm font-bold">{product.count} pedido(s)</span>
                     </div>
                     <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                      <div className="bg-primary rounded-full h-2 transition-all duration-500" style={{ width: `${(product.count / maxProductCount) * 100}%` }} />
+                      <div className="bg-primary rounded-full h-2 transition-[width] duration-500" style={{ width: `${(product.count / maxProductCount) * 100}%` }} />
                     </div>
                   </div>
                 ))}

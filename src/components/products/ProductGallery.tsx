@@ -146,7 +146,7 @@ const ProductGallery: React.FC<ProductGalleryProps> = ({ images, productName, vi
             {allMedia.map((_, i) => (
               <span
                 key={i}
-                className={cn('h-1.5 rounded-full bg-white shadow transition-all', i === selectedIndex ? 'w-5 opacity-100' : 'w-1.5 opacity-60')}
+                className={cn('h-1.5 rounded-full bg-white shadow transition', i === selectedIndex ? 'w-5 opacity-100' : 'w-1.5 opacity-60')}
               />
             ))}
           </div>
@@ -175,7 +175,7 @@ const ProductGallery: React.FC<ProductGalleryProps> = ({ images, productName, vi
               aria-label={m.kind === 'model' ? 'Ver em 3D' : `${productName} ${index + 1}`}
               aria-current={selectedIndex === index}
               className={cn(
-                'relative aspect-square overflow-hidden rounded-lg border-2 transition-all',
+                'relative aspect-square overflow-hidden rounded-lg border-2 transition',
                 selectedIndex === index ? 'border-primary ring-2 ring-primary/30' : 'border-transparent hover:border-border',
               )}
             >

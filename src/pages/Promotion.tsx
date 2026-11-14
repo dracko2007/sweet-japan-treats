@@ -259,7 +259,7 @@ const Promotion: React.FC = () => {
                 </div>
                 {!isSoldOut && (
                   <div className="h-2 bg-amber-200 rounded-full overflow-hidden">
-                    <div className="h-full bg-amber-500 rounded-full transition-all"
+                    <div className="h-full bg-amber-500 rounded-full transition"
                       style={{ width: `${Math.min(100, ((promo.soldCount ?? 0) / promo.maxProducts) * 100)}%` }} />
                   </div>
                 )}

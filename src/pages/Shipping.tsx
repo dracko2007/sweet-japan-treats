@@ -368,7 +368,7 @@ const Shipping: React.FC = () => {
                 id="country-selector"
                 value={country}
                 onChange={(e) => setCountry(e.target.value as CountryType)}
-                className="w-full p-3 rounded-xl border border-border bg-background text-foreground font-semibold focus:ring-2 focus:ring-primary transition-all text-sm cursor-pointer"
+                className="w-full p-3 rounded-xl border border-border bg-background text-foreground font-semibold focus:ring-2 focus:ring-primary transition text-sm cursor-pointer"
               >
                 <option value="Brasil">Brasil 🇧🇷</option>
                 <option value="Portugal">Portugal 🇵🇹</option>
@@ -724,7 +724,7 @@ const Shipping: React.FC = () => {
                 </p>
                 <div className="space-y-3">
                   {sampleRates.filter((carrier) => billableWeightG <= 2000 || carrier.name !== 'Japan Post Air Packet ✉️').map((carrier) => (
-                    <div key={carrier.name} className="p-4 rounded-xl bg-card border border-border space-y-3 hover:border-primary/50 transition-all">
+                    <div key={carrier.name} className="p-4 rounded-xl bg-card border border-border space-y-3 hover:border-primary/50 transition">
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex items-center gap-3">
                           <span className="text-3xl">{carrier.logo}</span>
