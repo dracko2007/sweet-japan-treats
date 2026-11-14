@@ -75,3 +75,18 @@ describe('Sandbox — despesas da venda', () => {
     expect(kpi('A PAGAR ao afiliado')).toHaveTextContent('¥220');
   });
 });
+
+describe('Sandbox — desconto por link ou código', () => {
+  it('dá o mesmo desconto pelo link e pelo código, e explica quando o desconto é zero', () => {
+    render(<CheckoutSandbox />);
+    fireEvent.click(screen.getByText('Simular compra')); // origem: link
+    fireEvent.click(screen.getByText('Código'));
+    fireEvent.click(screen.getByText('Simular compra'));
+    const rows = screen.getAllByText('−¥300');
+    expect(rows.length).toBeGreaterThanOrEqual(2); // linhas da tabela: as duas compras com o mesmo desconto
+
+    // Todos os itens em promoção: desconto zero e o aviso explica o motivo.
+    fireEvent.click(screen.getAllByLabelText(/Já em promoção/)[1]);
+    expect(screen.getByRole('note')).toHaveTextContent('todos os itens');
+  });
+});

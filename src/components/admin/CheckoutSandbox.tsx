@@ -252,12 +252,12 @@ const CheckoutSandbox: React.FC = () => {
           <div className="flex items-center justify-between"><div><h3 className="font-semibold">Carrinho da simulação</h3><p className="text-xs text-muted-foreground">Desconto somente nos produtos sem promoção.</p></div><span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">{items.length} itens</span></div>
           {items.map((item, index) => (
             <div key={item.name} className="rounded-xl border p-3 space-y-2">
-              <div className="flex items-center gap-3"><div className="min-w-0 flex-1"><p className="text-sm font-semibold">{item.name}</p><p className="text-xs text-muted-foreground">Quantidade: {item.quantity}</p></div><label className="flex items-center gap-1 text-xs"><input type="checkbox" checked={item.discounted} onChange={(e) => setItems((current) => current.map((value, i) => i === index ? { ...value, discounted: e.target.checked } : value))} /> Promoção</label></div>
+              <div className="flex items-center gap-3"><div className="min-w-0 flex-1"><p className="text-sm font-semibold">{item.name}</p><p className="text-xs text-muted-foreground">Quantidade: {item.quantity}</p></div><label className="flex items-center gap-1 text-xs"><input type="checkbox" checked={item.discounted} onChange={(e) => setItems((current) => current.map((value, i) => i === index ? { ...value, discounted: e.target.checked } : value))} /> Já em promoção (cupom não vale)</label></div>
               <div className="grid grid-cols-2 gap-2"><Input type="number" min="0" aria-label="Preço do item" value={item.price} onChange={(e) => { const price = Math.max(0, Number(e.target.value)); setItems((current) => current.map((value, i) => i === index ? { ...value, price, cost: Math.round(price / 2) } : value)); }} /><div className="rounded-md border bg-muted px-3 py-2 text-sm"><span className="block text-[10px] text-muted-foreground">Custo (50%)</span><strong>¥{item.cost.toLocaleString()}</strong></div></div>
               <p className="text-[11px] text-muted-foreground">Preço de venda · custo automático equivalente à metade do preço</p>
             </div>
           ))}
-          <div className="rounded-xl border border-blue-200 bg-blue-50 p-3 text-xs text-blue-800">O cupom não acumula no produto promocional. O lucro e a comissão consideram todos os produtos pagos.</div>
+          <div className="rounded-xl border border-blue-200 bg-blue-50 p-3 text-xs text-blue-800">O desconto do cupom é igual entrando por link ou por código: depende só dos itens. Item marcado como "Já em promoção" não recebe o cupom. O lucro e a comissão consideram todos os produtos pagos.</div>
         </div>
       </div>
 
@@ -280,6 +280,13 @@ const CheckoutSandbox: React.FC = () => {
               <p className="mb-3 text-xs text-muted-foreground">Prévia com o carrinho e o nível atuais. Clique em "Simular compra" para somar ao mês.</p>
               <Row label="Valor dos itens (preço de tabela)" value={yen(totals.subtotal)} />
               <Row label={`Desconto do cupom (${Math.max(0, Math.min(100, discountPercent))}% sobre ${yen(totals.eligibleForDiscount)} sem promoção)`} value={`−${yen(totals.discount)}`} tone="minus" />
+              {totals.discount === 0 && discountPercent > 0 && (
+                <p role="note" className="rounded-lg border border-amber-200 bg-amber-50 p-2 text-xs text-amber-800">
+                  {totals.eligibleForDiscount === 0
+                    ? 'Desconto ¥0: todos os itens do carrinho estão marcados como "Já em promoção". O cupom do afiliado não vale em item que já tem desconto. Isso vale igual por link ou por código.'
+                    : 'Desconto ¥0: confira o percentual do cupom.'}
+                </p>
+              )}
               <Row label="Cliente paga pelos produtos" value={yen(totals.netProducts)} strong />
               <Row label="Custo dos produtos" value={`−${yen(totals.productCost)}`} tone="minus" />
               <Row label="Lucro bruto" value={yen(totals.profit)} strong />
