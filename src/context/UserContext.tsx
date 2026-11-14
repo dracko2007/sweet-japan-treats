@@ -650,7 +650,12 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
           
           // Load the first bounded Firestore page and merge local history.
           const firestorePage = await loadInitialOrdersFromFirestore(firebaseUser.uid, mergedUser.email);
-          const allOrders = mergeOrders(localOrders, firestorePage.items);
+          // Lista completa do servidor: o que só existe no cache local foi apagado pela loja.
+          const serverNumbers = new Set(firestorePage.items.map((o) => o.orderNumber));
+          const localKept = firestorePage.hasMore || !firestorePage.items.length
+            ? localOrders
+            : localOrders.filter((o) => serverNumbers.has(o.orderNumber));
+          const allOrders = mergeOrders(localKept, firestorePage.items);
           setCoupons(userCoupons);
           setOrders(allOrders);
           setOrdersCursor(firestorePage.nextCursor);
