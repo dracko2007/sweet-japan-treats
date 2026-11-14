@@ -198,6 +198,20 @@ export const orderService = {
       safeStorage.setItem('japan-express-users', JSON.stringify(users));
     }
 
+    // Cópias antigas do histórico neste navegador (perfil do cliente): sem isto o
+    // pedido apagado no servidor reaparecia na tela a partir do cache local.
+    try {
+      const strip = (list: unknown): unknown[] | null =>
+        Array.isArray(list) ? list.filter((o) => (o as { orderNumber?: string })?.orderNumber !== orderNumber) : null;
+      safeStorage.keys().forEach((key) => {
+        if (key !== 'sakura_orders' && !key.startsWith('orders_')) return;
+        const kept = strip(JSON.parse(safeStorage.getItem(key) || 'null'));
+        if (kept) safeStorage.setItem(key, JSON.stringify(kept));
+      });
+    } catch {
+      // cache local ilegível: nada a limpar
+    }
+
     // Exclui de verdade no Firestore (deleteDoc), não apenas marca como cancelado
     let deletedRemote = false;
     try {

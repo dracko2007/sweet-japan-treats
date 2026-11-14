@@ -303,7 +303,9 @@ export const customerService = {
         ordersSnapshot.forEach((doc) => {
           const order = doc.data();
           const email = order.customerEmail;
-          const customer = email ? customerMap.get(email) : undefined;
+          const customer = email
+            ? (customerMap.get(email) ?? [...customerMap.values()].find((c) => c.email.toLowerCase() === String(email).toLowerCase()))
+            : undefined;
           if (customer) {
             const existingOrder = customer.orderHistory.find((o) => o.orderNumber === order.orderNumber);
             if (!existingOrder) {

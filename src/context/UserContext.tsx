@@ -398,7 +398,11 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
 
     try {
       const page = await loadOrdersFromFirestore(user.id, user.email);
-      setOrders(mergeOrders(localOrders, page.items));
+      // Lista completa vinda do servidor (sem próxima página): pedido que só existe no
+      // cache local foi apagado pela loja e não pode reaparecer no histórico.
+      const serverNumbers = new Set(page.items.map((o) => o.orderNumber));
+      const localKept = page.hasMore ? localOrders : localOrders.filter((o) => serverNumbers.has(o.orderNumber));
+      setOrders(mergeOrders(localKept, page.items));
       setOrdersCursor(page.nextCursor);
       setOrdersHasMore(page.hasMore);
       setOrdersOffline(false);
