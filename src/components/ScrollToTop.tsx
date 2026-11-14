@@ -10,9 +10,33 @@ const extractProductId = (pathname: string): string | null => {
   return match ? match[1] : null;
 };
 
+function scrollToTopNow() {
+  const lenis = getLenis();
+  if (lenis) lenis.scrollTo(0, { immediate: true });
+  else window.scrollTo(0, 0);
+}
+
 const ScrollToTop = () => {
   const { pathname, search } = useLocation();
   const firstLoadRef = useRef(true);
+
+  // Clicar num link interno que leva à MESMA página (logo na home, menu da página
+  // atual, mudança só de filtro na URL) não troca o `pathname`, então o efeito
+  // abaixo não rodava e a página ficava onde estava. Todo clique em link interno
+  // sobe ao topo. Ficam de fora: nova aba, download, modificadores e âncoras (#).
+  useEffect(() => {
+    const onClick = (event: MouseEvent) => {
+      if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      const link = (event.target as HTMLElement | null)?.closest?.('a[href]') as HTMLAnchorElement | null;
+      if (!link || link.target === '_blank' || link.hasAttribute('download')) return;
+      let url: URL;
+      try { url = new URL(link.href, window.location.href); } catch { return; }
+      if (url.origin !== window.location.origin || url.hash) return;
+      requestAnimationFrame(scrollToTopNow);
+    };
+    document.addEventListener('click', onClick);
+    return () => document.removeEventListener('click', onClick);
+  }, []);
 
   useEffect(() => {
     // O Lenis (smooth scroll global, ver `lib/smoothScroll.tsx`) mantém sua
