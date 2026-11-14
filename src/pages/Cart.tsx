@@ -496,20 +496,18 @@ const Cart: React.FC = () => {
                   </div>
                 )}
 
-                {/* Japan Local Shipping Banner */}
-                {selectedCountry === 'Japão' && (
-                  <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex items-start gap-3 mt-6">
-                    <span className="text-xl">📦</span>
-                    <div>
-                      <h4 className="font-sans font-bold text-sm text-emerald-800">
-                        Envio Nacional Seguro (Japan Post / Yamato / Sagawa)
-                      </h4>
-                      <p className="text-xs text-emerald-700 mt-1 leading-relaxed">
-                        Seu pedido será embalado e despachado diretamente de nossa loja em Hiroshima. O frete será calculado na próxima etapa com base no tamanho das caixas e na província selecionada.
-                      </p>
-                    </div>
+                {/* Aviso de envio seguro: nacional (Japão) ou internacional (demais países) */}
+                <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex items-start gap-3 mt-6">
+                  <span className="text-xl">📦</span>
+                  <div>
+                    <h4 className="font-sans font-bold text-sm text-emerald-800">
+                      {t(selectedCountry === 'Japão' ? 'cart.shipBanner.title.japan' : 'cart.shipBanner.title.intl')}
+                    </h4>
+                    <p className="text-xs text-emerald-700 mt-1 leading-relaxed">
+                      {t(selectedCountry === 'Japão' ? 'cart.shipBanner.body.japan' : 'cart.shipBanner.body.intl')}
+                    </p>
                   </div>
-                )}
+                </div>
               </div>
 
               {/* Order Summary Card */}
