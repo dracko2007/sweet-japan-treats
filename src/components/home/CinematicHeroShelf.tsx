@@ -711,7 +711,7 @@ const CinematicHeroShelf: React.FC<CinematicHeroShelfProps> = ({
             </span>
             <Link
               to={p.link}
-              className="group inline-flex items-center gap-2 text-xs font-medium text-pink-700 transition-colors hover:text-pink-900 md:text-sm"
+              className="group inline-flex min-h-[44px] items-center gap-2 text-xs font-medium text-pink-700 transition-colors hover:text-pink-900 md:text-sm"
             >
               {t('featured.details')}
               <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
@@ -747,13 +747,13 @@ const CinematicHeroShelf: React.FC<CinematicHeroShelfProps> = ({
         <div className="cinematic-reveal flex flex-col gap-3 sm:flex-row">
           <Link
             to="/produtos/cosmeticos"
-            className="inline-flex items-center justify-center gap-2 rounded-full bg-pink-600 px-6 py-2.5 text-xs font-medium text-white transition-colors hover:bg-pink-700 md:px-8 md:py-3 md:text-sm"
+            className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full bg-pink-600 px-6 py-2.5 text-xs font-medium text-white transition-colors hover:bg-pink-700 md:px-8 md:py-3 md:text-sm"
           >
             {t('cinematicHero.outro.cta.products')} <ArrowRight className="h-4 w-4" />
           </Link>
           <Link
             to="/faca-seu-pedido"
-            className="inline-flex items-center justify-center gap-2 rounded-full border border-pink-300 px-6 py-2.5 text-xs font-medium text-pink-700 transition-colors hover:bg-pink-50 md:px-8 md:py-3 md:text-sm"
+            className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full border border-pink-300 px-6 py-2.5 text-xs font-medium text-pink-700 transition-colors hover:bg-pink-50 md:px-8 md:py-3 md:text-sm"
           >
             {t('cinematicHero.outro.cta.order')}
           </Link>
@@ -807,7 +807,7 @@ const CinematicHeroShelf: React.FC<CinematicHeroShelfProps> = ({
             <button
               type="button"
               onClick={handleSkip}
-              className="text-[10px] uppercase tracking-[0.2em] text-white/70 mix-blend-difference transition-opacity hover:opacity-100 md:text-xs md:tracking-[0.25em]"
+              className="min-h-[44px] px-2 text-[10px] uppercase tracking-[0.2em] text-white/70 mix-blend-difference transition-opacity hover:opacity-100 md:text-xs md:tracking-[0.25em]"
             >
               {t('cinematicHero.skip')}
             </button>

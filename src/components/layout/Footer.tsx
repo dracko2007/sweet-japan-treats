@@ -139,7 +139,7 @@ const Footer: React.FC = () => {
                 <li className="pt-1">
                   <button
                     onClick={handleInstallClick}
-                    className="flex items-center gap-1.5 text-sm text-white underline underline-offset-2 hover:text-white/90 font-semibold transition-colors"
+                    className="flex min-h-[44px] items-center gap-1.5 text-sm text-white underline underline-offset-2 hover:text-white/90 font-semibold transition-colors"
                   >
                     <Smartphone className="w-3.5 h-3.5" />
                     {platform === 'ios' ? t('footer.appInstallIOS') : t('footer.appInstall')}
@@ -162,20 +162,20 @@ const Footer: React.FC = () => {
           {/* Contact */}
           <div>
             <h4 className="font-display font-semibold mb-4">{t('footer.contact')}</h4>
-            <div className="space-y-3">
-              <div className="flex items-start gap-2">
+            <div className="space-y-1">
+              <div className="flex items-start gap-2 pb-2">
                 <MapPin className="w-4 h-4 mt-0.5 text-accent-foreground/90" />
                 <span className="text-sm text-accent-foreground/90">
                   {isJapan ? COMPANY_PROFILE.fulfillmentOrigin.formattedJa : COMPANY_PROFILE.fulfillmentOrigin.formatted}
                 </span>
               </div>
-              <a href={`mailto:${CONTACT_EMAIL}`} className="flex items-start gap-2 group">
+              <a href={`mailto:${CONTACT_EMAIL}`} className="flex min-h-[44px] items-center gap-2 group">
                 <Mail className="w-4 h-4 mt-0.5 text-accent-foreground/90" />
                 <span className="text-sm text-accent-foreground/90 group-hover:text-accent-foreground transition-colors break-all">
                   {CONTACT_EMAIL}
                 </span>
               </a>
-              <a href={WHATSAPP_LINK} target="_blank" rel="noopener noreferrer" className="flex items-start gap-2 group">
+              <a href={WHATSAPP_LINK} target="_blank" rel="noopener noreferrer" className="flex min-h-[44px] items-center gap-2 group">
                 <MessageCircle className="w-4 h-4 mt-0.5 text-green-400" />
                 <span className="text-sm text-accent-foreground/90 group-hover:text-accent-foreground transition-colors">
                   WhatsApp: {COMPANY_PROFILE.whatsapp.international}
