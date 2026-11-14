@@ -207,8 +207,17 @@ function breakdownRows(order, currency) {
   const freteJapao = n(pb.shipping) - nacional;
   out.push(row(`Frete${isMixedOrder(order) ? ' do Japao' : ''}${carrier ? ` (${escapeHtml(carrier)})` : ''}`, freteJapao > 0 ? orderMoney(freteJapao, currency) : 'Gratis'));
   if (isMixedOrder(order)) out.push(row(`Frete nacional (${escapeHtml(localCarrierLabel(order.shipFrom))})`, nacional > 0 ? orderMoney(nacional, currency) : 'Gratis'));
-  if (n(pb.psFee) > 0) out.push(row('Taxa PS', orderMoney(pb.psFee, currency)));
-  if (n(pb.importDuty) > 0) out.push(row('Imposto de importacao dos EUA (pre-pago)', orderMoney(pb.importDuty, currency)));
+  // Taxa Personal Shopper: a tela de revisão a mostra mesmo quando foi isenta (cheia
+  // riscada + valor final). O e-mail faz o mesmo, em vez de sumir com a linha.
+  if (n(pb.psFeeDiscount) > 0 && n(pb.psFeeGross) > 0) {
+    out.push(row('Taxa PS (Personal Shopper)', `<span style="color:#9ca3af;text-decoration:line-through">${orderMoney(pb.psFeeGross, currency)}</span> `
+      + (n(pb.psFee) > 0 ? orderMoney(pb.psFee, currency) : '<span style="color:#059669;font-weight:bold">Isenta</span>')));
+  } else if (n(pb.psFee) > 0) {
+    out.push(row('Taxa PS (Personal Shopper)', orderMoney(pb.psFee, currency)));
+  } else if (order.psFeeWaiverApplied === true) {
+    // Pedido antigo: só sabia que foi isenta, não o valor cheio.
+    out.push(row('Taxa PS (Personal Shopper)', '<span style="color:#059669;font-weight:bold">Isenta</span>'));
+  }  if (n(pb.importDuty) > 0) out.push(row('Imposto de importacao dos EUA (pre-pago)', orderMoney(pb.importDuty, currency)));
   if (n(pb.pixIof) > 0 || n(pb.pixBankFee) > 0) {
     if (n(pb.pixIof) > 0) out.push(row('IOF do PIX', orderMoney(pb.pixIof, currency)));
     if (n(pb.pixBankFee) > 0) out.push(row('Tarifa bancaria do PIX', orderMoney(pb.pixBankFee, currency)));

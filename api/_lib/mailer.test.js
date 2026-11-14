@@ -338,3 +338,42 @@ describe('e-mail de envio detalhado (buildOrderEmail com tracking)', () => {
     expect(buildOrderEmail(enviadoPedido()).subject).toContain('Pedido recebido');
   });
 });
+
+describe('taxa PS no e-mail: aparece também quando foi isenta', () => {
+  const base = (pb, extra = {}) => ({
+    orderNumber: 'SE-BR-5', customerName: 'Ana', currency: 'BRL', totalPrice: 100,
+    items: [{ productName: 'Pocky', quantity: 1, price: 60 }],
+    priceBreakdown: { subtotal: 60, shipping: 40, ...pb },
+    ...extra,
+  });
+
+  it('taxa cobrada: mostra a linha com o valor', () => {
+    const html = buildOrderEmail(base({ psFee: 12, psFeeGross: 12, psFeeDiscount: 0 })).html;
+    expect(html).toContain('Taxa PS (Personal Shopper)');
+    expect(html).toContain('R$ 12');
+  });
+
+  it('taxa isenta: mostra a cheia riscada e "Isenta", como a tela de revisão', () => {
+    const html = buildOrderEmail(base({ psFee: 0, psFeeGross: 12, psFeeDiscount: 12 }, { psFeeWaiverApplied: true })).html;
+    expect(html).toContain('Taxa PS (Personal Shopper)');
+    expect(html).toContain('line-through');
+    expect(html).toContain('R$ 12');
+    expect(html).toContain('Isenta');
+  });
+
+  it('desconto parcial: cheia riscada e o valor que ficou', () => {
+    const html = buildOrderEmail(base({ psFee: 5, psFeeGross: 12, psFeeDiscount: 7 })).html;
+    expect(html).toContain('line-through');
+    expect(html).toContain('R$ 5');
+    expect(html).not.toContain('Isenta');
+  });
+
+  it('pedido antigo isento (sem valor cheio): ainda mostra "Isenta"; sem taxa nenhuma, nada aparece', () => {
+    expect(buildOrderEmail(base({ psFee: 0 }, { psFeeWaiverApplied: true })).html).toContain('Isenta');
+    expect(buildOrderEmail(base({ psFee: 0 })).html).not.toContain('Taxa PS');
+  });
+
+  it('o e-mail de envio também traz a taxa PS', () => {
+    expect(buildOrderEmail(base({ psFee: 12, psFeeGross: 12, psFeeDiscount: 0 }), { tracking: true }).html).toContain('Taxa PS (Personal Shopper)');
+  });
+});

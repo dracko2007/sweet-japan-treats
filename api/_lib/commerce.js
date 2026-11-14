@@ -5,6 +5,7 @@ import { roundYen } from '../../shared/pricing.js';
 import {
   autoApprovablePsDiscountYen,
   displayTotals,
+  yenToDisplay,
   productBenefits,
   psFeeDiscountYen,
   US_COUNTRY,
@@ -485,6 +486,15 @@ export function buildQuote({ requestedItems, products, country, prefecture, stat
       // Parte do frete que é nacional (itens enviados do país do cliente); o resto é do Japão.
       localShipping: shown.nationalShipping,
       psFee: shown.psFee,
+      // Taxa PS cheia e o quanto foi abatido (isenção, negociação, pontos). A tela de
+      // revisão mostra a cheia riscada; sem isto o pedido só guardava o valor final (0)
+      // e o e-mail escondia a linha inteira.
+      psFeeGross: psDiscountYen > 0
+        ? Math.max(shown.psFee, yenToDisplay(psFeeFinalYen + psDiscountYen, currency, rates, { exact: true }))
+        : shown.psFee,
+      psFeeDiscount: psDiscountYen > 0
+        ? Math.max(0, yenToDisplay(psFeeFinalYen + psDiscountYen, currency, rates, { exact: true }) - shown.psFee)
+        : 0,
       importDuty: shown.importDuty,
       paymentFee: shown.paymentFee,
       pixIof: shown.pixIof,
