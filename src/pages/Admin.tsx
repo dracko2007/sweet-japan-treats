@@ -1,5 +1,5 @@
 import { safeStorage } from '@/utils/storage';
-import { fmtOrderMoney, orderTotalYen, orderYenLines, yen } from '@/utils/adminOrderMoney';
+import { fmtOrderMoney, fmtPair, itemPhoto, orderTotalYen, orderYenView, yen } from '@/utils/adminOrderMoney';
 import React, { Suspense, lazy, useCallback, useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Package, Printer, ShoppingBag, User, MapPin, Phone, Mail, Calendar, TestTube, Tag, Truck, CheckCircle, XCircle, Trash2, BarChart3, Users, PackagePlus, Video, Megaphone, Clapperboard, Building2, Sparkles, ShieldCheck, Calculator, CloudUpload, FileText, Handshake, Flag, TrendingDown, MessageCircle, Trophy, Landmark } from 'lucide-react';
@@ -570,12 +570,13 @@ _This is an automated test message_
     const shippingCost = order.shipping?.cost ?? null;
     const grandTotal = order.totalPrice ?? order.total ?? 0;
     const grandTotalYen = orderTotalYen(order);
+    const yenView = orderYenView(order);
 
     const itemsHtml = order.items.map((item: OrderItem) => `
       <tr>
-        <td style="padding:6px 8px;border-bottom:1px solid #eee;">${isMixedOrder(order) && item.local ? '📍 ' : ''}${escapeHtml(item.productName || item.name)}${item.size ? ` <span style="color:#888;font-size:12px;">(${escapeHtml(item.size)})</span>` : ''}</td>
+        <td style="padding:6px 8px;border-bottom:1px solid #eee;">${itemPhoto(item) ? `<img src="${escapeHtml(itemPhoto(item) as string)}" width="40" height="40" alt="" style="vertical-align:middle;margin-right:8px;border-radius:6px;object-fit:cover;border:1px solid #eee">` : ''}${isMixedOrder(order) && item.local ? '📍 ' : ''}${escapeHtml(item.productName || item.name)}${item.size ? ` <span style="color:#888;font-size:12px;">(${escapeHtml(item.size)})</span>` : ''}</td>
         <td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:center;">${Number(item.quantity) || 0}</td>
-        <td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:right;">${fmtOrderMoney(Number(item.price) * Number(item.quantity), order.currency)}</td>
+        <td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:right;">${yenView ? yenView.itemValue(item) : fmtOrderMoney(Number(item.price) * Number(item.quantity), order.currency)}</td>
       </tr>
     `).join('');
     const html = `<!DOCTYPE html>
@@ -665,21 +666,21 @@ _This is an automated test message_
       <tr>
         <td>Subtotal</td>
         <td></td>
-        <td>${fmtOrderMoney(itemsSubtotal, order.currency)}</td>
+        <td>${yenView ? yenView.subtotal : fmtOrderMoney(itemsSubtotal, order.currency)}</td>
       </tr>
-      ${discount > 0 ? `<tr class="discount"><td>Cupom ${order.couponCode ? `(${escapeHtml(order.couponCode)})` : ''}</td><td></td><td>-${fmtOrderMoney(discount, order.currency)}</td></tr>` : ''}
+      ${(yenView ? yenView.discount !== null : discount > 0) ? `<tr class="discount"><td>Cupom ${order.couponCode ? `(${escapeHtml(order.couponCode)})` : ''}</td><td></td><td>${yenView && yenView.discount ? yenView.discount : `-${fmtOrderMoney(discount, order.currency)}`}</td></tr>` : ''}
       <tr>
         <td>Frete ${order.shippingCarrier ? `(${escapeHtml(carrierText(order))})` : ''}</td>
         <td></td>
-        <td>${localShippingText(order) ? escapeHtml(localShippingText(order) as string) : shippingCost != null ? (shippingCost === 0 ? 'Grátis' : `¥ ${Math.round(shippingCost).toLocaleString('pt-BR')}`) : 'N/A'}</td>
+        <td>${localShippingText(order) ? escapeHtml(localShippingText(order) as string) : yenView ? yenView.shipping : shippingCost != null ? (shippingCost === 0 ? 'Grátis' : `¥ ${Math.round(shippingCost).toLocaleString('en-US')}`) : 'N/A'}</td>
       </tr>
+      ${yenView && yenView.psFee ? `<tr><td>Taxa PS (Personal Shopper)</td><td></td><td>${yenView.psFee}</td></tr>` : ''}
       ${(order.federalTax > 0 || order.icmsTax > 0 || order.taxAmount > 0) ? `<tr><td style="color:#888;font-size:12px;">Impostos (II + ICMS)</td><td></td><td style="color:#888;font-size:12px;">R$ ${Number(order.federalTax && order.icmsTax ? (order.federalTax + order.icmsTax) : order.taxAmount || 0).toFixed(2)}</td></tr>` : ''}
       <tr class="grand">
         <td>Total Geral</td>
         <td></td>
-        <td style="color:#e4003a;">${fmtOrderMoney(grandTotal, order.currency)}${grandTotalYen && order.currency !== 'JPY' ? ` (${yen(grandTotalYen)})` : ''}</td>
+        <td style="color:#e4003a;">${yenView ? yenView.total : grandTotalYen && order.currency !== 'JPY' ? fmtPair(grandTotalYen, grandTotal, order.currency) : fmtOrderMoney(grandTotal, order.currency)}</td>
       </tr>
-      ${orderYenLines(order).map((l) => `<tr style="color:#555;${l.bold ? 'font-weight:bold;' : 'font-size:12px;'}"><td>${l.bold ? '' : '&nbsp;&nbsp;'}${l.label}</td><td></td><td>${yen(l.value)}</td></tr>`).join('')}
     </table>
   </div>
 
@@ -1138,9 +1139,14 @@ _This is an automated test message_
                         </h4>
                         <div className="space-y-2">
                           {order.items.map((item: OrderItem, i: number) => (
-                            <div key={i} className="flex justify-between text-sm">
-                               <span>{isMixedOrder(order) && item.local ? '📍 ' : ''}{item.productName || item.name} ({item.size}) x{item.quantity}</span>
-                               <span className="font-semibold font-mono">{fmtOrderMoney(item.price * item.quantity, order.currency)}</span>
+                            <div key={i} className="flex items-start gap-3 text-sm">
+                               {itemPhoto(item) ? (
+                                 <img src={itemPhoto(item) as string} alt={item.productName || item.name || 'Produto'} loading="lazy" className="h-12 w-12 shrink-0 rounded-md border border-border object-cover" />
+                               ) : (
+                                 <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-md border border-dashed border-border text-muted-foreground"><ShoppingBag className="h-4 w-4" /></div>
+                               )}
+                               <span className="flex-1">{isMixedOrder(order) && item.local ? '📍 ' : ''}{item.productName || item.name} ({item.size}) x{item.quantity}</span>
+                               <span className="font-semibold font-mono whitespace-nowrap">{orderYenView(order) ? orderYenView(order)!.itemValue(item) : fmtOrderMoney(item.price * item.quantity, order.currency)}</span>
                             </div>
                           ))}
                           {(() => {
@@ -1148,22 +1154,24 @@ _This is an automated test message_
                             // Detect coupon discount: saved field OR inferred from items sum vs totalPrice
                             const discount = order.couponDiscount || (itemsSubtotal > order.totalPrice ? itemsSubtotal - order.totalPrice : 0);
                             const shippingCost = order.shipping?.cost ?? null;
+                            // Igual ao site: valor na moeda do pedido e os ienes entre parênteses.
+                            const yv = orderYenView(order);
                             return (
                               <div className="pt-2 border-t border-border space-y-1">
                                 {/* Subtotal */}
                                 <div className="flex justify-between text-sm">
                                   <span>Subtotal</span>
-                                  <span className="font-mono">{fmtOrderMoney(itemsSubtotal, order.currency)}</span>
+                                  <span className="font-mono">{yv ? yv.subtotal : fmtOrderMoney(itemsSubtotal, order.currency)}</span>
                                 </div>
                                 
                                 {/* Coupon Discount */}
-                                {discount > 0 && (
+                                {(yv ? yv.discount !== null : discount > 0) && (
                                   <div className="flex justify-between text-sm text-green-600 font-bold">
                                     <span className="flex items-center gap-1">
                                       <Tag className="w-3 h-3" />
                                       Cupom {order.couponCode && <span className="font-mono bg-green-100 px-1 rounded text-xs">{order.couponCode}</span>}
                                     </span>
-                                    <span className="font-mono">-{fmtOrderMoney(discount, order.currency)}</span>
+                                    <span className="font-mono">{yv && yv.discount ? yv.discount : `-${fmtOrderMoney(discount, order.currency)}`}</span>
                                   </div>
                                 )}
                                 
@@ -1173,8 +1181,16 @@ _This is an automated test message_
                                     <Truck className="w-3 h-3" />
                                     Frete {order.shippingCarrier && <span className="text-muted-foreground text-xs">({carrierText(order)})</span>}
                                   </span>
-                                  <span className="font-mono">{localShippingText(order) ?? (shippingCost != null ? (shippingCost === 0 ? <span className="text-green-600">Grátis</span> : `¥ ${Math.round(shippingCost).toLocaleString('pt-BR')}`) : 'N/A')}</span>
+                                  <span className="font-mono">{localShippingText(order) ?? (yv ? (yv.shipping === 'Grátis' ? <span className="text-green-600">Grátis</span> : yv.shipping) : shippingCost != null ? (shippingCost === 0 ? <span className="text-green-600">Grátis</span> : `¥ ${Math.round(shippingCost).toLocaleString('en-US')}`) : 'N/A')}</span>
                                 </div>
+
+                                {/* Taxa Personal Shopper (cobrada, ou isenta) */}
+                                {yv && yv.psFee && (
+                                  <div className="flex justify-between text-sm">
+                                    <span>Taxa PS (Personal Shopper)</span>
+                                    <span className={`font-mono ${yv.psFeeNote === 'waived' ? 'text-green-600 font-semibold' : ''}`}>{yv.psFee}</span>
+                                  </div>
+                                )}
 
                                 {/* Impostos */}
                                 {(order.federalTax > 0 || order.icmsTax > 0 || order.taxAmount > 0) && (
@@ -1201,22 +1217,13 @@ _This is an automated test message_
                                 <div className="flex justify-between font-bold pt-1 border-t border-border text-base">
                                   <span>Total Geral</span>
                                   <span className="text-primary font-mono">
-                                    {order.currency !== 'JPY' && orderTotalYen(order) > 0
-                                      ? `${fmtOrderMoney(order.totalPrice ?? order.total ?? 0, order.currency)} (${yen(orderTotalYen(order))})`
-                                      : fmtOrderMoney(order.totalPrice ?? order.total ?? 0, order.currency)}
+                                    {yv
+                                      ? yv.total
+                                      : orderTotalYen(order) > 0 && order.currency !== 'JPY'
+                                        ? fmtPair(orderTotalYen(order), order.totalPrice ?? order.total ?? 0, order.currency)
+                                        : fmtOrderMoney(order.totalPrice ?? order.total ?? 0, order.currency)}
                                   </span>
                                 </div>
-                                {/* Em ienes: quanto o pedido custou/valeu, para o controle de gastos */}
-                                {orderYenLines(order).length > 0 && (
-                                  <div className="mt-1 rounded-md bg-muted/50 p-2 space-y-0.5">
-                                    {orderYenLines(order).map((line) => (
-                                      <div key={line.label} className={`flex justify-between text-xs ${line.bold ? 'font-semibold text-foreground' : 'text-muted-foreground'}`}>
-                                        <span>{line.label}</span>
-                                        <span className="font-mono">{yen(line.value)}</span>
-                                      </div>
-                                    ))}
-                                  </div>
-                                )}
                               </div>
                             );
                           })()}

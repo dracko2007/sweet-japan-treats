@@ -1,5 +1,6 @@
 import { safeStorage } from '@/utils/storage';
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Search, Package, Truck, CheckCircle, XCircle } from 'lucide-react';
 import Layout from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
@@ -49,7 +50,10 @@ interface TrackedOrder {
 }
 
 const TrackOrder: React.FC = () => {
-  const [orderNumber, setOrderNumber] = useState('');
+  // Link dos e-mails (`/rastrear?pedido=SE-BR-123456`): abre já com o pedido preenchido e buscado.
+  const [searchParams] = useSearchParams();
+  const pedidoDoLink = (searchParams.get('pedido') || '').trim().toUpperCase().slice(0, 40);
+  const [orderNumber, setOrderNumber] = useState(pedidoDoLink);
   const [searchedOrder, setSearchedOrder] = useState<TrackedOrder | null>(null);
   const [isSearching, setIsSearching] = useState(false);
   const { toast } = useToast();
@@ -63,6 +67,14 @@ const TrackOrder: React.FC = () => {
     { status: 'delivered', labelKey: 'trackOrder.status.delivered', icon: <CheckCircle className="w-6 h-6" /> },
   ];
 
+  const autoSearched = useRef(false);
+  useEffect(() => {
+    if (!pedidoDoLink || autoSearched.current) return;
+    autoSearched.current = true;
+    void handleSearch(pedidoDoLink);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pedidoDoLink]);
+
   const dateLocale = language === 'pt' ? 'pt-BR' : language === 'ja' ? 'ja-JP' : 'en-US';
 
   const paymentLabel = (method: string): string => {
@@ -71,8 +83,9 @@ const TrackOrder: React.FC = () => {
     return t('trackOrder.payment.card');
   };
 
-  const handleSearch = async () => {
-    if (!orderNumber.trim()) {
+  const handleSearch = async (override?: string) => {
+    const number = (override ?? orderNumber).trim().toUpperCase();
+    if (!number) {
       toast({
         title: t('trackOrder.error.title'),
         description: t('trackOrder.error.empty'),
@@ -91,7 +104,7 @@ const TrackOrder: React.FC = () => {
       const users = JSON.parse(usersData);
       for (const email of Object.keys(users)) {
         const userOrders = users[email]?.orders || [];
-        const found = userOrders.find((o: TrackedOrder) => o.orderNumber === orderNumber.toUpperCase());
+        const found = userOrders.find((o: TrackedOrder) => o.orderNumber === number);
         if (found) {
           order = found;
           break;
@@ -106,14 +119,14 @@ const TrackOrder: React.FC = () => {
         .map(key => safeStorage.getItem(key))
         .filter(Boolean)
         .flatMap(data => JSON.parse(data as string));
-      order = allLocalOrders.find((o: TrackedOrder) => o.orderNumber === orderNumber.toUpperCase()) || null;
+      order = allLocalOrders.find((o: TrackedOrder) => o.orderNumber === number) || null;
     }
 
     // 2. Se não encontrou localmente, busca direta no Firestore pelo ID do pedido
     // (o document ID é o orderNumber — O(1) em vez de ler todos os pedidos)
     if (!order && db) {
       try {
-        const snap = await getDoc(doc(db, 'orders', orderNumber.toUpperCase()));
+        const snap = await getDoc(doc(db, 'orders', number));
         if (snap.exists()) order = { id: snap.id, ...snap.data() } as TrackedOrder;
       } catch (err) {
         devError('Error searching Firestore:', err);
@@ -165,7 +178,7 @@ const TrackOrder: React.FC = () => {
                 onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
                 className="flex-1 text-lg"
               />
-              <Button onClick={handleSearch} size="lg" disabled={isSearching}>
+              <Button onClick={() => handleSearch()} size="lg" disabled={isSearching}>
                 <Search className="w-5 h-5 mr-2" />
                 {isSearching ? t('trackOrder.searching') : t('trackOrder.searchBtn')}
               </Button>

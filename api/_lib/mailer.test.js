@@ -389,3 +389,84 @@ describe('texto do e-mail de pedido recebido conforme o pagamento', () => {
     expect(buildOrderEmail(base).html).toContain('sera confirmado antes da separacao');
   });
 });
+
+describe('foto clicável e e-mail da loja em ienes', () => {
+  const pedidoIenes = (extra = {}) => ({
+    orderNumber: 'SE-BR-555', customerName: 'Ana', customerEmail: 'ana@exemplo.com', currency: 'BRL', totalPrice: 345.4,
+    paymentMethod: 'card', paymentConfirmed: true, couponCode: 'BEMVINDO10', shippingCarrier: 'ems',
+    totalYen: 9700, netProductsYen: 5000, shippingCostYen: 3600, psFeeYen: 1000,
+    items: [
+      { productName: 'Máscara', quantity: 1, price: 62, unitYen: 1780, image: 'https://exemplo.com/a.jpg' },
+      { productName: 'Protetor', quantity: 2, price: 62, unitYen: 2400, image: '' },
+    ],
+    priceBreakdown: { subtotal: 186, couponDiscount: 18.6, shipping: 107, psFee: 71, psFeeGross: 71, importDuty: 0 },
+    ...extra,
+  });
+
+  it('a foto do produto aparece nos e-mails; no do cliente abre o acompanhamento, no da loja não tem link', () => {
+    for (const opts of [{}, { tracking: true }]) {
+      const { html } = buildOrderEmail(pedidoIenes(), opts);
+      expect(html).toContain('src="https://exemplo.com/a.jpg"');
+      expect(html).toContain('href="https://japanexpress-store.com/rastrear?pedido=SE-BR-555"');
+      expect(html).toContain('alt="Máscara"');
+    }
+    const loja = buildOrderEmail(pedidoIenes(), { store: true }).html;
+    expect(loja).toContain('src="https://exemplo.com/a.jpg"');
+    expect(loja).not.toContain('rastrear');
+  });
+
+  it('produto sem foto https não gera imagem; foto http é ignorada', () => {
+    const { html } = buildOrderEmail(pedidoIenes({ items: [{ productName: 'X', quantity: 1, price: 10, unitYen: 500, image: 'http://inseguro.com/a.jpg' }] }));
+    expect(html).not.toContain('<img');
+    expect(html).not.toContain('inseguro.com');
+  });
+
+  it('e-mail da loja: tudo como no site, moeda do pedido e os ienes entre parênteses', () => {
+    const { html } = buildOrderEmail(pedidoIenes(), { store: true });
+    expect(html).toContain('R$ 62 (¥ 1,780)');
+    expect(html).toContain('R$ 124 (¥ 4,800)'); // 2 x ¥2.400
+    expect(html).toContain('Subtotal dos produtos');
+    expect(html).toContain('R$ 186 (¥ 6,580)');
+    expect(html).toContain('Desconto (cupom BEMVINDO10)');
+    expect(html).toContain('R$ 107 (¥ 3,600)');
+    expect(html).toContain('R$ 71 (¥ 1,000)');
+    expect(html).toContain('R$ 345 (¥ 9,700)');
+    expect(html).not.toContain('R$ 345,40');
+  });
+
+  it('taxa PS isenta aparece como Isenta no e-mail da loja; o do cliente continua na moeda dele', () => {
+    const { html } = buildOrderEmail(pedidoIenes({ psFeeYen: 0, psFeeWaiverApplied: true }), { store: true });
+    expect(html).toContain('Isenta');
+    const cliente = buildOrderEmail(pedidoIenes()).html;
+    expect(cliente).toContain('R$ 345,40');
+    expect(cliente).not.toContain('(¥');
+  });
+
+  it('pedido sem valores em ienes (antigo) ou de estoque local segue na moeda do pedido', () => {
+    const antigo = buildOrderEmail(pedidoIenes({ totalYen: undefined }), { store: true }).html;
+    expect(antigo).not.toContain('(¥');
+    expect(antigo).toContain('R$ 345,40');
+    const local = buildOrderEmail(pedidoIenes({ fulfillment: 'local', shipFrom: 'Brasil' }), { store: true }).html;
+    expect(local).not.toContain('(¥');
+  });
+});
+
+describe('texto do e-mail da loja e texto puro com foto', () => {
+  const base = { orderNumber: 'SE-BR-9', customerName: 'Ana', currency: 'BRL', totalPrice: 10, items: [{ productName: 'X', quantity: 1, price: 10, image: 'https://exemplo.com/x.jpg' }] };
+  it('e-mail da loja fala com a loja, não com o cliente', () => {
+    const loja = buildOrderEmail({ ...base, paymentConfirmed: true }, { store: true }).html;
+    expect(loja).toContain('Novo pedido de');
+    expect(loja).toContain('Pagamento confirmado: separar e enviar.');
+    expect(loja).not.toContain('Ola,');
+    expect(buildOrderEmail(base, { store: true }).html).toContain('Aguardando a confirmacao do pagamento');
+  });
+  it('a foto clicável não deixa linhas ": url" no texto puro', async () => {
+    process.env.RESEND_API_KEY = 're_chave_de_teste';
+    const f = vi.fn().mockResolvedValue(new Response(JSON.stringify({ id: 're_1' }), { status: 200 }));
+    vi.stubGlobal('fetch', f);
+    await sendMail({ to: 'a@b.com', subject: 's', html: buildOrderEmail(base).html });
+    const corpo = JSON.parse(f.mock.calls.at(-1)[1].body);
+    expect(corpo.text).not.toMatch(/^: https/m);
+    vi.unstubAllGlobals();
+  });
+});
