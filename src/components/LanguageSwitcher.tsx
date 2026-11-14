@@ -53,7 +53,7 @@ const LanguageSwitcher: React.FC<{ compact?: boolean }> = ({ compact = false }) 
         aria-label={`${t('a11y.selectLanguage')}: ${current.label}`}
         className={cn(
           "flex items-center bg-secondary/80 border border-border rounded-full hover:bg-secondary transition-all text-xs font-semibold text-foreground shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary",
-          compact ? "h-9 w-9 justify-center" : "gap-1.5 px-2 sm:px-3 py-1.5",
+          compact ? "h-10 w-10 justify-center" : "gap-1.5 px-2 sm:px-3 py-1.5",
         )}
       >
         {/* Compacto: sigla do idioma (PT/EN/JA); a bandeira ao lado é a do país e ficaria igual. */}

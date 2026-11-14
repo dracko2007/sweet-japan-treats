@@ -15,40 +15,30 @@ const ShippingBanner: React.FC = () => {
   ];
 
   return (
-    <section className="py-20 gradient-caramel text-primary-foreground relative overflow-hidden">
-      <div className="absolute inset-0 opacity-10">
-        <div className="absolute top-0 left-0 w-full h-full" 
-          style={{ 
-            backgroundImage: 'radial-gradient(circle at 2px 2px, currentColor 1px, transparent 0)',
-            backgroundSize: '40px 40px'
-          }} 
-        />
-      </div>
-
-      <div className="container mx-auto px-4 relative z-10">
+    <section className="py-16 md:py-20 bg-white text-foreground">
+      <div className="container mx-auto px-4">
         <div className="text-center mb-6 md:mb-12">
           <h2 className="font-display text-2xl md:text-4xl lg:text-5xl font-bold mb-2 md:mb-4">
             {t('shipping.title')}
           </h2>
-          <p className="text-primary-foreground/90 max-w-2xl mx-auto text-sm md:text-lg">
+          <p className="text-muted-foreground max-w-2xl mx-auto text-sm md:text-lg">
             {t('shipping.subtitle')}
           </p>
         </div>
 
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6 mb-6 md:mb-12">
-          {features.map((feature, index) => (
-            <div 
+          {features.map((feature) => (
+            <div
               key={feature.titleKey}
-              className="bg-primary-foreground/10 backdrop-blur-sm rounded-2xl p-3 md:p-6 text-center hover:bg-primary-foreground/15 transition-colors"
-              style={{ animationDelay: `${index * 100}ms` }}
+              className="rounded-2xl border border-pink-100 bg-pink-50/60 p-3 md:p-6 text-center"
             >
-              <div className="w-10 h-10 md:w-14 md:h-14 rounded-full bg-primary-foreground/20 flex items-center justify-center mx-auto mb-2 md:mb-4">
-                <feature.icon className="w-5 h-5 md:w-7 md:h-7" />
+              <div className="w-10 h-10 md:w-14 md:h-14 rounded-full bg-white text-primary ring-1 ring-pink-200 flex items-center justify-center mx-auto mb-2 md:mb-4">
+                <feature.icon className="w-5 h-5 md:w-7 md:h-7" aria-hidden="true" />
               </div>
               <h3 className="font-display text-sm md:text-lg font-semibold mb-1">
                 {t(feature.titleKey)}
               </h3>
-              <p className="text-xs md:text-sm text-primary-foreground/85">
+              <p className="text-xs md:text-sm text-muted-foreground">
                 {t(feature.descKey)}
               </p>
             </div>
@@ -56,7 +46,7 @@ const ShippingBanner: React.FC = () => {
         </div>
 
         <div className="text-center">
-          <Button asChild size="lg" variant="secondary" className="rounded-full px-8 text-base font-semibold">
+          <Button asChild size="lg" className="rounded-full px-8 text-base font-semibold">
             <Link to="/frete">
               {t('shippingBanner.cta')}
             </Link>

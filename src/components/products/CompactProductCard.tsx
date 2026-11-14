@@ -181,7 +181,7 @@ const CompactProductCard: React.FC<CompactProductCardProps> = ({ product }) => {
           type="button"
           onClick={handleToggleFavorite}
           className={cn(
-            'absolute right-2 top-2 flex h-9 w-9 items-center justify-center rounded-xl backdrop-blur-lg transition-all duration-300 hover:scale-110 active:scale-95',
+            'absolute right-1 top-1 flex h-11 w-11 items-center justify-center rounded-xl transition-[transform,background-color,box-shadow] duration-200 hover:scale-105 active:scale-95 motion-reduce:transition-none',
             isFavorite
               ? 'bg-gradient-to-br from-pink-500 to-pink-600 text-white shadow-lg shadow-pink-500/40'
               : 'bg-white/90 text-slate-600 shadow-md ring-1 ring-white/90 hover:bg-white hover:text-pink-500 hover:shadow-lg'
