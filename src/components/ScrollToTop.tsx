@@ -10,10 +10,16 @@ const extractProductId = (pathname: string): string | null => {
   return match ? match[1] : null;
 };
 
+// Sobe por todos os caminhos: o Lenis (posição interna), a janela e os elementos
+// raiz. No PWA instalado (standalone) o navegador não restaura nem zera o scroll
+// como numa aba comum, e a rota nova pode montar depois (lazy), então um único
+// `scrollTo` no instante da troca era desfeito e a página abria na posição antiga.
 function scrollToTopNow() {
   const lenis = getLenis();
-  if (lenis) lenis.scrollTo(0, { immediate: true });
-  else window.scrollTo(0, 0);
+  if (lenis) lenis.scrollTo(0, { immediate: true, force: true });
+  window.scrollTo(0, 0);
+  document.documentElement.scrollTop = 0;
+  document.body.scrollTop = 0;
 }
 
 const ScrollToTop = () => {
@@ -39,18 +45,17 @@ const ScrollToTop = () => {
   }, []);
 
   useEffect(() => {
-    // O Lenis (smooth scroll global, ver `lib/smoothScroll.tsx`) mantém sua
-    // própria posição interna e não escuta `window.scrollTo`. Resetar só o
-    // nativo deixava o Lenis "puxando" de volta pra posição antiga no frame
-    // seguinte — era isso que fazia a página às vezes abrir no meio/fim do
-    // scroll da rota anterior. `immediate: true` pula a animação: é troca de
-    // página, não deve haver scroll suave visível.
-    const lenis = getLenis();
-    if (lenis) {
-      lenis.scrollTo(0, { immediate: true });
-    } else {
-      window.scrollTo(0, 0);
-    }
+    // Nada de restaurar posição antiga ao navegar: a loja sempre abre a página no topo.
+    try { window.history.scrollRestoration = 'manual'; } catch { /* navegador sem suporte */ }
+    // Repete algumas vezes porque a rota nova (carregada sob demanda) cresce depois do
+    // primeiro frame e o Lenis/navegador podem reaplicar a posição anterior nesse meio-tempo.
+    scrollToTopNow();
+    const frame = requestAnimationFrame(scrollToTopNow);
+    const timers = [80, 250].map((ms) => window.setTimeout(scrollToTopNow, ms));
+    return () => {
+      cancelAnimationFrame(frame);
+      timers.forEach((timer) => window.clearTimeout(timer));
+    };
   }, [pathname]);
 
   // A referência capturada é válida apenas para a navegação iniciada pelo link.
