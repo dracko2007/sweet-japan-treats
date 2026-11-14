@@ -45,6 +45,7 @@
     { "source": "/api/guest-token", "destination": "/api/orders?action=guest-token" },
     { "source": "/api/negotiation-auto-approve", "destination": "/api/orders?action=negotiation-auto-approve" },
     { "source": "/api/ps-fee-waiver", "destination": "/api/orders?action=ps-fee-waiver" },
+    { "source": "/api/change-payment-method", "destination": "/api/orders?action=change-payment-method" },
     { "source": "/api/confirm-manual-payment", "destination": "/api/orders?action=confirm-manual-payment" },
     { "source": "/api/send-email", "destination": "/api/notify?action=email" },
     { "source": "/api/send-push", "destination": "/api/notify?action=push" },

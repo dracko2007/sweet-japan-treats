@@ -1,3 +1,4 @@
+import ChangeToCard from '@/components/checkout/ChangeToCard';
 import { safeStorage } from '@/utils/storage';
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
@@ -1477,6 +1478,9 @@ const Profile: React.FC = () => {
                             )}
                           </div>
                         </div>
+                        {!isPaid && order.paymentMethod === 'wise' && (
+                          <ChangeToCard orderId={String(order.orderNumber)} onPaid={() => window.location.reload()} />
+                        )}
                         {/* Action Buttons */}
                         <div className="flex flex-wrap gap-2">
                           <Button

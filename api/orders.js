@@ -941,6 +941,60 @@ async function handleNegotiationAutoApprove(req, res) {
   }
 }
 
+// Troca de forma de pagamento de um pedido ainda NÃO pago: Wise -> cartão.
+// Só Wise: é a única origem em que o total não muda (a Wise não tem taxa no
+// total; PIX leva IOF e tarifa, então trocar de/para PIX exigiria recalcular
+// o pedido — isso fica com a loja). O valor, o câmbio e as reservas de estoque
+// e pontos continuam os do pedido original; só o meio de cobrança muda.
+async function handleChangePaymentMethod(req, res) {
+  if (!handleCors(req, res, { methods: ['POST'] })) return;
+
+  try {
+    const user = await requireUser(req);
+    await enforceRateLimit(req, { scope: 'change-payment-method', limit: 10, windowMs: 30 * 60 * 1000, identity: user.uid });
+    const body = parseJsonObject(req.body);
+    assertExactKeys(body, ['orderId', 'paymentMethod']);
+    const orderId = requiredText(body.orderId, { max: 80, pattern: /^[A-Za-z0-9_-]+$/ });
+    if (body.paymentMethod !== 'card') throw new HttpError(400, 'invalid_payment_method');
+    const db = adminDb();
+    const orderRef = db.collection('orders').doc(orderId);
+    const snap = await orderRef.get();
+    if (!snap.exists) throw new HttpError(404, 'order_not_found');
+    const order = { id: snap.id, ...snap.data() };
+    const tokenEmail = typeof user.email === 'string' ? user.email.trim().toLowerCase() : '';
+    const customerEmail = typeof order.customerEmail === 'string' ? order.customerEmail.trim().toLowerCase() : '';
+    const isOwner = order.userId === user.uid
+      || (user.email_verified === true && tokenEmail !== '' && customerEmail !== '' && tokenEmail === customerEmail);
+    if (!isOwner) throw new HttpError(403, 'forbidden');
+
+    // Já está no cartão (reenvio do mesmo pedido): devolve o mesmo pagamento.
+    if (order.paymentMethod === 'card' && order.paymentConfirmed !== true && order.status === 'pending_payment') {
+      const intent = await stripeIntent(order);
+      res.status(200).json({ ok: true, order: publicOrder(order), clientSecret: intent?.client_secret || null });
+      return;
+    }
+    const paid = order.paymentConfirmed === true || order.fulfillmentState === 'fulfilled';
+    if (paid || order.status !== 'pending_payment') throw new HttpError(409, 'order_not_payable');
+    if (order.paymentMethod !== 'wise') throw new HttpError(409, 'payment_change_unavailable');
+    if (!paymentMethodsForCountry(order.shippingAddress?.country || '').includes('card')) throw new HttpError(409, 'payment_method_unavailable');
+    await assertPaymentMethodEnabled(db, 'card');
+
+    const changed = { ...order, paymentMethod: 'card' };
+    const intent = await stripeIntent(changed);
+    await orderRef.update({
+      paymentMethod: 'card',
+      previousPaymentMethod: order.paymentMethod,
+      paymentMethodChangedAt: new Date().toISOString(),
+      stripePaymentIntentId: intent.id,
+      updatedAt: new Date().toISOString(),
+    });
+    res.status(200).json({ ok: true, order: publicOrder(changed), clientSecret: intent?.client_secret || null });
+  } catch (error) {
+    console.error('[change-payment-method]', error instanceof Error ? error.message : error);
+    sendError(res, error);
+  }
+}
+
 async function handleConfirmManualPayment(req, res) {
   if (!handleCors(req, res, { methods: ['POST'] })) return;
 
@@ -992,7 +1046,8 @@ export default async function handler(req, res) {
   if (action === 'negotiation-auto-approve') return handleNegotiationAutoApprove(req, res);
   if (action === 'ps-fee-waiver') return handleIssuePsFeeWaiver(req, res);
   if (action === 'confirm-manual-payment') return handleConfirmManualPayment(req, res);
+  if (action === 'change-payment-method') return handleChangePaymentMethod(req, res);
   return res.status(400).json({ error: 'invalid_action' });
 }
 
-export { handleCreate, handleGuestToken, handleQuote, handleMarkReceived, handleConfirmManualPayment, handleIssuePsFeeWaiver, handleNegotiationAutoApprove };
+export { handleChangePaymentMethod, handleCreate, handleGuestToken, handleQuote, handleMarkReceived, handleConfirmManualPayment, handleIssuePsFeeWaiver, handleNegotiationAutoApprove };

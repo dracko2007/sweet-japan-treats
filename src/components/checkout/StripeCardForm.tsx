@@ -7,6 +7,15 @@ import { AlertCircle, CreditCard, Loader2 } from 'lucide-react';
 const stripePublishableKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY as string | undefined;
 const stripePromise = stripePublishableKey ? loadStripe(stripePublishableKey) : null;
 
+// Carteiras (Apple Pay / Google Pay = "tocar para pagar" por NFC) só no celular:
+// no computador o cliente digita o cartão. Celular = UA móvel + toque como ponteiro principal.
+function isSmartphone(): boolean {
+  if (typeof window === 'undefined' || typeof navigator === 'undefined') return false;
+  const mobileUa = /Android|iPhone|iPod|Mobile/i.test(navigator.userAgent);
+  const touchFirst = typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches;
+  return mobileUa && touchFirst;
+}
+
 interface StripeCardFormProps {
   clientSecret: string;
   onSuccess: () => void;
@@ -17,6 +26,7 @@ const CheckoutForm: React.FC<Pick<StripeCardFormProps, 'onSuccess'>> = ({ onSucc
   const elements = useElements();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const wallet = isSmartphone() ? 'auto' : 'never';
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -39,7 +49,7 @@ const CheckoutForm: React.FC<Pick<StripeCardFormProps, 'onSuccess'>> = ({ onSucc
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4 text-left">
-      <PaymentElement />
+      <PaymentElement options={{ wallets: { applePay: wallet, googlePay: wallet } }} />
       {error && (
         <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-2.5 text-xs text-red-700" role="alert">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
