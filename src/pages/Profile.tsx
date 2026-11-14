@@ -1479,7 +1479,7 @@ const Profile: React.FC = () => {
                           </div>
                         </div>
                         {!isPaid && order.paymentMethod === 'wise' && (
-                          <ChangeToCard orderId={String(order.orderNumber)} onPaid={() => window.location.reload()} />
+                          <ChangeToCard orderId={String(order.orderNumber)} onPaid={() => { void refreshOrders(); setTimeout(() => { void refreshOrders(); }, 5000); }} />
                         )}
                         {/* Action Buttons */}
                         <div className="flex flex-wrap gap-2">
