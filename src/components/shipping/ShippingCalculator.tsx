@@ -117,7 +117,7 @@ const ShippingCalculator: React.FC<ShippingCalculatorProps> = ({
             value={selectedPrefecture}
             onChange={(e) => { setSelectedPrefecture(e.target.value); setSelectedCarrier(null); }}
             disabled={!!externalPrefecture}
-            className="w-full p-3 rounded-lg border border-border bg-background text-foreground focus:ring-2 focus:ring-primary focus:border-primary transition-all disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+            className="w-full p-3 rounded-lg border border-border bg-background text-foreground focus:ring-2 focus:ring-primary focus:border-primary transition disabled:opacity-50 disabled:cursor-not-allowed font-medium"
           >
             <option value="">{t('calc.chooseProv')}</option>
             {japanPrefectures.map((pref) => (
@@ -278,7 +278,7 @@ const ShippingCalculator: React.FC<ShippingCalculatorProps> = ({
                 key={option.carrier}
                 onClick={() => onShippingSelect && selectable && setSelectedCarrier(option.carrier)}
                 className={cn(
-                  "rounded-xl p-4 border transition-all",
+                  "rounded-xl p-4 border transition",
                   onShippingSelect && selectable ? "cursor-pointer" : "",
                   (isConsultar && !isCombinar) ? "border-dashed border-border opacity-70" :
                   selectedCarrier === option.carrier
@@ -296,7 +296,7 @@ const ShippingCalculator: React.FC<ShippingCalculatorProps> = ({
                   <div className="flex items-center gap-3 min-w-0 flex-1">
                     {onShippingSelect && selectable && (
                       <div className={cn(
-                        "w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all shrink-0",
+                        "w-5 h-5 rounded-full border-2 flex items-center justify-center transition shrink-0",
                         selectedCarrier === option.carrier ? "border-primary bg-primary" : "border-border"
                       )}>
                         {selectedCarrier === option.carrier && <div className="w-2 h-2 rounded-full bg-white" />}

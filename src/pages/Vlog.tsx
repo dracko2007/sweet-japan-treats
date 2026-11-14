@@ -147,7 +147,7 @@ const Vlog: React.FC = () => {
             {grid.map((video) => (
               <div
                 key={video.id}
-                className="group bg-card rounded-2xl overflow-hidden border border-border shadow-sm hover:shadow-md hover:-translate-y-1 transition-all duration-300 cursor-pointer flex flex-col justify-between"
+                className="group bg-card rounded-2xl overflow-hidden border border-border shadow-sm hover:shadow-md hover:-translate-y-1 transition duration-300 cursor-pointer flex flex-col justify-between"
                 onClick={() => video.ytId && setPlayingVideo(video.ytId)}
               >
                 <div className="aspect-video bg-secondary/50 relative overflow-hidden">
@@ -163,7 +163,7 @@ const Vlog: React.FC = () => {
                     }}
                   />
 
-                  <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/40">
+                  <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity bg-black/40">
                     <div className="w-14 h-14 rounded-full bg-white text-primary flex items-center justify-center shadow-lg">
                       <Play className="w-6 h-6 text-primary fill-primary ml-1" />
                     </div>
@@ -290,7 +290,7 @@ const Vlog: React.FC = () => {
           <div className="relative w-full max-w-4xl bg-black rounded-2xl overflow-hidden shadow-2xl border border-white/10">
             <button
               onClick={() => setPlayingVideo(null)}
-              className="absolute top-4 right-4 z-10 p-2 rounded-full bg-black/60 text-white hover:bg-black/80 hover:text-primary transition-all"
+              className="absolute top-4 right-4 z-10 p-2 rounded-full bg-black/60 text-white hover:bg-black/80 hover:text-primary transition"
               aria-label="Close video"
             >
               <X className="w-5 h-5" />

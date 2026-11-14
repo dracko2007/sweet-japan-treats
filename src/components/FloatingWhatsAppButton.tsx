@@ -139,7 +139,7 @@ const FloatingWhatsAppButton: React.FC<FloatingWhatsAppButtonProps> = () => {
                   <button
                     key={opt.id}
                     onClick={() => handleOptionClick(opt.message)}
-                    className="w-full text-left p-2.5 rounded-2xl border border-slate-100 dark:border-slate-800/80 bg-slate-50/50 hover:bg-emerald-50/60 dark:bg-slate-800/40 dark:hover:bg-slate-800 hover:border-emerald-200 dark:hover:border-emerald-700/50 transition-all duration-200 flex items-center justify-between group shadow-sm hover:shadow"
+                    className="w-full text-left p-2.5 rounded-2xl border border-slate-100 dark:border-slate-800/80 bg-slate-50/50 hover:bg-emerald-50/60 dark:bg-slate-800/40 dark:hover:bg-slate-800 hover:border-emerald-200 dark:hover:border-emerald-700/50 transition duration-200 flex items-center justify-between group shadow-sm hover:shadow"
                   >
                     <div className="flex items-center gap-3 min-w-0 pr-2">
                       <div className={`w-8 h-8 rounded-xl shrink-0 flex items-center justify-center ${opt.iconBg} group-hover:scale-105 transition-transform`}>
@@ -154,7 +154,7 @@ const FloatingWhatsAppButton: React.FC<FloatingWhatsAppButtonProps> = () => {
                         </p>
                       </div>
                     </div>
-                    <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-emerald-600 group-hover:translate-x-0.5 transition-all shrink-0" />
+                    <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-emerald-600 group-hover:translate-x-0.5 transition shrink-0" />
                   </button>
                 );
               })}
@@ -180,7 +180,7 @@ const FloatingWhatsAppButton: React.FC<FloatingWhatsAppButtonProps> = () => {
         {...(isOpen ? {} : handleProps)}
         onClick={() => setIsOpen(!isOpen)}
         aria-label="Abrir atendimento no WhatsApp"
-        className="group flex items-center gap-2.5 bg-emerald-500 hover:bg-emerald-600 text-white pl-3.5 pr-4 py-2.5 rounded-full shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 hover:scale-105 transition-all duration-300 active:scale-95 border border-emerald-400/30 cursor-pointer"
+        className="group flex items-center gap-2.5 bg-emerald-500 hover:bg-emerald-600 text-white pl-3.5 pr-4 py-2.5 rounded-full shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 hover:scale-105 transition duration-300 active:scale-95 border border-emerald-400/30 cursor-pointer"
       >
         <div className="relative flex items-center justify-center w-6 h-6 rounded-full bg-white/20">
           <MessageCircle className="w-4 h-4 fill-white" />

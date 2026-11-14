@@ -264,7 +264,7 @@ const HeaderPro: React.FC = () => {
               <JapanExpressLogo
                 size={56}
                 className={cn(
-                  'shrink-0 drop-shadow-lg transition-all duration-300 group-hover:-rotate-6 group-hover:scale-105',
+                  'shrink-0 drop-shadow-lg transition duration-300 group-hover:-rotate-6 group-hover:scale-105',
                   compact ? 'h-10 w-10' : 'h-11 w-11 sm:h-14 sm:w-14',
                 )}
               />
@@ -280,7 +280,7 @@ const HeaderPro: React.FC = () => {
             <button
               type="button"
               onClick={() => setSearchOpen(true)}
-              className="group mx-2 hidden h-11 max-w-2xl flex-1 items-center gap-3 rounded-2xl border border-pink-100 bg-white/90 px-4 text-left text-sm text-slate-400 shadow-sm transition-all hover:border-pink-300 hover:shadow-lg hover:shadow-pink-100/60 md:flex"
+              className="group mx-2 hidden h-11 max-w-2xl flex-1 items-center gap-3 rounded-2xl border border-pink-100 bg-white/90 px-4 text-left text-sm text-slate-400 shadow-sm transition hover:border-pink-300 hover:shadow-lg hover:shadow-pink-100/60 md:flex"
               aria-label={t('navPro.search')}
               aria-haspopup="dialog"
             >
@@ -376,7 +376,7 @@ const HeaderPro: React.FC = () => {
                       key={totalItems}
                       initial={reduce ? false : { scale: 0.3, y: -6 }}
                       animate={{ scale: 1, y: 0 }}
-                      exit={{ scale: 0 }}
+                      exit={{ opacity: 0, scale: 0.9 }}
                       transition={{ type: 'spring', stiffness: 600, damping: 14 }}
                       className="absolute right-0.5 top-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-gradient-to-br from-primary to-accent px-1 text-[10px] font-bold text-white shadow-md"
                     >

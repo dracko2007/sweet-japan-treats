@@ -263,7 +263,7 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ productId, productName, onClo
                     {saving && videoProgress > 0 && (
                       <div className="mt-2">
                         <div className="h-2 bg-secondary rounded-full overflow-hidden">
-                          <div className="h-full bg-primary transition-all" style={{ width: `${videoProgress}%` }} />
+                          <div className="h-full bg-primary transition-[width]" style={{ width: `${videoProgress}%` }} />
                         </div>
                         <p className="text-xs text-muted-foreground mt-1">Enviando vídeo... {videoProgress}%</p>
                       </div>

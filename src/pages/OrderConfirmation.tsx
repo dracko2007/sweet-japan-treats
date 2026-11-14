@@ -300,7 +300,7 @@ const OrderConfirmation: React.FC = () => {
                         />
                         <button
                           onClick={copyToClipboard}
-                          className="bg-pink-500 hover:bg-pink-600 text-white px-4 flex items-center justify-center gap-1.5 transition-all text-xs font-bold"
+                          className="bg-pink-500 hover:bg-pink-600 text-white px-4 flex items-center justify-center gap-1.5 transition text-xs font-bold"
                         >
                           <Copy className="w-4 h-4" />
                           {copied ? 'Copiado!' : 'Copiar'}
@@ -321,7 +321,7 @@ const OrderConfirmation: React.FC = () => {
                         href={whatsappComprovante}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center justify-center gap-2 w-full bg-green-600 hover:bg-green-700 text-white font-bold px-4 py-3 rounded-xl transition-all"
+                        className="inline-flex items-center justify-center gap-2 w-full bg-green-600 hover:bg-green-700 text-white font-bold px-4 py-3 rounded-xl transition"
                       >
                         <ExternalLink className="w-4 h-4" />
                         Enviar comprovante no WhatsApp

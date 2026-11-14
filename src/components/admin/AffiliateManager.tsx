@@ -709,7 +709,7 @@ const AffiliateManager: React.FC = () => {
                         </div>
                         <div className="h-2 bg-secondary rounded-full overflow-hidden">
                           <div
-                            className={`h-full rounded-full transition-all ${
+                            className={`h-full rounded-full transition ${
                               progress >= 100 ? 'bg-green-500' :
                               progress >= 60  ? 'bg-amber-400' : 'bg-red-400'
                             }`}

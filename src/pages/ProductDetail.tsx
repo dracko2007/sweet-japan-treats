@@ -356,7 +356,7 @@ const ProductDetail: React.FC = () => {
 
                 <div className="text-lg text-muted-foreground mb-6">
                   <div className={cn(
-                    "space-y-2 transition-all duration-300",
+                    "space-y-2 transition duration-300",
                     !descExpanded && "line-clamp-4"
                   )}>
                     {translatedDesc.split('\n').map((line, i) =>
@@ -387,7 +387,7 @@ const ProductDetail: React.FC = () => {
                             key={v.id}
                             onClick={() => setSelectedSize(v.id)}
                             className={cn(
-                              'px-4 py-2 rounded-xl border-2 text-sm font-semibold transition-all',
+                              'px-4 py-2 rounded-xl border-2 text-sm font-semibold transition',
                               active ? 'border-primary bg-primary/10 text-primary' : 'border-border text-foreground hover:border-primary/50'
                             )}
                           >
@@ -497,7 +497,7 @@ const ProductDetail: React.FC = () => {
                     onClick={handleAddToCart}
                     size="lg"
                     disabled={deliveryBlocked || isSoldOut}
-                    className={`flex-1 h-11 gap-2 text-base font-bold shadow-md hover:shadow-lg transition-all ${(deliveryBlocked || isSoldOut) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    className={`flex-1 h-11 gap-2 text-base font-bold shadow-md hover:shadow-lg transition ${(deliveryBlocked || isSoldOut) ? 'opacity-50 cursor-not-allowed' : ''}`}
                   >
                     <ShoppingCart className="w-5 h-5" />
                     {deliveryBlocked ? deliveryBlockBtn : isSoldOut ? 'Esgotado' : t('productDetail.addToCart')}

@@ -121,6 +121,20 @@
     @apply border-border;
   }
 
+  /* Curvas de movimento (as mesmas do tailwind.config.ts: ease-out-strong etc.). */
+  :root {
+    --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+    --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+    --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+  }
+
+  /* Celular: sem o atraso de toque duplo (zoom por toque duplo) em controles, e o flash do toque
+     fica suave e rosa em vez do cinza padrão do navegador. O pinch-zoom da página continua livre. */
+  a, button, [role="button"], summary, label, select, input[type="checkbox"], input[type="radio"] {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: rgba(236, 72, 153, 0.12);
+  }
+
   /* Largura travada ao viewport SEM bloquear o pinch-zoom.
      overflow-x:hidden fica SÓ no body (no html, ele desabilita o zoom no mobile). */
   html {
@@ -451,4 +465,10 @@ html.lenis body {
   html.nav-pro {
     --bottom-nav-h: calc(64px + env(safe-area-inset-bottom));
   }
+}
+
+/* A barra de endereço do celular faz 100vh ficar maior que a área visível; dvh acompanha. */
+@supports (height: 100dvh) {
+  .min-h-screen { min-height: 100dvh; }
+  .h-screen { height: 100dvh; }
 }

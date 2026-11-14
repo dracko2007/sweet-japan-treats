@@ -220,7 +220,7 @@ const TrackOrder: React.FC = () => {
                     return (
                       <div key={step.status} className="relative flex items-start gap-6 pb-8 last:pb-0">
                         <div className={cn(
-                          "relative z-10 w-16 h-16 rounded-full flex items-center justify-center border-4 bg-card transition-all",
+                          "relative z-10 w-16 h-16 rounded-full flex items-center justify-center border-4 bg-card transition",
                           isCompleted && !isCancelled ? 'border-green-500 text-green-500' :
                           isCurrent && !isCancelled ? 'border-blue-500 text-blue-500 animate-pulse' :
                           'border-gray-300 text-gray-300'

@@ -52,7 +52,7 @@ const LanguageSwitcher: React.FC<{ compact?: boolean }> = ({ compact = false }) 
         aria-controls="language-switcher-menu"
         aria-label={`${t('a11y.selectLanguage')}: ${current.label}`}
         className={cn(
-          "flex items-center bg-secondary/80 border border-border rounded-full hover:bg-secondary transition-all text-xs font-semibold text-foreground shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary",
+          "flex items-center bg-secondary/80 border border-border rounded-full hover:bg-secondary transition text-xs font-semibold text-foreground shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary",
           compact ? "h-10 w-10 justify-center" : "gap-1.5 px-2 sm:px-3 py-1.5",
         )}
       >

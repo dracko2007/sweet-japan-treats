@@ -675,7 +675,7 @@ const ProductManager: React.FC = () => {
         <div className="flex flex-wrap gap-1.5">
           <button
             onClick={() => setFilterCat('all')}
-            className={cn('px-3 py-1.5 rounded-full text-xs font-semibold border transition-all', filterCat === 'all' ? 'bg-primary text-primary-foreground border-primary' : 'bg-card border-border text-muted-foreground hover:border-primary/50')}
+            className={cn('px-3 py-1.5 rounded-full text-xs font-semibold border transition', filterCat === 'all' ? 'bg-primary text-primary-foreground border-primary' : 'bg-card border-border text-muted-foreground hover:border-primary/50')}
           >
             Todos ({products.length})
           </button>
@@ -686,7 +686,7 @@ const ProductManager: React.FC = () => {
               <button
                 key={c.id}
                 onClick={() => setFilterCat(filterCat === c.id ? 'all' : c.id)}
-                className={cn('px-3 py-1.5 rounded-full text-xs font-semibold border transition-all', filterCat === c.id ? 'bg-primary text-primary-foreground border-primary' : 'bg-card border-border text-muted-foreground hover:border-primary/50')}
+                className={cn('px-3 py-1.5 rounded-full text-xs font-semibold border transition', filterCat === c.id ? 'bg-primary text-primary-foreground border-primary' : 'bg-card border-border text-muted-foreground hover:border-primary/50')}
               >
                 {c.icon} {c.label} ({count})
               </button>
@@ -1011,7 +1011,7 @@ const ProductManager: React.FC = () => {
                   >
                     <span>{editing.hidden ? '🙈 Oculto (não aparece)' : '✅ Publicado na loja'}</span>
                     <span className={`w-9 h-5 rounded-full relative transition-colors ${editing.hidden ? 'bg-gray-400' : 'bg-green-500'}`}>
-                      <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-all ${editing.hidden ? 'left-0.5' : 'left-4'}`} />
+                      <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-[left] ${editing.hidden ? 'left-0.5' : 'left-4'}`} />
                     </span>
                   </button>
                   <p className="text-[11px] text-muted-foreground mt-1.5">Oculto = fica registrado, mas o cliente não vê.</p>
@@ -1038,7 +1038,7 @@ const ProductManager: React.FC = () => {
                   >
                     <span>{editing.featured ? '⭐ Em destaque' : '☆ Sem destaque'}</span>
                     <span className={`w-9 h-5 rounded-full relative transition-colors ${editing.featured ? 'bg-amber-500' : 'bg-gray-400'}`}>
-                      <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-all ${editing.featured ? 'left-4' : 'left-0.5'}`} />
+                      <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-[left] ${editing.featured ? 'left-4' : 'left-0.5'}`} />
                     </span>
                   </button>
                   {(() => {
@@ -1079,7 +1079,7 @@ const ProductManager: React.FC = () => {
                   >
                     <span>{editing.heroCarousel ? '🎬 No hero' : '☆ Fora do hero'}</span>
                     <span className={`w-9 h-5 rounded-full relative transition-colors ${editing.heroCarousel ? 'bg-rose-500' : 'bg-gray-400'}`}>
-                      <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-all ${editing.heroCarousel ? 'left-4' : 'left-0.5'}`} />
+                      <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-[left] ${editing.heroCarousel ? 'left-4' : 'left-0.5'}`} />
                     </span>
                   </button>
                   {(() => {
@@ -1183,7 +1183,7 @@ const ProductManager: React.FC = () => {
                   >
                     <span>{editing?.isNew ? '✅ É lançamento' : 'Produto comum'}</span>
                     <span className={`w-9 h-5 rounded-full relative transition-colors ${editing?.isNew ? 'bg-blue-500' : 'bg-gray-300 dark:bg-gray-600'}`}>
-                      <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${editing?.isNew ? 'left-4' : 'left-0.5'}`} />
+                      <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-[left] ${editing?.isNew ? 'left-4' : 'left-0.5'}`} />
                     </span>
                   </button>
                   <p className="text-[11px] text-blue-600/70 dark:text-blue-400/70 mt-1.5">Aparece em destaque no filtro "Lançamento".</p>
@@ -1487,7 +1487,7 @@ const ProductManager: React.FC = () => {
                       onDrop={(e) => { e.preventDefault(); if (dragIndex !== null) moveImage(dragIndex, idx); setDragIndex(null); }}
                       onDragEnd={() => setDragIndex(null)}
                       className={cn(
-                        "relative w-20 h-20 rounded-lg overflow-hidden border-2 group cursor-grab active:cursor-grabbing transition-all",
+                        "relative w-20 h-20 rounded-lg overflow-hidden border-2 group cursor-grab active:cursor-grabbing transition",
                         dragIndex === idx ? "border-primary opacity-50 scale-95" : "border-border"
                       )}
                       title="Arraste para reordenar"
@@ -1503,7 +1503,7 @@ const ProductManager: React.FC = () => {
                       ) : (
                         <span className="absolute top-0 left-0 bg-black/50 text-white text-[9px] px-1 rounded-br">{idx + 1}</span>
                       )}
-                      <span className="absolute bottom-0.5 left-0.5 bg-black/50 text-white rounded p-0.5 opacity-0 group-hover:opacity-100 transition">
+                      <span className="absolute bottom-0.5 left-0.5 bg-black/50 text-white rounded p-0.5 opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 transition">
                         <GripVertical className="w-3 h-3" />
                       </span>
                       {(idx !== 0 || editing.videoCover) && (
@@ -1511,14 +1511,14 @@ const ProductManager: React.FC = () => {
                           type="button"
                           onClick={() => setPhotoAsCover(idx)}
                           title="Usar esta foto como capa"
-                          className="absolute bottom-0.5 right-0.5 bg-black/60 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition"
+                          className="absolute bottom-0.5 right-0.5 bg-black/60 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 transition"
                         >
                           <Star className="w-3 h-3" />
                         </button>
                       )}
                       <button
                         onClick={() => removeImage(idx)}
-                        className="absolute top-0.5 right-0.5 bg-black/60 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition"
+                        className="absolute top-0.5 right-0.5 bg-black/60 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 transition"
                       >
                         <X className="w-3 h-3" />
                       </button>

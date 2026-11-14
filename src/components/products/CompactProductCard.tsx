@@ -142,7 +142,7 @@ const CompactProductCard: React.FC<CompactProductCardProps> = ({ product }) => {
                 src={productThumb(product)}
                 alt={name}
                 loading="lazy"
-                className={`absolute inset-0 h-full w-full object-contain p-5 transition-all duration-500 group-hover:scale-[1.04] ${isHovered ? 'opacity-0' : 'opacity-100'}`}
+                className={`absolute inset-0 h-full w-full object-contain p-5 transition duration-500 group-hover:scale-[1.04] ${isHovered ? 'opacity-0' : 'opacity-100'}`}
               />
               {isHovered && (
                 <video
@@ -189,7 +189,7 @@ const CompactProductCard: React.FC<CompactProductCardProps> = ({ product }) => {
           aria-label={isFavorite ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
           aria-pressed={isFavorite}
         >
-          <Heart className={cn('h-5 w-5 transition-all', isFavorite && 'animate-[pop_0.35s_ease-out] fill-current')} />
+          <Heart className={cn('h-5 w-5 transition', isFavorite && 'animate-[pop_0.35s_ease-out] fill-current')} />
         </button>
         {/* Tarja verde na base da foto: o produto já está no país do cliente. */}
         {offer && (
@@ -241,7 +241,7 @@ const CompactProductCard: React.FC<CompactProductCardProps> = ({ product }) => {
             <button
               type="button"
               onClick={handleAddToCart}
-              className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-pink-500 via-pink-600 to-fuchsia-600 text-white shadow-lg shadow-pink-500/30 transition-all duration-300 hover:-rotate-6 hover:scale-110 hover:shadow-xl active:scale-90"
+              className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-pink-500 via-pink-600 to-fuchsia-600 text-white shadow-lg shadow-pink-500/30 transition duration-300 hover:-rotate-6 hover:scale-110 hover:shadow-xl active:scale-90"
               aria-label={cartQuantity > 0 ? `Adicionar mais — ${cartQuantity} no carrinho` : 'Adicionar ao carrinho'}
             >
               <Plus className="h-5 w-5" />

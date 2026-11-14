@@ -147,7 +147,7 @@ export default function VisitorStats() {
                   const label = d.date.slice(5); // 'MM-DD'
                   return (
                     <div key={d.date} className="flex-1 flex flex-col items-center gap-1 group">
-                      <span className="text-[9px] text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity font-mono">
+                      <span className="text-[9px] text-muted-foreground opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity font-mono">
                         {d.total}
                       </span>
                       <div

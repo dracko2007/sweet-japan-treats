@@ -113,7 +113,19 @@ export default {
         "accordion-up": "accordion-up 0.2s ease-out",
         "pulse-zoom": "pulse-zoom 2s ease-in-out infinite",
       },
+      // Curvas fortes (o `ease-out` padrão do navegador é fraco demais para movimento de UI).
+      // Mesmos valores das variáveis --ease-* em index.css.
+      transitionTimingFunction: {
+        "out-strong": "cubic-bezier(0.23, 1, 0.32, 1)",
+        "in-out-strong": "cubic-bezier(0.77, 0, 0.175, 1)",
+        drawer: "cubic-bezier(0.32, 0.72, 0, 1)",
+      },
     },
+  },
+  // `hover:` só vale em aparelho que realmente tem hover. No celular o toque disparava o hover
+  // e deixava o card "preso" crescido/colorido depois do toque.
+  future: {
+    hoverOnlyWhenSupported: true,
   },
   plugins: [require("tailwindcss-animate")],
 } satisfies Config;

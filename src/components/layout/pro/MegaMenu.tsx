@@ -52,7 +52,7 @@ const MegaMenu: React.FC<Props> = ({ id, categories, counts, tags, highlights, o
                 <Link
                   to={`/produtos/${c.id}`}
                   onClick={onNavigate}
-                  className="group flex items-center gap-3 rounded-2xl border border-transparent p-2.5 transition-all hover:border-pink-100 hover:bg-pink-50/70"
+                  className="group flex items-center gap-3 rounded-2xl border border-transparent p-2.5 transition hover:border-pink-100 hover:bg-pink-50/70"
                 >
                   <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-pink-50 to-pink-100 text-xl ring-1 ring-pink-200/60 transition-transform duration-300 group-hover:-rotate-6 group-hover:scale-110">
                     {c.icon}
@@ -80,7 +80,7 @@ const MegaMenu: React.FC<Props> = ({ id, categories, counts, tags, highlights, o
                     <Link
                       to={`/produtos?q=${encodeURIComponent(tag)}`}
                       onClick={onNavigate}
-                      className="inline-block rounded-full border border-pink-100 bg-pink-50/60 px-3 py-1.5 text-xs font-semibold capitalize text-slate-700 transition-all hover:-translate-y-0.5 hover:border-pink-300 hover:bg-pink-100 hover:text-pink-700"
+                      className="inline-block rounded-full border border-pink-100 bg-pink-50/60 px-3 py-1.5 text-xs font-semibold capitalize text-slate-700 transition hover:-translate-y-0.5 hover:border-pink-300 hover:bg-pink-100 hover:text-pink-700"
                     >
                       {tag}
                     </Link>

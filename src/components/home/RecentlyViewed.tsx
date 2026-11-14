@@ -43,7 +43,7 @@ const RecentlyViewed: React.FC = () => {
               <Link
                 key={product.id}
                 to={`/produto/${product.id}`}
-                className="group shrink-0 w-36 sm:w-40 bg-white rounded-xl border border-gray-100 overflow-hidden shadow-soft hover:shadow-card transition-all"
+                className="group shrink-0 w-36 sm:w-40 bg-white rounded-xl border border-gray-100 overflow-hidden shadow-soft hover:shadow-card transition"
               >
                 <div className="aspect-square bg-white overflow-hidden">
                   <img
