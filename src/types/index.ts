@@ -147,6 +147,11 @@ export interface Order {
   total?: number;
   carrier?: string;
   grandTotalYen?: number;
+  /** Valores em ienes gravados pelo servidor no pedido (o painel mostra quanto foi gasto). */
+  totalYen?: number;
+  netProductsYen?: number;
+  shippingCostYen?: number;
+  psFeeYen?: number;
   federalTax?: number;   // II (pedidos antigos do Brasil)
   icmsTax?: number;      // ICMS (pedidos antigos do Brasil)
   /** Endereço "solto" de pedidos antigos (os atuais usam `shippingAddress`). */

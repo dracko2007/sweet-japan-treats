@@ -1,4 +1,5 @@
 import { safeStorage } from '@/utils/storage';
+import { fmtOrderMoney, orderTotalYen, orderYenLines, yen } from '@/utils/adminOrderMoney';
 import React, { Suspense, lazy, useCallback, useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Package, Printer, ShoppingBag, User, MapPin, Phone, Mail, Calendar, TestTube, Tag, Truck, CheckCircle, XCircle, Trash2, BarChart3, Users, PackagePlus, Video, Megaphone, Clapperboard, Building2, Sparkles, ShieldCheck, Calculator, CloudUpload, FileText, Handshake, Flag, TrendingDown, MessageCircle, Trophy, Landmark } from 'lucide-react';
@@ -568,13 +569,13 @@ _This is an automated test message_
     const discount = order.couponDiscount || (itemsSubtotal > order.totalPrice ? itemsSubtotal - order.totalPrice : 0);
     const shippingCost = order.shipping?.cost ?? null;
     const grandTotal = order.totalPrice ?? order.total ?? 0;
-    const grandTotalYen = order.grandTotalYen;
+    const grandTotalYen = orderTotalYen(order);
 
     const itemsHtml = order.items.map((item: OrderItem) => `
       <tr>
         <td style="padding:6px 8px;border-bottom:1px solid #eee;">${isMixedOrder(order) && item.local ? '📍 ' : ''}${escapeHtml(item.productName || item.name)}${item.size ? ` <span style="color:#888;font-size:12px;">(${escapeHtml(item.size)})</span>` : ''}</td>
         <td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:center;">${Number(item.quantity) || 0}</td>
-        <td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:right;">R$ ${(Number(item.price) * Number(item.quantity)).toFixed(2)}</td>
+        <td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:right;">${fmtOrderMoney(Number(item.price) * Number(item.quantity), order.currency)}</td>
       </tr>
     `).join('');
     const html = `<!DOCTYPE html>
@@ -664,9 +665,9 @@ _This is an automated test message_
       <tr>
         <td>Subtotal</td>
         <td></td>
-        <td>R$ ${itemsSubtotal.toFixed(2)}</td>
+        <td>${fmtOrderMoney(itemsSubtotal, order.currency)}</td>
       </tr>
-      ${discount > 0 ? `<tr class="discount"><td>Cupom ${order.couponCode ? `(${escapeHtml(order.couponCode)})` : ''}</td><td></td><td>-R$ ${discount.toFixed(2)}</td></tr>` : ''}
+      ${discount > 0 ? `<tr class="discount"><td>Cupom ${order.couponCode ? `(${escapeHtml(order.couponCode)})` : ''}</td><td></td><td>-${fmtOrderMoney(discount, order.currency)}</td></tr>` : ''}
       <tr>
         <td>Frete ${order.shippingCarrier ? `(${escapeHtml(carrierText(order))})` : ''}</td>
         <td></td>
@@ -676,8 +677,9 @@ _This is an automated test message_
       <tr class="grand">
         <td>Total Geral</td>
         <td></td>
-        <td style="color:#e4003a;">R$ ${grandTotal.toFixed(2)}${grandTotalYen ? ` (¥ ${Number(grandTotalYen).toLocaleString()})` : ''}</td>
+        <td style="color:#e4003a;">${fmtOrderMoney(grandTotal, order.currency)}${grandTotalYen && order.currency !== 'JPY' ? ` (${yen(grandTotalYen)})` : ''}</td>
       </tr>
+      ${orderYenLines(order).map((l) => `<tr style="color:#555;${l.bold ? 'font-weight:bold;' : 'font-size:12px;'}"><td>${l.bold ? '' : '&nbsp;&nbsp;'}${l.label}</td><td></td><td>${yen(l.value)}</td></tr>`).join('')}
     </table>
   </div>
 
@@ -1138,7 +1140,7 @@ _This is an automated test message_
                           {order.items.map((item: OrderItem, i: number) => (
                             <div key={i} className="flex justify-between text-sm">
                                <span>{isMixedOrder(order) && item.local ? '📍 ' : ''}{item.productName || item.name} ({item.size}) x{item.quantity}</span>
-                               <span className="font-semibold font-mono">R$ {(item.price * item.quantity).toFixed(2)}</span>
+                               <span className="font-semibold font-mono">{fmtOrderMoney(item.price * item.quantity, order.currency)}</span>
                             </div>
                           ))}
                           {(() => {
@@ -1151,7 +1153,7 @@ _This is an automated test message_
                                 {/* Subtotal */}
                                 <div className="flex justify-between text-sm">
                                   <span>Subtotal</span>
-                                  <span className="font-mono">R$ {itemsSubtotal.toFixed(2)}</span>
+                                  <span className="font-mono">{fmtOrderMoney(itemsSubtotal, order.currency)}</span>
                                 </div>
                                 
                                 {/* Coupon Discount */}
@@ -1161,7 +1163,7 @@ _This is an automated test message_
                                       <Tag className="w-3 h-3" />
                                       Cupom {order.couponCode && <span className="font-mono bg-green-100 px-1 rounded text-xs">{order.couponCode}</span>}
                                     </span>
-                                    <span className="font-mono">-R$ {discount.toFixed(2)}</span>
+                                    <span className="font-mono">-{fmtOrderMoney(discount, order.currency)}</span>
                                   </div>
                                 )}
                                 
@@ -1199,11 +1201,22 @@ _This is an automated test message_
                                 <div className="flex justify-between font-bold pt-1 border-t border-border text-base">
                                   <span>Total Geral</span>
                                   <span className="text-primary font-mono">
-                                    {order.currency !== 'JPY' && order.grandTotalYen
-                                      ? `R$ ${(order.totalPrice ?? order.total ?? 0).toFixed(2)} (¥ ${(order.grandTotalYen as number).toLocaleString()})`
-                                      : `R$ ${(order.totalPrice ?? order.total ?? 0).toFixed(2)}`}
+                                    {order.currency !== 'JPY' && orderTotalYen(order) > 0
+                                      ? `${fmtOrderMoney(order.totalPrice ?? order.total ?? 0, order.currency)} (${yen(orderTotalYen(order))})`
+                                      : fmtOrderMoney(order.totalPrice ?? order.total ?? 0, order.currency)}
                                   </span>
                                 </div>
+                                {/* Em ienes: quanto o pedido custou/valeu, para o controle de gastos */}
+                                {orderYenLines(order).length > 0 && (
+                                  <div className="mt-1 rounded-md bg-muted/50 p-2 space-y-0.5">
+                                    {orderYenLines(order).map((line) => (
+                                      <div key={line.label} className={`flex justify-between text-xs ${line.bold ? 'font-semibold text-foreground' : 'text-muted-foreground'}`}>
+                                        <span>{line.label}</span>
+                                        <span className="font-mono">{yen(line.value)}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
                               </div>
                             );
                           })()}

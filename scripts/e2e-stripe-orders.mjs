@@ -60,11 +60,11 @@ const P = { a: 0, b: 1, c: 2, d: 3 };
 const SCENARIOS = [
   { n: 1, dest: BR(), prefix: 'SE-BR', carrier: 'ems', items: [[P.a, 1]], pm: 'pm_card_visa' },
   { n: 2, dest: BR(), prefix: 'SE-BR', carrier: 'eraito', items: [[P.b, 2]], pm: 'pm_card_mastercard' },
-  { n: 3, dest: BR(), prefix: 'SE-BR', carrier: 'kozutsumi-air', items: [[P.c, 1], [P.a, 1]], pm: 'pm_card_visa_debit' },
+  { n: 3, dest: BR(), prefix: 'SE-BR', carrier: 'ems', items: [[P.c, 1], [P.a, 1]], pm: 'pm_card_visa_debit' },
   { n: 4, dest: BR(), prefix: 'SE-BR', carrier: 'ems', items: [[P.d, 3]], pm: 'pm_card_visa', waivePs: true },
   { n: 5, dest: BR(), prefix: 'SE-BR', carrier: 'eraito', items: [[P.b, 1], [P.c, 1]], pm: 'pm_card_mastercard' },
   { n: 6, dest: US(), prefix: 'SE-US', carrier: 'ems', items: [[P.a, 2]], pm: 'pm_card_visa' },
-  { n: 7, dest: US(), prefix: 'SE-US', carrier: 'eraito', items: [[P.b, 1], [P.d, 1]], pm: 'pm_card_amex' },
+  { n: 7, dest: US(), prefix: 'SE-US', carrier: 'ems', items: [[P.b, 1], [P.d, 1]], pm: 'pm_card_amex' },
   { n: 8, dest: JP(), prefix: 'SC-JP', carrier: 'yuubin', items: [[P.c, 1]], pm: 'pm_card_visa' },
   { n: 9, dest: JP(), prefix: 'SC-JP', carrier: 'yamato', items: [[P.a, 2], [P.d, 1]], pm: 'pm_card_mastercard', waivePs: true },
   { n: 10, dest: BR(), prefix: 'SE-BR', carrier: 'ems', items: [[P.b, 2], [P.c, 1]], pm: 'pm_card_visa' },
@@ -99,8 +99,12 @@ async function guestIdToken() {
   return j.idToken;
 }
 
+const ONLY = (process.env.E2E_ONLY || '').split(',').filter(Boolean).map(Number);
+// Com E2E_CONFIRM_PK (chave PUBLICÁVEL de teste, pública no site) o script também paga cada pedido
+// com o cartão de teste do cenário, como o navegador faria; o webhook do Stripe cuida do resto.
+const CONFIRM_PK = process.env.E2E_CONFIRM_PK || '';
 const results = [];
-for (const s of SCENARIOS) {
+for (const s of SCENARIOS.filter((x) => ONLY.length === 0 || ONLY.includes(x.n))) {
   const orderId = `${s.prefix}-999${String(s.n).padStart(3, '0')}`;
   const email = `delivered+je-teste-${String(s.n).padStart(2, '0')}@resend.dev`;
   const row = { n: s.n, orderId, email, country: s.dest.country, carrier: s.carrier, pm: s.pm, waivePs: Boolean(s.waivePs) };
@@ -142,6 +146,12 @@ for (const s of SCENARIOS) {
       row.psFee = c.json.order?.priceBreakdown?.psFee;
       row.psFeeGross = c.json.order?.priceBreakdown?.psFeeGross;
       row.psFeeWaiverApplied = c.json.order?.psFeeWaiverApplied;
+      if (CONFIRM_PK) {
+        const body2 = new URLSearchParams({ client_secret: String(c.json.clientSecret), payment_method: s.pm, return_url: `${CATALOG}/` });
+        const pay = await fetch(`https://api.stripe.com/v1/payment_intents/${row.paymentIntent}/confirm`, { method: 'POST', headers: { authorization: `Bearer ${CONFIRM_PK}`, 'content-type': 'application/x-www-form-urlencoded' }, body: body2 });
+        const pj = await pay.json();
+        row.payment = pj.status || pj.error?.code;
+      }
     }
   } catch (error) {
     row.error = error instanceof Error ? error.message : String(error);
