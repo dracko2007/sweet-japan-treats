@@ -245,16 +245,18 @@ function trackingPageUrl(order) {
 }
 
 /** Foto do produto, clicável: abre o acompanhamento do pedido. Sem foto https, vazio. */
-function productThumb(item, order) {
+function productThumb(item, order, { link = true } = {}) {
   const image = safeHttpsUrl(item.image || item.imageUrl);
   if (!image) return '';
   const alt = escapeHtml(item.productName || item.name || 'Produto');
-  return `<a href="${escapeHtml(trackingPageUrl(order))}" style="text-decoration:none"><img src="${escapeHtml(image)}" width="56" height="56" alt="${alt}" style="display:block;width:56px;height:56px;object-fit:cover;border-radius:8px;border:1px solid #eee"></a>`;
+  const img = `<img src="${escapeHtml(image)}" width="56" height="56" alt="${alt}" style="display:block;width:56px;height:56px;object-fit:cover;border-radius:8px;border:1px solid #eee">`;
+  // O acompanhamento é do cliente: o e-mail da loja mostra a foto, sem link.
+  return link ? `<a href="${escapeHtml(trackingPageUrl(order))}" style="text-decoration:none">${img}</a>` : img;
 }
 
 /** Linha de item com foto | nome | valor. */
-function itemRowWithPhoto(item, order, label, value) {
-  return `<tr><td style="${cell};width:64px;vertical-align:top">${productThumb(item, order)}</td>`
+function itemRowWithPhoto(item, order, label, value, { link = true } = {}) {
+  return `<tr><td style="${cell};width:64px;vertical-align:top">${productThumb(item, order, { link })}</td>`
     + `<td style="${cell};vertical-align:top">${label}</td>`
     + `<td style="${cell};text-align:right;white-space:nowrap;vertical-align:top">${value}</td></tr>`;
 }
@@ -270,20 +272,35 @@ function storeYenView(order) {
   const totalYen = Number(order.totalYen) || 0;
   const items = Array.isArray(order.items) ? order.items : [];
   if (!(totalYen > 0) || items.some((i) => !i.freeGift && !(Number(i.unitYen) > 0))) return null;
-  const subtotal = items.reduce((sum, i) => sum + (i.freeGift ? 0 : Number(i.unitYen) * Math.max(1, Number(i.quantity || 1))), 0);
+  const currency = String(order.currency || 'JPY').toUpperCase();
+  const pb = order.priceBreakdown || {};
+  const qty = (i) => Math.max(1, Number(i.quantity || 1));
+  const yenFmt = (v) => `¥ ${Math.round(Number(v) || 0).toLocaleString('en-US')}`;
+  // Mesmo formato do site (utils/currency.ts): moeda do pedido e os ienes entre parênteses.
+  const local = (v) => {
+    const n = Number(v) || 0;
+    if (currency === 'USD') return `$ ${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    if (currency === 'EUR') return `€ ${Math.round(n).toLocaleString('pt-BR')}`;
+    return `R$ ${Math.round(n).toLocaleString('pt-BR')}`;
+  };
+  const pair = (yenValue, localValue) => (currency === 'JPY' || localValue == null ? yenFmt(yenValue) : `${local(localValue)} (${yenFmt(yenValue)})`);
+
+  const subtotal = items.reduce((sum, i) => sum + (i.freeGift ? 0 : Number(i.unitYen) * qty(i)), 0);
+  const localSubtotal = pb.subtotal ?? items.reduce((sum, i) => sum + (i.freeGift ? 0 : Number(i.price || 0) * qty(i)), 0);
   const net = order.netProductsYen != null ? Number(order.netProductsYen) : subtotal;
   const discount = Math.max(0, subtotal - net);
+  const localDiscount = (Number(pb.couponDiscount) || 0) + (Number(pb.pointsDiscount) || 0);
   const shipping = Number(order.shippingCostYen) || 0;
   const psFee = Number(order.psFeeYen) || 0;
-  const rows = [row('Subtotal dos produtos', money(subtotal, 'JPY'))];
-  if (discount > 0) rows.push(row(`Desconto${order.couponCode ? ` (cupom ${escapeHtml(order.couponCode)})` : ''}`, `− ${money(discount, 'JPY')}`));
+  const rows = [row('Subtotal dos produtos', pair(subtotal, localSubtotal))];
+  if (discount > 0) rows.push(row(`Desconto${order.couponCode ? ` (cupom ${escapeHtml(order.couponCode)})` : ''}`, `− ${pair(discount, localDiscount > 0 ? localDiscount : undefined)}`));
   const carrier = CARRIER_LABEL[order.shippingCarrier || order.shipping?.carrier] || '';
-  rows.push(row(`Frete${carrier ? ` (${escapeHtml(carrier)})` : ''}`, shipping > 0 ? money(shipping, 'JPY') : 'Gratis'));
-  if (psFee > 0) rows.push(row('Taxa PS (Personal Shopper)', money(psFee, 'JPY')));
+  rows.push(row(`Frete${carrier ? ` (${escapeHtml(carrier)})` : ''}`, shipping > 0 ? pair(shipping, pb.shipping) : 'Gratis'));
+  if (psFee > 0) rows.push(row('Taxa PS (Personal Shopper)', pair(psFee, pb.psFee)));
   else if (order.psFeeWaiverApplied === true) rows.push(row('Taxa PS (Personal Shopper)', '<span style="color:#059669;font-weight:bold">Isenta</span>'));
-  if (Number(order.productCostYen) > 0) rows.push(row('<span style="color:#777">Custo dos produtos</span>', `<span style="color:#777">${money(Number(order.productCostYen), 'JPY')}</span>`));
-  rows.push(row('Total em ienes', money(totalYen, 'JPY'), { bold: true }));
-  return { rows: rows.join(''), unitValue: (item, quantity) => (item.freeGift ? 'Brinde' : money(Number(item.unitYen) * quantity, 'JPY')) };
+  if (Number(order.productCostYen) > 0) rows.push(row('<span style="color:#777">Custo dos produtos</span>', `<span style="color:#777">${yenFmt(order.productCostYen)}</span>`));
+  rows.push(row('Total', pair(totalYen, order.totalPrice ?? order.total), { bold: true }));
+  return { rows: rows.join(''), unitValue: (item, quantity) => (item.freeGift ? 'Brinde' : pair(Number(item.unitYen) * quantity, Number(item.price || 0) * quantity)) };
 }
 
 const SHIP_STEPS = ['Pagamento confirmado', 'Pedido separado', 'Enviado', 'Entregue'];
@@ -419,14 +436,14 @@ export function buildOrderEmail(order, { tracking = false, store = false } = {})
       const origem = isMixedOrder(order) && !item.freeGift
         ? ` <span style="color:${item.local ? '#047857' : '#777'}">[${item.local ? `enviado do ${escapeHtml(order.shipFrom)}` : 'enviado do Japao'}]</span>`
         : '';
-      return itemRowWithPhoto(item, order, `${escapeHtml(item.productName || item.name)}${option ? ` <span style="color:#777">(${escapeHtml(option)})</span>` : ''}${origem} × ${quantity}`, value);
+      return itemRowWithPhoto(item, order, `${escapeHtml(item.productName || item.name)}${option ? ` <span style="color:#777">(${escapeHtml(option)})</span>` : ''}${origem} × ${quantity}`, value, { link: !store });
     }).join('')
     : '';
   const breakdown = yenView ? yenView.rows : breakdownRows(order, currency);
   const total = yenView ? '' : row('Total', orderMoney(order.totalPrice ?? order.total, currency), { bold: true });
   // Na loja, em ienes, o que o cliente de fato pagou continua à vista (moeda e forma de pagamento).
-  const paidBlock = yenView
-    ? `<p style="margin:10px 0 0;color:#555"><strong>Cliente pagou:</strong> ${escapeHtml(orderMoney(order.totalPrice ?? order.total, currency))}${Number(order.priceBreakdown?.importDuty) > 0 ? ` (inclui imposto de importacao ${escapeHtml(orderMoney(order.priceBreakdown.importDuty, currency))} pre-pago pela loja)` : ''}</p>`
+  const paidBlock = yenView && Number(order.priceBreakdown?.importDuty) > 0
+    ? `<p style="margin:10px 0 0;color:#555;font-size:13px">O total inclui imposto de importacao de ${escapeHtml(orderMoney(order.priceBreakdown.importDuty, currency))}, pre-pago pela loja.</p>`
     : '';
 
   const payment = PAYMENT_LABEL[order.paymentMethod] || '';

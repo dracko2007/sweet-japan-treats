@@ -403,13 +403,16 @@ describe('foto clicável e e-mail da loja em ienes', () => {
     ...extra,
   });
 
-  it('a foto do produto aparece nos e-mails e abre o acompanhamento com o pedido preenchido', () => {
-    for (const opts of [{}, { store: true }, { tracking: true }]) {
+  it('a foto do produto aparece nos e-mails; no do cliente abre o acompanhamento, no da loja não tem link', () => {
+    for (const opts of [{}, { tracking: true }]) {
       const { html } = buildOrderEmail(pedidoIenes(), opts);
       expect(html).toContain('src="https://exemplo.com/a.jpg"');
       expect(html).toContain('href="https://japanexpress-store.com/rastrear?pedido=SE-BR-555"');
       expect(html).toContain('alt="Máscara"');
     }
+    const loja = buildOrderEmail(pedidoIenes(), { store: true }).html;
+    expect(loja).toContain('src="https://exemplo.com/a.jpg"');
+    expect(loja).not.toContain('rastrear');
   });
 
   it('produto sem foto https não gera imagem; foto http é ignorada', () => {
@@ -418,20 +421,17 @@ describe('foto clicável e e-mail da loja em ienes', () => {
     expect(html).not.toContain('inseguro.com');
   });
 
-  it('e-mail da loja vem em ienes, com o que o cliente pagou à vista', () => {
+  it('e-mail da loja: tudo como no site, moeda do pedido e os ienes entre parênteses', () => {
     const { html } = buildOrderEmail(pedidoIenes(), { store: true });
-    expect(html).toContain('¥1,780');
-    expect(html).toContain('¥4,800'); // 2 x ¥2.400
+    expect(html).toContain('R$ 62 (¥ 1,780)');
+    expect(html).toContain('R$ 124 (¥ 4,800)'); // 2 x ¥2.400
     expect(html).toContain('Subtotal dos produtos');
-    expect(html).toContain('¥6,580'); // 1.780 + 4.800
+    expect(html).toContain('R$ 186 (¥ 6,580)');
     expect(html).toContain('Desconto (cupom BEMVINDO10)');
-    expect(html).toContain('¥3,600');
-    expect(html).toContain('¥1,000');
-    expect(html).toContain('Total em ienes');
-    expect(html).toContain('¥9,700');
-    expect(html).toContain('Cliente pagou:');
-    expect(html).toContain('R$ 345,40');
-    expect(html).not.toContain('R$ 124');
+    expect(html).toContain('R$ 107 (¥ 3,600)');
+    expect(html).toContain('R$ 71 (¥ 1,000)');
+    expect(html).toContain('R$ 345 (¥ 9,700)');
+    expect(html).not.toContain('R$ 345,40');
   });
 
   it('taxa PS isenta aparece como Isenta no e-mail da loja; o do cliente continua na moeda dele', () => {
@@ -439,15 +439,15 @@ describe('foto clicável e e-mail da loja em ienes', () => {
     expect(html).toContain('Isenta');
     const cliente = buildOrderEmail(pedidoIenes()).html;
     expect(cliente).toContain('R$ 345,40');
-    expect(cliente).not.toContain('Total em ienes');
+    expect(cliente).not.toContain('(¥');
   });
 
   it('pedido sem valores em ienes (antigo) ou de estoque local segue na moeda do pedido', () => {
     const antigo = buildOrderEmail(pedidoIenes({ totalYen: undefined }), { store: true }).html;
-    expect(antigo).not.toContain('Total em ienes');
+    expect(antigo).not.toContain('(¥');
     expect(antigo).toContain('R$ 345,40');
     const local = buildOrderEmail(pedidoIenes({ fulfillment: 'local', shipFrom: 'Brasil' }), { store: true }).html;
-    expect(local).not.toContain('Total em ienes');
+    expect(local).not.toContain('(¥');
   });
 });
 

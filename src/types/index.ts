@@ -100,6 +100,9 @@ export interface OrderItem {
   image?: string;
   /** Enviado do estoque que já está no país do cliente (`order.shipFrom`), não do Japão. */
   local?: boolean;
+  /** Preço unitário em ienes gravado pelo servidor (o `price` fica na moeda do pedido). */
+  unitYen?: number;
+  freeGift?: boolean;
 }
 
 export interface OrderShippingAddress {
@@ -139,7 +142,11 @@ export interface Order {
   fulfillment?: 'japan' | 'local' | 'mixed';
   shipFrom?: string;
   /** Conta congelada no pedido, na moeda do pedido. */
-  priceBreakdown?: { shipping?: number; localShipping?: number };
+  priceBreakdown?: {
+    subtotal?: number; couponDiscount?: number; pointsDiscount?: number; shipping?: number; localShipping?: number;
+    psFee?: number; psFeeGross?: number; psFeeDiscount?: number; importDuty?: number;
+  };
+  psFeeWaiverApplied?: boolean;
   shippingAddress?: OrderShippingAddress;
   trackingNumber?: string;
   trackingUrl?: string;
