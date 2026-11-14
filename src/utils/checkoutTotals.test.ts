@@ -57,7 +57,16 @@ const sabonete = {
   localStock: { Brasil: { enabled: true, price: 200, quantity: 12, shippingOptions: [{ name: 'Sul', price: 30 }, { name: 'Sudeste', price: 22 }] } },
 } as unknown as Product;
 
-const catalog = new Map([mask, serum, box, sabonete].map((product) => [product.id, product]));
+const brinde = {
+  id: 'brinde',
+  name: 'Brinde frete grátis',
+  prices: { small: 1200, large: 1200 },
+  freeShippingSolo: true,
+  weightGrams: 150,
+  stock: { unlimited: true },
+} as unknown as Product;
+
+const catalog = new Map([mask, serum, box, sabonete, brinde].map((product) => [product.id, product]));
 
 interface Scenario {
   country: string;
@@ -154,6 +163,18 @@ const cart = (...entries: Array<[Product, number, string?]>): CartItem[] =>
 describe('screen total equals the charged total', () => {
   it('Brasil, cartão, EMS', () => {
     expectSameBill(both({ country: 'Brasil', carrier: 'ems', paymentMethod: 'card', items: cart([mask, 2], [serum, 1]) }));
+  });
+
+  it('frete grátis do produto: tela e servidor concordam, sozinho (¥0) e com outro item (cobrado)', () => {
+    const sozinho = both({ country: 'Brasil', carrier: 'ems', paymentMethod: 'card', items: cart([brinde, 1]) });
+    expectSameBill(sozinho);
+    expect(sozinho.server.display.shipping).toBe(0);
+    const comOutro = both({ country: 'Brasil', carrier: 'ems', paymentMethod: 'card', items: cart([brinde, 1], [mask, 1]) });
+    expectSameBill(comOutro);
+    expect(comOutro.server.display.shipping).toBeGreaterThan(0);
+    const duas = both({ country: 'Brasil', carrier: 'ems', paymentMethod: 'card', items: cart([brinde, 2]) });
+    expectSameBill(duas);
+    expect(duas.server.display.shipping).toBeGreaterThan(0);
   });
 
   it('Brasil, Wise, Air Packet, com cupom de 10% e pontos', () => {

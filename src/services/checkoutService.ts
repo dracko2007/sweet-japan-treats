@@ -243,6 +243,13 @@ export async function prepareCheckout(
   return { order: payload.order, clientSecret: payload.clientSecret || null };
 }
 
+/** Troca um pedido Wise ainda não pago para cartão; devolve o pagamento a confirmar. */
+export async function changeOrderToCard(orderId: string): Promise<{ clientSecret: string }> {
+  const payload = await postCheckout<{ clientSecret?: string | null }>('/api/change-payment-method', { orderId, paymentMethod: 'card' });
+  if (!payload.clientSecret) throw new CheckoutError('card_not_initialized');
+  return { clientSecret: payload.clientSecret };
+}
+
 /** Mensagem para o cliente a partir do código de erro do servidor. */
 export function checkoutErrorMessage(code: string): string {
   const messages: Record<string, string> = {
@@ -250,6 +257,8 @@ export function checkoutErrorMessage(code: string): string {
     invalid_ps_fee_waiver: 'A isenção da taxa expirou ou já foi usada. O total foi atualizado; tente novamente.',
     ps_fee_waiver_already_used: 'A isenção da taxa expirou ou já foi usada. O total foi atualizado; tente novamente.',
     payment_method_unavailable: 'Esta forma de pagamento não está disponível para o país de entrega.',
+    order_not_payable: 'Este pedido já foi pago ou não aceita mais pagamento.',
+    payment_change_unavailable: 'Este pedido não permite trocar a forma de pagamento. Fale com a loja pelo WhatsApp.',
     payment_method_disabled: 'Esta forma de pagamento está em manutenção. Escolha outra.',
     shipping_unavailable: 'Esta forma de envio não está disponível para o país de entrega. Volte e escolha outra.',
     insufficient_stock: 'Um dos produtos acabou de esgotar. Revise o carrinho.',

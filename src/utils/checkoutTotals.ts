@@ -10,6 +10,7 @@ import {
   displayTotals,
   productBenefits,
   psFeeDiscountYen as finalPsFeeDiscountYen,
+  soloFreeShipping,
 } from '../../shared/money.js';
 import { localUnitYen } from '../../shared/local-stock.js';
 import { localOffer, splitCart } from '@/utils/localStock';
@@ -143,7 +144,13 @@ export function computeCheckoutTotals({
   });
   const psFeeFinalYen = benefits.psFeeYen - psDiscountYen;
 
-  const freeShipping = benefits.terms?.freeShipping === true;
+  const localItems = local ? localItemSet(items, local.country) : null;
+  const soloFree = soloFreeShipping(items.map((item) => ({
+    quantity: item.quantity,
+    freeShippingSolo: item.product.freeShippingSolo,
+    local: localItems?.has(item),
+  })));
+  const freeShipping = benefits.terms?.freeShipping === true || soloFree;
   const baseShippingYen = freeShipping ? 0 : Math.max(0, Number(shippingYen) || 0);
   const appliedShippingDiscountYen = Math.min(baseShippingYen, Math.max(0, Number(shippingDiscountYen) || 0));
   const finalShippingYen = baseShippingYen - appliedShippingDiscountYen;

@@ -14,6 +14,7 @@ import { trackPurchase } from '@/lib/analytics';
 import { useUser } from '@/context/UserContext';
 import { referralService } from '@/services/referralService';
 import { COMPANY_PROFILE } from '@/config/companyProfile';
+import ChangeToCard from '@/components/checkout/ChangeToCard';
 
 // O PayPay é app japonês e identifica a conta pelo número LOCAL: um cliente que
 // digitar o formato internacional não encontra a loja. Já o WhatsApp é discado
@@ -27,7 +28,7 @@ const OrderConfirmation: React.FC = () => {
   const { toast } = useToast();
   const { t } = useLanguage();
   const { user } = useUser();
-  const order = location.state?.order;
+  const [order, setOrder] = useState(location.state?.order);
   const isGuest = !!location.state?.isGuest;
   const [showGuestModal, setShowGuestModal] = useState(isGuest);
 
@@ -440,6 +441,10 @@ const OrderConfirmation: React.FC = () => {
                     Em instantes enviaremos o link de pagamento Wise pelo seu contato.
                   </p>
                 )}
+                <div className="border-t border-emerald-100 pt-4">
+                  <p className="mb-2 text-xs text-muted-foreground">Escolheu Wise sem querer? Troque aqui, o valor é o mesmo.</p>
+                  <ChangeToCard orderId={order.id} onPaid={() => setOrder({ ...order, paymentMethod: 'card' })} />
+                </div>
               </div>
             )}
 

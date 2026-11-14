@@ -8,6 +8,7 @@ import {
   yenToDisplay,
   productBenefits,
   psFeeDiscountYen,
+  soloFreeShipping,
   US_COUNTRY,
 } from '../../shared/money.js';
 import { localOffer, localOrderShipping, localUnitYen } from '../../shared/local-stock.js';
@@ -383,7 +384,12 @@ export function buildQuote({ requestedItems, products, country, prefecture, stat
   // Frete do Japão (itens que vêm de lá) + frete nacional (itens do país do cliente,
   // cadastrado no produto; um pacote só: vale o maior). Cada parte é uma remessa.
   const japanLines = lineItems.filter((item) => !item.local);
-  const freeShipping = benefits.terms?.freeShipping === true;
+  const soloFree = soloFreeShipping(lineItems.map((item) => ({
+    quantity: item.quantity,
+    freeShippingSolo: item.product.freeShippingSolo,
+    local: item.local,
+  })));
+  const freeShipping = benefits.terms?.freeShipping === true || soloFree;
   let shippingDisplay = null;
   let shipping = { amount: 0, weightG: 0 };
   if (japanLines.length > 0) {
