@@ -5,8 +5,6 @@ import FeaturedProducts from '@/components/home/FeaturedProducts';
 import RecentlyViewed from '@/components/home/RecentlyViewed';
 import HomeVideos from '@/components/home/HomeVideos';
 import ShippingBanner from '@/components/home/ShippingBanner';
-import NewsletterSection from '@/components/home/NewsletterSection';
-import AppDownloadSection from '@/components/AppDownloadSection';
 import ScrollReveal from '@/components/ScrollReveal';
 import WelcomeCouponBanner from '@/components/WelcomeCouponBanner';
 import CinematicHeroShelfTransition from '@/components/home/CinematicHeroShelfTransition';
@@ -33,14 +31,9 @@ const Index: React.FC = () => (
     {/* Videos */}
     <ScrollReveal><HomeVideos /></ScrollReveal>
 
-    {/* Shipping Banner */}
+    {/* Frete + newsletter (uma seção: a newsletter sozinha era uma faixa de meia tela).
+        O app continua em 'Instalar o App' no rodapé e no InstallPrompt. */}
     <ScrollReveal><ShippingBanner /></ScrollReveal>
-
-    {/* Newsletter */}
-    <ScrollReveal><NewsletterSection /></ScrollReveal>
-
-    {/* App Download */}
-    <ScrollReveal><AppDownloadSection /></ScrollReveal>
   </Layout>
 );
 

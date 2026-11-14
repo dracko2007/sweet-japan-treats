@@ -7,7 +7,7 @@ const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
 type Status = 'idle' | 'loading' | 'done' | 'invalid' | 'failed';
 
-const NewsletterSection: React.FC = () => {
+const NewsletterSection: React.FC<{ embedded?: boolean }> = ({ embedded = false }) => {
   const [email, setEmail] = useState('');
   const [status, setStatus] = useState<Status>('idle');
 
@@ -39,14 +39,15 @@ const NewsletterSection: React.FC = () => {
 
   const showError = status === 'invalid' || status === 'failed';
 
+  const Wrapper: React.ElementType = embedded ? 'div' : 'section';
   return (
-    <section className="py-12 md:py-16 bg-pink-50">
-      <div className="container mx-auto px-4">
+    <Wrapper className={embedded ? 'border-t border-pink-100 pt-10' : 'py-12 md:py-16 bg-pink-50'}>
+      <div className={embedded ? '' : 'container mx-auto px-4'}>
         <div className="max-w-xl mx-auto text-center text-foreground">
-          <Mail className="w-10 h-10 mx-auto mb-3 text-primary" aria-hidden="true" />
-          <h2 className="font-display text-2xl md:text-3xl font-bold mb-2">
+          <Mail className="w-8 h-8 mx-auto mb-3 text-primary" aria-hidden="true" />
+          <h3 className="font-display text-xl md:text-2xl font-bold mb-2">
             Fique por dentro das novidades
-          </h2>
+          </h3>
           <p className="text-muted-foreground mb-6">
             Receba avisos de novos produtos e promoções direto no seu e-mail.
           </p>
@@ -96,7 +97,7 @@ const NewsletterSection: React.FC = () => {
           )}
         </div>
       </div>
-    </section>
+    </Wrapper>
   );
 };
 

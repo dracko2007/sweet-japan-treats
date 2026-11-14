@@ -104,7 +104,10 @@ const CATEGORY_LABEL: Record<string, string> = {
   papelaria: 'Papelaria', eletronicos: 'Eletrônicos', masculino: 'Masculino',
   vestuario: 'Vestuário', higiene: 'Higiene & Saúde', pet: 'Pet',
 };
-const HERO_MAX_PRODUCTS = 3; // produtos sorteados por visita (além da promo); 4 alongava demais a rolagem até a grade
+const HERO_MAX_PRODUCTS = 2; // produtos sorteados por visita (além da promo): mais que isso empurra o catálogo para longe
+// Fração da largura da track cobrada em rolagem vertical: <1 = a prateleira anda mais rápido
+// e o catálogo chega em ~3 telas em vez de ~6.
+const SCROLL_PER_PANEL = 0.7;
 
 const heroStyleFor = (category?: string) =>
   (category && HERO_CATEGORY_STYLE[category]) || DEFAULT_HERO_STYLE;
@@ -236,7 +239,7 @@ const CinematicHeroShelf: React.FC<CinematicHeroShelfProps> = ({
   // assíncrona (Firestore) mas acontece durante o vídeo de intro — o cliente
   // só alcança os painéis de produto depois, então a troca é invisível.
   const { products, loading: productsLoading } = useProducts();
-  const [shelf, setShelf] = useState<ShelfProduct[]>(PRODUCTS);
+  const [shelf, setShelf] = useState<ShelfProduct[]>(PRODUCTS.slice(0, HERO_MAX_PRODUCTS + 1));
   const shelfResolved = useRef(false);
   useEffect(() => {
     if (shelfResolved.current || productsLoading) return;
@@ -353,7 +356,7 @@ const CinematicHeroShelf: React.FC<CinematicHeroShelfProps> = ({
         scrollTrigger: {
           trigger: section,
           start: () => `top ${headerH()}px`,
-          end: () => `+=${distance()}`,
+          end: () => `+=${distance() * SCROLL_PER_PANEL}`,
           scrub: 1,
           pin: true,
           invalidateOnRefresh: true,
@@ -405,7 +408,7 @@ const CinematicHeroShelf: React.FC<CinematicHeroShelfProps> = ({
           scrollTrigger: {
             trigger: section,
             start: () => `top ${headerH()}px`,
-            end: () => `+=${distance()}`,
+            end: () => `+=${distance() * SCROLL_PER_PANEL}`,
             scrub: 1,
           },
         },
@@ -600,12 +603,13 @@ const CinematicHeroShelf: React.FC<CinematicHeroShelfProps> = ({
         </div>
       )}
 
-      <div
+      <div className="relative z-10 flex max-w-3xl flex-col items-center text-center">
+       <div
         className={cn(
-          'relative z-10 flex max-w-2xl flex-col items-center text-center transition-opacity duration-700',
+          'flex flex-col items-center transition-opacity duration-700',
           logoMoment && 'opacity-0',
         )}
-      >
+       >
         <p className="cinematic-reveal font-jp mb-2 text-[10px] uppercase tracking-[0.35em] text-pink-200/90 md:mb-5 md:text-xs md:tracking-[0.5em]">
           {t('cinematicHero.intro.eyebrow')}
         </p>
@@ -618,9 +622,22 @@ const CinematicHeroShelf: React.FC<CinematicHeroShelfProps> = ({
         <p className="cinematic-reveal mb-4 max-w-sm text-xs leading-relaxed text-white/80 drop-shadow line-clamp-3 md:mb-10 md:max-w-md md:text-lg md:line-clamp-none">
           {t('cinematicHero.intro.description')}
         </p>
-        <div className="cinematic-reveal flex items-center gap-2 text-[10px] uppercase tracking-[0.22em] text-white/70 md:text-xs md:tracking-[0.3em]">
-          <ArrowDown className="cinematic-bob h-3 w-3" />
-          <span>{t('cinematicHero.intro.scroll')}</span>
+       </div>
+        {/* Ações fora do bloco que some com o vídeo: a primeira tela sempre tem o que fazer.
+            Botões legíveis tanto sobre o vídeo escuro quanto sobre a cena rosa final. */}
+        <div className="cinematic-reveal flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
+          <Link
+            to="/produtos/cosmeticos"
+            className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full bg-pink-600 px-7 py-2.5 text-sm font-semibold text-white shadow-lg transition-colors hover:bg-pink-700 motion-reduce:transition-none"
+          >
+            {t('cinematicHero.outro.cta.products')} <ArrowRight className="h-4 w-4" aria-hidden="true" />
+          </Link>
+          <Link
+            to="/faca-seu-pedido"
+            className="inline-flex min-h-[44px] items-center justify-center rounded-full bg-white px-7 py-2.5 text-sm font-semibold text-pink-700 shadow-lg transition-colors hover:bg-pink-50 motion-reduce:transition-none"
+          >
+            {t('cinematicHero.outro.cta.order')}
+          </Link>
         </div>
       </div>
     </div>
