@@ -264,3 +264,116 @@ describe('buildOrderEmail: a conta inteira do pedido', () => {
     expect(japao.html).not.toContain('ENVIAR DO');
   });
 });
+
+describe('e-mail de envio detalhado (buildOrderEmail com tracking)', () => {
+  const enviadoPedido = (extra = {}) => ({
+    orderNumber: 'SE-BR-777001',
+    customerName: 'Ana',
+    customerEmail: 'ana@exemplo.com',
+    currency: 'BRL',
+    totalPrice: 130,
+    paymentMethod: 'card',
+    shippingCarrier: 'ems',
+    trackingCode: 'EE123456789JP',
+    shippingAddress: { name: 'Ana Lima', postalCode: '01000-000', city: 'Sao Paulo', prefecture: 'SP', address: 'Rua A, 1', building: 'Ap 2', country: 'Brasil' },
+    items: [
+      { productName: 'Pocky', variantLabel: 'Kit 3', quantity: 2, price: 45, image: 'https://exemplo.com/p.jpg' },
+      { productName: 'Brinde KitKat', quantity: 1, price: 0, freeGift: true },
+    ],
+    priceBreakdown: { subtotal: 90, shipping: 40, paymentFee: 0 },
+    ...extra,
+  });
+
+  it('traz código, transportadora, botão de rastreio, itens, conta e endereço no corpo', () => {
+    const { subject, html } = buildOrderEmail(enviadoPedido(), { tracking: true });
+    expect(subject).toBe('Pedido enviado - #SE-BR-777001');
+    expect(html).toContain('EE123456789JP');
+    expect(html).toContain('EMS');
+    expect(html).toContain('Rastrear meu pedido');
+    expect(html).toContain('/rastrear');
+    expect(html).toContain('Pocky');
+    expect(html).toContain('Kit 3');
+    expect(html).toContain('Brinde');
+    expect(html).toContain('src="https://exemplo.com/p.jpg"');
+    expect(html).toContain('Subtotal dos produtos');
+    expect(html).toContain('Rua A, 1');
+    expect(html).toContain('Ana Lima');
+    expect(html).toContain('Alfandega e tributos');
+    expect(html).toContain('https://wa.me/817013671679');
+  });
+
+  it('só aceita link de rastreio https; o resto cai no rastreio do próprio site', () => {
+    const bom = buildOrderEmail(enviadoPedido({ trackingUrl: 'https://rastreio.exemplo.com/EE1' }), { tracking: true }).html;
+    expect(bom).toContain('href="https://rastreio.exemplo.com/EE1"');
+    const ruim = buildOrderEmail(enviadoPedido({ trackingUrl: 'javascript:alert(1)' }), { tracking: true }).html;
+    expect(ruim).not.toContain('javascript:');
+    expect(ruim).toContain('/rastrear');
+  });
+
+  it('miniatura só com imagem https e tudo que vem de fora é escapado', () => {
+    const { html } = buildOrderEmail(enviadoPedido({
+      trackingCode: '<script>x</script>',
+      items: [{ productName: '<b>X</b>', quantity: 1, price: 10, image: 'http://inseguro.com/a.jpg' }],
+    }), { tracking: true });
+    expect(html).not.toContain('<script>');
+    expect(html).not.toContain('<b>X</b>');
+    expect(html).not.toContain('inseguro.com');
+  });
+
+  it('sem código ainda, avisa que aguarda a transportadora; pedido local não fala de alfândega', () => {
+    const semCodigo = buildOrderEmail(enviadoPedido({ trackingCode: '', trackingNumber: '' }), { tracking: true }).html;
+    expect(semCodigo).toContain('Aguardando a transportadora');
+    const local = buildOrderEmail(enviadoPedido({ fulfillment: 'local', shipFrom: 'Brasil' }), { tracking: true }).html;
+    expect(local).toContain('Seu pedido saiu do Brasil');
+    expect(local).not.toContain('Alfandega e tributos');
+    const misto = buildOrderEmail(enviadoPedido({ fulfillment: 'mixed', shipFrom: 'Brasil' }), { tracking: true }).html;
+    expect(misto).toContain('dois envios');
+  });
+
+  it('o texto puro leva o código e o link, e a loja continua recebendo o aviso de novo pedido', () => {
+    const { html } = buildOrderEmail(enviadoPedido(), { tracking: true });
+    expect(html).toContain('Codigo de rastreio');
+    // o aviso de pedido novo e o e-mail de confirmação não mudam
+    expect(buildOrderEmail(enviadoPedido(), { store: true }).subject).toContain('Novo pedido');
+    expect(buildOrderEmail(enviadoPedido()).subject).toContain('Pedido recebido');
+  });
+});
+
+describe('taxa PS no e-mail: aparece também quando foi isenta', () => {
+  const base = (pb, extra = {}) => ({
+    orderNumber: 'SE-BR-5', customerName: 'Ana', currency: 'BRL', totalPrice: 100,
+    items: [{ productName: 'Pocky', quantity: 1, price: 60 }],
+    priceBreakdown: { subtotal: 60, shipping: 40, ...pb },
+    ...extra,
+  });
+
+  it('taxa cobrada: mostra a linha com o valor', () => {
+    const html = buildOrderEmail(base({ psFee: 12, psFeeGross: 12, psFeeDiscount: 0 })).html;
+    expect(html).toContain('Taxa PS (Personal Shopper)');
+    expect(html).toContain('R$ 12');
+  });
+
+  it('taxa isenta: mostra a cheia riscada e "Isenta", como a tela de revisão', () => {
+    const html = buildOrderEmail(base({ psFee: 0, psFeeGross: 12, psFeeDiscount: 12 }, { psFeeWaiverApplied: true })).html;
+    expect(html).toContain('Taxa PS (Personal Shopper)');
+    expect(html).toContain('line-through');
+    expect(html).toContain('R$ 12');
+    expect(html).toContain('Isenta');
+  });
+
+  it('desconto parcial: cheia riscada e o valor que ficou', () => {
+    const html = buildOrderEmail(base({ psFee: 5, psFeeGross: 12, psFeeDiscount: 7 })).html;
+    expect(html).toContain('line-through');
+    expect(html).toContain('R$ 5');
+    expect(html).not.toContain('Isenta');
+  });
+
+  it('pedido antigo isento (sem valor cheio): ainda mostra "Isenta"; sem taxa nenhuma, nada aparece', () => {
+    expect(buildOrderEmail(base({ psFee: 0 }, { psFeeWaiverApplied: true })).html).toContain('Isenta');
+    expect(buildOrderEmail(base({ psFee: 0 })).html).not.toContain('Taxa PS');
+  });
+
+  it('o e-mail de envio também traz a taxa PS', () => {
+    expect(buildOrderEmail(base({ psFee: 12, psFeeGross: 12, psFeeDiscount: 0 }), { tracking: true }).html).toContain('Taxa PS (Personal Shopper)');
+  });
+});

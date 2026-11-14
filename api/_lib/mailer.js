@@ -1,6 +1,7 @@
 import { encodeEmail, unsubscribeToken } from './email-optout.js';
 import { escapeHtml, HttpError } from './http.js';
 import { localCarrierLabel } from '../../shared/local-stock.js';
+import { COMPANY_PROFILE } from '../../shared/company-profile.js';
 
 // Remetente padrão: subdomínio dedicado ao envio (`mail.`), com reputação
 // separada do domínio principal (que recebe e-mail pela Zoho). Endereço de
@@ -206,8 +207,17 @@ function breakdownRows(order, currency) {
   const freteJapao = n(pb.shipping) - nacional;
   out.push(row(`Frete${isMixedOrder(order) ? ' do Japao' : ''}${carrier ? ` (${escapeHtml(carrier)})` : ''}`, freteJapao > 0 ? orderMoney(freteJapao, currency) : 'Gratis'));
   if (isMixedOrder(order)) out.push(row(`Frete nacional (${escapeHtml(localCarrierLabel(order.shipFrom))})`, nacional > 0 ? orderMoney(nacional, currency) : 'Gratis'));
-  if (n(pb.psFee) > 0) out.push(row('Taxa PS', orderMoney(pb.psFee, currency)));
-  if (n(pb.importDuty) > 0) out.push(row('Imposto de importacao dos EUA (pre-pago)', orderMoney(pb.importDuty, currency)));
+  // Taxa Personal Shopper: a tela de revisão a mostra mesmo quando foi isenta (cheia
+  // riscada + valor final). O e-mail faz o mesmo, em vez de sumir com a linha.
+  if (n(pb.psFeeDiscount) > 0 && n(pb.psFeeGross) > 0) {
+    out.push(row('Taxa PS (Personal Shopper)', `<span style="color:#9ca3af;text-decoration:line-through">${orderMoney(pb.psFeeGross, currency)}</span> `
+      + (n(pb.psFee) > 0 ? orderMoney(pb.psFee, currency) : '<span style="color:#059669;font-weight:bold">Isenta</span>')));
+  } else if (n(pb.psFee) > 0) {
+    out.push(row('Taxa PS (Personal Shopper)', orderMoney(pb.psFee, currency)));
+  } else if (order.psFeeWaiverApplied === true) {
+    // Pedido antigo: só sabia que foi isenta, não o valor cheio.
+    out.push(row('Taxa PS (Personal Shopper)', '<span style="color:#059669;font-weight:bold">Isenta</span>'));
+  }  if (n(pb.importDuty) > 0) out.push(row('Imposto de importacao dos EUA (pre-pago)', orderMoney(pb.importDuty, currency)));
   if (n(pb.pixIof) > 0 || n(pb.pixBankFee) > 0) {
     if (n(pb.pixIof) > 0) out.push(row('IOF do PIX', orderMoney(pb.pixIof, currency)));
     if (n(pb.pixBankFee) > 0) out.push(row('Tarifa bancaria do PIX', orderMoney(pb.pixBankFee, currency)));
@@ -217,7 +227,137 @@ function breakdownRows(order, currency) {
   return out.join('');
 }
 
+/** Só https: o código de rastreio vem de gente (admin) e vira link no e-mail do cliente. */
+function safeHttpsUrl(value) {
+  try {
+    const url = new URL(String(value || ''));
+    return url.protocol === 'https:' ? url.toString() : '';
+  } catch {
+    return '';
+  }
+}
+
+const SHIP_STEPS = ['Pagamento confirmado', 'Pedido separado', 'Enviado', 'Entregue'];
+
+/** Linha do tempo em tabela (e-mail não tem CSS moderno): etapas até `current` preenchidas. */
+function shippingProgress(current = 2) {
+  const cells = SHIP_STEPS.map((label, i) => {
+    const done = i < current;
+    const now = i === current;
+    const bg = done ? '#10b981' : now ? '#ec4899' : '#e5e7eb';
+    const color = done || now ? '#ffffff' : '#9ca3af';
+    const mark = done ? '&#10003;' : String(i + 1);
+    return `<td align="center" style="width:25%;padding:0 2px;vertical-align:top"><div style="width:26px;height:26px;line-height:26px;border-radius:13px;background:${bg};color:${color};font-size:13px;font-weight:bold;margin:0 auto">${mark}</div><div style="margin-top:6px;font-size:11px;line-height:1.3;color:${now ? '#be185d' : '#6b7280'};${now ? 'font-weight:bold' : ''}">${label}</div></td>`;
+  }).join('');
+  return `<table role="presentation" style="width:100%;border-collapse:collapse;margin:18px 0"><tr>${cells}</tr></table>`;
+}
+
+function shippingItemRow(item, order, currency) {
+  const quantity = Math.max(1, Number(item.quantity || 1));
+  const value = item.freeGift ? 'Brinde' : orderMoney(Number(item.price || 0) * quantity, currency);
+  const option = item.freeGift ? '' : String(item.variantLabel || '');
+  const image = safeHttpsUrl(item.image || item.imageUrl);
+  const origem = isMixedOrder(order) && !item.freeGift
+    ? `<div style="font-size:12px;color:${item.local ? '#047857' : '#777'}">${item.local ? `Enviado do ${escapeHtml(order.shipFrom)}` : 'Enviado do Japao'}</div>`
+    : '';
+  const thumb = image
+    ? `<img src="${escapeHtml(image)}" width="56" height="56" alt="" style="display:block;width:56px;height:56px;object-fit:cover;border-radius:8px;border:1px solid #eee">`
+    : '';
+  return `<tr><td style="${cell};width:64px;vertical-align:top">${thumb}</td>`
+    + `<td style="${cell};vertical-align:top"><strong>${escapeHtml(item.productName || item.name || 'Produto')}</strong>`
+    + `${option ? `<div style="font-size:12px;color:#777">${escapeHtml(option)}</div>` : ''}${origem}`
+    + `<div style="font-size:12px;color:#777">Quantidade: ${quantity}</div></td>`
+    + `<td style="${cell};text-align:right;white-space:nowrap;vertical-align:top">${value}</td></tr>`;
+}
+
+/**
+ * E-mail "Pedido enviado": tudo o que o cliente precisa na própria mensagem,
+ * sem ter de abrir o site. Substitui a versão de duas linhas (só o código).
+ *
+ * Só afirma o que o pedido sabe: transportadora, código, itens, conta e endereço
+ * vêm do pedido; nenhum prazo é inventado (varia por modalidade e destino, e a
+ * página de frete é a fonte dele). Link de rastreio só se for https.
+ */
+export function buildShippingEmail(order) {
+  const orderNumber = escapeHtml(order.orderNumber || order.id);
+  const name = escapeHtml(order.customerName || order.shippingAddress?.name || 'cliente');
+  const currency = String(order.currency || 'JPY');
+  const origin = siteOrigin();
+
+  const local = isLocalOrder(order);
+  const mixed = isMixedOrder(order);
+  const shipFrom = local || mixed ? escapeHtml(order.shipFrom) : '';
+  const carrier = local
+    ? localCarrierLabel(order.shipFrom)
+    : CARRIER_LABEL[order.shippingCarrier || order.shipping?.carrier] || escapeHtml(order.carrier || '') || '';
+  const code = String(order.trackingCode || order.trackingNumber || '').trim();
+  const trackUrl = safeHttpsUrl(order.trackingUrl) || `${origin}/rastrear`;
+
+  const headline = mixed
+    ? 'Seu pedido tem dois envios'
+    : local ? `Seu pedido saiu do ${shipFrom}` : 'Seu pedido saiu do Japao';
+  const intro = mixed
+    ? `Parte dos itens sai do ${shipFrom} e o restante sai do Japao, cada envio com seu frete.`
+    : local
+      ? `Ele vai por frete nacional, direto do estoque no ${shipFrom}.`
+      : 'Ele ja esta com a transportadora e a caminho do seu endereco.';
+
+  const preheader = code
+    ? `Pedido #${orderNumber} enviado. Codigo de rastreio: ${escapeHtml(code)}.`
+    : `Pedido #${orderNumber} enviado. O codigo de rastreio chega em breve.`;
+
+  const tracking = `<div style="margin:16px 0;padding:16px;border:1px solid #fbcfe8;background:#fdf2f8;border-radius:12px;text-align:center">`
+    + `<p style="margin:0;font-size:12px;color:#9d174d;text-transform:uppercase;letter-spacing:.06em">Codigo de rastreio</p>`
+    + `<p style="margin:6px 0 2px;font-size:24px;font-weight:bold;font-family:Consolas,Menlo,monospace;color:#831843;word-break:break-all">${code ? escapeHtml(code) : 'Aguardando a transportadora'}</p>`
+    + `${carrier ? `<p style="margin:0 0 12px;font-size:13px;color:#6b7280">Transportadora: <strong>${escapeHtml(carrier)}</strong></p>` : '<div style="height:12px"></div>'}`
+    + `<a href="${escapeHtml(trackUrl)}" style="display:inline-block;padding:12px 26px;background:#ec4899;color:#ffffff;text-decoration:none;font-weight:bold;border-radius:999px">Rastrear meu pedido</a>`
+    + `<p style="margin:10px 0 0;font-size:12px;color:#6b7280">${code ? 'O codigo pode levar algumas horas para aparecer no site da transportadora. ' : ''}Voce tambem acompanha em ${escapeHtml(origin.replace(/^https?:\/\//, ''))}/rastrear.</p></div>`;
+
+  const items = Array.isArray(order.items) ? order.items.slice(0, 50).map((item) => shippingItemRow(item, order, currency)).join('') : '';
+  const breakdown = breakdownRows(order, currency) ?? '';
+  const total = row('Total', orderMoney(order.totalPrice ?? order.total, currency), { bold: true });
+  const summary = `<h3 style="margin:22px 0 6px;font-size:16px;color:#831843">Resumo do pedido</h3>`
+    + `<table role="presentation" style="width:100%;border-collapse:collapse">${items}</table>`
+    + `<table role="presentation" style="width:100%;border-collapse:collapse;margin-top:6px">${breakdown}${total}</table>`;
+
+  const address = order.shippingAddress || {};
+  const destination = [address.name, [address.address, address.building].filter(Boolean).join(' - '),
+    [address.city, address.prefecture].filter(Boolean).join(' - '), address.postalCode, address.country]
+    .filter(Boolean).map(escapeHtml).join('<br>');
+  const payment = PAYMENT_LABEL[order.paymentMethod] || '';
+  const delivery = `<h3 style="margin:22px 0 6px;font-size:16px;color:#831843">Entrega</h3>`
+    + `<p style="margin:0">${destination || 'Endereco informado no pedido'}</p>`
+    + `${payment ? `<p style="margin:10px 0 0"><strong>Pagamento:</strong> ${escapeHtml(payment)}</p>` : ''}`
+    + `${carrier ? `<p style="margin:4px 0 0"><strong>Envio:</strong> ${escapeHtml(carrier)}</p>` : ''}`;
+
+  // Imposto/inspeção: só quando a entrega cruza fronteira. Texto alinhado ao aviso
+  // de tributação do site (shared/tax-disclosure.js): a loja não cobra, a autoridade sim.
+  const crossesBorder = !local && String(address.country || '').trim().toLowerCase() !== 'japan'
+    && String(address.country || '').trim().toLowerCase() !== 'japao' && currency !== 'JPY';
+  const customs = crossesBorder
+    ? `<div style="margin:18px 0 0;padding:12px;border:1px solid #e5e7eb;background:#f9fafb;border-radius:10px;font-size:13px;color:#4b5563"><strong>Alfandega e tributos.</strong> Produtos enviados do Japao podem passar por inspecao e ter tributos definidos pela autoridade do pais de destino, cobrados por ela na entrega. A loja nao cobra esses valores no site.</div>`
+    : '';
+
+  const next = `<h3 style="margin:22px 0 6px;font-size:16px;color:#831843">O que acontece agora</h3>`
+    + `<ol style="margin:0;padding-left:20px;color:#374151"><li>A transportadora atualiza o rastreio a cada etapa do trajeto.</li>`
+    + `<li>Quando chegar, confira a embalagem antes de assinar e guarde o codigo ${code ? `<strong>${escapeHtml(code)}</strong> ` : ''}ate receber.</li>`
+    + `<li>Recebeu? Marque como recebido na area de pedidos do site e conte para a gente o que achou.</li></ol>`;
+
+  const wa = `https://wa.me/${COMPANY_PROFILE.whatsapp.digits}`;
+  const help = `<div style="margin:22px 0 0;padding:14px;border-top:1px solid #eee;font-size:13px;color:#4b5563;text-align:center">`
+    + `Precisa de ajuda com o pedido <strong>#${orderNumber}</strong>? Responda este e-mail ou chame no <a href="${escapeHtml(wa)}" style="color:#047857;font-weight:bold">WhatsApp ${escapeHtml(COMPANY_PROFILE.whatsapp.international)}</a>.</div>`;
+
+  const html = wrapEmail(
+    `<span style="display:none;max-height:0;overflow:hidden;opacity:0;color:#fff">${preheader}</span>`
+    + `<p style="margin:0 0 4px;font-size:20px;font-weight:bold;color:#831843">${headline}</p>`
+    + `<p style="margin:0">Ola, <strong>${name}</strong>. ${intro}</p>`
+    + shippingProgress(2) + tracking + summary + delivery + customs + next + help
+  );
+  return { subject: `Pedido enviado - #${orderNumber}`, html };
+}
+
 export function buildOrderEmail(order, { tracking = false, store = false } = {}) {
+  if (tracking && !store) return buildShippingEmail(order);
   const orderNumber = escapeHtml(order.orderNumber || order.id);
   const name = escapeHtml(order.customerName || order.shippingAddress?.name || 'cliente');
   const currency = String(order.currency || 'JPY');

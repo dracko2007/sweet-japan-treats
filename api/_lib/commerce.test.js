@@ -40,6 +40,24 @@ describe('authoritative checkout quote', () => {
     expect(result.total).toBeGreaterThan(1);
   });
 
+  it('guarda a taxa PS cheia e o desconto, para o e-mail mostrar a isenção como a tela', () => {
+    const cobrada = quote();
+    expect(cobrada.psFeeYen).toBeGreaterThan(0);
+    expect(cobrada.display.psFee).toBeGreaterThan(0);
+    expect(cobrada.display.psFeeDiscount).toBe(0);
+    expect(cobrada.display.psFeeGross).toBe(cobrada.display.psFee);
+
+    const isenta = quote({ psFeeWaived: true });
+    expect(isenta.psFeeWaiverApplied).toBe(true);
+    expect(isenta.psFeeYen).toBe(0);
+    expect(isenta.display.psFee).toBe(0);
+    expect(isenta.display.psFeeDiscount).toBeGreaterThan(0);
+    expect(isenta.display.psFeeGross).toBeGreaterThan(0);
+    // a conta continua fechando: o desconto é a cheia menos o que ficou
+    expect(isenta.display.psFeeGross - isenta.display.psFeeDiscount).toBeCloseTo(isenta.display.psFee, 2);
+    expect(isenta.display.psFeeGross).toBeCloseTo(cobrada.display.psFee, 2);
+  });
+
   it('grava o nome da opção como a loja mostra (para o e-mail do pedido)', () => {
     expect(quote().items[0].variantLabel).toBe('Pequeno');
     const kit = { ...product, variants: [{ id: 'u', label: 'Unidade', price: 500 }, { id: 'kit-3', label: 'Kit 3 unidades', price: 1400 }] };
