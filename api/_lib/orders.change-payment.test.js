@@ -52,7 +52,8 @@ function database(order, settings = { cardEnabled: true }) {
 
 const wiseOrder = {
   orderNumber: 'SE-BR-1', userId: 'u1', customerEmail: 'u1@example.com', status: 'pending_payment',
-  paymentMethod: 'wise', totalPrice: 450, total: 450, currency: 'BRL', items: [],
+  paymentMethod: 'wise', totalPrice: 450, total: 450, currency: 'BRL',
+  items: [{ productId: 'p1', productName: 'Sabonete Corporal', size: 'small', quantity: 2 }, { productId: 'p2', productName: 'Mascara', size: 'large', quantity: 1 }],
   shippingAddress: { country: 'Brasil' },
 };
 
@@ -77,6 +78,9 @@ describe('troca de pagamento do pedido (Wise -> cartão)', () => {
     expect(res.statusCode).toBe(200);
     expect(res.body.clientSecret).toBe('pi_new_secret_x');
     expect(injected.intents[0]).toMatchObject({ amount: 45000, currency: 'brl' });
+    // O painel do Stripe mostra o que foi comprado.
+    expect(injected.intents[0].description).toBe('Japan Express - Order SE-BR-1: 2x Sabonete Corporal, 1x Mascara (large)');
+    expect(injected.intents[0].metadata).toMatchObject({ orderId: 'SE-BR-1', items: '2x Sabonete Corporal, 1x Mascara (large)' });
     expect(injected.db.state.order).toMatchObject({ paymentMethod: 'card', previousPaymentMethod: 'wise', stripePaymentIntentId: 'pi_new', totalPrice: 450 });
   });
 

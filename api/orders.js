@@ -249,6 +249,10 @@ async function stripeIntent(order) {
     const existing = await stripe.paymentIntents.retrieve(order.stripePaymentIntentId);
     return existing;
   }
+  const itemsSummary = (Array.isArray(order.items) ? order.items : [])
+    .map((item) => `${Number(item.quantity) || 1}x ${String(item.productName || item.name || item.productId || '').trim()}${item.size && item.size !== 'small' ? ` (${item.size})` : ''}`)
+    .filter((line) => line.length > 3)
+    .join(', ');
   const zeroDecimal = order.currency === 'JPY';
   const amount = zeroDecimal ? Math.round(order.totalPrice) : Math.round(order.totalPrice * 100);
   if (amount < (zeroDecimal ? 50 : 50)) throw new HttpError(400, 'amount_below_minimum');
@@ -256,9 +260,13 @@ async function stripeIntent(order) {
     amount,
     currency: order.currency.toLowerCase(),
     automatic_payment_methods: { enabled: true },
-    description: `Japan Express - Order ${order.orderNumber}`,
+    // O Stripe não tem "produtos" num PaymentIntent: o que o painel mostra é a
+    // descrição e o metadata. Os itens vão aqui para quem abrir o pagamento no
+    // Stripe saber o que foi comprado (Stripe limita a descrição a 1000 caracteres
+    // e cada valor de metadata a 500).
+    description: `Japan Express - Order ${order.orderNumber}${itemsSummary ? `: ${itemsSummary}` : ''}`.slice(0, 1000),
     receipt_email: order.customerEmail,
-    metadata: { orderId: order.orderNumber, userId: order.userId },
+    metadata: { orderId: order.orderNumber, userId: order.userId, ...(itemsSummary ? { items: itemsSummary.slice(0, 500) } : {}) },
   }, { idempotencyKey: `payment-intent:${order.orderNumber}` });
 }
 
