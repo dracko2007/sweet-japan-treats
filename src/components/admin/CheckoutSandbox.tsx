@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Coins, CreditCard, FlaskConical, HandCoins, PiggyBank, Receipt, RotateCcw, ShieldCheck, ShoppingBag, Tag, Users } from 'lucide-react';
+import { Coins, CreditCard, FlaskConical, HandCoins, PiggyBank, Receipt, RotateCcw, ShieldCheck, ShoppingBag, Tag, Truck, Users, Wallet } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -14,6 +14,7 @@ const initialItems: SandboxItem[] = [
 type Purchase = {
   n: number; method: string; source: 'link' | 'code'; tier: string; percent: number;
   gross: number; discount: number; net: number; cost: number; profit: number; commission: number; finalProfit: number;
+  extras: number; realProfit: number;
 };
 
 const yen = (value: number) => `¥${Math.round(value).toLocaleString()}`;
@@ -56,6 +57,11 @@ const CheckoutSandbox: React.FC = () => {
   const [purchaseCount, setPurchaseCount] = useState(0);
   const [monthRevenue, setMonthRevenue] = useState(0);
   const [history, setHistory] = useState<Purchase[]>([]);
+  // Despesas da venda (opcionais, começam em zero): não mudam a comissão, só o resultado real.
+  const [shippingCharged, setShippingCharged] = useState(0);
+  const [shippingPaid, setShippingPaid] = useState(0);
+  const [psFeeOn, setPsFeeOn] = useState(false);
+  const [feePercent, setFeePercent] = useState(0);
   const [result, setResult] = useState('');
   // Divulgador: recebe o produto, sem comissão; mede quem veio (link/código) e quem comprou.
   const [kind, setKind] = useState<'affiliate' | 'promoter'>('affiliate');
@@ -122,12 +128,19 @@ const CheckoutSandbox: React.FC = () => {
     return {
       gross: sum((x) => x.gross), discount: sum((x) => x.discount), net: sum((x) => x.net), cost: sum((x) => x.cost),
       profit: sum((x) => x.profit), commission: sum((x) => x.commission), finalProfit: sum((x) => x.finalProfit),
+      extras: sum((x) => x.extras), realProfit: sum((x) => x.realProfit),
     };
   }, [history]);
 
   // Prévia da próxima compra e distância até o próximo nível (a meta é em LUCRO acumulado no mês).
   const currentTier = tierForRevenue(monthRevenue);
   const nextCommission = Math.round(totals.profit * percentForTier(currentTier) / 100);
+  // Despesas: taxa PS (¥1.000 por unidade) entra como receita; a taxa do meio de pagamento
+  // incide sobre tudo que o cliente paga (produtos + frete + taxa PS).
+  const psFeeCharged = psFeeOn ? items.reduce((sum, item) => sum + item.quantity, 0) * 1000 : 0;
+  const customerPays = totals.netProducts + shippingCharged + psFeeCharged;
+  const paymentFee = Math.round(customerPays * Math.max(0, feePercent) / 100);
+  const extras = shippingCharged - shippingPaid + psFeeCharged - paymentFee;
   const nextGoal = currentTier === 'Bronze' ? bronzeGoal : currentTier === 'Prata' ? silverGoal : 0;
   const nextTierName = currentTier === 'Bronze' ? 'Prata' : 'Ouro';
   const missingProfit = Math.max(0, nextGoal + 1 - monthRevenue);
@@ -145,6 +158,7 @@ const CheckoutSandbox: React.FC = () => {
       n: purchaseCount + 1, method: paymentMethod, source: affiliateSource, tier: tierBefore, percent: saleCommissionPercent,
       gross: totals.subtotal, discount: totals.discount, net: totals.netProducts, cost: totals.productCost,
       profit: totals.profit, commission, finalProfit: totals.profit - commission,
+      extras, realProfit: totals.profit - commission + extras,
     }]);
     setResult(`COMPRA ${purchaseCount + 1} SIMULADA — ${paymentMethod.toUpperCase()} — ${affiliateSource === 'link' ? 'LINK' : 'CÓDIGO'} ${affiliateCode || '—'} — nível da compra: ${tierBefore} (${saleCommissionPercent}%) — comissão: ${yen(commission)} — próximo nível: ${nextTier}`);
   };
@@ -161,6 +175,10 @@ const CheckoutSandbox: React.FC = () => {
     setPurchaseCount(0);
     setMonthRevenue(0);
     setHistory([]);
+    setShippingCharged(0);
+    setShippingPaid(0);
+    setPsFeeOn(false);
+    setFeePercent(0);
     setResult('');
     setKind('affiliate');
     setPerson(PEOPLE[0]);
@@ -252,6 +270,8 @@ const CheckoutSandbox: React.FC = () => {
             <Kpi icon={Coins} label="Lucro bruto (conta da meta)" value={yen(month.profit)} hint={month.net > 0 ? `margem ${pct(month.profit, month.net)}` : undefined} />
             <Kpi icon={HandCoins} tone="pink" label="A PAGAR ao afiliado" value={yen(month.commission)} hint={month.profit > 0 ? `${pct(month.commission, month.profit)} do lucro · ${pct(month.commission, month.net)} da venda` : 'liberada após a entrega'} />
             <Kpi icon={PiggyBank} tone="green" label="Seu lucro depois da comissão" value={yen(month.finalProfit)} hint={month.net > 0 ? `${pct(month.finalProfit, month.net)} da venda líquida` : undefined} />
+            <Kpi icon={Truck} label="Frete, taxa PS e taxa de pagamento" value={`${month.extras >= 0 ? '+' : '−'}${yen(Math.abs(month.extras))}`} hint="saldo das despesas da venda (preencha ao lado)" />
+            <Kpi icon={Wallet} tone="green" label="RESULTADO REAL do mês" value={yen(month.realProfit)} hint={month.net > 0 ? `${pct(month.realProfit, month.net)} da venda líquida` : 'lucro final somando frete e taxas'} />
           </div>
 
           <div className="grid gap-4 lg:grid-cols-2">
@@ -264,8 +284,15 @@ const CheckoutSandbox: React.FC = () => {
               <Row label="Custo dos produtos" value={`−${yen(totals.productCost)}`} tone="minus" />
               <Row label="Lucro bruto" value={yen(totals.profit)} strong />
               <Row label={`Comissão do afiliado (${percentForTier(tierForRevenue(monthRevenue))}% do lucro · nível ${tierForRevenue(monthRevenue)})`} value={`−${yen(nextCommission)}`} tone="minus" />
-              <Row label="Seu lucro final" value={yen(totals.profit - nextCommission)} strong tone="plus" />
-              <p className="mt-2 text-[11px] text-muted-foreground">Fora desta conta: frete, taxa PS, taxas do meio de pagamento e câmbio. A comissão real é calculada só sobre produtos.</p>
+              <Row label="Lucro dos produtos depois da comissão" value={yen(totals.profit - nextCommission)} strong tone="plus" />
+              {(shippingCharged > 0 || shippingPaid > 0 || psFeeCharged > 0 || paymentFee > 0) && (<>
+                {shippingCharged > 0 && <Row label="Frete cobrado do cliente" value={`+${yen(shippingCharged)}`} />}
+                {shippingPaid > 0 && <Row label="Frete que você paga ao transportador" value={`−${yen(shippingPaid)}`} tone="minus" />}
+                {psFeeCharged > 0 && <Row label="Taxa PS cobrada (¥1.000 por unidade)" value={`+${yen(psFeeCharged)}`} />}
+                {paymentFee > 0 && <Row label={`Taxa do meio de pagamento (${feePercent}% de ${yen(customerPays)})`} value={`−${yen(paymentFee)}`} tone="minus" />}
+                <Row label="Resultado real da venda" value={yen(totals.profit - nextCommission + extras)} strong tone="plus" />
+              </>)}
+              <p className="mt-2 text-[11px] text-muted-foreground">A comissão do afiliado é sempre calculada só sobre os produtos. Frete, taxa PS e taxa de pagamento aparecem quando preenchidos em "Despesas da venda". Câmbio não entra.</p>
             </div>
 
             <div className="space-y-4">
@@ -276,6 +303,15 @@ const CheckoutSandbox: React.FC = () => {
                   <div className="mt-2 h-2 overflow-hidden rounded-full bg-secondary"><div className="h-full rounded-full bg-primary transition-[width]" style={{ width: `${Math.min(100, Math.round((monthRevenue / Math.max(nextGoal, 1)) * 100))}%` }} /></div>
                   <p className="mt-1.5 text-xs text-muted-foreground">Faltam <strong>{yen(missingProfit)}</strong> de lucro para o nível {nextTierName} (cerca de {yen(missingSales)} em vendas, com a margem desta cesta).</p>
                 </>) : <p className="mt-1.5 text-xs text-muted-foreground">Nível máximo atingido neste mês.</p>}
+              </div>
+              <div className="space-y-3 rounded-2xl border bg-card p-5 shadow-sm">
+                <div><h3 className="font-semibold">Despesas da venda (opcional)</h3><p className="text-xs text-muted-foreground">Mostra o que sobra de verdade. Não muda a comissão do afiliado.</p></div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1"><Label>Frete cobrado do cliente (¥)</Label><Input aria-label="Frete cobrado do cliente (¥)" type="number" min="0" value={shippingCharged} onChange={(e) => setShippingCharged(Math.max(0, Number(e.target.value)))} /></div>
+                  <div className="space-y-1"><Label>Frete que você paga (¥)</Label><Input aria-label="Frete que você paga (¥)" type="number" min="0" value={shippingPaid} onChange={(e) => setShippingPaid(Math.max(0, Number(e.target.value)))} /></div>
+                  <div className="space-y-1"><Label>Taxa do meio de pagamento (%)</Label><Input aria-label="Taxa do meio de pagamento (%)" type="number" min="0" max="100" step="0.1" value={feePercent} onChange={(e) => setFeePercent(Math.max(0, Number(e.target.value)))} /><p className="text-[11px] text-muted-foreground">Confira o % no seu painel do Stripe/Wise.</p></div>
+                  <label className="flex items-center gap-2 self-end pb-6 text-sm"><input type="checkbox" aria-label="Cobrar taxa PS (¥1.000/un)" checked={psFeeOn} onChange={(e) => setPsFeeOn(e.target.checked)} /> Cobrar taxa PS (¥1.000/un)</label>
+                </div>
               </div>
               <div className="space-y-3 rounded-2xl border bg-card p-5 shadow-sm">
                 <div><Label>Forma de pagamento (só identifica a compra)</Label><div className="mt-1 flex flex-wrap gap-2">{['card', 'pix', 'bank', 'wise'].map((method) => <Button key={method} type="button" size="sm" variant={paymentMethod === method ? 'default' : 'outline'} onClick={() => setPaymentMethod(method)}>{method.toUpperCase()}</Button>)}</div></div>
@@ -289,16 +325,16 @@ const CheckoutSandbox: React.FC = () => {
             <div className="overflow-x-auto rounded-2xl border bg-card p-5 shadow-sm">
               <h3 className="mb-3 font-semibold">Compras simuladas no mês</h3>
               <table className="w-full min-w-[640px] text-xs">
-                <thead><tr className="border-b text-left text-muted-foreground">{['#', 'Pgto', 'Nível', 'Venda', 'Desconto', 'Custo', 'Lucro', 'Comissão', 'Seu lucro'].map((h) => <th key={h} className="py-1.5 pr-3 font-medium">{h}</th>)}</tr></thead>
+                <thead><tr className="border-b text-left text-muted-foreground">{['#', 'Pgto', 'Nível', 'Venda', 'Desconto', 'Custo', 'Lucro', 'Comissão', 'Seu lucro', 'Real'].map((h) => <th key={h} className="py-1.5 pr-3 font-medium">{h}</th>)}</tr></thead>
                 <tbody>
                   {history.map((x) => (
                     <tr key={x.n} className="border-b last:border-0 tabular-nums">
                       <td className="py-1.5 pr-3">{x.n}</td><td className="pr-3">{x.method.toUpperCase()} · {x.source === 'link' ? 'link' : 'código'}</td><td className="pr-3">{x.tier} {x.percent}%</td>
                       <td className="pr-3">{yen(x.net)}</td><td className="pr-3 text-green-700">−{yen(x.discount)}</td><td className="pr-3">{yen(x.cost)}</td><td className="pr-3">{yen(x.profit)}</td>
-                      <td className="pr-3 font-semibold text-primary">{yen(x.commission)}</td><td className="font-semibold">{yen(x.finalProfit)}</td>
+                      <td className="pr-3 font-semibold text-primary">{yen(x.commission)}</td><td className="pr-3 font-semibold">{yen(x.finalProfit)}</td><td className="font-bold text-green-700">{yen(x.realProfit)}</td>
                     </tr>
                   ))}
-                  <tr className="font-bold tabular-nums"><td className="pt-2 pr-3" colSpan={3}>Total do mês</td><td className="pr-3 pt-2">{yen(month.net)}</td><td className="pr-3 pt-2 text-green-700">−{yen(month.discount)}</td><td className="pr-3 pt-2">{yen(month.cost)}</td><td className="pr-3 pt-2">{yen(month.profit)}</td><td className="pr-3 pt-2 text-primary">{yen(month.commission)}</td><td className="pt-2">{yen(month.finalProfit)}</td></tr>
+                  <tr className="font-bold tabular-nums"><td className="pt-2 pr-3" colSpan={3}>Total do mês</td><td className="pr-3 pt-2">{yen(month.net)}</td><td className="pr-3 pt-2 text-green-700">−{yen(month.discount)}</td><td className="pr-3 pt-2">{yen(month.cost)}</td><td className="pr-3 pt-2">{yen(month.profit)}</td><td className="pr-3 pt-2 text-primary">{yen(month.commission)}</td><td className="pr-3 pt-2">{yen(month.finalProfit)}</td><td className="pt-2 text-green-700">{yen(month.realProfit)}</td></tr>
                 </tbody>
               </table>
             </div>

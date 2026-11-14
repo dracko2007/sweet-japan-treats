@@ -56,3 +56,22 @@ describe('Sandbox — afiliado (painel)', () => {
     expect(screen.queryByText('Compras simuladas no mês')).not.toBeInTheDocument();
   });
 });
+
+describe('Sandbox — despesas da venda', () => {
+  it('soma frete cobrado, taxa PS e taxa de pagamento e desconta o frete pago, sem mexer na comissão', () => {
+    render(<CheckoutSandbox />);
+    // Defaults: lucro dos produtos após comissão = ¥1.980.
+    fireEvent.change(screen.getByLabelText('Frete cobrado do cliente (¥)'), { target: { value: '2000' } });
+    fireEvent.change(screen.getByLabelText('Frete que você paga (¥)'), { target: { value: '1500' } });
+    fireEvent.click(screen.getByLabelText(/Cobrar taxa PS/));
+    fireEvent.change(screen.getByLabelText('Taxa do meio de pagamento (%)'), { target: { value: '4' } });
+    // Cliente paga 4.700 + 2.000 + 2.000 (2 itens × ¥1.000) = ¥8.700; taxa 4% = ¥348.
+    // Extras: +2.000 −1.500 +2.000 −348 = +¥2.152; resultado real = 1.980 + 2.152 = ¥4.132.
+    fireEvent.click(screen.getByText('Simular compra'));
+    expect(screen.getByRole('status')).toHaveTextContent('comissão: ¥220');
+    const kpi = (label: string) => screen.getAllByText(label)[0].closest('div')!.parentElement!;
+    expect(kpi('Frete, taxa PS e taxa de pagamento')).toHaveTextContent('+¥2,152');
+    expect(kpi('RESULTADO REAL do mês')).toHaveTextContent('¥4,132');
+    expect(kpi('A PAGAR ao afiliado')).toHaveTextContent('¥220');
+  });
+});
