@@ -618,11 +618,12 @@ export const firebaseSyncService = {
       await ensureAdminAuth();
       ensureFirebaseReady();
       const usersRef = collection(db, 'users');
-      const q = query(usersRef, where('email', '==', email));
-      const snap = await getDocs(q);
-      await Promise.all(
-        snap.docs.map((d) => updateDoc(doc(db, 'users', d.id), { orders: [] }))
-      );
+      // O e-mail do cadastro pode estar com outra caixa que a do pedido: busca as duas grafias.
+      const trimmed = email.trim();
+      const variants = Array.from(new Set([trimmed, trimmed.toLowerCase()])).filter(Boolean);
+      const snaps = await Promise.all(variants.map((value) => getDocs(query(usersRef, where('email', '==', value)))));
+      const ids = new Set(snaps.flatMap((snap) => snap.docs.map((d) => d.id)));
+      await Promise.all([...ids].map((id) => updateDoc(doc(db, 'users', id), { orders: [] })));
       return true;
     } catch (error) {
       devError('❌ [FIREBASE] Error clearing user orders:', error);
