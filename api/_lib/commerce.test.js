@@ -484,3 +484,43 @@ describe('pedido de estoque local', () => {
     expect(doJapao.total).toBe(quote({ products: new Map([['p1', { ...product, discountPercent: 20 }]]) }).total);
   });
 });
+
+describe('frete grátis do produto (só quando é o único item do pedido)', () => {
+  const solo = { ...product, freeShippingSolo: true };
+  const outro = { ...product, id: 'p2', name: 'Outro' };
+  const um = [{ productId: 'p1', variantId: 'small', quantity: 1 }];
+  const marcado = (overrides = {}) => quote({ products: new Map([['p1', solo], ['p2', outro]]), requestedItems: um, ...overrides });
+
+  it('produto marcado, sozinho e com 1 unidade: frete ¥0, o resto da conta não muda', () => {
+    const livre = marcado();
+    const normal = quote();
+    expect(normal.shippingYen).toBeGreaterThan(0);
+    expect(livre.shippingYen).toBe(0);
+    expect(livre.display.shipping).toBe(0);
+    expect(livre.display.psFee).toBe(normal.display.psFee);
+    expect(livre.display.products).toBe(normal.display.products);
+  });
+
+  it('funciona também no Japão e nos EUA (o imposto DDP segue cobrado)', () => {
+    expect(marcado({ country: 'Japão', prefecture: 'Tokyo', carrier: 'yamato' }).shippingYen).toBe(0);
+    const us = marcado({ country: 'Estados Unidos', prefecture: 'CA', state: 'CA' });
+    expect(us.shippingYen).toBe(0);
+    expect(us.display.importDuty).toBe(quote({ country: 'Estados Unidos', prefecture: 'CA', state: 'CA' }).display.importDuty);
+  });
+
+  it('com mais de um produto o frete é cobrado normalmente', () => {
+    const dois = marcado({ requestedItems: [...um, { productId: 'p2', variantId: 'small', quantity: 1 }] });
+    const semFlag = quote({ products: new Map([['p1', product], ['p2', outro]]), requestedItems: [...um, { productId: 'p2', variantId: 'small', quantity: 1 }] });
+    expect(dois.shippingYen).toBe(semFlag.shippingYen);
+    expect(dois.shippingYen).toBeGreaterThan(0);
+  });
+
+  it('2 unidades do mesmo produto marcado pagam o frete', () => {
+    const duas = marcado({ requestedItems: [{ productId: 'p1', variantId: 'small', quantity: 2 }] });
+    expect(duas.shippingYen).toBeGreaterThan(0);
+  });
+
+  it('produto sem a marca não ganha frete grátis', () => {
+    expect(quote().shippingYen).toBeGreaterThan(0);
+  });
+});

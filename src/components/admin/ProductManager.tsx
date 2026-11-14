@@ -1128,6 +1128,17 @@ const ProductManager: React.FC = () => {
                       <span>💸 <strong>Isentar taxa de Personal Shopper</strong> (¥1.000/un — não cobra essa taxa neste produto)</span>
                     </label>
                   </div>
+                  <div className="flex items-center gap-2 mt-2">
+                    <label className="flex items-center gap-2 cursor-pointer select-none text-sm">
+                      <input
+                        type="checkbox"
+                        checked={!!editing.freeShippingSolo}
+                        onChange={e => setEditing({ ...editing, freeShippingSolo: e.target.checked || undefined })}
+                        className="w-4 h-4 rounded accent-primary"
+                      />
+                      <span>🚚 <strong>Frete grátis</strong> (só se este for o único produto do pedido, 1 unidade — se o cliente adicionar mais algo, o frete volta a ser cobrado)</span>
+                    </label>
+                  </div>
                 </div>
               </div>
 

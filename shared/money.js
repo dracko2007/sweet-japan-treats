@@ -107,6 +107,19 @@ function couponEligible(line, terms) {
 }
 
 /**
+ * Frete grátis do produto: vale só quando o pedido tem UM produto, em quantidade 1,
+ * e ele está marcado (`freeShippingSolo`). Qualquer outro item (inclusive brinde)
+ * ou mais de uma unidade devolve o frete normal. Itens do estoque do país do
+ * cliente (`local`) têm frete nacional próprio e ficam de fora.
+ * `lines`: [{ quantity, freeShippingSolo, local }]
+ */
+export function soloFreeShipping(lines) {
+  if (!Array.isArray(lines) || lines.length !== 1) return false;
+  const [line] = lines;
+  return line.freeShippingSolo === true && Number(line.quantity) === 1 && !line.local;
+}
+
+/**
  * Benefícios em ¥ sobre a mercadoria. Mesma ordem do servidor: cupom, depois
  * pontos (que pagam só mercadoria), depois taxa PS.
  *

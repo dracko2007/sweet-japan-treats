@@ -54,6 +54,7 @@ export interface Product {
   weightVerified?: boolean;  // true = peso conferido (balança/fonte confiável): frete usa o peso exato, sem a margem de 200 g.
   packageDimensionsCm?: ProductPackageDimensionsCm; // Medidas da embalagem/produto em cm, sem margem de seguranca.
   tags?: string[];           // Tipos/subcategorias para filtro inteligente (ex: 'shampoo', 'filtro solar')
+  freeShippingSolo?: boolean; // true = frete grátis quando este é o ÚNICO produto do pedido (1 unidade)
   noPsFee?: boolean;         // true = isenta a taxa de Personal Shopper (¥1000/un) deste produto
   featured?: boolean;        // true = aparece na seção "Em Destaque" da home (máx 4 por vez, rotação semanal)
   featuredAt?: string;       // ISO timestamp de quando foi marcado como destaque (ordena a rotação)
